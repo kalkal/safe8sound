@@ -1,0 +1,21 @@
+# secrets and local notes
+.env
+.env.*
+!.env.example
+
+# dependencies and builds
+node_modules/
+dist/
+build/
+coverage/
+cdk.out/
+.turbo/
+*.tsbuildinfo
+
+# tooling
+.DS_Store
+Thumbs.db
+*.log
+playwright-report/
+test-results/
+reports/mutation/
