@@ -20,3 +20,5 @@ logs/
 playwright-report/
 test-results/
 reports/mutation/
+
+# session worktrees (local only)
