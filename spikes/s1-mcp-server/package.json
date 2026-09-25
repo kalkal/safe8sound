@@ -1,0 +1,30 @@
+{
+  "name": "spike-s1-mcp-server",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Throwaway spike S1: stateless MCP server over Streamable HTTP (spec 2025-11-25). Not part of the workspace.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run --maxWorkers=2 --exclude \"test/e2e/**\"",
+    "test:e2e": "vitest run --maxWorkers=1 test/e2e",
+    "inspector:e2e": "node scripts/inspector-e2e.mjs",
+    "start": "node --import tsx src/main.ts",
+    "bench": "node scripts/bench.mjs 500 8",
+    "control": "node --import tsx scripts/control-plain-output-schema.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "2.8.0",
+    "@types/node": "22.20.4",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.2"
+  }
+}

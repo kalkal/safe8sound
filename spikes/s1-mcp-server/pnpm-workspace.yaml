@@ -1,0 +1,8 @@
+# Standalone root for the throwaway spike: keeps it out of the future repo workspace.
+allowBuilds:
+  '@modelcontextprotocol/inspector': false
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@vitest/mocker@5.0.2'
+  - '@vitest/spy@5.0.2'
+  - vitest@5.0.2
