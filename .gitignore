@@ -16,6 +16,7 @@ cdk.out/
 .DS_Store
 Thumbs.db
 *.log
+logs/
 playwright-report/
 test-results/
 reports/mutation/
