@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "profileId": "real-plant-calibrated-proposal",
+  "status": "proposal from spike S6 (issue #10); values with 'assumption: true' must be calibrated on real data (M5)",
+  "units": "W, Wh, kW, kWh, degC, K/kW, kWh/K unless stated in the key name",
+
+  "inverter": {
+    "family": "ZCS 1PH HYD 6000 ZSS HP (Sofar HYD-ES family), single phase, 48 V battery",
+    "acRatedW": 6000,
+    "acMaxVa": 6000,
+    "batteryMaxChargeW": 5000,
+    "batteryMaxDischargeW": 5000,
+    "batteryMaxCurrentA": 100,
+    "batteryVoltageRangeV": { "min": 42, "max": 58 },
+    "batteryPathMaxEfficiency": 0.946,
+    "epsRatedVa": 5000,
+    "epsPeakVa": 6000,
+    "epsPeakSeconds": 60,
+    "epsSwitchMs": 10,
+    "standbyW": 10,
+    "offGridSelfConsumptionW": { "value": 40, "assumption": true, "note": "not in the datasheet (only standby < 10 W); measure in M5" },
+    "dodProgrammablePct": { "min": 0, "max": 90 }
+  },
+
+  "battery": {
+    "chemistry": "LiFePO4",
+    "modules": 3,
+    "moduleNominalWh": 5100,
+    "moduleUsableWh": 4600,
+    "nominalWh": 15300,
+    "usableWh": 13800,
+    "maxDodPct": 90,
+    "hardwareMinSocPct": 10,
+    "moduleMaxCurrentA": 50,
+    "nominalVoltageV": 51.2,
+    "chargeEfficiency": 0.94,
+    "dischargeEfficiency": 0.94,
+    "roundTripEfficiency": 0.884,
+    "roundTripNote": "0.94 x 0.94, slightly below the 0.946 per-direction maximum of the inverter battery path (conservative)",
+    "coldChargeDerate": { "belowC": 15, "note": "the BMS limits charge current below 15 degC; not relevant for the summer demo" }
+  },
+
+  "pv": {
+    "peakW": 7360,
+    "modules": 16,
+    "moduleW": 460,
+    "tiltDeg": { "value": 30, "assumption": true },
+    "azimuthDeg": { "value": 0, "assumption": true, "note": "0 = south (PVGIS convention)" },
+    "systemLossPct": 14,
+    "locationRounded": { "lat": 41.9, "lon": 12.5, "isPlaceholder": true },
+    "hourlyProfileFile": "pv-profile.json",
+    "dailyKwhByMonth": [20.9, 28.0, 31.7, 34.1, 34.0, 38.4, 39.6, 37.2, 32.2, 27.1, 18.4, 16.9],
+    "stormDayFactor": { "value": 0.2, "assumption": true, "note": "fraction of the monthly mean on an overcast storm day; replace with the p10 day when the real location is known" }
+  },
+
+  "hvacUnits": {
+    "source": "Hisense Easy Smart technical sheet 31/01/2025 (cooling at 27/19 degC indoor, 35/24 degC outdoor)",
+    "sizes": [
+      {
+        "sizeBtu": 9000, "count": null, "countKnown": false,
+        "coolingKw": { "min": 1.0, "nominal": 2.6, "max": 3.0 },
+        "coolingInputKw": { "min": 0.19, "nominal": 0.77, "max": 1.5 },
+        "heatingInputKw": { "min": 0.19, "nominal": 0.68, "max": 1.5 },
+        "eer": 3.4, "seer": 6.3, "dryLph": 0.9
+      },
+      {
+        "sizeBtu": 12000, "count": 3, "countKnown": true,
+        "coolingKw": { "min": 1.0, "nominal": 3.2, "max": 4.0 },
+        "coolingInputKw": { "min": 0.19, "nominal": 0.97, "max": 1.6 },
+        "heatingInputKw": { "min": 0.19, "nominal": 0.87, "max": 1.6 },
+        "eer": 3.3, "seer": 6.4, "dryLph": 1.2
+      },
+      {
+        "sizeBtu": 18000, "count": 2, "countKnown": true,
+        "coolingKw": { "min": 1.0, "nominal": 5.0, "max": 6.0 },
+        "coolingInputKw": { "min": 0.26, "nominal": 1.55, "max": 2.3 },
+        "heatingInputKw": { "min": 0.35, "nominal": 1.35, "max": 2.3 },
+        "eer": 3.23, "seer": 6.1, "dryLph": 2.0
+      },
+      {
+        "sizeBtu": 24000, "count": 1, "countKnown": true,
+        "coolingKw": { "min": 1.6, "nominal": 6.3, "max": 7.2 },
+        "coolingInputKw": { "min": 0.42, "nominal": 2.07, "max": 2.76 },
+        "heatingInputKw": { "min": 0.4, "nominal": 2.06, "max": 2.7 },
+        "eer": 3.05, "seer": 6.3, "dryLph": 2.2
+      }
+    ],
+    "modes": ["cool", "heat", "dry", "fan_only", "auto", "off"],
+    "freshAir": false,
+    "partLoadModel": "input = clamp(thermalDemandKw / eer, coolingInputKw.min, coolingInputKw.max); below min the unit cycles on/off",
+    "dryMode": {
+      "behaviour": "compressor at low speed, indoor fan at low/auto speed, compressor stops when room temperature reaches the set point",
+      "inputFactorOfCoolNominal": { "value": 0.5, "range": [0.4, 0.7], "assumption": true },
+      "sensibleCoolingFactorOfCool": { "value": 0.3, "assumption": true },
+      "note": "no datasheet figure for dry-mode input power; calibrate with ConnectLife daily kWh"
+    },
+    "fanOnlyInputW": { "value": 30, "assumption": true }
+  },
+
+  "fans": {
+    "coolingEffectC": { "value": 1.5, "range": [1.0, 2.0], "configMaxC": 3.0 },
+    "coolingEffectNote": "CBE: about 2 degC at 0.5 m/s; ASHRAE 55 allows up to 0.8 m/s without occupant control (up to about 4 degC). We use less than the 0.5 m/s value.",
+    "setpointRaiseEqualsCoolingEffect": true,
+    "hvacEnergySavingPerDegC": 0.10,
+    "powerW": { "value": 40, "assumption": true, "note": "fan type and control path still unknown (S8)" }
+  },
+
+  "thermal": {
+    "model": "1R1C per room: C dT/dt = (Tout - T)/R + Qhvac + Qinternal + Qsolar",
+    "perFloorArea": {
+      "uaWPerKM2": { "value": 1.5, "range": [1.0, 2.5] },
+      "capacitanceKwhPerKM2": { "value": 0.03, "range": [0.015, 0.07] },
+      "timeConstantH": { "value": 20, "range": [6, 70], "note": "= capacitance / UA; follows from the two ranges above" }
+    },
+    "derivation": "UA = walls (0.7-1.3 W/m2K) + windows (2.5-5 W/m2K) + infiltration (0.3-0.9 ACH); C between the shallow-mass estimate (0.0036-0.0054 kWh/K per m3) and the ISO 13790 medium-heavy mass classes (165-260 kJ/m2K)",
+    "internalGainsW": { "perRoomBase": 50, "perOccupant": 80, "assumption": true },
+    "solarGainFactor": { "value": 0.4, "range": [0.25, 0.8], "note": "fraction of irradiance on the window area that becomes heat" },
+    "exampleRoom": {
+      "floorM2": 15, "heightM": 2.7,
+      "RKPerKw": 44.4, "CKwhPerK": 0.45, "timeConstantH": 20
+    }
+  },
+
+  "epsLoads": {
+    "baseW": { "value": 60, "assumption": true, "includes": "router, home hub, sensors" },
+    "fridgeAvgW": { "value": 60, "assumption": true, "onEps": "unknown" }
+  },
+
+  "derivedChecks": {
+    "hvacNominalInputAllKnownUnitsKw": 8.08,
+    "hvacMaxInputAllKnownUnitsKw": 12.16,
+    "note": "3 x 12000 + 2 x 18000 + 1 x 24000, without the 9000 BTU units (count unknown). Grid-tied: above 6 kW the grid supplies the rest. Off-grid (EPS): hard cap 5000 VA and battery 5000 W."
+  }
+}

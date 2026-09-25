@@ -1,0 +1,11 @@
+{
+  "location": {
+    "latRounded": 41.9,
+    "lonRounded": 12.5,
+    "timeZone": "Europe/Rome",
+    "isPlaceholder": true
+  },
+  "pv": { "peakKw": 7.36, "lossPct": 14, "tiltDeg": 30, "azimuthDeg": 0 },
+  "years": { "start": 2019, "end": 2023 },
+  "api": { "baseUrl": "https://re.jrc.ec.europa.eu/api/v5_3", "timeoutMs": 60000 }
+}
