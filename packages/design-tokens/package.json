@@ -1,0 +1,23 @@
+{
+  "name": "@cold-reserve/design-tokens",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The single source of the visual style: W3C DTCG tokens.json -> CSS custom properties (light-dark) + typed token names.",
+  "type": "module",
+  "exports": {
+    ".": "./generated/tokens.ts",
+    "./tokens.css": "./generated/tokens.css",
+    "./tokens.json": "./tokens.json"
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "culori": "4.0.2",
+    "style-dictionary": "5.5.5"
+  },
+  "devDependencies": {
+    "@types/culori": "4.0.1"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@cold-reserve/source-simulator",
+  "private": true,
+  "version": "0.0.0",
+  "description": "HomeDataSource from the seeded simulator.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*"
+  }
+}

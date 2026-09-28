@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/ingest-api",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Signed snapshot ingest (v1) and transition detector hook.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

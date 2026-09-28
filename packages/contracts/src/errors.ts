@@ -1,0 +1,130 @@
+import { z } from 'zod';
+import { GuaranteeIdSchema } from './guarantees.js';
+import { MeasureUnitSchema } from './units.js';
+
+// Error taxonomy shared by every package (docs/error-handling.md §2).
+// New codes are added here only, and only compatibly (never renamed or re-categorised).
+
+export const ErrorCategorySchema = z.enum([
+  'validation',
+  'guard_rejection',
+  'not_found',
+  'unauthorized',
+  'forbidden',
+  'conflict',
+  'dependency_unavailable',
+  'rate_limited',
+  'internal',
+]);
+export type ErrorCategory = z.infer<typeof ErrorCategorySchema>;
+
+export const ERROR_CATALOG = {
+  // validation: the caller or the model fixes the input
+  invalid_input: { category: 'validation' },
+  invalid_setpoint: { category: 'validation' },
+  unknown_room: { category: 'validation' },
+  plan_expired: { category: 'validation' },
+  safety_threshold_out_of_range: { category: 'validation' },
+  // guard_rejection: the model re-plans (one code per guarantee)
+  storm_reserve_violated: { category: 'guard_rejection' },
+  inverter_limit_exceeded: { category: 'guard_rejection' },
+  battery_power_exceeded: { category: 'guard_rejection' },
+  safe_room_comfort_violated: { category: 'guard_rejection' },
+  pacing_off_track: { category: 'guard_rejection' },
+  // not_found
+  plan_not_found: { category: 'not_found' },
+  home_not_found: { category: 'not_found' },
+  // unauthorized / forbidden: configuration
+  missing_token: { category: 'unauthorized' },
+  wrong_client: { category: 'unauthorized' },
+  invalid_signature: { category: 'unauthorized' },
+  signature_expired: { category: 'unauthorized' },
+  origin_not_allowed: { category: 'forbidden' },
+  demo_disabled: { category: 'forbidden' },
+  // conflict: idempotent success, return the original outcome
+  plan_already_applied: { category: 'conflict' },
+  // dependency_unavailable: transient, retry with backoff then degrade
+  home_data_stale: { category: 'dependency_unavailable' },
+  split_cloud_unreachable: { category: 'dependency_unavailable' },
+  forecast_unavailable: { category: 'dependency_unavailable' },
+  bedrock_throttled: { category: 'dependency_unavailable' },
+  agent_timeout: { category: 'dependency_unavailable' },
+  polly_unavailable: { category: 'dependency_unavailable' },
+  store_unavailable: { category: 'dependency_unavailable' },
+  // rate_limited: wait retryAfterMs
+  demo_quota_exceeded: { category: 'rate_limited' },
+  // internal: a bug, alert
+  unexpected_error: { category: 'internal' },
+  output_schema_violation: { category: 'internal' },
+  invalid_config: { category: 'internal' },
+} as const satisfies Record<string, { category: ErrorCategory }>;
+
+export type ErrorCode = keyof typeof ERROR_CATALOG;
+export const ERROR_CODES = Object.keys(ERROR_CATALOG) as [ErrorCode, ...ErrorCode[]];
+export const ErrorCodeSchema = z.enum(ERROR_CODES);
+
+export const categoryOf = (code: ErrorCode): ErrorCategory => ERROR_CATALOG[code].category;
+
+const RETRYABLE: ReadonlySet<ErrorCategory> = new Set(['dependency_unavailable', 'rate_limited']);
+/** Only transient failures are retried (docs/error-handling.md §4). */
+export const isRetryableCategory = (category: ErrorCategory): boolean => RETRYABLE.has(category);
+
+/** Typed error details: a closed set of fields, never free-form data, stacks or secrets. */
+export const ErrorDetailsSchema = z.strictObject({
+  /** Dotted path of the offending input field. */
+  field: z.string().min(1).max(120).optional(),
+  issues: z
+    .array(z.strictObject({ path: z.string().max(120), message: z.string().min(1).max(200) }))
+    .max(20)
+    .optional(),
+  guarantee: GuaranteeIdSchema.optional(),
+  measured: z.number().optional(),
+  limit: z.number().optional(),
+  nearestAllowed: z.number().optional(),
+  unit: MeasureUnitSchema.optional(),
+  ageSeconds: z.number().int().nonnegative().optional(),
+  planId: z.string().min(1).max(64).optional(),
+  roomId: z.string().min(1).max(64).optional(),
+});
+export type ErrorDetails = z.infer<typeof ErrorDetailsSchema>;
+
+/** The error envelope: MCP `structuredContent` with `isError: true`, and the base of HTTP problems. */
+export const ErrorEnvelopeSchema = z
+  .strictObject({
+    code: ErrorCodeSchema,
+    category: ErrorCategorySchema,
+    /** Short, actionable English text. */
+    message: z.string().min(1).max(300),
+    retryable: z.boolean(),
+    retryAfterMs: z.number().int().nonnegative().optional(),
+    details: ErrorDetailsSchema.optional(),
+  })
+  .superRefine((e, ctx) => {
+    if (categoryOf(e.code) !== e.category) {
+      ctx.addIssue({ code: 'custom', path: ['category'], message: `"${e.code}" belongs to "${categoryOf(e.code)}"` });
+    }
+    if (isRetryableCategory(e.category) !== e.retryable) {
+      ctx.addIssue({ code: 'custom', path: ['retryable'], message: `retryable must be ${String(isRetryableCategory(e.category))}` });
+    }
+    if (e.retryAfterMs !== undefined && !e.retryable) {
+      ctx.addIssue({ code: 'custom', path: ['retryAfterMs'], message: 'retryAfterMs only applies to retryable errors' });
+    }
+  });
+export type ErrorEnvelope = z.infer<typeof ErrorEnvelopeSchema>;
+
+/** Builds a consistent envelope: category and retryable come from the catalog. */
+export function toolError(
+  code: ErrorCode,
+  message: string,
+  extra: { retryAfterMs?: number; details?: ErrorDetails } = {},
+): ErrorEnvelope {
+  const category = categoryOf(code);
+  return {
+    code,
+    category,
+    message,
+    retryable: isRetryableCategory(category),
+    ...(extra.retryAfterMs !== undefined && { retryAfterMs: extra.retryAfterMs }),
+    ...(extra.details !== undefined && { details: extra.details }),
+  };
+}

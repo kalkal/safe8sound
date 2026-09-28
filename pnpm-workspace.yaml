@@ -1,0 +1,48 @@
+packages:
+  - packages/*
+  - packages/adapters/*
+  - apps/*
+  - infra
+
+# One version of shared runtime libraries across the workspace (plan section 9.4: a single Zod v4).
+catalog:
+  zod: 4.6.5
+
+overrides:
+  zod: 4.6.5
+
+# Supply-chain settings (issue #37). pnpm 12 reads every non-auth setting from this file,
+# not from .npmrc (https://pnpm.io/settings). Defaults are restated on purpose so a future
+# default change never weakens them silently.
+# Sources, checked 2026-09-28:
+#   https://pnpm.io/settings/dependency-resolution
+#   https://pnpm.io/settings/build
+#   https://pnpm.io/supply-chain-security
+
+# Wait one day before installing a newly published version (default 1440 since pnpm 11).
+minimumReleaseAge: 1440
+# Fail instead of silently picking an older version when nothing is old enough
+# (default true only when minimumReleaseAge is set explicitly, as here).
+minimumReleaseAgeStrict: true
+# Only direct dependencies may come from git/tarball URLs (default true since pnpm 11).
+blockExoticSubdeps: true
+# Not a default (default "off"): refuse a version whose publish trust level dropped,
+# e.g. trusted publishing / provenance followed by a plain token publish.
+trustPolicy: no-downgrade
+# Reviewed exceptions, exact versions only (never a whole package). Both were published
+# by an existing maintainer without provenance after a release that had it; both are
+# old, widely installed and have no advisory.
+# - undici-types@6.21.0 (via @types/node 22): published 2024-11.
+# - why-is-node-running@3.2.2 (via vitest): published 2025-01-08; 3.2.1 had SLSA provenance.
+trustPolicyExclude:
+  - undici-types@6.21.0
+  - why-is-node-running@3.2.2
+# Exit non-zero when a dependency has an unreviewed build script (default true).
+strictDepBuilds: true
+dangerouslyAllowAllBuilds: false
+# Reviewed build scripts. Everything not listed here stays blocked.
+allowBuilds:
+  esbuild: true
+
+# Refuse to install on a Node version outside the root "engines" range.
+engineStrict: true

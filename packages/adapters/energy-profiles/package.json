@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/energy-profiles",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Declarative inverter/battery mapping profiles (sofar-hyd-es) and fixtures.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

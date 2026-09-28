@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/sim-api",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Demo auth, hard caps, kill switch, agent proxy, Polly, scripted fallback.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

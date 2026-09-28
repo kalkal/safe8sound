@@ -1,0 +1,14 @@
+{
+  "name": "@cold-reserve/store-dynamodb",
+  "private": true,
+  "version": "0.0.0",
+  "description": "StateStore on the single DynamoDB table.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*"
+  }
+}

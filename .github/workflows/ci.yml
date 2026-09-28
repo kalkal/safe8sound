@@ -1,0 +1,46 @@
+# Quality gates on every PR to main and every push to main. No deploy (AWS only for the final tests).
+name: ci
+
+# Note: with paths-ignore, a docs-only PR does not run `verify`. If `verify` ever becomes a
+# required status check, add an always-run job that reports the same check name, or docs-only
+# PRs will wait forever.
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**', 'spikes/**']
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**', 'spikes/**']
+  workflow_dispatch:
+
+permissions: read-all
+
+# Free minutes are limited (issue #38): a newer push cancels the older run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CDK_DISABLE_CLI_TELEMETRY: 'true'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm lint:css
+      - run: pnpm depcruise
+      - run: pnpm test
+      - name: cdk synth + cdk-nag
+        run: pnpm synth

@@ -1,0 +1,36 @@
+{
+  "name": "cold-reserve",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Voice agent that turns a home battery into a comfort reserve.",
+  "type": "module",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22.13 <23"
+  },
+  "scripts": {
+    "prepare": "node tooling/src/install-hooks.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/ui-cards && tsc -p apps/alexa-sim",
+    "lint": "eslint --max-warnings=0 .",
+    "lint:css": "stylelint \"**/*.css\"",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs packages apps infra tooling",
+    "test": "vitest run",
+    "tokens": "pnpm --filter @cold-reserve/design-tokens build",
+    "synth": "pnpm --filter @cold-reserve/infra synth",
+    "heavy": "node tooling/src/heavy.mjs",
+    "check": "pnpm typecheck && pnpm lint && pnpm lint:css && pnpm depcruise && pnpm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.4",
+    "dependency-cruiser": "18.4.0",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "stylelint": "17.15.0",
+    "stylelint-declaration-strict-value": "1.12.1",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "5.0.2"
+  }
+}

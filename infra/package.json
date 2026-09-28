@@ -1,0 +1,24 @@
+{
+  "name": "@cold-reserve/infra",
+  "private": true,
+  "version": "0.0.0",
+  "description": "AWS CDK app: dev and demo stages, cdk-nag AwsSolutions checks. Synth only until the final tests.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "synth": "cdk synth --quiet --no-notices"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "aws-cdk-lib": "2.271.0",
+    "cdk-nag": "3.0.2",
+    "constructs": "10.8.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "aws-cdk": "2.1143.0",
+    "tsx": "4.23.15"
+  }
+}

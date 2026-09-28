@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/i18n",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Message catalogs for every user-facing string.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

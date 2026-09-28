@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/core",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Pure domain: thermal, energy, reserve, safe hours, level, season, planner. No I/O.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

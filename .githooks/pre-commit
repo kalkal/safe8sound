@@ -1,0 +1,4 @@
+#!/bin/sh
+# Versioned hook (core.hooksPath=.githooks, set by `pnpm install`).
+# Secret scan of the staged changes (gitleaks, or the built-in fallback).
+node tooling/src/secret-scan.mjs || exit 1

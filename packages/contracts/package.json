@@ -1,0 +1,14 @@
+{
+  "name": "@cold-reserve/contracts",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Shared Zod schemas, branded units, error codes and envelopes (leaf package: depends on Zod only).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures": "./src/fixtures.ts"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  }
+}

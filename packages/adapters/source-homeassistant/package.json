@@ -1,0 +1,14 @@
+{
+  "name": "@cold-reserve/source-homeassistant",
+  "private": true,
+  "version": "0.0.0",
+  "description": "HomeDataSource from the real home snapshots (read-only).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*"
+  }
+}

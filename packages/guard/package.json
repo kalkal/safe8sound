@@ -1,0 +1,14 @@
+{
+  "name": "@cold-reserve/guard",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Composable guard constraints; every check returns a GuaranteeResult.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*"
+  }
+}

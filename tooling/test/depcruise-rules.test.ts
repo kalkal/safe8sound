@@ -1,0 +1,38 @@
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { cruise, type IReporterOutput } from 'dependency-cruiser';
+import { describe, expect, it } from 'vitest';
+
+const require = createRequire(import.meta.url);
+const config = require('../../.dependency-cruiser.cjs') as { forbidden: unknown[] };
+const fixtures = fileURLToPath(new URL('./fixtures/depcruise/', import.meta.url));
+
+async function violations(): Promise<Array<{ rule: string; from: string; to: string }>> {
+  const result: IReporterOutput = await cruise(['packages', 'apps'], {
+    baseDir: fixtures,
+    ruleSet: { forbidden: config.forbidden } as never,
+    validate: true,
+  });
+  if (typeof result.output === 'string') throw new Error('expected a cruise result object');
+  return result.output.summary.violations.map((v) => ({ rule: v.rule.name, from: v.from, to: v.to }));
+}
+
+describe('dependency-cruiser: architecture rules (plan §10.4, §14.2)', () => {
+  it('flags each forbidden edge of the fixture tree with its rule', async () => {
+    const found = await violations();
+    const rules = (from: string) => found.filter((v) => v.from.startsWith(from)).map((v) => v.rule);
+    expect(rules('packages/core/src/uses-io.ts')).toContain('core-and-guard-are-pure');
+    expect(rules('packages/core/src/uses-guard.ts')).toContain('core-does-not-depend-on-guard');
+    expect(rules('packages/contracts/src/uses-core.ts')).toContain('contracts-is-a-leaf');
+    expect(rules('apps/alpha/src/uses-beta.ts')).toContain('apps-do-not-import-each-other');
+    expect(rules('packages/adapters/store-memory/src/uses-guard.ts')).toContain('adapters-use-contracts-and-core-only');
+    expect(rules('packages/guard/src/uses-app.ts')).toContain('packages-do-not-import-apps');
+    expect(found.map((v) => v.rule)).toContain('no-circular');
+  });
+
+  it('allows the edges the architecture wants', async () => {
+    const found = await violations();
+    const allowed = ['packages/guard/src/uses-core.ts', 'packages/adapters/store-memory/src/uses-core.ts', 'apps/alpha/src/uses-contracts.ts'];
+    expect(found.filter((v) => allowed.includes(v.from))).toEqual([]);
+  });
+});

@@ -1,0 +1,15 @@
+{
+  "name": "@cold-reserve/ui-cards",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Shared MCP Apps card components and signature components (sky, cubes, floor plan, receipt); tokens only.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/design-tokens": "workspace:*",
+    "@cold-reserve/i18n": "workspace:*"
+  }
+}

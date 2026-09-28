@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/jobs",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Scheduled Lambdas: weather fetch, storm tick, weekly export, synthetic check.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

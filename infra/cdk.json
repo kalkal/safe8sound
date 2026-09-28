@@ -1,0 +1,12 @@
+{
+  "app": "tsx src/main.ts",
+  "watch": {
+    "include": ["src/**"]
+  },
+  "context": {
+    "cold-reserve:region": "us-east-1",
+    "cold-reserve:stages": ["dev", "demo"],
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/core:target-partitions": ["aws"]
+  }
+}

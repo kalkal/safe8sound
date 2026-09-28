@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/home-bridge",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Runs at home: outbound only, read-only, 24 h buffer.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

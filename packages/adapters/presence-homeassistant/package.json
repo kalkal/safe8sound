@@ -1,0 +1,14 @@
+{
+  "name": "@cold-reserve/presence-homeassistant",
+  "private": true,
+  "version": "0.0.0",
+  "description": "PresenceAdapter over Home Assistant sensors (read-only).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*"
+  }
+}

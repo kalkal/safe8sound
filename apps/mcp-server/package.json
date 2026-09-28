@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/mcp-server",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Stateless MCP server: module registry, capability modules, Lambda and Node HTTP entry.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

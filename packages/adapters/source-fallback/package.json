@@ -1,0 +1,14 @@
+{
+  "name": "@cold-reserve/source-fallback",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Decorator that falls back to the simulator and says so (homeLink).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*"
+  }
+}

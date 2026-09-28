@@ -1,0 +1,17 @@
+/* Base layer shared by every card. Reads only semantic tokens from @cold-reserve/design-tokens. */
+@layer reset, tokens, base, components, surfaces, overrides;
+
+@layer base {
+  :root {
+    color: var(--text-primary);
+    background: var(--surface-card);
+    font-family: var(--font-body);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-regular);
+  }
+
+  :focus-visible {
+    outline: calc(var(--border-thin) * 3) solid var(--focus-ring);
+    outline-offset: calc(var(--border-thin) * 2);
+  }
+}

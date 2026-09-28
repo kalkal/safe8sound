@@ -1,0 +1,59 @@
+@layer tokens {
+  :root {
+    color-scheme: dark;
+    --radius-card: 16px;
+    --radius-pill: 30px;
+    --radius-cube: 9px;
+    --target-min: 48px;
+    --border-thin: 1px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --cube-size: 28px;
+    --font-size-min: 14px;
+    --font-size-body: 16px;
+    --font-size-lead: 20px;
+    --font-size-hero-min: 52px;
+    --font-size-hero-max: 84px;
+    --font-body: Roboto, system-ui, sans-serif;
+    --font-data: "Roboto Mono", ui-monospace, monospace;
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-bold: 700;
+    --duration-fast: 150ms;
+    --surface-card: light-dark(oklch(1.0000 0.0000 0.00), oklch(0.2076 0.0135 258.37));
+    --surface-card-raised: light-dark(oklch(0.9654 0.0042 236.50), oklch(0.2579 0.0174 255.68));
+    --surface-card-line: light-dark(oklch(0.2076 0.0135 258.37 / 0.16), oklch(1.0000 0.0000 0.00 / 0.15));
+    --text-primary: light-dark(oklch(0.2076 0.0135 258.37), oklch(0.9684 0.0042 236.50));
+    --text-secondary: light-dark(oklch(0.4453 0.0270 254.55), oklch(0.7806 0.0199 248.08));
+    --accent: light-dark(oklch(0.5404 0.0921 195.74), oklch(0.6942 0.1185 194.77));
+    --focus-ring: light-dark(oklch(0.5404 0.0921 195.74), oklch(0.6942 0.1185 194.77));
+    --button-primary-bg: light-dark(oklch(0.5404 0.0921 195.74), oklch(0.5404 0.0921 195.74));
+    --button-primary-bg-hover: light-dark(oklch(0.4783 0.0815 195.90), oklch(0.4783 0.0815 195.90));
+    --button-primary-text: light-dark(oklch(1.0000 0.0000 0.00), oklch(1.0000 0.0000 0.00));
+    --status-ok: light-dark(oklch(0.5084 0.1330 151.02), oklch(0.8517 0.1895 150.50));
+    --status-warn: light-dark(oklch(0.5078 0.1080 73.30), oklch(0.8615 0.1423 82.66));
+    --status-storm: light-dark(oklch(0.4804 0.1958 286.10), oklch(0.7752 0.1261 293.03));
+    --status-alert: light-dark(oklch(0.5013 0.1783 28.70), oklch(0.7582 0.1448 29.02));
+    --status-neutral: light-dark(oklch(0.4453 0.0270 254.55), oklch(0.7806 0.0199 248.08));
+    --level-comfort: light-dark(oklch(0.5404 0.0921 195.74), oklch(0.8271 0.1210 179.14));
+    --level-balanced: light-dark(oklch(0.5291 0.1290 248.80), oklch(0.8374 0.0923 237.74));
+    --level-saver: light-dark(oklch(0.5078 0.1080 73.30), oklch(0.8615 0.1423 82.66));
+    --level-essential: light-dark(oklch(0.4804 0.1958 286.10), oklch(0.7752 0.1261 293.03));
+    --level-on: light-dark(oklch(1.0000 0.0000 0.00), oklch(0.2076 0.0135 258.37));
+    --cube-edge: light-dark(oklch(0.2076 0.0135 258.37 / 0.16), oklch(1.0000 0.0000 0.00 / 0.15));
+    --cube-fill: linear-gradient(145deg, light-dark(oklch(0.9696 0.0213 186.03), oklch(1.0000 0.0000 0.00)) 0%, light-dark(oklch(0.8686 0.0689 187.94), oklch(0.9585 0.0286 185.95)) 35%, light-dark(oklch(0.7476 0.1070 186.66), oklch(0.8686 0.0689 187.94)) 100%);
+  }
+  :root[data-card-theme="pawnio-dark"] {
+    color-scheme: dark;
+  }
+  :root[data-card-theme="pawnio-light"] {
+    color-scheme: light;
+  }
+  :root.theme-storm {
+    --accent: light-dark(oklch(0.4804 0.1958 286.10), oklch(0.7752 0.1261 293.03));
+    --cube-fill: linear-gradient(145deg, light-dark(oklch(0.9464 0.0284 294.59), oklch(1.0000 0.0000 0.00)) 0%, light-dark(oklch(0.8273 0.0953 293.65), oklch(0.9217 0.0424 295.90)) 35%, light-dark(oklch(0.6862 0.1611 290.99), oklch(0.7752 0.1261 293.03)) 100%);
+  }
+}

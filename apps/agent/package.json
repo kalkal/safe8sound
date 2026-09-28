@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/agent",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Strands agent on AgentCore (zip deploy).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

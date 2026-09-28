@@ -1,0 +1,31 @@
+import { err, ok, type Result } from '@cold-reserve/contracts';
+
+// Every user-facing string lives in a catalog (plan §14.1). en-US for the hackathon; it-IT later.
+
+/** The one place the product name lives: it is still a working name. Catalogs use {product}. */
+export const PRODUCT_NAME = 'Cold Reserve';
+
+const enUS = {
+  'app.welcome': 'Welcome to {product}.',
+  'level.changed': "I'm switching to {level} mode so the safe room stays comfortable until {until}.",
+  'data.simulated': 'Simulated data',
+  'data.asOf': 'As of {time}',
+} as const;
+
+export type MessageKey = keyof typeof enUS;
+export const CATALOGS = { 'en-US': enUS } satisfies Record<string, Record<MessageKey, string>>;
+export type Locale = keyof typeof CATALOGS;
+export const LOCALES = Object.keys(CATALOGS) as Locale[];
+
+export interface FormatError {
+  key: MessageKey;
+  missing: string[];
+}
+
+export function format(locale: Locale, key: MessageKey, values: Readonly<Record<string, string>> = {}): Result<string, FormatError> {
+  const template: string = CATALOGS[locale][key];
+  const filled: Readonly<Record<string, string>> = { product: PRODUCT_NAME, ...values };
+  const missing = [...template.matchAll(/\{(\w+)\}/g)].map((m) => m[1] ?? '').filter((name) => !(name in filled));
+  if (missing.length > 0) return err({ key, missing });
+  return ok(template.replace(/\{(\w+)\}/g, (_, name: string) => filled[name] ?? ''));
+}
