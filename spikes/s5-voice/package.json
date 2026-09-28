@@ -1,0 +1,27 @@
+{
+  "name": "spike-s5-voice",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Throwaway spike S5: voice round trip in the browser (Web Speech API + speechSynthesis, XState v5). Not part of the workspace.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5175 --strictPort",
+    "test": "vitest run --maxWorkers=2",
+    "test:e2e": "playwright test",
+    "measure": "node scripts/measure-real.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "xstate": "5.33.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.4",
+    "typescript": "6.0.3",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  }
+}

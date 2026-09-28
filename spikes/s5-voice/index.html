@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>S5 voice spike</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { margin: 0 auto; max-width: 720px; padding: 16px; }
+      #state { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+      button { min-width: 48px; min-height: 48px; font-size: 1rem; }
+      form { display: flex; gap: 8px; margin: 12px 0; }
+      input[type='text'] { flex: 1; min-height: 44px; font-size: 1rem; }
+      .bubble { padding: 8px 12px; border-radius: 8px; background: rgba(127, 127, 127, 0.15); min-height: 1.5em; }
+      #error:empty, #hint:empty { display: none; }
+      #error { color: #b3261e; }
+      table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+      td, th { border-bottom: 1px solid rgba(127, 127, 127, 0.3); padding: 4px 6px; text-align: right; }
+      pre { white-space: pre-wrap; font-size: 0.8rem; max-height: 240px; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Voice round trip (spike S5)</h1>
+    <p>State: <span id="state" data-testid="state">idle</span></p>
+    <p>
+      <button id="mic" data-testid="mic" aria-label="Speak">🎤 Speak</button>
+      <button id="cancel" data-testid="cancel">Stop</button>
+    </p>
+    <p id="privacy">Voice goes to your browser's speech service. You can always type instead.</p>
+    <form id="text-form">
+      <input id="text" data-testid="text" type="text" aria-label="Type a question" placeholder="Type a question" />
+      <button type="submit" data-testid="send">Send</button>
+    </form>
+    <p id="hint" data-testid="hint"></p>
+    <p id="error" role="status" data-testid="error"></p>
+    <h2>You said</h2>
+    <div class="bubble" id="transcript" data-testid="transcript"></div>
+    <h2>Reply</h2>
+    <div class="bubble" id="reply" data-testid="reply" aria-live="polite"></div>
+    <h2>Latency (ms)</h2>
+    <table>
+      <thead><tr><th>#</th><th>recognition</th><th>reply</th><th>tts start</th><th>perceived</th><th>speaking</th></tr></thead>
+      <tbody id="latency" data-testid="latency"></tbody>
+    </table>
+    <h2>Environment</h2>
+    <p>
+      <button id="install">Install on-device language pack</button>
+      <button id="bench">Bench speech synthesis</button>
+    </p>
+    <pre id="env" data-testid="env"></pre>
+    <h2>Log</h2>
+    <pre id="log"></pre>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
