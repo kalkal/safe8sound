@@ -1,0 +1,38 @@
+/* Test harness only, not a product surface: system colors, no tokens (the frame tokens are F8 work). */
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+body {
+  margin: 0;
+  background: Canvas;
+  color: CanvasText;
+}
+.host {
+  display: grid;
+  gap: 1rem;
+  max-inline-size: 60rem;
+  margin-inline: auto;
+  padding: 1rem;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.controls button[aria-pressed='true'] {
+  font-weight: 700;
+  text-decoration: underline;
+}
+.card-slot iframe {
+  display: block;
+  inline-size: 100%;
+  /* color-scheme is set inline to the card theme: a mismatch makes Chrome paint an opaque backdrop. */
+  border: 0;
+}
+.diagnostics {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  font-size: 0.875rem;
+}

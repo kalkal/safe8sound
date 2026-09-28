@@ -1,0 +1,258 @@
+/* Plan card (ui://cold-reserve/plan-card). Reads only semantic and component tokens from the "tokens" layer. */
+@layer reset, tokens, base, components, surfaces, overrides;
+
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  html,
+  body,
+  h1,
+  p,
+  ol,
+  ul {
+    margin: 0;
+    padding: 0;
+  }
+  ol,
+  ul {
+    list-style: none;
+  }
+}
+
+@layer base {
+  html {
+    /* Transparent so the card's own rounded surface is the only background inside the iframe. */
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-regular);
+    line-height: 1.4;
+  }
+  body {
+    container-type: inline-size;
+    container-name: card;
+  }
+  :focus-visible {
+    outline: calc(var(--border-thin) * 3) solid var(--focus-ring);
+    outline-offset: calc(var(--border-thin) * 2);
+  }
+}
+
+@layer components {
+  .card {
+    display: grid;
+    gap: var(--space-3);
+    padding-block: var(--space-4);
+    padding-inline: var(--space-4);
+    background: var(--surface-card);
+    border: var(--border-thin) solid var(--surface-card-line);
+    border-radius: var(--radius-card);
+  }
+
+  .card-quiet {
+    color: var(--text-secondary);
+  }
+
+  .card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .badge {
+    margin-inline-start: auto;
+    padding-block: var(--space-1);
+    padding-inline: var(--space-3);
+    border-radius: var(--radius-pill);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+    font-weight: var(--font-weight-medium);
+  }
+  .badge-live {
+    background: var(--status-ok);
+    color: var(--level-on);
+  }
+  .badge-simulated {
+    color: var(--status-neutral);
+    border: var(--border-thin) dashed currentColor;
+  }
+
+  .storm-banner {
+    color: var(--status-storm);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .hero {
+    display: grid;
+    line-height: 1.05;
+  }
+  .hero-lead {
+    color: var(--text-secondary);
+    font-size: var(--font-size-lead);
+    font-weight: var(--font-weight-medium);
+  }
+  .hero-time {
+    font-family: var(--font-data);
+    font-size: clamp(var(--font-size-hero-min), 11cqi, var(--font-size-hero-max));
+    font-weight: var(--font-weight-bold);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .estimate {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-min);
+  }
+  .tag {
+    padding-inline: var(--space-2);
+    border: var(--border-thin) solid var(--surface-card-line);
+    border-radius: var(--radius-pill);
+    color: var(--text-secondary);
+  }
+  .confidence {
+    padding-inline: var(--space-3);
+    border-radius: var(--radius-pill);
+    background: color-mix(in oklab, var(--accent) 18%, var(--surface-card));
+    text-transform: capitalize;
+  }
+
+  .reason,
+  .caption {
+    color: var(--text-secondary);
+    font-size: var(--font-size-min);
+  }
+
+  .levels {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-1);
+
+    & li {
+      padding-block: var(--space-2);
+      border: var(--border-thin) solid color-mix(in oklab, var(--level-color) 55%, transparent);
+      border-radius: var(--radius-pill);
+      background: var(--surface-card-raised);
+      color: var(--text-secondary);
+      font-size: var(--font-size-min);
+      text-align: center;
+    }
+    & [data-level='comfort'] {
+      --level-color: var(--level-comfort);
+    }
+    & [data-level='balanced'] {
+      --level-color: var(--level-balanced);
+    }
+    & [data-level='saver'] {
+      --level-color: var(--level-saver);
+    }
+    & [data-level='essential'] {
+      --level-color: var(--level-essential);
+    }
+    & [aria-current='true'] {
+      background: var(--level-color);
+      color: var(--level-on);
+      font-weight: var(--font-weight-bold);
+    }
+  }
+
+  .cubes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  .cube {
+    inline-size: var(--cube-size);
+    aspect-ratio: 1;
+    border: var(--border-thin) solid var(--cube-edge);
+    border-radius: var(--radius-cube);
+    background: var(--cube-fill);
+  }
+  .cube[data-cube='partial'] {
+    /* Only the bottom part of the last cube is left. */
+    clip-path: inset(calc((1 - var(--cube-part)) * 100%) 0 0 0);
+  }
+
+  .receipt ul {
+    display: grid;
+  }
+  .receipt li {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding-block: var(--space-2);
+    border-block-end: var(--border-thin) dashed var(--surface-card-line);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+  }
+  .receipt-value {
+    color: var(--text-secondary);
+  }
+  .receipt-verdict {
+    color: var(--status-ok);
+    font-weight: var(--font-weight-bold);
+  }
+  .receipt li[data-ok='false'] .receipt-verdict {
+    color: var(--status-alert);
+  }
+
+  .actions {
+    display: grid;
+    gap: var(--space-2);
+  }
+  .button-primary {
+    justify-self: start;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding-inline: var(--space-6);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text);
+    font: inherit;
+    font-weight: var(--font-weight-bold);
+    cursor: pointer;
+    transition: background-color var(--duration-fast) ease;
+
+    &:hover:not(:disabled) {
+      background: var(--button-primary-bg-hover);
+    }
+    &:disabled {
+      background: color-mix(in oklab, var(--button-primary-bg) 35%, var(--surface-card));
+      cursor: not-allowed;
+    }
+  }
+  /* The blocked reason reads as part of the decision, not as fine print. */
+  .card:has(.button-primary:disabled) .actions .caption {
+    color: var(--text-primary);
+  }
+}
+
+@layer surfaces {
+  /* Wide containers (tablet, Echo Show landscape): reserve and receipt side by side. */
+  @container card (width >= 34rem) {
+    .card {
+      grid-template-columns: 1fr 1fr;
+      column-gap: var(--space-6);
+    }
+    .card > :not(.reserve, .receipt) {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+@layer overrides {
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none;
+    }
+  }
+}

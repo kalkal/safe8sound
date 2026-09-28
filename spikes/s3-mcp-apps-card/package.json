@@ -1,0 +1,43 @@
+{
+  "name": "spike-s3-mcp-apps-card",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Throwaway spike S3: MCP Apps card (ui://) rendered in a React host through the ext-apps AppBridge, styled only by DTCG tokens. Not part of the workspace.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "tokens": "node --import tsx scripts/build-tokens.ts",
+    "build:card": "pnpm tokens && vite build --config vite.card.config.ts",
+    "server": "node --import tsx src/server/main.ts",
+    "host": "vite --config vite.host.config.ts",
+    "test": "vitest run --maxWorkers=2",
+    "test:e2e": "pnpm build:card && playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "@modelcontextprotocol/sdk": "1.30.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@types/culori": "4.0.1",
+    "@types/node": "22.20.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "culori": "4.0.2",
+    "jsdom": "30.1.1",
+    "style-dictionary": "5.5.5",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  }
+}
