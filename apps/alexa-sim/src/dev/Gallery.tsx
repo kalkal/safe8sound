@@ -1,7 +1,7 @@
 import '@cold-reserve/ui-cards/cards.css';
-import { HomeProfileSchema, PlanSchema } from '@cold-reserve/contracts';
-import { exampleHomeProfile } from '@cold-reserve/contracts/fixtures';
-import { GuardReceipt, PlanCard, advisoryPlan, cardThemeFor, hotDayPlan, rejectedPlan } from '@cold-reserve/ui-cards';
+import { HomeProfileSchema, PlanSchema, PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema } from '@cold-reserve/contracts';
+import { exampleHomeProfile, examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
+import { GuardReceipt, IceCubesCard, PlanCard, PreferencesCard, advisoryPlan, cardThemeFor, hotDayPlan, rejectedPlan } from '@cold-reserve/ui-cards';
 
 // Dev-only style lab (plan §11.1bis point 8): every card on contract fixtures, in the theme the host
 // would pass (`?gallery&theme=light|dark`). Used for visual checks and the per-theme screenshots.
@@ -11,6 +11,7 @@ const usableWh = home.battery.usableWh;
 const timeZone = home.location.tz;
 /** The longest plan id the contract allows, to check wrapping at phone width. */
 const longIdPlan = PlanSchema.parse({ ...rejectedPlan(), id: 'P'.repeat(64) });
+const outlook = ReserveOutlookSchema.parse(exampleReserveOutlook());
 
 export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined }) {
   document.documentElement.dataset['cardTheme'] = cardThemeFor(hostTheme);
@@ -19,6 +20,13 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       <PlanCard plan={hotDayPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <GuardReceipt plan={hotDayPlan()} />
       <GuardReceipt plan={longIdPlan} />
+      <IceCubesCard outlook={outlook} />
+      <PreferencesCard
+        preferences={PreferencesSchema.parse(examplePreferences())}
+        limits={SafetyHardLimitsSchema.parse(exampleSafetyLimits())}
+        rooms={home.rooms}
+        outlook={outlook}
+      />
       <PlanCard plan={advisoryPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
     </div>
   );

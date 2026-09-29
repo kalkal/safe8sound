@@ -25,3 +25,11 @@ export function formatMeasure(value: number, unit: string | undefined): string {
       return one(value);
   }
 }
+
+/** Hours to the nearest half, as people say them: 9½, 18, ½. */
+export function formatHours(hours: number): string {
+  const rounded = Math.round(hours * 2) / 2;
+  const whole = Math.floor(rounded);
+  const half = rounded > whole ? '½' : '';
+  return whole === 0 && half !== '' ? half : `${String(whole)}${half}`;
+}
