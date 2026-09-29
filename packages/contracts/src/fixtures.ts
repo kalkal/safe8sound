@@ -3,6 +3,7 @@ import type { HomeProfileSchema, HvacUnitSchema } from './home.js';
 import type { GuaranteeId } from './guarantees.js';
 import type { PlanSchema } from './plan.js';
 import type { PreferencesSchema, SafetyHardLimitsSchema } from './preferences.js';
+import type { ReserveOutlookSchema } from './reserve-outlook.js';
 import type { ForecastSchema, SnapshotSchema } from './snapshot.js';
 
 // Example inputs for tests in every package. Each call returns a fresh, mutable object.
@@ -157,5 +158,17 @@ export function exampleSafetyLimits(): z.input<typeof SafetyHardLimitsSchema> {
     cooling: { maxC: { min: 24, max: 30, default: 27 } },
     heating: { minC: { min: 16, max: 22, default: 18 } },
     humidity: { minPct: { min: 30, max: 50, default: 40 }, maxPct: { min: 50, max: 70, default: 60 } },
+  };
+}
+
+/** Ice cubes and reserve hours; the hours match the example home at a mild evening load. */
+export function exampleReserveOutlook(): z.input<typeof ReserveOutlookSchema> {
+  return {
+    level: 'comfort',
+    hoursAtCurrentLevel: 9.5,
+    hoursAtEssential: 18,
+    reserveHoursAtEssential: 10,
+    origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' },
+    ts: '2026-07-15T21:10:00+02:00',
   };
 }
