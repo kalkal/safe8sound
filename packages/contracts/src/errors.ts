@@ -25,6 +25,11 @@ export const ERROR_CATALOG = {
   unknown_room: { category: 'validation' },
   plan_expired: { category: 'validation' },
   safety_threshold_out_of_range: { category: 'validation' },
+  // HTTP transport (MCP server, F3): sent with their own status through toProblemDetails
+  method_not_allowed: { category: 'validation' },
+  payload_too_large: { category: 'validation' },
+  route_not_found: { category: 'validation' },
+  missing_protocol_version: { category: 'validation' },
   // guard_rejection: the model re-plans (one code per guarantee)
   storm_reserve_violated: { category: 'guard_rejection' },
   inverter_limit_exceeded: { category: 'guard_rejection' },

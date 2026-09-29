@@ -31,8 +31,23 @@ export const ProblemDetailsSchema = z.strictObject({
 });
 export type ProblemDetails = z.infer<typeof ProblemDetailsSchema>;
 
-export function toProblemDetails(error: ErrorEnvelope, context: { instance: string }): ProblemDetails {
-  const { status, title } = HTTP[error.category];
+type Upto<N extends number, Acc extends number[] = []> = Acc['length'] extends N ? Acc[number] : Upto<N, [...Acc, Acc['length']]>;
+
+/** An HTTP error status: the integers 400 to 599, checked by the compiler and again at runtime. */
+export type HttpErrorStatus = Exclude<Upto<600>, Upto<400>>;
+
+const isHttpErrorStatus = (n: number): boolean => Number.isInteger(n) && n >= 400 && n <= 599;
+
+/**
+ * `status` overrides the category status where HTTP needs a more precise one (405, 413).
+ * A status outside 400-599 is a bug in the caller, so it throws.
+ */
+export function toProblemDetails(error: ErrorEnvelope, context: { instance: string; status?: HttpErrorStatus }): ProblemDetails {
+  const { title } = HTTP[error.category];
+  if (context.status !== undefined && !isHttpErrorStatus(context.status)) {
+    throw new RangeError(`Problem status must be an integer from 400 to 599, got ${String(context.status)}`);
+  }
+  const status = context.status ?? HTTP[error.category].status;
   return {
     type: `urn:cold-reserve:problem:${error.code}`,
     title,
