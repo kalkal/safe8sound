@@ -13,7 +13,16 @@ const params: SimParams = {
   hvac: { dryInputFactor: 0.5, drySensibleFactor: 0.3, fanOnlyInputW: 30 },
   gains: { perRoomBaseW: 50, perOccupantW: 80 },
   solarApertureM2: { default: 0.3, byRoom: {} },
-  humidity: { exchangeTimeConstantH: 3, coolRemovalPctPerH: 4, dryRemovalPctPerH: 5 },
+  humidity: {
+    exchangeTimeConstantH: 3,
+    roomVolumeM3: { default: 35, byRoom: {} },
+    occupantGainGph: 60,
+    baseGainGph: 30,
+    removalLphPerCoolingKw: 0.33,
+    dryRemovalFactor: 0.6,
+    rating: { tempC: 27, rhPct: 47 },
+    coilDewpointC: 8,
+  },
   pv: { lossRatio: 0.14 },
   load: { noiseRatio: 0.05 },
 };

@@ -1,7 +1,7 @@
 import { watt, type Celsius, type HomeProfile, type HvacMode, type Minutes, type Pct, type Watt } from '@cold-reserve/contracts';
 import { acLimitW, dispatch, type Dispatch } from './energy.js';
 import { hvacResponse, type HvacModelParams, type HvacResponse } from './hvac.js';
-import { indoorEquilibriumRh, stepRoomHumidity } from './humidity.js';
+import { stepRoomMoisture } from './humidity.js';
 import { pvPowerW } from './pv.js';
 import { coolingToReachW, stepRoomTemperature } from './thermal.js';
 
@@ -15,7 +15,23 @@ export interface SimParams {
   readonly gains: { readonly perRoomBaseW: number; readonly perOccupantW: number };
   /** Effective solar aperture (window area x solar gain factor), m², per room with a default. */
   readonly solarApertureM2: { readonly default: number; readonly byRoom: Readonly<Record<string, number>> };
-  readonly humidity: { readonly exchangeTimeConstantH: number; readonly coolRemovalPctPerH: number; readonly dryRemovalPctPerH: number };
+  /** Water balance of the room air (see humidity.ts); sources in the simulator's README. */
+  readonly humidity: {
+    readonly exchangeTimeConstantH: number;
+    /** Room air volume, m³, per room with a default. */
+    readonly roomVolumeM3: { readonly default: number; readonly byRoom: Readonly<Record<string, number>> };
+    /** Water from one person at rest, g/h. */
+    readonly occupantGainGph: number;
+    /** Water from household activities per room, g/h. */
+    readonly baseGainGph: number;
+    /** Dehumidification capacity per kW of rated cooling, l/h (datasheet). */
+    readonly removalLphPerCoolingKw: number;
+    /** Share of that capacity the dry mode uses (the cool mode uses its duty). */
+    readonly dryRemovalFactor: number;
+    /** Indoor air at which the datasheet capacity is rated. */
+    readonly rating: { readonly tempC: number; readonly rhPct: number };
+    readonly coilDewpointC: number;
+  };
   readonly pv: { readonly lossRatio: number };
   /** Base load varies by +/- this ratio around the scenario value. */
   readonly load: { readonly noiseRatio: number };
@@ -82,7 +98,7 @@ export function stepHome(args: { state: HomeState; inputs: HomeInputs; profile: 
             params.hvac,
           );
     const fansW = input?.fanOn === true ? room.fans.reduce((sum, f) => sum + f.powerW, 0) : 0;
-    return { rs, room, gainsW, hvac, fansW };
+    return { rs, room, gainsW, hvac, fansW, occupants: input?.occupants.length ?? 0 };
   });
 
   const hvacW = rooms.reduce((sum, r) => sum + r.hvac.electricW, 0);
@@ -103,20 +119,27 @@ export function stepHome(args: { state: HomeState; inputs: HomeInputs; profile: 
   // Off grid, a shortfall is shared by every load: the HVAC delivers only the served fraction.
   const servedRatio = loadW > 0 ? flows.servedLoadW / loadW : 1;
 
-  const nextRooms = rooms.map(({ rs, room, gainsW, hvac }): RoomState => {
+  const nextRooms = rooms.map(({ rs, room, gainsW, hvac, occupants }): RoomState => {
     const tempC = stepRoomTemperature({ tempC: rs.tempC, outC: inputs.outC, netHeatW: watt(gainsW - hvac.coolingW * servedRatio), dt, thermal: room.thermal });
-    const removal =
-      hvac.dehumidifying === 'dry'
-        ? params.humidity.dryRemovalPctPerH
-        : hvac.dehumidifying === 'cool'
-          ? params.humidity.coolRemovalPctPerH * hvac.duty
-          : 0;
-    const humidityPct = stepRoomHumidity({
+    // Datasheet dehumidification (l/h at the rated cooling) of the units running, scaled by the dry-mode
+    // share or, in cool, by the cooling delivered over the rated cooling.
+    const dehumidifying = hvac.dehumidifying;
+    const ratedKw = dehumidifying === 'none' ? 0 : room.hvacUnits.filter((u) => u.modes.includes(dehumidifying)).reduce((sum, u) => sum + u.coolingKw, 0);
+    const capacityGph = ratedKw * params.humidity.removalLphPerCoolingKw * 1000;
+    const share = dehumidifying === 'dry' ? params.humidity.dryRemovalFactor : ratedKw > 0 ? Math.min(1, hvac.coolingW / (ratedKw * 1000)) : 0;
+    const humidityPct = stepRoomMoisture({
       rhPct: rs.humidityPct,
-      equilibriumPct: indoorEquilibriumRh({ outC: inputs.outC, outRhPct: inputs.outRhPct, inC: tempC }),
+      tempC: rs.tempC,
+      nextTempC: tempC,
+      outC: inputs.outC,
+      outRhPct: inputs.outRhPct,
       dt,
+      volumeM3: params.humidity.roomVolumeM3.byRoom[rs.id] ?? params.humidity.roomVolumeM3.default,
       exchangeTimeConstantH: params.humidity.exchangeTimeConstantH,
-      removalPctPerH: removal * servedRatio,
+      gainsGph: params.humidity.baseGainGph + params.humidity.occupantGainGph * occupants,
+      removalGph: capacityGph * share * servedRatio,
+      rating: params.humidity.rating,
+      coilDewpointC: params.humidity.coilDewpointC,
     });
     return { id: rs.id, tempC, humidityPct };
   });

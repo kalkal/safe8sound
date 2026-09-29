@@ -14,7 +14,17 @@ export const SimulatorParamsSchema = z.strictObject({
   hvac: z.strictObject({ dryInputFactor: fraction, drySensibleFactor: fraction, fanOnlyInputW: nonNegative }),
   gains: z.strictObject({ perRoomBaseW: nonNegative, perOccupantW: nonNegative }),
   solarApertureM2: z.strictObject({ default: nonNegative, byRoom: z.record(z.string(), nonNegative) }),
-  humidity: z.strictObject({ exchangeTimeConstantH: z.number().positive(), coolRemovalPctPerH: nonNegative, dryRemovalPctPerH: nonNegative }),
+  /** Water balance of the room air: sources for every value in the README ("Humidity parameters"). */
+  humidity: z.strictObject({
+    exchangeTimeConstantH: z.number().positive(),
+    roomVolumeM3: z.strictObject({ default: z.number().positive(), byRoom: z.record(z.string(), z.number().positive()) }),
+    occupantGainGph: nonNegative,
+    baseGainGph: nonNegative,
+    removalLphPerCoolingKw: nonNegative,
+    dryRemovalFactor: fraction,
+    rating: z.strictObject({ tempC: z.number().min(15).max(35), rhPct: z.number().min(20).max(80) }),
+    coilDewpointC: z.number().min(0).max(25),
+  }),
   pv: z.strictObject({ lossRatio: fraction }),
   load: z.strictObject({ noiseRatio: fraction }),
   /** Feels-like effect of a running fan, used by the comfort levels only. */

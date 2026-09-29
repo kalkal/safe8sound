@@ -11,7 +11,7 @@ Judges, tests and E2E always run on it (plan §1 principle 3). The physics lives
 | Room temperature | 1R1C per room, `C dT/dt = (Tout - T)/R + Q`, solved exactly over each step (stable for any step) | `core/thermal.ts` |
 | Heat gains | base + per occupant + irradiance x effective solar aperture | `core/simulation.ts` |
 | Splits | cool/heat at the rated COP, capped at max input; dry = fixed fraction of nominal input and of rated cooling; fan only = fan power; units without a mode stay off | `core/hvac.ts` |
-| Room humidity | relaxes toward the outdoor vapour pressure at room temperature; cool (by duty) and dry remove %RH per hour | `core/humidity.ts` |
+| Room humidity | water balance of the room air in vapour pressure: air exchange toward the outdoor vapour pressure, gains from people and the household, removal by the splits from their datasheet capacity, never below the coil dew point; exact solution per step | `core/humidity.ts` |
 | Feels-like | NOAA heat index from 26.7 °C, never below the air; a fan lowers it by a configured effect. Comfort levels only, never the safety guarantee | `core/comfort.ts` |
 | PV | peak x irradiance / 1000 W/m² x (1 - losses) | `core/pv.ts` |
 | Battery and flows | self-consumption; rated charge/discharge power; hardware floor to 100 %; sqrt(round trip) each way; inverter AC limit on grid, EPS limit off grid; off grid: no import/export, surplus curtailed, shortfall not served (HVAC then delivers only the served share) | `core/energy.ts` |
@@ -32,6 +32,23 @@ The 1R1C constants are in K/kW and kWh/K as in the contract.
   for grid outages, occupancy (roles only) and HVAC settings, and `simulatedGroups`: the field groups the
   scenario replaces even over a live home. `storm-blackout` lists all three groups, so it is always
   fully simulated. The clear-day and heatwave weather is the PVGIS July profile of S6 turned into irradiance.
+
+## Humidity parameters (`humidity` in `data/simulator-params.json`)
+
+| Parameter | Value | Source / reasoning |
+|---|---|---|
+| `removalLphPerCoolingKw` | 0.33 l/h per kW | Hisense Easy Smart datasheets: 0.9–2.2 l/h across 9 000–24 000 BTU (plan §4ter); at the rated cooling. |
+| `rating` | 27 °C, 47 % RH | The datasheet capacity is rated at the EN 14511 indoor condition, 27 °C dry bulb and 19 °C wet bulb (about 47 % RH). More humid air gives more water, drier air less. |
+| cool-mode share | cooling delivered ÷ rated cooling (max 1) | The datasheet figure is at the rated capacity, and a split at part load removes proportionally less water. A constant sensible heat ratio, about 0.8. |
+| `dryRemovalFactor` | 0.6 | Dry mode runs the compressor at low speed whatever the cooling need; assumption from S6, to calibrate with ConnectLife data. |
+| `occupantGainGph` | 60 g/h | A person at rest gives off about 40–70 g/h of water vapour (CIBSE Guide A order of magnitude). |
+| `baseGainGph` | 30 g/h per room | Small household sources (plants, cooking spread over the day). Assumption. |
+| `exchangeTimeConstantH` | 3 h | About 0.33 air changes per hour in a closed room (unchanged from S6). |
+| `roomVolumeM3` | 35 m³ (living 70) | About 13 m² × 2.7 m; the living room is about twice as large. |
+| `coilDewpointC` | 8 °C | Typical evaporator saturation temperature of a split in cooling (5–10 °C): the air is never dried below this dew point. |
+
+With these values a split in cool at part load keeps a humid room at 64–80 % RH on a humid night: at low
+load an inverter split removes little water. The dry mode brings the room down to about 52–55 %.
 
 ## Reproducibility
 

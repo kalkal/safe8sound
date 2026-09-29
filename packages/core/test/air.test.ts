@@ -2,7 +2,7 @@ import { celsius, minutes, pct, watt } from '@cold-reserve/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { feelsLikeC } from '../src/comfort.js';
-import { indoorEquilibriumRh, saturationVaporPressureHpa, stepRoomHumidity } from '../src/humidity.js';
+import { indoorEquilibriumRh, saturationVaporPressureHpa, stepRoomMoisture } from '../src/humidity.js';
 import { pvPowerW } from '../src/pv.js';
 
 describe('humidity', () => {
@@ -22,27 +22,118 @@ describe('humidity', () => {
     expect(indoorEquilibriumRh({ outC: celsius(30), outRhPct: pct(95), inC: celsius(20) })).toBe(100);
   });
 
-  it('relaxes toward the equilibrium and removal lowers it', () => {
-    const base = { rhPct: pct(70), equilibriumPct: pct(50), dt: minutes(60), exchangeTimeConstantH: 3 };
-    const passive = stepRoomHumidity({ ...base, removalPctPerH: 0 });
-    expect(passive).toBeLessThan(70);
-    expect(passive).toBeGreaterThan(50);
-    expect(stepRoomHumidity({ ...base, removalPctPerH: 5 })).toBeLessThan(passive);
+});
+
+describe('stepRoomMoisture: water balance of the room air', () => {
+  // A 35 m³ bedroom at 26 °C in a humid evening (28 °C, 70 % outside).
+  const base = {
+    rhPct: pct(60),
+    tempC: celsius(26),
+    nextTempC: celsius(26),
+    outC: celsius(28),
+    outRhPct: pct(70),
+    dt: minutes(60),
+    volumeM3: 35,
+    exchangeTimeConstantH: 3,
+    gainsGph: 0,
+    removalGph: 0,
+    rating: { tempC: 27, rhPct: 47 },
+    coilDewpointC: 8,
+  };
+
+  it('with no gains and no removal relaxes toward the outdoor water vapour at room temperature', () => {
+    const eq = indoorEquilibriumRh({ outC: base.outC, outRhPct: base.outRhPct, inC: base.tempC });
+    const next = stepRoomMoisture(base);
+    expect(next).toBeGreaterThan(60);
+    expect(next).toBeLessThan(eq);
+    expect(stepRoomMoisture({ ...base, dt: minutes(6000) })).toBeCloseTo(eq, 6);
   });
 
-  it('always stays in [0, 100]', () => {
+  it('keeps the water when the room cools: the relative humidity rises', () => {
+    expect(stepRoomMoisture({ ...base, dt: minutes(0.001), nextTempC: celsius(24) })).toBeGreaterThan(60);
+  });
+
+  it('a 1 l/h split at full duty dries a humid room within the hour (datasheet order of magnitude)', () => {
+    const next = stepRoomMoisture({ ...base, rhPct: pct(80), removalGph: 1000 });
+    expect(next).toBeLessThan(60);
+  });
+
+  it('removes the datasheet capacity at the rating condition (27 °C, 47 %), with no gains or exchange', () => {
+    // 35 m³ at 27 °C: 1 % RH is about 9 g of water. Over 3.6 s the rate is the initial one: 1.2 l/h.
+    const hours = 0.001;
+    const next = stepRoomMoisture({ ...base, rhPct: pct(47), tempC: celsius(27), nextTempC: celsius(27), outRhPct: pct(47), outC: celsius(27), removalGph: 1200, dt: minutes(hours * 60), exchangeTimeConstantH: 1e9 });
+    const gramsPerPct = ((saturationVaporPressureHpa(celsius(27)) * 100 * 35) / (461.5 * 300.15) / 100) * 1000;
+    expect(((47 - next) * gramsPerPct) / hours).toBeCloseTo(1200, -1);
+  });
+
+  it('occupants add water: about 60 g/h per person (CIBSE Guide A order of magnitude)', () => {
+    expect(stepRoomMoisture({ ...base, gainsGph: 120 })).toBeGreaterThan(stepRoomMoisture(base));
+  });
+
+  it('never dries the air below the coil dew point, however large the removal', () => {
+    const floor = (saturationVaporPressureHpa(celsius(8)) / saturationVaporPressureHpa(celsius(26))) * 100;
+    const next = stepRoomMoisture({ ...base, removalGph: 1e7, dt: minutes(600) });
+    expect(next).toBeGreaterThanOrEqual(floor - 1e-6);
+    expect(next).toBeLessThan(floor + 1);
+  });
+
+  const inputs = fc.record({
+    rh: fc.double({ min: 0, max: 100, noNaN: true }),
+    t: fc.double({ min: 10, max: 40, noNaN: true }),
+    t2: fc.double({ min: 10, max: 40, noNaN: true }),
+    out: fc.double({ min: 0, max: 45, noNaN: true }),
+    outRh: fc.double({ min: 0, max: 100, noNaN: true }),
+    dt: fc.double({ min: 0.1, max: 600, noNaN: true }),
+    gains: fc.double({ min: 0, max: 1000, noNaN: true }),
+    removal: fc.double({ min: 0, max: 5000, noNaN: true }),
+  });
+  const step = (x: { rh: number; t: number; t2: number; out: number; outRh: number; dt: number; gains: number; removal: number }) =>
+    stepRoomMoisture({
+      ...base,
+      rhPct: pct(x.rh),
+      tempC: celsius(x.t),
+      nextTempC: celsius(x.t2),
+      outC: celsius(x.out),
+      outRhPct: pct(x.outRh),
+      dt: minutes(x.dt),
+      gainsGph: x.gains,
+      removalGph: x.removal,
+    });
+
+  it('property: always stays in [0, 100]', () => {
     fc.assert(
-      fc.property(
-        fc.double({ min: 0, max: 100, noNaN: true }),
-        fc.double({ min: 0, max: 100, noNaN: true }),
-        fc.double({ min: 0.1, max: 600, noNaN: true }),
-        fc.double({ min: 0, max: 50, noNaN: true }),
-        (rh, eq, dt, removal) => {
-          const next = stepRoomHumidity({ rhPct: pct(rh), equilibriumPct: pct(eq), dt: minutes(dt), exchangeTimeConstantH: 3, removalPctPerH: removal });
-          expect(next).toBeGreaterThanOrEqual(0);
-          expect(next).toBeLessThanOrEqual(100);
-        },
-      ),
+      fc.property(inputs, (x) => {
+        const next = step(x);
+        expect(next).toBeGreaterThanOrEqual(0);
+        expect(next).toBeLessThanOrEqual(100);
+      }),
+      { numRuns: 10_000 },
+    );
+  });
+
+  it('property: more removal never gives more humidity', () => {
+    fc.assert(
+      fc.property(inputs, fc.double({ min: 0, max: 5000, noNaN: true }), (x, extra) => {
+        expect(step({ ...x, removal: x.removal + extra })).toBeLessThanOrEqual(step(x) + 1e-6);
+      }),
+      { numRuns: 10_000 },
+    );
+  });
+
+  it('property: with occupants and the split running, a steady state exists inside (0, 100)', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 4 }), fc.double({ min: 0, max: 1000, noNaN: true }), fc.double({ min: 40, max: 100, noNaN: true }), (people, removal, outRh) => {
+        let rh = pct(50);
+        let previous = -1;
+        for (let i = 0; i < 400; i++) {
+          previous = rh;
+          rh = stepRoomMoisture({ ...base, rhPct: rh, outRhPct: pct(outRh), gainsGph: people * 60 + 50, removalGph: removal, dt: minutes(15) });
+        }
+        expect(Math.abs(rh - previous)).toBeLessThan(1e-3);
+        expect(rh).toBeGreaterThan(0);
+        expect(rh).toBeLessThanOrEqual(100);
+      }),
+      { numRuns: 1_000 },
     );
   });
 });

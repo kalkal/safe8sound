@@ -59,9 +59,10 @@ describe('hvacResponse', () => {
     expect(r.dehumidifying).toBe('dry');
   });
 
-  it('dry mode at set point only runs the fan', () => {
+  it('dry mode keeps dehumidifying at its set point: compressor at the dry input, no sensible cooling', () => {
     const r = hvacResponse([split12k], 'dry', watt(-100), params);
-    expect(r).toMatchObject({ coolingW: 0, electricW: 30, dehumidifying: 'none' });
+    expect(r).toMatchObject({ coolingW: 0, dehumidifying: 'dry', duty: 0 });
+    expect(r.electricW).toBeCloseTo(0.5 * 970, 6);
   });
 
   it('fan only: fan power, no cooling', () => {

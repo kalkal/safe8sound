@@ -3,8 +3,9 @@ import { kilowattToWatt, watt, type HvacMode, type HvacUnit, type Watt } from '@
 // Simple, declared split model (spike S6, Hisense Easy Smart datasheet):
 // - cool/heat: thermal power = electric input x COP, COP = rated cooling / nominal input;
 //   capped at the maximum input. Below the minimum input the unit cycles, so the average still scales.
-// - dry: compressor at low speed until the set point, with a fixed fraction of the nominal input and of
-//   the rated cooling (both assumptions from S6, to calibrate with ConnectLife kWh).
+// - dry: compressor at low speed with a fixed fraction of the nominal input, dehumidifying whether or not
+//   the room needs sensible cooling; sensible cooling up to a fixed fraction of the rated cooling (both
+//   assumptions from S6, to calibrate with ConnectLife kWh).
 // - fan_only: fan power only.
 
 export interface HvacModelParams {
@@ -60,8 +61,8 @@ export function hvacResponse(units: readonly HvacUnit[], mode: HvacMode, cooling
   if (mode === 'auto' || mode === 'heat_cool') return hvacResponse(able, coolingNeedW >= 0 ? 'cool' : 'heat', coolingNeedW, params);
 
   if (mode === 'dry') {
+    // The compressor runs at low speed to dehumidify even when the room needs no sensible cooling.
     const need = Math.max(0, coolingNeedW);
-    if (need === 0) return { ...IDLE, electricW: watt(params.fanOnlyInputW * able.length) };
     const r = fill(
       able.map((u) => ({ capW: kilowattToWatt(u.coolingKw) * params.drySensibleFactor, perThermalW: () => 0 })),
       need,

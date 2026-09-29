@@ -112,9 +112,11 @@ describe('SimulatorSource', () => {
     }
   });
 
-  it('storm-blackout: default HVAC drains to the floor at ~06:00 before the grid returns at 06:30', () => {
-    // Without pacing (F4) the battery runs out just before the grid comes back: the case that the
-    // pacing_on_track guarantee must prevent.
+  it('storm-blackout: default HVAC drains to the floor at ~04:00, before the grid returns at 06:30', () => {
+    // Without pacing (F4) the battery runs out before the grid comes back: the case that the
+    // pacing_on_track guarantee must prevent. Since the humidity calibration the dry mode keeps its
+    // compressor running all night (it dehumidifies without a cooling need), so the floor moved from
+    // 06:16 to about 04:00.
     const { sim, start, scenario } = source('storm-blackout');
     const outage = scenario.gridOutages[0];
     if (!outage) throw new Error('storm-blackout has an outage');
@@ -122,8 +124,9 @@ describe('SimulatorSource', () => {
     for (let m = 0; m <= scenario.durationH * 60 && floorAtH === undefined; m++) {
       if (sim.snapshotAt(start + m * 60_000).batterySocPct <= profile.battery.minSocHwPct) floorAtH = m / 60;
     }
-    // Scenario starts at 12:00 local: 06:00 is hour 18, 06:30 is hour 18.5.
-    expect(floorAtH).toBeGreaterThanOrEqual(17.5);
+    // Scenario starts at 12:00 local: 04:00 is hour 16, 06:30 is hour 18.5.
+    expect(floorAtH).toBeGreaterThanOrEqual(15.5);
+    expect(floorAtH).toBeLessThan(16.5);
     expect(floorAtH).toBeLessThan(outage.toH);
     expect(outage.toH).toBe(18.5);
     const dark = sim.snapshotAt(start + (outage.toH - 0.1) * HOUR);
