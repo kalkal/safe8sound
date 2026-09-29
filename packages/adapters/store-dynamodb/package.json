@@ -5,10 +5,14 @@
   "description": "StateStore on the single DynamoDB table.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./testing/fake-table.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.1141.0",
+    "@aws-sdk/lib-dynamodb": "3.1141.0",
     "@cold-reserve/contracts": "workspace:*",
-    "@cold-reserve/core": "workspace:*"
+    "@cold-reserve/core": "workspace:*",
+    "zod": "catalog:"
   }
 }
