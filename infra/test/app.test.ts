@@ -1,7 +1,7 @@
 import { App, Stack } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { Bucket } from 'aws-cdk-lib/aws-s3';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { applyGuardrails, buildApp, loadInfraConfig, type InfraConfig } from '../src/index.js';
 
 const config: InfraConfig = { region: 'us-east-1', stages: ['dev', 'demo'] };
@@ -26,6 +26,13 @@ describe('loadInfraConfig (region and stages always from config)', () => {
 });
 
 describe('buildApp', () => {
+  // The first synth in a process loads most of aws-cdk-lib: ~10 s idle, 27 s on the old PC under load
+  // (issue #53), while later synths take well under 2 s. Pay that once here, with its own timeout,
+  // so the assertions below keep the normal test timeout.
+  beforeAll(() => {
+    buildApp(new App(), config).synth();
+  }, 90_000);
+
   it('creates one foundation stack per stage, in the configured region', () => {
     const app = buildApp(new App(), { region: 'eu-south-1', stages: ['dev', 'demo'] });
     const stacks = stacksOf(app);
