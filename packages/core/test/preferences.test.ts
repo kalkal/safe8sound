@@ -49,6 +49,63 @@ describe('updatePreferences', () => {
     );
   });
 
+  it('never lets an accepted update leave the heating and humidity hard limits (property)', () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: -60, max: 80, noNaN: true }),
+        fc.double({ min: 0, max: 100, noNaN: true }),
+        fc.double({ min: 0, max: 100, noNaN: true }),
+        (minC, minPct, maxPct) => {
+          const update = { safety: { heating: { minC }, humidity: { minPct, maxPct } }, comfortC: { heating: Math.max(minC, 20) } };
+          const result = updatePreferences(current(), update, ctx);
+          if (result.ok) {
+            const s = result.value.preferences.safety;
+            expect(s.heating.minC).toBeGreaterThanOrEqual(limits.heating.minC.min);
+            expect(s.heating.minC).toBeLessThanOrEqual(limits.heating.minC.max);
+            expect(s.humidity.minPct).toBeGreaterThanOrEqual(limits.humidity.minPct.min);
+            expect(s.humidity.minPct).toBeLessThanOrEqual(limits.humidity.minPct.max);
+            expect(s.humidity.maxPct).toBeGreaterThanOrEqual(limits.humidity.maxPct.min);
+            expect(s.humidity.maxPct).toBeLessThanOrEqual(limits.humidity.maxPct.max);
+          }
+        },
+      ),
+    );
+  });
+
+  it.each([
+    ['safety.cooling.maxC', (v: number) => ({ safety: { cooling: { maxC: v } }, comfortC: { cooling: Math.min(v, 24) } }), limits.cooling.maxC],
+    ['safety.heating.minC', (v: number) => ({ safety: { heating: { minC: v } }, comfortC: { heating: Math.max(v, 16) } }), limits.heating.minC],
+    ['safety.humidity.minPct', (v: number) => ({ safety: { humidity: { minPct: v } } }), limits.humidity.minPct],
+    ['safety.humidity.maxPct', (v: number) => ({ safety: { humidity: { maxPct: v } } }), limits.humidity.maxPct],
+  ] as const)('%s: accepts the hard limit at min and max, refuses max + epsilon', (field, update, bound) => {
+    expect(updatePreferences(current(), update(bound.min), ctx).ok).toBe(true);
+    expect(updatePreferences(current(), update(bound.max), ctx).ok).toBe(true);
+    expect(updatePreferences(current(), update(bound.max + 0.001), ctx)).toMatchObject({
+      ok: false,
+      error: { code: 'safety_threshold_out_of_range', details: { field, nearestAllowed: bound.max } },
+    });
+  });
+
+  it('refuses a humidity band whose minimum is not below its maximum', () => {
+    expect(updatePreferences(current(), { safety: { humidity: { minPct: 50, maxPct: 50 } } }, ctx)).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_input', details: { field: 'safety' } },
+    });
+  });
+
+  it('reports a final schema failure (repeated rooms) as invalid_input with the issues', () => {
+    const result = updatePreferences(current(), { roomPriority: ['bedroom-1', 'living', 'living'] }, ctx);
+    expect(result).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+    expect(!result.ok && result.error.details?.issues?.[0]?.path).toBe('roomPriority');
+  });
+
+  it('records the path the confirmation came through when the caller knows it', () => {
+    const result = updatePreferences(current(), { language: 'it-IT' }, { ...ctx, confirmedVia: 'tool' });
+    expect(result.ok && result.value.changes).toEqual([
+      { ts: ctx.at, field: 'language', from: 'en-US', to: 'it-IT', by: 'user', confirmed: true, confirmedVia: 'tool' },
+    ]);
+  });
+
   it('refuses a comfort setpoint outside the safety thresholds of its season', () => {
     expect(updatePreferences(current(), { comfortC: { cooling: 29 } }, ctx)).toMatchObject({
       ok: false,

@@ -41,6 +41,8 @@ export interface PreferencesUpdateContext {
   /** ISO 8601 time of the confirmation. */
   readonly at: string;
   readonly by: ConfigChange['by'];
+  /** The path the confirmation came through, when the caller knows it. */
+  readonly confirmedVia?: ConfigChange['confirmedVia'];
 }
 
 export interface PreferencesUpdateResult {
@@ -141,7 +143,9 @@ function diff(before: Preferences, after: Preferences, ctx: PreferencesUpdateCon
     const from = read(before);
     const to = read(after);
     const contactsChanged = field === 'familyContacts.count' && JSON.stringify(before.familyContacts) !== JSON.stringify(after.familyContacts);
-    if (from !== to || contactsChanged) changes.push({ ts: ctx.at, field, from, to, by: ctx.by, confirmed: true });
+    if (from !== to || contactsChanged) {
+      changes.push({ ts: ctx.at, field, from, to, by: ctx.by, confirmed: true, ...(ctx.confirmedVia === undefined ? {} : { confirmedVia: ctx.confirmedVia }) });
+    }
   }
   return changes;
 }

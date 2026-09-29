@@ -118,6 +118,16 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
         expect(await store.getPreferences()).toEqual({ ok: true, value: t.prefs() });
         expect(await store.listConfigChanges()).toEqual({ ok: true, value: [] });
       });
+
+      it('accepts up to 99 changes at once (one DynamoDB transaction) and refuses more, saving nothing', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        const many = (n: number) => Array.from({ length: n }, (_, i) => t.change(i, 28));
+        expect((await store.putPreferences(t.prefs(), many(99))).ok).toBe(true);
+        const other = t.harness.factory(t.homeB);
+        expect(await other.putPreferences(t.prefs(), many(100))).toMatchObject({ ok: false, error: { code: 'invalid_input', details: { field: 'changes' } } });
+        expect(await other.getPreferences()).toEqual({ ok: true, value: undefined });
+      });
     });
 
     describe('home scoping', () => {

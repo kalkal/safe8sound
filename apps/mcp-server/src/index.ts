@@ -2,6 +2,8 @@
 export const packageName = '@cold-reserve/mcp-server';
 
 export { createApp, type App, type AppOptions } from './app.js';
+export { composeModules, createDynamoStoreFactory, profileFor, type ComposeOptions } from './compose.js';
+export { defaultPreferencesFor, loadPreferencesConfig, preferencesConfigFile, type PreferencesConfig } from './preferences-config.js';
 export { loadConfig, parseClients, type ClientGrant, type ServerConfig } from './config.js';
 export { createMcpHandler, type LogEntry, type Logger, type McpHandler } from './handler.js';
 export { createLambdaHandler, type FunctionUrlEvent, type FunctionUrlResult } from './lambda.js';

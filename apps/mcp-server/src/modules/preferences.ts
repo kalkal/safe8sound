@@ -116,6 +116,8 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
         roomIds: deps.roomIdsFor(ctx.homeId),
         at: new Date(deps.clock.now()).toISOString(),
         by: 'user',
+        // The model passed confirmed: true after the host prompt; the log says so, not more.
+        confirmedVia: 'tool',
       });
       if (!next.ok) return next;
       const saved = await deps.storeFor(ctx.homeId).putPreferences(next.value.preferences, next.value.changes);

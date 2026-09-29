@@ -58,9 +58,43 @@ describe('preferences module (MCP tools)', () => {
     expect(set.isError).toBeFalsy();
     expect(set.structuredContent).toMatchObject({
       preferences: { safety: { cooling: { maxC: 28 } } },
-      changes: [{ field: 'safety.cooling.maxC', from: 27, to: 28, by: 'user', confirmed: true, ts: '2026-07-15T12:00:00.000Z' }],
+      changes: [{ field: 'safety.cooling.maxC', from: 27, to: 28, by: 'user', confirmed: true, confirmedVia: 'tool', ts: '2026-07-15T12:00:00.000Z' }],
     });
     expect((await call(d, 'get_preferences', {})).structuredContent).toMatchObject({ isDefault: false, preferences: { safety: { cooling: { maxC: 28 } } } });
+  });
+
+  it('reports every refusal of the domain through MCP, and saves nothing', async () => {
+    const d = deps();
+    expect(await call(d, 'set_preferences', { comfortC: { cooling: 29 }, confirmed: true })).toMatchObject({
+      isError: true,
+      structuredContent: { code: 'invalid_setpoint', details: { field: 'comfortC.cooling', nearestAllowed: 27 } },
+    });
+    expect(await call(d, 'set_preferences', { roomPriority: ['living', 'bedroom-1', 'study'], confirmed: true })).toMatchObject({
+      isError: true,
+      structuredContent: { code: 'invalid_input', details: { field: 'roomPriority' } },
+    });
+    expect((await call(d, 'get_preferences', {})).structuredContent).toMatchObject({ isDefault: true });
+  });
+
+  it('reports a failed write as store_unavailable and does not claim the change', async () => {
+    const memory = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: { now: () => NOW_MS } });
+    // Reads go to a real memory store; the write fails.
+    const storeFor = (home: HomeId): StateStore => {
+      const base = memory(home);
+      return {
+        homeId: base.homeId,
+        getPreferences: () => base.getPreferences(),
+        putPreferences: () => Promise.resolve({ ok: false, error: { code: 'store_unavailable', category: 'dependency_unavailable', message: 'Down.', retryable: true } }),
+        listConfigChanges: () => base.listConfigChanges(),
+        savePlan: (plan) => base.savePlan(plan),
+        getPlan: (id) => base.getPlan(id),
+        applyPlan: (id) => base.applyPlan(id),
+        recordGuardRejection: (r) => base.recordGuardRejection(r),
+        listGuardRejections: () => base.listGuardRejections(),
+      };
+    };
+    const set = await call(deps({ storeFor }), 'set_preferences', { language: 'it-IT', confirmed: true });
+    expect(set).toMatchObject({ isError: true, structuredContent: { code: 'store_unavailable', retryable: true } });
   });
 
   it('requires the person to have confirmed the change', async () => {

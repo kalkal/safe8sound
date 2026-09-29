@@ -95,4 +95,10 @@ describe('ConfigChangeSchema', () => {
     expect(ConfigChangeSchema.safeParse({ ...change, confirmed: false }).success).toBe(false);
     expect(ConfigChangeSchema.safeParse({ ...change, by: 'agent' }).success).toBe(false);
   });
+
+  it('says through which path the confirmation came (optional, approved in #20)', () => {
+    expect(ConfigChangeSchema.safeParse({ ...change, confirmedVia: 'tool' }).success).toBe(true);
+    expect(ConfigChangeSchema.safeParse({ ...change, confirmedVia: 'app' }).success).toBe(true);
+    expect(ConfigChangeSchema.safeParse({ ...change, confirmedVia: 'telepathy' }).success).toBe(false);
+  });
 });

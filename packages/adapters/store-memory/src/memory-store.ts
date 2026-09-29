@@ -46,6 +46,7 @@ export interface MemoryStateStoreOptions {
 }
 
 const DAY_MS = 24 * 60 * 60_000;
+const MAX_CHANGES = 99;
 
 export const memoryStateStoreFactory =
   (options: MemoryStateStoreOptions): StateStoreFactory =>
@@ -71,6 +72,10 @@ class MemoryStateStore implements StateStore {
     // Validate everything first, so the preferences and their log are written together or not at all.
     if (changes.some((change) => !IsoDateTimeSchema.safeParse(change.ts).success)) {
       return Promise.resolve(err(toolError('invalid_input', 'Every configuration change needs an ISO 8601 time.', { details: { field: 'changes' } })));
+    }
+    // Same limit as store-dynamodb: preferences + changes fit in one 100-item transaction.
+    if (changes.length > MAX_CHANGES) {
+      return Promise.resolve(err(toolError('invalid_input', `At most ${String(MAX_CHANGES)} changes at once.`, { details: { field: 'changes' } })));
     }
     this.#put('PREFS', { value: preferences });
     for (const change of changes) {

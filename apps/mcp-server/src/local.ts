@@ -1,18 +1,31 @@
+import type { ErrorEnvelope, Result } from '@cold-reserve/contracts';
+import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { createApp } from './app.js';
+import { composeModules } from './compose.js';
 import { startNodeServer } from './node-server.js';
+import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 
 // Local Node entry: 127.0.0.1 only (plan §13.2.3). Tokens from MCP_CLIENTS in the environment.
+// State lives in memory: it survives new MCP sessions, not a restart of this process.
 const log = (line: object) => {
   console.error(JSON.stringify({ ts: new Date().toISOString(), component: 'mcp-server', ...line }));
 };
 
-const app = createApp(process.env, { wallClock: { now: Date.now }, logger: { log } });
-if (!app.ok) {
-  log({ level: 'error', code: app.error.code, message: app.error.message });
+/** A configuration error stops the process at startup, with the reason in the log. */
+function orExit<T>(result: Result<T, ErrorEnvelope>): T {
+  if (result.ok) return result.value;
+  log({ level: 'error', code: result.error.code, message: result.error.message, details: result.error.details });
   process.exit(1);
 }
 
-const server = await startNodeServer(app.value.handler, { host: '127.0.0.1', port: Number(process.env['PORT'] ?? 3316), path: app.value.config.path, maxBodyBytes: app.value.config.maxBodyBytes });
+const wallClock = { now: Date.now };
+const preferences = orExit(loadPreferencesConfig(preferencesConfigFile()));
+const modules = orExit(
+  composeModules({ preferences, storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wallClock }), clock: wallClock }),
+);
+const app = orExit(createApp(process.env, { wallClock, logger: { log }, modules }));
+
+const server = await startNodeServer(app.handler, { host: '127.0.0.1', port: Number(process.env['PORT'] ?? 3316), path: app.config.path, maxBodyBytes: app.config.maxBodyBytes });
 console.log(JSON.stringify({ level: 'info', component: 'mcp-server', message: `listening on ${server.url}` }));
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

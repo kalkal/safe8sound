@@ -1,0 +1,14 @@
+{
+  "$comment": "Hard limits and defaults of the user's comfort and safety preferences (issue #20). These are the ranges a person may set in the app, not the health thresholds: the 26/31 C health thresholds and TM59 live in the guard (F4), which decides anyway. Values approved in #20; changeable by the owner.",
+  "limits": {
+    "cooling": { "maxC": { "min": 24, "max": 30, "default": 27 } },
+    "heating": { "minC": { "min": 16, "max": 22, "default": 18 } },
+    "humidity": {
+      "minPct": { "min": 30, "max": 50, "default": 40 },
+      "maxPct": { "min": 50, "max": 70, "default": 60 }
+    }
+  },
+  "comfortC": { "cooling": 25, "heating": 20 },
+  "autoStormOnGridLoss": true,
+  "language": "en-US"
+}

@@ -100,5 +100,7 @@ export const ConfigChangeSchema = z.strictObject({
   to: z.union([z.number(), z.string(), z.boolean()]),
   by: z.enum(['user', 'scenario']),
   confirmed: z.literal(true),
+  /** Where the confirmation came from: the MCP tool (after the host prompt) or the app. Additive, approved in #20. */
+  confirmedVia: z.enum(['tool', 'app']).optional(),
 });
 export type ConfigChange = z.infer<typeof ConfigChangeSchema>;
