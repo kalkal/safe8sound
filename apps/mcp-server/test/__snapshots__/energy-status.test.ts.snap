@@ -1,0 +1,369 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`tools/list of the production registry > matches the snapshot (names, annotations, input and output JSON Schemas) 1`] = `
+{
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "Current state of the home: battery, solar, load and grid, the pacing level and why, whether the splits can be driven, each room with temperature and whether it is served or waiting, and where every group of data comes from (live or simulated).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object",
+      },
+      "name": "get_home_status",
+      "outputSchema": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "batterySocPct": {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number",
+              },
+              "controlAvailability": {
+                "enum": [
+                  "ok",
+                  "cloud_unreachable",
+                  "manual_only",
+                ],
+                "type": "string",
+              },
+              "gridAvailable": {
+                "type": "boolean",
+              },
+              "gridW": {
+                "type": "number",
+              },
+              "homeId": {
+                "pattern": "^[a-z0-9][a-z0-9#_-]{0,63}$",
+                "type": "string",
+              },
+              "homeLink": {
+                "enum": [
+                  "ok",
+                  "stale",
+                  "lost",
+                ],
+                "type": "string",
+              },
+              "lastLiveAt": {
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "type": "string",
+              },
+              "level": {
+                "enum": [
+                  "comfort",
+                  "balanced",
+                  "saver",
+                  "essential",
+                ],
+                "type": "string",
+              },
+              "levelChangedAt": {
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "type": "string",
+              },
+              "levelReason": {
+                "enum": [
+                  "weather",
+                  "occupancy",
+                  "user_choice",
+                  "soc_below_track",
+                  "soc_above_track",
+                  "storm",
+                ],
+                "type": "string",
+              },
+              "loadW": {
+                "type": "number",
+              },
+              "origin": {
+                "additionalProperties": false,
+                "properties": {
+                  "energy": {
+                    "enum": [
+                      "live",
+                      "simulated",
+                    ],
+                    "type": "string",
+                  },
+                  "rooms": {
+                    "enum": [
+                      "live",
+                      "simulated",
+                    ],
+                    "type": "string",
+                  },
+                  "scenario": {
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,47}$",
+                    "type": "string",
+                  },
+                  "weather": {
+                    "enum": [
+                      "live",
+                      "simulated",
+                    ],
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "energy",
+                  "rooms",
+                  "weather",
+                ],
+                "type": "object",
+              },
+              "pvW": {
+                "type": "number",
+              },
+              "rooms": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "humidityPct": {
+                      "maximum": 100,
+                      "minimum": 0,
+                      "type": "number",
+                    },
+                    "occupants": {
+                      "items": {
+                        "pattern": "^[a-z][a-z_-]{0,31}$",
+                        "type": "string",
+                      },
+                      "maxItems": 20,
+                      "type": "array",
+                    },
+                    "roomId": {
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$",
+                      "type": "string",
+                    },
+                    "state": {
+                      "enum": [
+                        "served",
+                        "waiting",
+                      ],
+                      "type": "string",
+                    },
+                    "tempC": {
+                      "maximum": 80,
+                      "minimum": -60,
+                      "type": "number",
+                    },
+                    "waitingReason": {
+                      "enum": [
+                        "inverter_limit",
+                        "pacing_level",
+                        "user_off",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "roomId",
+                    "tempC",
+                    "occupants",
+                    "state",
+                  ],
+                  "type": "object",
+                },
+                "type": "array",
+              },
+              "ts": {
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "type": "string",
+              },
+            },
+            "required": [
+              "homeId",
+              "ts",
+              "batterySocPct",
+              "pvW",
+              "loadW",
+              "gridW",
+              "gridAvailable",
+              "level",
+              "levelReason",
+              "levelChangedAt",
+              "controlAvailability",
+              "rooms",
+              "origin",
+              "homeLink",
+            ],
+            "type": "object",
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": [
+                  "validation",
+                  "guard_rejection",
+                  "not_found",
+                  "unauthorized",
+                  "forbidden",
+                  "conflict",
+                  "dependency_unavailable",
+                  "rate_limited",
+                  "internal",
+                ],
+                "type": "string",
+              },
+              "code": {
+                "enum": [
+                  "invalid_input",
+                  "invalid_setpoint",
+                  "unknown_room",
+                  "plan_expired",
+                  "safety_threshold_out_of_range",
+                  "method_not_allowed",
+                  "payload_too_large",
+                  "route_not_found",
+                  "missing_protocol_version",
+                  "storm_reserve_violated",
+                  "inverter_limit_exceeded",
+                  "battery_power_exceeded",
+                  "safe_room_comfort_violated",
+                  "pacing_off_track",
+                  "night_recovery_unmet",
+                  "plan_not_found",
+                  "home_not_found",
+                  "missing_token",
+                  "wrong_client",
+                  "invalid_signature",
+                  "signature_expired",
+                  "origin_not_allowed",
+                  "demo_disabled",
+                  "plan_already_applied",
+                  "home_data_stale",
+                  "split_cloud_unreachable",
+                  "forecast_unavailable",
+                  "bedrock_throttled",
+                  "agent_timeout",
+                  "agent_unavailable",
+                  "polly_unavailable",
+                  "store_unavailable",
+                  "demo_quota_exceeded",
+                  "unexpected_error",
+                  "output_schema_violation",
+                  "invalid_config",
+                ],
+                "type": "string",
+              },
+              "details": {
+                "additionalProperties": false,
+                "properties": {
+                  "ageSeconds": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "field": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "guarantee": {
+                    "enum": [
+                      "storm_reserve",
+                      "inverter_limit",
+                      "battery_power",
+                      "safe_room_comfort",
+                      "pacing_on_track",
+                    ],
+                    "type": "string",
+                  },
+                  "issues": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "message": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "path": {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "path",
+                        "message",
+                      ],
+                      "type": "object",
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "limit": {
+                    "type": "number",
+                  },
+                  "measured": {
+                    "type": "number",
+                  },
+                  "nearestAllowed": {
+                    "type": "number",
+                  },
+                  "planId": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "roomId": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "unit": {
+                    "enum": [
+                      "W",
+                      "Wh",
+                      "%",
+                      "C",
+                      "min",
+                    ],
+                    "type": "string",
+                  },
+                },
+                "type": "object",
+              },
+              "message": {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string",
+              },
+              "retryAfterMs": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "retryable": {
+                "type": "boolean",
+              },
+            },
+            "required": [
+              "code",
+              "category",
+              "message",
+              "retryable",
+            ],
+            "type": "object",
+          },
+        ],
+        "type": "object",
+      },
+      "title": "Home status",
+    },
+  ],
+}
+`;

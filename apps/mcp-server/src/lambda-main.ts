@@ -13,6 +13,7 @@ export const handler = createLambdaHandler(async () => {
   const app = createApp(
     { ...process.env, MCP_CLIENTS: clients.value },
     {
+      wallClock: { now: Date.now },
       logger: {
         log: (entry) => {
           console.error(JSON.stringify(entry));

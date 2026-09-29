@@ -6,7 +6,7 @@ const log = (line: object) => {
   console.error(JSON.stringify({ ts: new Date().toISOString(), component: 'mcp-server', ...line }));
 };
 
-const app = createApp(process.env, { logger: { log } });
+const app = createApp(process.env, { wallClock: { now: Date.now }, logger: { log } });
 if (!app.ok) {
   log({ level: 'error', code: app.error.code, message: app.error.message });
   process.exit(1);

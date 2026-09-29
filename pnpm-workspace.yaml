@@ -36,14 +36,22 @@ trustPolicy: no-downgrade
 # old, widely installed and have no advisory.
 # - undici-types@6.21.0 (via @types/node 22): published 2024-11.
 # - why-is-node-running@3.2.2 (via vitest): published 2025-01-08; 3.2.1 had SLSA provenance.
+# - chokidar@4.0.3 (via @modelcontextprotocol/inspector, dev only): published 2024-12-18 by the
+#   existing maintainer; 4.0.1 had provenance, 4.0.2 and 4.0.3 do not.
+# - pino@9.14.0 (via @modelcontextprotocol/inspector, dev only): published 2025-10-18 by the
+#   existing maintainer as a 9.x backport; 9.13.1 and 10.x have provenance.
 trustPolicyExclude:
   - undici-types@6.21.0
   - why-is-node-running@3.2.2
+  - chokidar@4.0.3
+  - pino@9.14.0
 # Exit non-zero when a dependency has an unreviewed build script (default true).
 strictDepBuilds: true
 dangerouslyAllowAllBuilds: false
 # Reviewed build scripts. Everything not listed here stays blocked.
 allowBuilds:
+  # Blocked: its postinstall installs the web/TUI clients; the CLI we use needs none (spike S1).
+  '@modelcontextprotocol/inspector': false
   esbuild: true
 
 # Refuse to install on a Node version outside the root "engines" range.

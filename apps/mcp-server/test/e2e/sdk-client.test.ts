@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { fixedClock } from '@cold-reserve/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { startNodeServer, type RunningServer } from '../../src/node-server.js';
@@ -13,7 +14,7 @@ let server: RunningServer;
 beforeAll(async () => {
   const app = createApp(
     { MCP_CLIENTS: `agent@demo=${TOKEN},video@home=${HOME_TOKEN}` },
-    { logger: { log: () => undefined }, modules: [probeModule] },
+    { wallClock: fixedClock(Date.UTC(2026, 8, 29, 7)), logger: { log: () => undefined }, modules: [probeModule] },
   );
   if (!app.ok) throw new Error(app.error.message);
   server = await startNodeServer(app.value.handler, { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: app.value.config.maxBodyBytes });
@@ -41,8 +42,8 @@ describe('SDK client over HTTP', () => {
   it('lists the module tools with their annotations and calls one: the home comes from the token', async () => {
     const { client } = await connect(HOME_TOKEN);
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name)).toEqual(['whoami', 'explode', 'bad_output']);
-    expect(tools[0]?.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    expect(tools.map((t) => t.name)).toEqual(['get_home_status', 'whoami', 'explode', 'bad_output']);
+    expect(tools[1]?.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     const result = await client.callTool({ name: 'whoami', arguments: {} });
     expect(result.structuredContent).toEqual({ clientId: 'video', homeId: 'home' });
     await client.close();
@@ -80,9 +81,9 @@ describe('raw HTTP against the running server', () => {
 
 describe('createApp', () => {
   it('fails with invalid_config on a bad token list or a bad module set', () => {
-    const log = { log: () => undefined };
-    expect(createApp({}, { logger: log })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
-    expect(createApp({ MCP_CLIENTS: `agent@demo=${TOKEN}` }, { logger: log, modules: [probeModule, probeModule] })).toMatchObject({
+    const log = { wallClock: fixedClock(0), logger: { log: () => undefined } };
+    expect(createApp({}, log)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    expect(createApp({ MCP_CLIENTS: `agent@demo=${TOKEN}` }, { ...log, modules: [probeModule, probeModule] })).toMatchObject({
       ok: false,
       error: { code: 'invalid_config' },
     });

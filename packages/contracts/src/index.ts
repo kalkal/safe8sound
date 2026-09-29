@@ -12,3 +12,4 @@ export * from './snapshot.js';
 export * from './night-recovery.js';
 export * from './plan.js';
 export * from './preferences.js';
+export * from './home-status.js';
