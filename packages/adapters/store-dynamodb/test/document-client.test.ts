@@ -68,4 +68,21 @@ describe('createDocumentTableClient', () => {
     const { table } = stub(Object.assign(new Error('Rate exceeded'), { name: 'ThrottlingException' }));
     await expect(table.get('HOME#demo', 'PREFS')).rejects.toThrow('Rate exceeded');
   });
+
+  it('writes several items in one TransactWriteCommand (all or nothing)', async () => {
+    const { sent, table } = stub({});
+    await table.transactPut([
+      { PK: 'HOME#demo', SK: 'EVENT#1' },
+      { PK: 'HOME#demo', SK: 'PREFS' },
+    ]);
+    expect(sent[0]).toEqual({
+      name: 'TransactWriteCommand',
+      input: {
+        TransactItems: [
+          { Put: { TableName: 'ColdReserve-dev', Item: { PK: 'HOME#demo', SK: 'EVENT#1' } } },
+          { Put: { TableName: 'ColdReserve-dev', Item: { PK: 'HOME#demo', SK: 'PREFS' } } },
+        ],
+      },
+    });
+  });
 });

@@ -107,6 +107,19 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
       });
     });
 
+    describe('preferences and their log are written together', () => {
+      it('rejects a change with an unreadable time and saves nothing', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        await store.putPreferences(t.prefs(), []);
+        const changed = { ...t.prefs(), language: 'it-IT' as const };
+        const bad = { ...t.change(0, 28), ts: 'yesterday' };
+        expect(await store.putPreferences(changed, [bad])).toMatchObject({ ok: false, error: { code: 'invalid_input', details: { field: 'changes' } } });
+        expect(await store.getPreferences()).toEqual({ ok: true, value: t.prefs() });
+        expect(await store.listConfigChanges()).toEqual({ ok: true, value: [] });
+      });
+    });
+
     describe('home scoping', () => {
       it('never shows one home the data of another', async () => {
         const t = setup();

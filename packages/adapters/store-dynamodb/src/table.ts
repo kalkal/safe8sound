@@ -21,4 +21,6 @@ export interface TableClient {
   update(pk: string, sk: string, set: Readonly<Record<string, unknown>>, conditions: readonly Condition[]): Promise<WriteOutcome>;
   /** Every item of the partition whose sort key starts with the prefix. */
   query(pk: string, skPrefix: string): Promise<TableItem[]>;
+  /** Writes all the items or none (DynamoDB TransactWriteItems, at most 100 items). */
+  transactPut(items: readonly TableItem[]): Promise<void>;
 }

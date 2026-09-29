@@ -9,6 +9,7 @@ export * from './hvac.js';
 export * from './level.js';
 export * from './night.js';
 export * from './origin.js';
+export * from './preferences.js';
 export * from './ports.js';
 export * from './projection.js';
 export * from './pv.js';

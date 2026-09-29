@@ -2,6 +2,7 @@ import {
   GetCommand,
   PutCommand,
   QueryCommand,
+  TransactWriteCommand,
   UpdateCommand,
   type DynamoDBDocumentClient,
   type GetCommandOutput,
@@ -9,7 +10,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import type { Condition, TableClient, TableItem, WriteOutcome } from './table.js';
 
-export type TableCommand = GetCommand | PutCommand | UpdateCommand | QueryCommand;
+export type TableCommand = GetCommand | PutCommand | UpdateCommand | QueryCommand | TransactWriteCommand;
 
 /** What the table client needs from the AWS SDK: injected, so tests never reach the network. */
 export interface DocumentSender {
@@ -114,6 +115,10 @@ export function createDocumentTableClient(options: { tableName: string; sender: 
         startKey = out.LastEvaluatedKey;
       } while (startKey);
       return items;
+    },
+
+    async transactPut(items) {
+      await sender.send(new TransactWriteCommand({ TransactItems: items.map((Item) => ({ Put: { TableName, Item } })) }));
     },
   };
 }

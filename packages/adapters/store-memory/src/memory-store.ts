@@ -68,6 +68,10 @@ class MemoryStateStore implements StateStore {
   }
 
   putPreferences(preferences: Preferences, changes: readonly ConfigChange[]): Promise<Result<void, ErrorEnvelope>> {
+    // Validate everything first, so the preferences and their log are written together or not at all.
+    if (changes.some((change) => !IsoDateTimeSchema.safeParse(change.ts).success)) {
+      return Promise.resolve(err(toolError('invalid_input', 'Every configuration change needs an ISO 8601 time.', { details: { field: 'changes' } })));
+    }
     this.#put('PREFS', { value: preferences });
     for (const change of changes) {
       const sk = `EVENT#${change.ts}#${String(this.#next())}`;

@@ -52,5 +52,11 @@ export function createFakeTable(): TableClient {
           .sort(([a], [b]) => (a < b ? -1 : 1))
           .map(([, item]) => clone(item)),
       ),
+
+    transactPut(items) {
+      // No conditions are used in transactions yet, so every item is written, in one step.
+      for (const item of items) partition(item.PK).set(item.SK, clone(item));
+      return Promise.resolve();
+    },
   };
 }
