@@ -42,5 +42,8 @@ jobs:
       - run: pnpm lint:css
       - run: pnpm depcruise
       - run: pnpm test
+      # The demo script and the fault-injection scenarios (ScriptedAgent, no network, no LLM).
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
       - name: cdk synth + cdk-nag
         run: pnpm synth

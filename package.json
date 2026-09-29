@@ -18,7 +18,8 @@
     "tokens": "pnpm --filter @cold-reserve/design-tokens build",
     "synth": "pnpm --filter @cold-reserve/infra synth",
     "heavy": "node tooling/src/heavy.mjs",
-    "check": "pnpm typecheck && pnpm lint && pnpm lint:css && pnpm depcruise && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm lint:css && pnpm depcruise && pnpm test",
+    "e2e": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -31,6 +32,7 @@
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.1",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "@playwright/test": "1.63.0"
   }
 }

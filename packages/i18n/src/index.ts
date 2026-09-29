@@ -10,6 +10,21 @@ const enUS = {
   'level.changed': "I'm switching to {level} mode so the safe room stays comfortable until {until}.",
   'data.simulated': 'Simulated data',
   'data.asOf': 'As of {time}',
+  'data.live': 'LIVE',
+  'data.simulatedBadge': 'SIMULATED',
+  'sim.title': '{product} · Alexa+ simulator',
+  'chat.label': 'Ask a question',
+  'chat.placeholder': "What's my battery level?",
+  'chat.send': 'Ask',
+  'chat.thinking': 'Thinking…',
+  'chat.cancel': 'Cancel',
+  'chat.degraded': "I can't reach the assistant right now, so this is a scripted answer.",
+  'chat.errorTransient': "I can't answer right now. Try again in a moment.",
+  'chat.errorOther': 'Something went wrong with this answer. Try asking in a different way.',
+  'chat.retry': 'Try again',
+  'status.battery': 'Battery',
+  'surface.failed': 'This part of the screen stopped working. Reload the page to try again.',
+  'config.invalid': 'The simulator is not configured correctly. Check its settings and reload the page.',
 } as const;
 
 export type MessageKey = keyof typeof enUS;

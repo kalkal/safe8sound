@@ -1,0 +1,191 @@
+/* Surface A (text chat) for F8a. Reads only semantic tokens from @cold-reserve/design-tokens. */
+@layer reset, tokens, base, components, surfaces, overrides;
+
+@layer base {
+  :root {
+    color: var(--text-primary);
+    background: var(--surface-card);
+    font-family: var(--font-body);
+    font-size: var(--font-size-body);
+  }
+
+  body {
+    margin: 0;
+  }
+
+  :focus-visible {
+    outline: calc(var(--border-thin) * 3) solid var(--focus-ring);
+    outline-offset: calc(var(--border-thin) * 2);
+  }
+}
+
+@layer components {
+  .button {
+    min-block-size: var(--target-min);
+    padding-inline: var(--space-6);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text);
+    font: inherit;
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--button-primary-bg-hover);
+    }
+
+    &:disabled {
+      /* Not a design token on purpose: a state dimming, not a colour; the text keeps its token colour. */
+      opacity: 0.6;
+      cursor: progress;
+    }
+  }
+
+  .link-button {
+    min-block-size: var(--target-min);
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* LIVE: solid status-ok border. SIMULATED: dashed neutral grey-blue (board decision #1·34). */
+  .badge {
+    display: inline-block;
+    padding: var(--space-1) var(--space-2);
+    border: var(--border-thin) solid var(--status-ok);
+    border-radius: var(--radius-pill);
+    color: var(--status-ok);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+
+    &[data-origin="simulated"] {
+      border-style: dashed;
+      border-color: var(--status-neutral);
+      color: var(--status-neutral);
+    }
+  }
+
+  .answer {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: var(--border-thin) solid var(--surface-card-line);
+    border-radius: var(--radius-card);
+    background: var(--surface-card-raised);
+  }
+
+  .answer-text {
+    margin: 0;
+    font-size: var(--font-size-lead);
+  }
+
+  .notice {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  .facts {
+    margin: 0;
+  }
+
+  .fact {
+    display: grid;
+    gap: var(--space-1);
+
+    & dt {
+      color: var(--text-secondary);
+    }
+
+    & dd {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-3);
+      margin: 0;
+    }
+  }
+
+  .fact-value {
+    font-family: var(--font-data);
+    font-size: var(--font-size-hero-min);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .fact-asof {
+    color: var(--text-secondary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+  }
+}
+
+@layer surfaces {
+  .surface {
+    display: grid;
+    gap: var(--space-6);
+    /* Reading measure of the text chat (about 70 characters), not a style token; the surface frames (F8c/F8d) own their layout. */
+    max-inline-size: 40rem;
+    margin-inline: auto;
+    padding: var(--space-6) var(--space-4);
+
+    & h1 {
+      margin: 0;
+      font-size: var(--font-size-lead);
+      font-weight: var(--font-weight-medium);
+    }
+  }
+
+  .conversation {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .bubble {
+    justify-self: end;
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--surface-card-raised);
+  }
+
+  .thinking,
+  .failure p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  .failure {
+    display: grid;
+    gap: var(--space-3);
+    justify-items: start;
+  }
+
+  .ask {
+    display: grid;
+    gap: var(--space-2);
+
+    & label {
+      color: var(--text-secondary);
+    }
+
+    & input {
+      flex: 1;
+      min-inline-size: 0;
+      min-block-size: var(--target-min);
+      padding-inline: var(--space-4);
+      border: var(--border-thin) solid var(--surface-card-line);
+      border-radius: var(--radius-pill);
+      background: var(--surface-card-raised);
+      color: var(--text-primary);
+      font: inherit;
+    }
+  }
+
+  .ask-row {
+    display: flex;
+    gap: var(--space-2);
+  }
+}

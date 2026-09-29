@@ -7,11 +7,26 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5318 --strictPort",
+    "build": "vite build"
+  },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",
     "@cold-reserve/design-tokens": "workspace:*",
     "@cold-reserve/i18n": "workspace:*",
     "@cold-reserve/ui-cards": "workspace:*",
+    "@tanstack/react-query": "5.104.0",
+    "@xstate/react": "6.1.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "xstate": "5.33.2",
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "vite": "8.3.1"
   }
 }

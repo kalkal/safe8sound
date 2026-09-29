@@ -2,7 +2,7 @@ import { DataOriginSchema, IsoDateTimeSchema, PctSchema } from '@cold-reserve/co
 import { z } from 'zod';
 
 // The turn protocol between alexa-sim and sim-api: POST /v1/turns.
-// TODO(sim-api): move these schemas to packages/contracts when sim-api is built (maintainer decision, issue #18).
+// TODO(sim-api, #55): move these schemas to packages/contracts when sim-api is built.
 
 export const TurnRequestSchema = z.strictObject({
   question: z.string().trim().min(1).max(500),

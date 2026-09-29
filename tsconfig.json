@@ -11,6 +11,7 @@
     "infra/**/*.ts",
     "tooling/**/*.ts",
     "tooling/**/*.mjs",
+    "e2e/**/*.ts",
     "*.config.ts"
   ],
   "exclude": [
