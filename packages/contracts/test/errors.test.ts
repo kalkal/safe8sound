@@ -54,6 +54,7 @@ describe('error catalog (docs/error-handling.md §2)', () => {
     expect(categoryOf('origin_not_allowed')).toBe('forbidden');
     expect(categoryOf('plan_already_applied')).toBe('conflict');
     expect(categoryOf('home_data_stale')).toBe('dependency_unavailable');
+    expect(categoryOf('agent_unavailable')).toBe('dependency_unavailable');
     expect(categoryOf('demo_quota_exceeded')).toBe('rate_limited');
     expect(categoryOf('unexpected_error')).toBe('internal');
   });

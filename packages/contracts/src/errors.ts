@@ -49,6 +49,7 @@ export const ERROR_CATALOG = {
   forecast_unavailable: { category: 'dependency_unavailable' },
   bedrock_throttled: { category: 'dependency_unavailable' },
   agent_timeout: { category: 'dependency_unavailable' },
+  agent_unavailable: { category: 'dependency_unavailable' },
   polly_unavailable: { category: 'dependency_unavailable' },
   store_unavailable: { category: 'dependency_unavailable' },
   // rate_limited: wait retryAfterMs

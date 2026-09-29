@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "status": {
+    "batterySocPct": 78,
+    "origin": { "energy": "simulated", "rooms": "simulated", "weather": "simulated" },
+    "ts": "2026-07-15T21:10:00+02:00"
+  },
+  "entries": [
+    {
+      "id": "battery-level",
+      "patterns": ["battery level", "battery", "charge level", "soc"],
+      "text": "Your battery is at {soc} percent.",
+      "withStatus": true
+    }
+  ],
+  "fallback": "In scripted mode I can only answer a few questions. Try asking: what's my battery level?"
+}
