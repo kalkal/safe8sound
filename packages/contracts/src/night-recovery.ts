@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { EntityIdSchema, IsoDateTimeSchema, epochMs } from './common.js';
 import { CelsiusSchema } from './units.js';
 
-// Night recovery of the safe/bed room (feature queue item 1, approved by the maintainer on 2026-09-28).
+// Night recovery of the safe/bed room (feature queue item 1, approved in #19).
 // It is a comfort-for-sleep metric, not a medical outcome: we never claim it prevents illness.
 
 /**

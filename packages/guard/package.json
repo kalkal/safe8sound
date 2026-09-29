@@ -5,10 +5,16 @@
   "description": "Composable guard constraints; every check returns a GuaranteeResult.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./config/guard.json": "./config/guard.json"
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",
-    "@cold-reserve/core": "workspace:*"
+    "@cold-reserve/core": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cold-reserve/source-simulator": "workspace:*",
+    "fast-check": "catalog:"
   }
 }

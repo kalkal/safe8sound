@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "projection": {
+    "stepMinutes": 5,
+    "baseLoadWByLocalHour": [250, 230, 220, 220, 220, 240, 300, 450, 500, 400, 350, 350, 400, 450, 450, 400, 450, 550, 700, 800, 700, 550, 400, 300]
+  },
+  "reserve": { "essentialLoadW": 350, "capWh": 6000 },
+  "pacing": { "trackTolerancePct": 3, "downMarginPct": 3, "upMarginPct": 5, "maxChangesPerHour": 4, "minDwellMinutes": 20 },
+  "safeRoom": { "graceMinutes": 60 }
+}
