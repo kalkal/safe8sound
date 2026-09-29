@@ -19,10 +19,13 @@
     "synth": "pnpm --filter @cold-reserve/infra synth",
     "heavy": "node tooling/src/heavy.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm lint:css && pnpm depcruise && pnpm test",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "mutation": "node tooling/src/mutation.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@stryker-mutator/core": "10.0.0",
     "@types/node": "22.20.4",
     "dependency-cruiser": "18.4.0",
     "eslint": "10.11.0",
@@ -32,7 +35,6 @@
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.1",
-    "vitest": "5.0.2",
-    "@playwright/test": "1.63.0"
+    "vitest": "5.0.2"
   }
 }
