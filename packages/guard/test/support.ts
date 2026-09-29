@@ -51,6 +51,7 @@ export const params: SimParams = {
     dryRemovalFactor: 0.6,
     rating: { tempC: 27, rhPct: 47 },
     coilDewpointC: 8,
+    maxLatentShare: 0.5,
   },
   pv: { lossRatio: 0.14 },
   load: { noiseRatio: 0.05 },

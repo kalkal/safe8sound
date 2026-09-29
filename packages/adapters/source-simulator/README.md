@@ -38,13 +38,14 @@ The 1R1C constants are in K/kW and kWh/K as in the contract.
 | Parameter | Value | Source / reasoning |
 |---|---|---|
 | `removalLphPerCoolingKw` | 0.33 l/h per kW | Hisense Easy Smart datasheets: 0.9–2.2 l/h across 9 000–24 000 BTU (plan §4ter); at the rated cooling. |
-| `rating` | 27 °C, 47 % RH | The datasheet capacity is rated at the EN 14511 indoor condition, 27 °C dry bulb and 19 °C wet bulb (about 47 % RH). More humid air gives more water, drier air less. |
+| `rating` | 27 °C, 47 % RH | **Assumption** (to check on the Hisense datasheet): the capacity is rated at the EN 14511 indoor condition, 27 °C dry bulb and 19 °C wet bulb (about 47 % RH). More humid air gives more water, drier air less. |
 | cool-mode share | cooling delivered ÷ rated cooling (max 1) | The datasheet figure is at the rated capacity, and a split at part load removes proportionally less water. A constant sensible heat ratio, about 0.8. |
-| `dryRemovalFactor` | 0.6 | Dry mode runs the compressor at low speed whatever the cooling need; assumption from S6, to calibrate with ConnectLife data. |
+| `dryRemovalFactor` | 0.6 | **Assumption.** Dry mode runs the compressor at low speed whatever the cooling need (about 485 W for a 12 000 BTU unit, from `dryInputFactor` 0.5 × nominal input); to calibrate with ConnectLife data. |
 | `occupantGainGph` | 60 g/h | A person at rest gives off about 40–70 g/h of water vapour (CIBSE Guide A order of magnitude). |
 | `baseGainGph` | 30 g/h per room | Small household sources (plants, cooking spread over the day). Assumption. |
 | `exchangeTimeConstantH` | 3 h | About 0.33 air changes per hour in a closed room (unchanged from S6). |
 | `roomVolumeM3` | 35 m³ (living 70) | About 13 m² × 2.7 m; the living room is about twice as large. |
+| `maxLatentShare` | 0.5 | Assumption: at most half of the rated cooling can go into drying. It bounds the linear removal model in very humid air. |
 | `coilDewpointC` | 8 °C | Typical evaporator saturation temperature of a split in cooling (5–10 °C): the air is never dried below this dew point. |
 
 With these values a split in cool at part load keeps a humid room at 64–80 % RH on a humid night: at low

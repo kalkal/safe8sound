@@ -24,6 +24,7 @@ export const SimulatorParamsSchema = z.strictObject({
     dryRemovalFactor: fraction,
     rating: z.strictObject({ tempC: z.number().min(15).max(35), rhPct: z.number().min(20).max(80) }),
     coilDewpointC: z.number().min(0).max(25),
+    maxLatentShare: fraction,
   }),
   pv: z.strictObject({ lossRatio: fraction }),
   load: z.strictObject({ noiseRatio: fraction }),

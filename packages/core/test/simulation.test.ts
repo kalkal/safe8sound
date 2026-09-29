@@ -20,6 +20,7 @@ const params: SimParams = {
     dryRemovalFactor: 0.6,
     rating: { tempC: 27, rhPct: 47 },
     coilDewpointC: 8,
+    maxLatentShare: 0.5,
   },
   pv: { lossRatio: 0.14 },
   load: { noiseRatio: 0.05 },
@@ -93,6 +94,37 @@ describe('stepHome', () => {
     const a = stepHome({ state: state(), inputs: dry, profile, params, dt: minutes(30), noise: 0.5 });
     const b = stepHome({ state: state(), inputs: none, profile, params, dt: minutes(30), noise: 0.5 });
     expect(room(a.state, 'bedroom-1')?.humidityPct).toBeLessThan(room(b.state, 'bedroom-1')?.humidityPct ?? -Infinity);
+  });
+
+  describe('humidity wiring', () => {
+    const rh = (step: ReturnType<typeof stepHome>, id: string) => room(step.state, id)?.humidityPct ?? NaN;
+    const run = (over: Partial<HomeInputs>, st = state(), p: SimParams = params) => stepHome({ state: st, inputs: inputs(over), profile, params: p, dt: minutes(30), noise: 0.5 });
+    const at = (tempC: number) => ({ socPct: pct(50), rooms: profile.rooms.map((r) => ({ id: r.id, tempC: celsius(tempC), humidityPct: pct(65) })) });
+
+    it('dry dehumidifies at its set point, where cool at light load removes little', () => {
+      // A mild evening, the room already at 25 °C: cool at 25 has nothing to do, dry keeps its compressor running.
+      const mild = { outC: celsius(24), irradianceWm2: 0 };
+      const cool = run({ ...mild, rooms: [{ id: 'bedroom-1', occupants: [], hvac: { mode: 'cool', setpointC: celsius(25) }, fanOn: false }] }, at(25));
+      const dry = run({ ...mild, rooms: [{ id: 'bedroom-1', occupants: [], hvac: { mode: 'dry', setpointC: celsius(25) }, fanOn: false }] }, at(25));
+      expect(rh(dry, 'bedroom-1')).toBeLessThan(rh(cool, 'bedroom-1') - 5);
+    });
+
+    it('removes nothing when nothing is served: off grid with an empty battery and no sun', () => {
+      const empty = { ...state(), socPct: pct(profile.battery.minSocHwPct) };
+      const dark = { irradianceWm2: 0, gridAvailable: false };
+      const drying = run({ ...dark, rooms: [{ id: 'bedroom-1', occupants: [], hvac: { mode: 'dry', setpointC: celsius(24) }, fanOn: false }] }, empty);
+      const idle = run({ ...dark, rooms: [] }, empty);
+      expect(drying.flows.servedLoadW).toBe(0);
+      expect(rh(drying, 'bedroom-1')).toBeCloseTo(rh(idle, 'bedroom-1'), 9);
+    });
+
+    it('a larger room (living, 70 m³) changes humidity more slowly than a 35 m³ one', () => {
+      const drying = { rooms: [{ id: 'living', occupants: [], hvac: { mode: 'dry' as const, setpointC: celsius(24) }, fanOn: false }] };
+      const small = run(drying, state(), { ...params, humidity: { ...params.humidity, roomVolumeM3: { default: 35, byRoom: {} } } });
+      const large = run(drying, state(), { ...params, humidity: { ...params.humidity, roomVolumeM3: { default: 35, byRoom: { living: 70 } } } });
+      expect(55 - rh(large, 'living')).toBeLessThan(55 - rh(small, 'living'));
+      expect(55 - rh(large, 'living')).toBeGreaterThan(0);
+    });
   });
 
   it('rejects a state that does not match the profile (a programming error)', () => {

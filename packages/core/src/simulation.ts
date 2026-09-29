@@ -9,6 +9,9 @@ import { coolingToReachW, stepRoomTemperature } from './thermal.js';
 // Pure: the caller passes the noise draw and the step length; every physical parameter comes from
 // the home profile or from `SimParams` (config), never from constants here.
 
+/** Latent heat of vaporisation of water, about 2450 J/g. */
+const LATENT_WH_PER_G = 2450 / 3600;
+
 export interface SimParams {
   readonly hvac: HvacModelParams;
   /** Internal heat gains per room, W. */
@@ -31,6 +34,8 @@ export interface SimParams {
     /** Indoor air at which the datasheet capacity is rated. */
     readonly rating: { readonly tempC: number; readonly rhPct: number };
     readonly coilDewpointC: number;
+    /** At most this share of the rated cooling can be latent (drying), however humid the air. */
+    readonly maxLatentShare: number;
   };
   readonly pv: { readonly lossRatio: number };
   /** Base load varies by +/- this ratio around the scenario value. */
@@ -138,6 +143,8 @@ export function stepHome(args: { state: HomeState; inputs: HomeInputs; profile: 
       exchangeTimeConstantH: params.humidity.exchangeTimeConstantH,
       gainsGph: params.humidity.baseGainGph + params.humidity.occupantGainGph * occupants,
       removalGph: capacityGph * share * servedRatio,
+      // Latent heat of water ~0.68 Wh/g: at most `maxLatentShare` of the rated cooling goes to drying.
+      maxRemovalGph: (ratedKw * 1000 * params.humidity.maxLatentShare * share * servedRatio) / LATENT_WH_PER_G,
       rating: params.humidity.rating,
       coilDewpointC: params.humidity.coilDewpointC,
     });

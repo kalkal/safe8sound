@@ -39,6 +39,7 @@ describe('stepRoomMoisture: water balance of the room air', () => {
     removalGph: 0,
     rating: { tempC: 27, rhPct: 47 },
     coilDewpointC: 8,
+    maxRemovalGph: 1e9,
   };
 
   it('with no gains and no removal relaxes toward the outdoor water vapour at room temperature', () => {
@@ -64,6 +65,14 @@ describe('stepRoomMoisture: water balance of the room air', () => {
     const next = stepRoomMoisture({ ...base, rhPct: pct(47), tempC: celsius(27), nextTempC: celsius(27), outRhPct: pct(47), outC: celsius(27), removalGph: 1200, dt: minutes(hours * 60), exchangeTimeConstantH: 1e9 });
     const gramsPerPct = ((saturationVaporPressureHpa(celsius(27)) * 100 * 35) / (461.5 * 300.15) / 100) * 1000;
     expect(((47 - next) * gramsPerPct) / hours).toBeCloseTo(1200, -1);
+  });
+
+  it('caps the removal in very humid air at the latent limit', () => {
+    const humid = { ...base, rhPct: pct(95), removalGph: 1200, dt: minutes(0.06), exchangeTimeConstantH: 1e9, outRhPct: pct(95) };
+    const gramsPerPct = ((saturationVaporPressureHpa(celsius(26)) * 100 * 35) / (461.5 * 299.15) / 100) * 1000;
+    const rate = (next: number) => ((95 - next) * gramsPerPct) / 0.001;
+    expect(rate(stepRoomMoisture({ ...humid, maxRemovalGph: 1e9 }))).toBeGreaterThan(2000);
+    expect(rate(stepRoomMoisture({ ...humid, maxRemovalGph: 1500 }))).toBeCloseTo(1500, -2);
   });
 
   it('occupants add water: about 60 g/h per person (CIBSE Guide A order of magnitude)', () => {

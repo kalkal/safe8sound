@@ -37,6 +37,8 @@ export interface MoistureStep {
   readonly gainsGph: number;
   /** Removal of the running units at the rating condition, g/h (datasheet l/h x share). */
   readonly removalGph: number;
+  /** Upper bound on the removal rate, g/h: the latent share of the unit's cooling (very humid air). */
+  readonly maxRemovalGph: number;
   /** Indoor air of the datasheet rating (EN 14511: 27 °C dry bulb, 19 °C wet bulb, about 47 % RH). */
   readonly rating: { readonly tempC: number; readonly rhPct: number };
   /** Coil dew point: the air is never dried below it. */
@@ -68,7 +70,11 @@ export function stepRoomMoisture(input: MoistureStep): Pct {
   const passive = solve(0);
   const eRating = (input.rating.rhPct / 100) * saturationVaporPressureHpa(celsius(input.rating.tempC));
   const span = eRating - eCoil;
-  const k = input.removalGph > 0 && span > 0 ? (hpaPerGram * input.removalGph) / span : 0;
+  const linear = input.removalGph > 0 && span > 0 ? (hpaPerGram * input.removalGph) / span : 0;
+  // The linear model grows without bound in very humid air; a coil cannot remove more latent heat than a
+  // share of its cooling. The cap is applied at the start of the step (the rate only falls within it).
+  const excess = e0 - eCoil;
+  const k = excess > 0 ? Math.min(linear, (hpaPerGram * input.maxRemovalGph) / excess) : linear;
   // The coil only removes water: it never takes the air below its dew point, nor adds any.
   const e = Math.max(Math.min(solve(k), passive), Math.min(passive, eCoil));
   return clampPct((Math.min(Math.max(e, 0), eSat) / eSat) * 100);
