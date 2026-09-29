@@ -7,7 +7,9 @@
   "exports": {
     ".": "./generated/tokens.ts",
     "./tokens.css": "./generated/tokens.css",
-    "./tokens.json": "./tokens.json"
+    "./tokens.json": "./tokens.json",
+    "./themes": "./src/themes.ts",
+    "./source": "./src/source.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts"

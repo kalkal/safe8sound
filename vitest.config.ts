@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 // run a single module with `pnpm test packages/<name>`.
 export default defineConfig({
   test: {
-    include: ['{packages,apps,infra,tooling}/**/test/**/*.test.ts'],
+    include: ['{packages,apps,infra,tooling}/**/test/**/*.test.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/cdk.out/**', 'tooling/test/fixtures/**'],
     maxWorkers: process.env['CI'] ? 4 : 2,
     testTimeout: 20_000,

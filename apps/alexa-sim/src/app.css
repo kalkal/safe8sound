@@ -189,3 +189,12 @@
     gap: var(--space-2);
   }
 }
+
+@layer surfaces {
+  /* Dev-only card gallery: cards side by side at their inline width. */
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+    gap: var(--space-6);
+  }
+}

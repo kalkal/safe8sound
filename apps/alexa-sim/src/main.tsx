@@ -1,7 +1,7 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import './app.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { buildAgent } from './agent/index.js';
 import { parseConfig } from './config.js';
@@ -18,6 +18,14 @@ const agent = config.ok ? buildAgent(config.value) : config;
 if (!agent.ok) console.error('invalid simulator config', agent.error);
 const queryClient = new QueryClient();
 
+// Dev-only card gallery (`?gallery&theme=light`): never part of a production build.
+const params = new URLSearchParams(window.location.search);
+const galleryTheme = params.get('theme') === 'light' ? 'light' : 'dark';
+const Gallery =
+  import.meta.env.DEV && params.has('gallery')
+    ? lazy(() => import('./dev/Gallery.js').then((m) => ({ default: () => <m.Gallery hostTheme={galleryTheme} /> })))
+    : null;
+
 createRoot(container).render(
   <StrictMode>
     <main className="surface">
@@ -25,7 +33,11 @@ createRoot(container).render(
         <h1>{t('sim.title')}</h1>
       </header>
       <ErrorBoundary>
-        {config.ok && agent.ok ? (
+        {Gallery !== null ? (
+          <Suspense fallback={null}>
+            <Gallery />
+          </Suspense>
+        ) : config.ok && agent.ok ? (
           <QueryClientProvider client={queryClient}>
             <Conversation agent={agent.value} turnBudgetMs={config.value.turnBudgetMs} />
           </QueryClientProvider>

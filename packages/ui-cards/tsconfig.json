@@ -1,5 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../../tsconfig.bundler.json",
-  "include": ["src", "test"]
+  "include": [
+    "src",
+    "test"
+  ],
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
 }

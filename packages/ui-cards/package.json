@@ -5,11 +5,21 @@
   "description": "Shared MCP Apps card components and signature components (sky, cubes, floor plan, receipt); tokens only.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./cards.css": "./src/cards.css"
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",
     "@cold-reserve/design-tokens": "workspace:*",
-    "@cold-reserve/i18n": "workspace:*"
+    "@cold-reserve/i18n": "workspace:*",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "jsdom": "30.1.1"
   }
 }
