@@ -2,8 +2,10 @@ import { CfnWaitConditionHandle, Stack, Stage, Validations, type App, type Stack
 import { AwsSolutionsChecks } from 'cdk-nag';
 import type { Construct } from 'constructs';
 import type { InfraConfig, StageName } from './config.js';
+import { DataStack } from './data-stack.js';
+import { McpStack } from './mcp-stack.js';
 
-/** Placeholder for the shared resources; F3/F5/F8 add the web, mcp, agent and data stacks. */
+/** Placeholder for the shared resources; F5/F8 add the web and agent stacks. */
 export class FoundationStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps) {
     super(scope, id, props);
@@ -16,12 +18,15 @@ export class FoundationStack extends Stack {
 export class ColdReserveStage extends Stage {
   constructor(scope: Construct, stageName: StageName, config: InfraConfig) {
     super(scope, stageName, { env: { region: config.region } });
-    new FoundationStack(this, 'foundation', {
-      stackName: `cold-reserve-${stageName}-foundation`,
+    const common = (name: string) => ({
+      stackName: `cold-reserve-${stageName}-${name}`,
       // demo is what the judges see: deploys are manual and reserved to the owner.
       terminationProtection: stageName === 'demo',
       tags: { project: 'cold-reserve', stage: stageName },
     });
+    new FoundationStack(this, 'foundation', common('foundation'));
+    const data = new DataStack(this, 'data', { ...common('data'), retain: stageName === 'demo' });
+    new McpStack(this, 'mcp', { ...common('mcp'), stage: stageName, mcp: config.mcp, state: config.state, table: data.table });
   }
 }
 

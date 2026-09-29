@@ -1,12 +1,34 @@
 {
   "app": "tsx src/main.ts",
   "watch": {
-    "include": ["src/**"]
+    "include": [
+      "src/**"
+    ]
   },
   "context": {
     "cold-reserve:region": "us-east-1",
-    "cold-reserve:stages": ["dev", "demo"],
+    "cold-reserve:stages": [
+      "dev",
+      "demo"
+    ],
     "@aws-cdk/core:checkSecretUsage": true,
-    "@aws-cdk/core:target-partitions": ["aws"]
+    "@aws-cdk/core:target-partitions": [
+      "aws"
+    ],
+    "cold-reserve:mcp": {
+      "clientsParameter": "/cold-reserve/{stage}/mcp-server/clients",
+      "memoryMb": 512,
+      "timeoutSeconds": 10,
+      "logRetentionDays": 14,
+      "p95AlarmMs": 500,
+      "ssmTimeoutMs": 2000,
+      "allowedOrigins": [],
+      "scenario": "clear-day"
+    },
+    "cold-reserve:state": {
+      "connectTimeoutMs": 500,
+      "requestTimeoutMs": 1500,
+      "maxAttempts": 3
+    }
   }
 }
