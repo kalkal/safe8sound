@@ -31,6 +31,7 @@ export const ERROR_CATALOG = {
   battery_power_exceeded: { category: 'guard_rejection' },
   safe_room_comfort_violated: { category: 'guard_rejection' },
   pacing_off_track: { category: 'guard_rejection' },
+  night_recovery_unmet: { category: 'guard_rejection' },
   // not_found
   plan_not_found: { category: 'not_found' },
   home_not_found: { category: 'not_found' },

@@ -3,6 +3,7 @@ import { exampleForecast, exampleSnapshot } from '../src/fixtures.js';
 import {
   ForecastSchema,
   LEVELS,
+  LevelReasonSchema,
   PacingStateSchema,
   RoomServiceSchema,
   SnapshotSchema,
@@ -61,6 +62,10 @@ describe('pacing level', () => {
     const state = { level: 'saver', levelReason: 'soc_below_track', levelChangedAt: '2026-09-28T22:00:00+02:00' };
     expect(PacingStateSchema.safeParse(state).success).toBe(true);
     expect(PacingStateSchema.safeParse({ ...state, levelReason: 'because' }).success).toBe(false);
+  });
+
+  it('has a reason for stepping back up, next to the one for stepping down', () => {
+    expect(LevelReasonSchema.options).toEqual(expect.arrayContaining(['soc_below_track', 'soc_above_track']));
   });
 });
 

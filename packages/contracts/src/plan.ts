@@ -3,6 +3,7 @@ import { EntityIdSchema, HomeIdSchema, IsoDateTimeSchema, epochMs } from './comm
 import { GUARANTEE_IDS, GuaranteeResultSchema } from './guarantees.js';
 import { HvacModeSchema } from './home.js';
 import { DataOriginSchema } from './origin.js';
+import { NightRecoverySchema, PlanWarningSchema } from './night-recovery.js';
 import { LevelSchema, levelRank } from './pacing.js';
 import { ForecastConfidenceSchema } from './snapshot.js';
 import { CelsiusSchema, PctSchema, WattHourSchema } from './units.js';
@@ -61,6 +62,10 @@ export const PlanSchema = z
     sourceOrigin: DataOriginSchema,
     /** True on the real home during the hackathon: the plan is advice, nothing is commanded. */
     advisoryOnly: z.boolean(),
+    /** Night recovery of the safe room, when the plan covers part of a night (optional, added 2026-09-29). */
+    nightRecovery: NightRecoverySchema.optional(),
+    /** What must be said even though the plan is accepted (optional, added 2026-09-29). */
+    warnings: z.array(PlanWarningSchema).max(10).optional(),
   })
   .superRefine((plan, ctx) => {
     if (epochMs(plan.expiresAt) <= epochMs(plan.createdAt)) {
@@ -73,6 +78,10 @@ export const PlanSchema = z
     const ranks = plan.ladder.map((step) => levelRank(step.level));
     if (ranks.some((rank, i) => i > 0 && rank <= (ranks[i - 1] ?? -1))) {
       ctx.addIssue({ code: 'custom', path: ['ladder'], message: 'Ladder goes from comfort down, without repeats' });
+    }
+    const warningCodes: readonly string[] = (plan.warnings ?? []).map((w) => w.code);
+    if (plan.nightRecovery?.status === 'infeasible' && !warningCodes.includes('night_recovery_infeasible')) {
+      ctx.addIssue({ code: 'custom', path: ['warnings'], message: 'An infeasible night recovery needs its warning' });
     }
     const allowed = new Set(plan.ladder.map((step) => step.level));
     plan.steps.forEach((step, i) => {

@@ -9,7 +9,8 @@ export type Level = z.infer<typeof LevelSchema>;
 export const levelRank = (level: Level): number => LEVELS.indexOf(level);
 
 /** Why the level is what it is (plan §11.5): every change is explained. */
-export const LevelReasonSchema = z.enum(['weather', 'occupancy', 'user_choice', 'soc_below_track', 'storm']);
+/** `soc_above_track` added 2026-09-29 (additive, approved by the maintainer): a step back up has its own reason. */
+export const LevelReasonSchema = z.enum(['weather', 'occupancy', 'user_choice', 'soc_below_track', 'soc_above_track', 'storm']);
 export type LevelReason = z.infer<typeof LevelReasonSchema>;
 
 export const PacingStateSchema = z.strictObject({
