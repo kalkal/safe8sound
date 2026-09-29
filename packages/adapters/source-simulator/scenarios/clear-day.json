@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "id": "clear-day",
+  "version": "1.0.0",
+  "description": "A clear, hot July day. Grandpa stays home in the safe room; the daughter works from the study and comes back to the living room in the evening.",
+  "startAt": "2026-07-15T00:00:00+02:00",
+  "durationH": 24,
+  "stepSeconds": 60,
+  "seed": 20260715,
+  "simulatedGroups": ["weather"],
+  "initial": {
+    "batterySocPct": 45,
+    "rooms": [
+      { "id": "bedroom-1", "tempC": 26, "humidityPct": 55 },
+      { "id": "bedroom-2", "tempC": 26.5, "humidityPct": 55 },
+      { "id": "study", "tempC": 27, "humidityPct": 52 },
+      { "id": "living", "tempC": 27, "humidityPct": 55 }
+    ]
+  },
+  "hourly": [
+    { "tempOutC": 24, "humidityOutPct": 70, "irradianceWm2": 0, "stormProb": 0.02, "baseLoadW": 250 },
+    { "tempOutC": 23.5, "humidityOutPct": 72, "irradianceWm2": 0, "stormProb": 0.02, "baseLoadW": 230 },
+    { "tempOutC": 23, "humidityOutPct": 74, "irradianceWm2": 0, "stormProb": 0.02, "baseLoadW": 220 },
+    { "tempOutC": 22.5, "humidityOutPct": 75, "irradianceWm2": 0, "stormProb": 0.02, "baseLoadW": 220 },
+    { "tempOutC": 22, "humidityOutPct": 76, "irradianceWm2": 0, "stormProb": 0.02, "baseLoadW": 220 },
+    { "tempOutC": 22, "humidityOutPct": 76, "irradianceWm2": 0, "stormProb": 0.02, "baseLoadW": 240 },
+    { "tempOutC": 23, "humidityOutPct": 72, "irradianceWm2": 3, "stormProb": 0.02, "baseLoadW": 300 },
+    { "tempOutC": 25, "humidityOutPct": 65, "irradianceWm2": 48, "stormProb": 0.02, "baseLoadW": 450 },
+    { "tempOutC": 27, "humidityOutPct": 58, "irradianceWm2": 209, "stormProb": 0.02, "baseLoadW": 500 },
+    { "tempOutC": 29, "humidityOutPct": 52, "irradianceWm2": 398, "stormProb": 0.02, "baseLoadW": 400 },
+    { "tempOutC": 30.5, "humidityOutPct": 47, "irradianceWm2": 573, "stormProb": 0.02, "baseLoadW": 350 },
+    { "tempOutC": 31.5, "humidityOutPct": 44, "irradianceWm2": 687, "stormProb": 0.02, "baseLoadW": 350 },
+    { "tempOutC": 32.5, "humidityOutPct": 41, "irradianceWm2": 761, "stormProb": 0.02, "baseLoadW": 450 },
+    { "tempOutC": 33, "humidityOutPct": 40, "irradianceWm2": 787, "stormProb": 0.02, "baseLoadW": 500 },
+    { "tempOutC": 33.5, "humidityOutPct": 39, "irradianceWm2": 765, "stormProb": 0.02, "baseLoadW": 400 },
+    { "tempOutC": 33.5, "humidityOutPct": 39, "irradianceWm2": 693, "stormProb": 0.02, "baseLoadW": 350 },
+    { "tempOutC": 33, "humidityOutPct": 40, "irradianceWm2": 589, "stormProb": 0.02, "baseLoadW": 350 },
+    { "tempOutC": 32, "humidityOutPct": 42, "irradianceWm2": 432, "stormProb": 0.02, "baseLoadW": 450 },
+    { "tempOutC": 30.5, "humidityOutPct": 46, "irradianceWm2": 236, "stormProb": 0.02, "baseLoadW": 650 },
+    { "tempOutC": 28.5, "humidityOutPct": 52, "irradianceWm2": 63, "stormProb": 0.02, "baseLoadW": 800 },
+    { "tempOutC": 27, "humidityOutPct": 58, "irradianceWm2": 10, "stormProb": 0.02, "baseLoadW": 700 },
+    { "tempOutC": 26, "humidityOutPct": 62, "irradianceWm2": 0, "stormProb": 0.02, "baseLoadW": 550 },
+    { "tempOutC": 25, "humidityOutPct": 65, "irradianceWm2": 0, "stormProb": 0.02, "baseLoadW": 400 },
+    { "tempOutC": 24.5, "humidityOutPct": 68, "irradianceWm2": 0, "stormProb": 0.02, "baseLoadW": 300 }
+  ],
+  "sun": {
+    "sunrise": ["2026-07-15T05:45:00+02:00", "2026-07-16T05:46:00+02:00"],
+    "sunset": ["2026-07-15T20:40:00+02:00"]
+  },
+  "gridOutages": [],
+  "occupancy": [
+    { "roomId": "bedroom-1", "roles": ["grandpa"], "fromH": 0, "toH": 24 },
+    { "roomId": "bedroom-2", "roles": ["daughter"], "fromH": 0, "toH": 7.5 },
+    { "roomId": "study", "roles": ["daughter"], "fromH": 9, "toH": 17 },
+    { "roomId": "living", "roles": ["daughter"], "fromH": 18, "toH": 21 },
+    { "roomId": "bedroom-2", "roles": ["daughter"], "fromH": 21, "toH": 24 }
+  ],
+  "hvac": [
+    { "roomId": "bedroom-1", "mode": "cool", "setpointC": 26, "fanOn": true, "fromH": 10, "toH": 22 },
+    { "roomId": "study", "mode": "cool", "setpointC": 26, "fanOn": false, "fromH": 11, "toH": 17 },
+    { "roomId": "living", "mode": "cool", "setpointC": 26, "fanOn": false, "fromH": 16, "toH": 22 }
+  ]
+}

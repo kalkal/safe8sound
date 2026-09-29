@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "homeId": "demo",
+  "inverterMaxAcW": 6000,
+  "eps": { "continuousVa": 5000, "peakVa": 6000, "peakSeconds": 60 },
+  "battery": { "nominalWh": 15300, "usableWh": 13800, "minSocHwPct": 10, "maxChargeW": 5000, "maxDischargeW": 5000, "roundTripEff": 0.884 },
+  "pvPeakW": 7360,
+  "rooms": [
+    {
+      "id": "bedroom-1",
+      "name": "Bedroom",
+      "isSafeRoom": true,
+      "thermal": { "rKPerKw": 44.4, "cKwhPerK": 0.45 },
+      "hvacUnits": [
+        {
+          "id": "split-bedroom-1",
+          "model": "Hisense Easy Smart 12000 BTU",
+          "coolingKw": 3.2,
+          "inputKw": { "min": 0.19, "nominal": 0.97, "max": 1.6 },
+          "modes": ["cool", "heat", "dry", "fan_only", "auto", "off"],
+          "controlPath": "cloud"
+        }
+      ],
+      "fans": [{ "id": "fan-bedroom-1", "powerW": 40, "controllable": false }]
+    },
+    {
+      "id": "bedroom-2",
+      "name": "Second bedroom",
+      "isSafeRoom": false,
+      "thermal": { "rKPerKw": 47.6, "cKwhPerK": 0.42 },
+      "hvacUnits": [
+        {
+          "id": "split-bedroom-2",
+          "model": "Hisense Easy Smart 12000 BTU",
+          "coolingKw": 3.2,
+          "inputKw": { "min": 0.19, "nominal": 0.97, "max": 1.6 },
+          "modes": ["cool", "heat", "dry", "fan_only", "auto", "off"],
+          "controlPath": "cloud"
+        }
+      ],
+      "fans": []
+    },
+    {
+      "id": "study",
+      "name": "Study",
+      "isSafeRoom": false,
+      "thermal": { "rKPerKw": 55.6, "cKwhPerK": 0.36 },
+      "hvacUnits": [
+        {
+          "id": "split-study",
+          "model": "Hisense Easy Smart 12000 BTU",
+          "coolingKw": 3.2,
+          "inputKw": { "min": 0.19, "nominal": 0.97, "max": 1.6 },
+          "modes": ["cool", "heat", "dry", "fan_only", "auto", "off"],
+          "controlPath": "cloud"
+        }
+      ],
+      "fans": []
+    },
+    {
+      "id": "living",
+      "name": "Living room",
+      "isSafeRoom": false,
+      "thermal": { "rKPerKw": 22.2, "cKwhPerK": 0.9 },
+      "hvacUnits": [
+        {
+          "id": "split-living",
+          "model": "Hisense Easy Smart 24000 BTU",
+          "coolingKw": 6.3,
+          "inputKw": { "min": 0.42, "nominal": 2.07, "max": 2.76 },
+          "modes": ["cool", "heat", "dry", "fan_only", "auto", "off"],
+          "controlPath": "cloud"
+        }
+      ],
+      "fans": [{ "id": "fan-living", "powerW": 40, "controllable": false }]
+    }
+  ],
+  "epsCircuits": ["safe-room", "router", "fridge"],
+  "location": { "latRounded": 41.9, "lonRounded": 12.5, "tz": "Europe/Rome" }
+}

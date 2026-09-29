@@ -6,9 +6,11 @@ packages:
 
 # One version of shared runtime libraries across the workspace (plan section 9.4: a single Zod v4).
 catalog:
+  fast-check: 4.10.2
   zod: 4.6.5
 
 overrides:
+  fast-check: 4.10.2
   zod: 4.6.5
 
 # Supply-chain settings (issue #37). pnpm 12 reads every non-auth setting from this file,

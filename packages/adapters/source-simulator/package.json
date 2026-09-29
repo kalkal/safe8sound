@@ -9,6 +9,10 @@
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",
-    "@cold-reserve/core": "workspace:*"
+    "@cold-reserve/core": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "fast-check": "catalog:"
   }
 }
