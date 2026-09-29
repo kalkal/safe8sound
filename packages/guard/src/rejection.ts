@@ -25,5 +25,22 @@ export function rejectionOf(verdict: GuardVerdict): ErrorEnvelope | undefined {
     };
     return toolError(CODE[failed.id], failed.reason, { details });
   }
+  const night = verdict.nightRecovery;
+  if (night?.status === 'unmet') {
+    const minutes = (h: number) => Math.round(h * 60);
+    return toolError(
+      'night_recovery_unmet',
+      `The plan keeps the safe room at or below ${night.thresholdC.toString()} °C for ${night.achievedHours.toString()} of the ${night.requiredHours.toString()} night hours it can reach.`,
+      {
+        details: {
+          roomId: night.roomId,
+          measured: minutes(night.achievedHours),
+          limit: minutes(night.requiredHours),
+          nearestAllowed: minutes(night.requiredHours),
+          unit: 'min',
+        },
+      },
+    );
+  }
   return undefined;
 }

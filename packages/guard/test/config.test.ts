@@ -6,6 +6,7 @@ describe('guard config', () => {
   it('parses the default file', () => {
     const c = parseGuardConfig(rawConfig);
     expect(c.ok && c.value.reserve).toEqual({ essentialLoadW: 350, capWh: 6000 });
+    expect(c.ok && c.value.nightRecovery.thresholdC).toEqual({ standard: 26, elderly: 24 });
   });
 
   it('reports an invalid config as invalid_config with the field paths', () => {
@@ -22,6 +23,12 @@ describe('guard config errors', () => {
   it('says the configuration is not valid and names the field', () => {
     const c = parseGuardConfig({ ...rawConfig, pacing: { ...rawConfig.pacing, maxChangesPerHour: 0 } });
     expect(!c.ok && c.error).toMatchObject({ message: 'The guard configuration is not valid.', details: { issues: [{ path: 'pacing.maxChangesPerHour' }] } });
+  });
+
+  it('names the elderly night threshold when it is above the standard one, and accepts them equal (boundary)', () => {
+    const c = parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, thresholdC: { standard: 26, elderly: 27 } } });
+    expect(!c.ok && c.error).toMatchObject({ details: { issues: [{ path: 'nightRecovery.thresholdC.elderly', message: 'The elderly threshold is at most the standard one' }] } });
+    expect(parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, thresholdC: { standard: 26, elderly: 26 } } }).ok).toBe(true);
   });
 
   it('reports at most 20 issues', () => {

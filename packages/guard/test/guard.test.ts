@@ -1,8 +1,8 @@
-import { GUARANTEE_IDS, HomeProfileSchema, type GuaranteeId } from '@cold-reserve/contracts';
+import { ForecastSchema, GUARANTEE_IDS, HomeProfileSchema, PreferencesSchema, NightRecoverySchema, type GuaranteeId } from '@cold-reserve/contracts';
 import { exampleHomeProfile } from '@cold-reserve/contracts/fixtures';
 import { describe, expect, it } from 'vitest';
 import { CONSTRAINTS, rejectionOf, runGuard, type GuardVerdict } from '../src/index.js';
-import { H, T0, input, plan, snapshot, step } from './support.js';
+import { H, T0, config, hotNight, input, iso, plan, preferences, snapshot, step } from './support.js';
 
 const g = (v: GuardVerdict, id: GuaranteeId) => {
   const found = v.guarantees.find((x) => x.id === id);
@@ -141,5 +141,97 @@ describe('pacing_on_track', () => {
     const r = g(runGuard(input({ plan: plan([step({ targetPct: 99 })]) })), 'pacing_on_track');
     expect(r.ok).toBe(false);
     expect(r.unit).toBe('%');
+  });
+});
+
+describe('night recovery (feature queue item 1)', () => {
+  it('is met when the bedroom stays at 25 °C all night', () => {
+    const n = runGuard(input()).nightRecovery;
+    expect(n && NightRecoverySchema.parse(n).status).toBe('met');
+    expect(n?.achievedHours).toBeGreaterThanOrEqual(n?.requiredHours ?? Infinity);
+    expect(n?.window.start).toBe('2026-07-15T20:00:00.000Z');
+  });
+
+  it('rejects a plan that misses a reachable target', () => {
+    const v = runGuard(input({ plan: plan([step({ mode: 'off' })]) }));
+    expect(v.nightRecovery?.status).toBe('unmet');
+    expect(v.ok).toBe(false);
+  });
+
+  it('elderly mode needs 24 °C: a 25 °C plan is unmet', () => {
+    const v = runGuard(input({ nightRecoveryMode: 'elderly' }));
+    expect(v.nightRecovery?.thresholdC).toBe(24);
+    expect(v.nightRecovery?.status).toBe('unmet');
+    expect(v.guarantees.every((x) => x.ok)).toBe(true);
+    expect(v.ok).toBe(false);
+    expect(v.warnings).toEqual([]);
+    expect(rejectionOf(v)?.code).toBe('night_recovery_unmet');
+  });
+
+  it('says honestly when the battery cannot do it: infeasible, best hours, a warning, not a rejection', () => {
+    const v = runGuard(input({ snapshot: snapshot({ gridAvailable: false, socPct: 11 }), plan: plan([step({ targetPct: 11 })]) }));
+    const n = v.nightRecovery;
+    expect(n?.status).toBe('infeasible');
+    expect(n?.bestAchievableHours).toBeLessThan(n?.requiredHours ?? 0);
+    expect(v.warnings.map((w) => w.code)).toEqual(['night_recovery_infeasible']);
+    expect(v.warnings[0]?.message).toMatch(/^Tonight the battery can keep the Bedroom at or below 26 °C for about \d+(\.\d+)? hours, not the 6 hours of the night-recovery target\.$/);
+    expect(n?.bestAchievableHours).toBeGreaterThanOrEqual(n?.achievedHours ?? Infinity);
+    expect(rejectionOf(v)?.code).not.toBe('night_recovery_unmet');
+  });
+
+  it('does not call a target feasible when reaching it would run the battery out before dawn', () => {
+    // Off grid at 30 %: cooling the bedroom to 23.5 °C all night would reach the hours, then leave the
+    // safe room without power before the 07:00 recharge.
+    const v = runGuard(input({ nightRecoveryMode: 'elderly', snapshot: snapshot({ gridAvailable: false, socPct: 30 }), plan: plan([step({ mode: 'fan_only', targetPct: 10 })]) }));
+    expect(v.nightRecovery?.status).toBe('infeasible');
+    expect(v.nightRecovery?.bestAchievableHours).toBe(v.nightRecovery?.achievedHours);
+  });
+
+  it('does not call a target feasible when reaching it would take the room out of its humidity band', () => {
+    // A humid night: cooling to 23.5 °C would reach the hours, with the room far above 60 % RH.
+    const humid = ForecastSchema.parse({ ...hotNight(), hourly: hotNight().hourly.map((h) => ({ ...h, humidityOutPct: 95 })) });
+    const v = runGuard(input({ nightRecoveryMode: 'elderly', forecast: humid, plan: plan([step({ mode: 'fan_only', targetPct: 40 })]) }));
+    expect(v.nightRecovery?.status).toBe('infeasible');
+  });
+
+  it('off grid with a full battery the target is reachable: missing it is a rejection', () => {
+    const v = runGuard(input({ snapshot: snapshot({ gridAvailable: false, socPct: 100 }), plan: plan([step({ mode: 'fan_only', targetPct: 10 })]) }));
+    expect(v.nightRecovery?.status).toBe('unmet');
+  });
+
+  it('a reference that leaves the humidity band proves nothing (tight band)', () => {
+    const tight = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 30, maxPct: 40 } } });
+    const v = runGuard(input({ preferences: tight, plan: plan([step({ mode: 'fan_only' })]) }));
+    expect(v.nightRecovery?.status).toBe('infeasible');
+  });
+
+  it('reports the reference hours as the best when they beat the plan', () => {
+    const nine = config((c) => ({ ...c, nightRecovery: { ...c.nightRecovery, requiredHours: 24 } }));
+    const v = runGuard(input({ config: nine, plan: plan([step({ mode: 'fan_only' })]) }));
+    expect(v.nightRecovery?.status).toBe('infeasible');
+    expect(v.nightRecovery?.bestAchievableHours).toBeGreaterThan(v.nightRecovery?.achievedHours ?? Infinity);
+  });
+
+  it('is not evaluated outside the cooling season', () => {
+    const v = runGuard(input({ season: 'heating' }));
+    expect('nightRecovery' in v).toBe(false);
+    expect(v.warnings).toEqual([]);
+  });
+
+  it('is not evaluated when the projection has no night', () => {
+    const morning = Date.parse('2026-07-16T08:00:00+02:00');
+    const day = ForecastSchema.parse({
+      ...hotNight(),
+      hourly: Array.from({ length: 6 }, (_, i) => ({ ts: iso(morning + i * H), tempOutC: 30, humidityOutPct: 50, irradianceWm2: 700, stormProb: 0 })),
+    });
+    const v = runGuard(input({ forecast: day, snapshot: snapshot({ ms: morning }), plan: plan([step({ atMs: morning })], morning + 3 * H) }));
+    expect('nightRecovery' in v).toBe(false);
+    expect(v.warnings).toEqual([]);
+  });
+
+  it('is met with no warning', () => {
+    const v = runGuard(input());
+    expect(v.nightRecovery?.status).toBe('met');
+    expect(v.warnings).toEqual([]);
   });
 });

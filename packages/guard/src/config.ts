@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 const positive = z.number().positive();
 const nonNegative = z.number().nonnegative();
+const hour = z.number().int().min(0).max(23);
 
 export const GuardConfigSchema = z.strictObject({
   schemaVersion: z.literal(1),
@@ -25,6 +26,22 @@ export const GuardConfigSchema = z.strictObject({
   }),
   /** Time a plan gets to bring the safe room inside its thresholds. */
   safeRoom: z.strictObject({ graceMinutes: nonNegative }),
+  /** Night recovery (feature queue item 1): sources in packages/contracts/src/night-recovery.ts. */
+  nightRecovery: z
+    .strictObject({
+      windowStartHour: hour,
+      windowEndHour: hour,
+      thresholdC: z.strictObject({ standard: z.number().min(18).max(30), elderly: z.number().min(18).max(30) }),
+      requiredHours: nonNegative.max(24),
+      heatIndexBaseC: z.number(),
+      budgetDegreeHours: nonNegative,
+      /** The reference strategy that decides feasibility cools this far below the threshold. */
+      referenceSetpointMarginK: nonNegative.max(5),
+    })
+    .refine((n) => n.thresholdC.elderly <= n.thresholdC.standard, {
+      path: ['thresholdC', 'elderly'],
+      message: 'The elderly threshold is at most the standard one',
+    }),
 });
 export type GuardConfig = z.infer<typeof GuardConfigSchema>;
 

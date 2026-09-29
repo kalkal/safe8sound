@@ -26,6 +26,7 @@ function verdictAt(id: ScenarioId, atH: number, s: { mode: HvacMode; setpointC: 
     season: 'cooling',
     model: defaultSimParams(),
     config: config(),
+    nightRecoveryMode: 'standard',
   });
 }
 
@@ -70,5 +71,10 @@ describe('heatwave: 38 °C in the afternoon, grid up', () => {
     const low = verdictAt('heatwave', 14, { mode: 'cool', setpointC: 26, fanOn: true, targetPct: 20 });
     expect(byId(low, 'storm_reserve')?.ok).toBe(false);
     expect(rejectionOf(low)?.code).toBe('storm_reserve_violated');
+  });
+
+  it('evaluates the night of the safe room', () => {
+    expect(v.nightRecovery?.roomId).toBe('bedroom-1');
+    expect(v.nightRecovery?.window.start).toBe('2026-07-16T20:00:00.000Z');
   });
 });

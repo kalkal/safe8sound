@@ -2,6 +2,7 @@ import {
   pct,
   type Forecast,
   type HomeProfile,
+  type NightRecoveryMode,
   type Pct,
   type Plan,
   type Preferences,
@@ -40,6 +41,7 @@ export interface GuardInput {
   /** Physics of the projection (the simulator parameters, from config). */
   readonly model: SimParams;
   readonly config: GuardConfig;
+  readonly nightRecoveryMode: NightRecoveryMode;
 }
 
 /** Everything the constraints read, computed once. */
@@ -112,7 +114,7 @@ export function currentControls(snapshot: Snapshot): RoomControl[] {
   return snapshot.rooms.map((r) => ({ id: r.id, ...(r.hvac === undefined ? {} : { hvac: { mode: r.hvac.mode, setpointC: r.hvac.setpointC } }), fanOn: r.fanOn ?? false }));
 }
 
-/** Projects any control schedule from the snapshot (the plan, or another schedule to compare with). */
+/** Projects any control schedule from the snapshot: the plan, or the night-recovery reference. */
 export function projectFrom(
   input: GuardInput,
   controlAt: (ms: number) => readonly RoomControl[],

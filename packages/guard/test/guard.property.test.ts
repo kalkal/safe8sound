@@ -121,12 +121,53 @@ describe('guard invariants (fast-check, 10 000 cases)', () => {
     );
   }, TIMEOUT);
 
-  it('always returns the five guarantees, and ok means all of them hold', () => {
+  it('always returns the five guarantees, and ok means all of them hold and the night is not unmet', () => {
     fc.assert(
       fc.property(randomCase, (c) => {
         const v = runGuard(c.guard);
         expect(v.guarantees).toHaveLength(5);
-        expect(v.ok).toBe(v.guarantees.every((x) => x.ok));
+        expect(v.ok).toBe(v.guarantees.every((x) => x.ok) && v.nightRecovery?.status !== 'unmet');
+      }),
+      RUNS,
+    );
+  }, TIMEOUT);
+
+  it('night recovery hours never decrease with more energy in the battery (off grid)', () => {
+    const night = fc.record({
+      a: fc.oneof(fc.constantFrom(10, 11, 100), fc.double({ min: 10, max: 100, noNaN: true })),
+      b: fc.oneof(fc.constantFrom(10, 11, 100), fc.double({ min: 10, max: 100, noNaN: true })),
+      setpointC: fc.integer({ min: 20, max: 28 }),
+      mode: fc.constantFrom<HvacMode>('cool', 'dry'),
+    });
+    const nightConfig = config((c) => ({ ...c, projection: { ...c.projection, stepMinutes: 30 } }));
+    fc.assert(
+      fc.property(night, ({ a, b, setpointC, mode }) => {
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        const run = (soc: number) =>
+          runGuard(input({ config: nightConfig, snapshot: snapshot({ socPct: soc, gridAvailable: false }), plan: plan([step({ mode, setpointC, targetPct: 10 })]) })).nightRecovery;
+        const nLo = run(lo);
+        const nHi = run(hi);
+        expect(nHi?.achievedHours ?? 0).toBeGreaterThanOrEqual((nLo?.achievedHours ?? 0) - 1e-9);
+        if (nLo?.bestAchievableHours !== undefined && nHi?.bestAchievableHours !== undefined) {
+          expect(nHi.bestAchievableHours).toBeGreaterThanOrEqual(nLo.bestAchievableHours - 1e-9);
+        }
+      }),
+      { numRuns: runs(1_000) },
+    );
+  }, TIMEOUT);
+
+  it('never a fake pass: met means the hours and the heat budget really hold; infeasible always carries its warning', () => {
+    fc.assert(
+      fc.property(randomCase, (c) => {
+        const v = runGuard(c.guard);
+        const n = v.nightRecovery;
+        if (n === undefined) return;
+        if (n.status === 'met') {
+          expect(n.achievedHours).toBeGreaterThanOrEqual(n.requiredHours - 1e-9);
+          expect(n.heatIndexDegreeHoursAbove26_7).toBeLessThanOrEqual(n.budgetDegreeHours + 1e-9);
+        }
+        const codes: readonly string[] = v.warnings.map((w) => w.code);
+        expect(codes.includes('night_recovery_infeasible')).toBe(n.status === 'infeasible');
       }),
       RUNS,
     );

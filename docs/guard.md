@@ -1,4 +1,4 @@
-# The guard and the pacing levels
+# The guard, the pacing levels and the night recovery
 
 "The model proposes, the guard decides." The guard (`packages/guard`) checks a candidate plan against the home's physical limits and the person's safety thresholds. It never modifies a plan: every result carries the reason and, when it fails, the nearest allowed value, so the planner can re-plan.
 
@@ -31,12 +31,24 @@ A failing verdict becomes a `guard_rejection` error (`rejectionOf`), named after
 - **Rate limit.** There are at most `maxChangesPerHour` changes in any hour.
 - **Ladder bounds.** The level never leaves the ladder the person confirmed.
 
+## Night recovery
+The guard also checks the safe room's night. This is a comfort-for-sleep measure, never a medical claim.
+- **Window and thresholds.** 22:00–07:00 local time, the bedroom night hours of CIBSE TM59. The room must stay at or below 26 °C (TM59 night threshold), or 24 °C in the `elderly` mode, for at least `requiredHours` (capped by the part of the night the projection covers). The 24 °C comes from a study of older adults (median age 72): the risk of reduced overnight heart-rate-variability recovery grows with bedroom temperature above 24 °C (×1.4 at 24–26 °C, ×2.0 at 26–28 °C) ([PMC12751657](https://pmc.ncbi.nlm.nih.gov/articles/PMC12751657/)).
+- **Heat budget.** Heat Index degree-hours above 26.7 °C, summed as max(0, HI − 26.7) × hours. 26.7 °C (80 °F) is where the NOAA heat index is defined and where the "caution" band of the [EnergyPlus resilience metrics](https://bigladdersoftware.com/epx/docs/24-1/engineering-reference/resilience-metrics.html) starts. The total must stay within `budgetDegreeHours`.
+- **Status:**
+  - `met`: the plan's own projection reaches the hours within the budget;
+  - `unmet`: it does not, but a reference strategy does. The reference cools the safe room only, and only during the window, a little below the threshold. The plan is rejected (`night_recovery_unmet`);
+  - `infeasible`: no reference that keeps the room safe does it. The plan is **not** rejected. The result gives `bestAchievableHours` and the plan carries a `night_recovery_infeasible` warning, so voice and cards say it honestly.
+- **When the reference counts.** The reference proves the target reachable only if it respects what matters at night: off grid it must not run the battery out before the next recharge, and the room's humidity must stay inside its safety band. Hours bought by leaving the safe room without power before dawn, or at 85 % RH, are not "achievable".
+
 ## Configuration
 Defaults are in `packages/guard/config/guard.json`, validated by `GuardConfigSchema`. An invalid file is an `invalid_config` error with the field paths.
 
 ## Tests
-- Unit tests for each constraint.
+- Unit tests for each constraint and for the night statuses.
 - The seeded `storm-blackout` scenario: the scenario's own HVAC empties the battery before the 08:00 recharge, so `pacing_on_track` refuses it.
 - Property tests with fast-check, 10 000 cases each:
   - no accepted plan breaks the reserve, the inverter or the battery limits;
   - the guard never changes its inputs;
+  - night hours never decrease with more energy;
+  - `met` is never a fake pass.

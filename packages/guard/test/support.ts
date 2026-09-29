@@ -128,6 +128,7 @@ export function input(over: Partial<GuardInput> = {}): GuardInput {
     season: 'cooling',
     model: params,
     config: config(),
+    nightRecoveryMode: 'standard',
     ...over,
   };
 }
