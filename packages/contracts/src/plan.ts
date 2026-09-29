@@ -3,6 +3,7 @@ import { EntityIdSchema, HomeIdSchema, IsoDateTimeSchema, epochMs } from './comm
 import { GUARANTEE_IDS, GuaranteeResultSchema } from './guarantees.js';
 import { HvacModeSchema } from './home.js';
 import { DataOriginSchema } from './origin.js';
+import { CounterfactualSchema } from './counterfactual.js';
 import { NightRecoverySchema, PlanWarningSchema } from './night-recovery.js';
 import { LevelSchema, levelRank } from './pacing.js';
 import { ForecastConfidenceSchema } from './snapshot.js';
@@ -64,6 +65,8 @@ export const PlanSchema = z
     advisoryOnly: z.boolean(),
     /** Night recovery of the safe room, when the plan covers part of a night (optional, added 2026-09-29). */
     nightRecovery: NightRecoverySchema.optional(),
+    /** The same scenario with no plan and with the naive plan, in the safe room (optional, added 2026-09-29). */
+    counterfactual: CounterfactualSchema.optional(),
     /** What must be said even though the plan is accepted (optional, added 2026-09-29). */
     warnings: z.array(PlanWarningSchema).max(10).optional(),
   })

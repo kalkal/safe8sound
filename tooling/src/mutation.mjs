@@ -1,4 +1,4 @@
-// `pnpm heavy pnpm mutation [group...]`: Stryker on the guard and the F4 modules of core, threshold 80 %.
+// `pnpm heavy pnpm mutation <group...> | --all`: Stryker on the guard and the F4 modules of core, threshold 80 %.
 // Stryker's Vitest runner 10.0.0 runs no test per mutant with Vitest 5 (every mutant "survives"), so we use
 // the command runner: each group of sources is mutated against the tests that exercise it, which keeps the
 // run short enough for the heavy lock. Run it in slices (one or a few groups per `pnpm heavy` call, each
@@ -24,6 +24,9 @@ export const GROUPS = [
   { name: 'core-rooms', mutate: ['packages/core/src/rooms.ts'], tests: ['packages/core/test/rooms.test.ts'] },
   { name: 'core-night', mutate: ['packages/core/src/night.ts'], tests: ['packages/core/test/night.test.ts'] },
   { name: 'core-projection', mutate: ['packages/core/src/projection.ts'], tests: ['packages/core/test/projection.test.ts'] },
+  { name: 'core-planner', mutate: ['packages/core/src/planner.ts'], tests: ['packages/core/test/planner.test.ts'] },
+  { name: 'core-counterfactual', mutate: ['packages/core/src/counterfactual.ts'], tests: ['packages/core/test/counterfactual.test.ts'] },
+  { name: 'guard-counterfactual', mutate: ['packages/guard/src/counterfactual.ts'], tests: ['packages/guard/test/counterfactual.test.ts'] },
   // The guard is split per source so that each slice stays well under 15 minutes of heavy lock.
   { name: 'guard-constraints', mutate: ['packages/guard/src/constraints.ts'], tests: ['packages/guard/test/constraints.test.ts'] },
   { name: 'guard-rejection', mutate: ['packages/guard/src/rejection.ts'], tests: ['packages/guard/test/rejection.test.ts'] },
@@ -31,7 +34,7 @@ export const GROUPS = [
   {
     name: 'guard-context',
     mutate: ['packages/guard/src/context.ts', 'packages/guard/src/guard.ts'],
-    tests: ['packages/guard/test/context.test.ts', 'packages/guard/test/guard.test.ts'],
+    tests: ['packages/guard/test/context.test.ts', 'packages/guard/test/guard.test.ts', 'packages/guard/test/scenarios.test.ts'],
   },
   { name: 'guard-night', mutate: ['packages/guard/src/night.ts'], tests: ['packages/guard/test/guard.test.ts', 'packages/guard/test/guard.property.test.ts'] },
 ];
@@ -74,9 +77,31 @@ export function groupConfig(group) {
   };
 }
 
+/**
+ * The slices to run: named groups, or `--all` (only when no other session needs the heavy lock).
+ * Nothing or an unknown name is a usage error (exit 2) that lists the groups.
+ * @param {readonly string[]} args
+ * @returns {{ ok: true, groups: Group[] } | { ok: false, exitCode: 2, message: string }}
+ */
+export function selectGroups(args) {
+  const list = `Groups: ${GROUPS.map((g) => g.name).join(', ')}.`;
+  if (args.length === 0) {
+    return { ok: false, exitCode: 2, message: `usage: pnpm heavy pnpm mutation <group...> | --all
+${list}` };
+  }
+  if (args.includes('--all')) return { ok: true, groups: [...GROUPS] };
+  const unknown = args.find((a) => !GROUPS.some((g) => g.name === a));
+  if (unknown !== undefined) return { ok: false, exitCode: 2, message: `Unknown group "${unknown}". ${list}` };
+  return { ok: true, groups: GROUPS.filter((g) => args.includes(g.name)) };
+}
+
 function main() {
-  const only = process.argv.slice(2);
-  const groups = only.length === 0 ? GROUPS : GROUPS.filter((g) => only.includes(g.name));
+  const selected = selectGroups(process.argv.slice(2));
+  if (!selected.ok) {
+    console.error(selected.message);
+    process.exit(selected.exitCode);
+  }
+  const groups = selected.groups;
   mkdirSync('reports/mutation', { recursive: true });
   /** @type {Report[]} */
   const reports = [];

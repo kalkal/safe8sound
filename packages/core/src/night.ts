@@ -74,6 +74,21 @@ const inWindow = (hour: number, cfg: NightWindowConfig) =>
     ? hour >= cfg.windowStartHour || hour < cfg.windowEndHour
     : hour >= cfg.windowStartHour && hour < cfg.windowEndHour;
 
+/** The next night-window stretch in [fromMs, toMs), found on a 5-minute grid; undefined if there is none. */
+export function nextNightWindow(fromMs: number, toMs: number, tz: string, config: NightWindowConfig): { startMs: number; endMs: number } | undefined {
+  const step = 5 * 60_000;
+  // Now, then every 5 minutes on the clock.
+  const times = [fromMs];
+  for (let ms = (Math.floor(fromMs / step) + 1) * step; ms < toMs; ms += step) times.push(ms);
+  let startMs: number | undefined;
+  for (const ms of times) {
+    const night = inWindow(localHour(ms, tz), config);
+    if (startMs === undefined && night) startMs = ms;
+    if (startMs !== undefined && !night) return { startMs, endMs: ms };
+  }
+  return startMs === undefined ? undefined : { startMs, endMs: toMs };
+}
+
 /** Metrics over the first contiguous night-window stretch of the projection; undefined if there is none. */
 export function nightMetrics(
   points: readonly ProjectionPoint[],

@@ -31,7 +31,8 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
   // A partial window (a re-plan at 02:00, or a horizon that ends before 07:00) cannot see the hours outside
   // it: those are given the benefit of the doubt, so only the hours still needed are required.
   const windowHours = nightWindowHours(cfg.windowStartHour, cfg.windowEndHour);
-  const requiredHours = Math.max(0, cfg.requiredHours - (windowHours - plan.coveredHours));
+  // Clamped: on the autumn clock change the night lasts 10 hours, one more than the window's 9.
+  const requiredHours = Math.min(cfg.requiredHours, Math.max(0, cfg.requiredHours - (windowHours - plan.coveredHours)));
   const meets = (m: NightMetrics | undefined) =>
     m !== undefined && m.achievedHours >= requiredHours - EPS && m.heatIndexDegreeHours <= cfg.budgetDegreeHours + EPS;
 

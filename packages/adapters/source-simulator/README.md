@@ -45,11 +45,12 @@ The 1R1C constants are in K/kW and kWh/K as in the contract.
 | `baseGainGph` | 30 g/h per room | Small household sources (plants, cooking spread over the day). Assumption. |
 | `exchangeTimeConstantH` | 3 h | About 0.33 air changes per hour in a closed room (unchanged from S6). |
 | `roomVolumeM3` | 35 m³ (living 70) | About 13 m² × 2.7 m; the living room is about twice as large. |
-| `maxLatentShare` | 0.5 | Assumption: at most half of the rated cooling can go into drying. It bounds the linear removal model in very humid air. |
+| `maxLatentShare` | 0.5 | Assumption: at most half of the cooling in use (rated × share × served) can go into drying. It bounds the linear removal model in very humid air. |
 | `coilDewpointC` | 8 °C | Typical evaporator saturation temperature of a split in cooling (5–10 °C): the air is never dried below this dew point. |
 
-With these values a split in cool at part load keeps a humid room at 64–80 % RH on a humid night: at low
-load an inverter split removes little water. The dry mode brings the room down to about 52–55 %.
+With these values (recomputed with the rating condition and the latent cap), the safe room of the built-in
+scenarios stays at 43–80 % RH in cool: at low load on a humid night an inverter split removes little water.
+The dry mode takes it to 35–65 % (down to the coil limit in the storm).
 
 ## Reproducibility
 

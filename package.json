@@ -6,7 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@12.6.0",
   "engines": {
-    "node": ">=22.13 <23"
+    "node": ">=22.18 <23"
   },
   "scripts": {
     "prepare": "node tooling/src/install-hooks.mjs",

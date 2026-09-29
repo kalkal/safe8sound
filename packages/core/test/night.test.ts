@@ -1,6 +1,6 @@
 import { celsius, pct, watt } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { OFFSET_CACHE_LIMIT, heatIndexExcessC, localHour, nightMetrics, offsetCacheSize, type NightWindowConfig } from '../src/night.js';
+import { OFFSET_CACHE_LIMIT, heatIndexExcessC, localHour, nextNightWindow, nightMetrics, offsetCacheSize, type NightWindowConfig } from '../src/night.js';
 import type { ProjectionPoint } from '../src/projection.js';
 
 const TZ = 'Europe/Rome';
@@ -115,5 +115,22 @@ describe('nightMetrics (CIBSE TM59 night window 22:00-07:00)', () => {
   it('is undefined for a room the projection does not have', () => {
     const p = points('2026-07-15T22:00:00+02:00', 12, 5, () => 25);
     expect(nightMetrics(p, { roomId: 'living', tz: TZ, stepMinutes: 5, thresholdC: 26, config: cfg })).toBeUndefined();
+  });
+});
+
+describe('nextNightWindow', () => {
+  const from = Date.parse('2026-07-15T14:00:00+02:00');
+  it('finds the next 22:00-07:00 stretch, cut to the range', () => {
+    expect(nextNightWindow(from, from + 24 * 3_600_000, TZ, cfg)).toEqual({
+      startMs: Date.parse('2026-07-15T22:00:00+02:00'),
+      endMs: Date.parse('2026-07-16T07:00:00+02:00'),
+    });
+    expect(nextNightWindow(from, Date.parse('2026-07-16T03:00:00+02:00'), TZ, cfg)?.endMs).toBe(Date.parse('2026-07-16T03:00:00+02:00'));
+  });
+
+  it('starts now when it is already night, and is undefined when the range has no night', () => {
+    const late = Date.parse('2026-07-15T23:30:00+02:00');
+    expect(nextNightWindow(late, late + 3_600_000, TZ, cfg)?.startMs).toBe(late);
+    expect(nextNightWindow(from, from + 3 * 3_600_000, TZ, cfg)).toBeUndefined();
   });
 });

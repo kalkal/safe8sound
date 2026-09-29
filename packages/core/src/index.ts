@@ -3,6 +3,7 @@ export const packageName = '@cold-reserve/core';
 
 export * from './clock.js';
 export * from './comfort.js';
+export * from './counterfactual.js';
 export * from './energy.js';
 export * from './humidity.js';
 export * from './hvac.js';
@@ -12,6 +13,7 @@ export * from './origin.js';
 export * from './preferences.js';
 export * from './ports.js';
 export * from './projection.js';
+export * from './planner.js';
 export * from './pv.js';
 export * from './reserve.js';
 export * from './rooms.js';

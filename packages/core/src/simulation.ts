@@ -143,7 +143,8 @@ export function stepHome(args: { state: HomeState; inputs: HomeInputs; profile: 
       exchangeTimeConstantH: params.humidity.exchangeTimeConstantH,
       gainsGph: params.humidity.baseGainGph + params.humidity.occupantGainGph * occupants,
       removalGph: capacityGph * share * servedRatio,
-      // Latent heat of water ~0.68 Wh/g: at most `maxLatentShare` of the rated cooling goes to drying.
+      // Latent heat of water ~0.68 Wh/g: at most `maxLatentShare` of the cooling in use (rated × share × served)
+      // goes to drying.
       maxRemovalGph: (ratedKw * 1000 * params.humidity.maxLatentShare * share * servedRatio) / LATENT_WH_PER_G,
       rating: params.humidity.rating,
       coilDewpointC: params.humidity.coilDewpointC,

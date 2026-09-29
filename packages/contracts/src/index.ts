@@ -9,6 +9,7 @@ export * from './origin.js';
 export * from './home.js';
 export * from './pacing.js';
 export * from './snapshot.js';
+export * from './counterfactual.js';
 export * from './night-recovery.js';
 export * from './plan.js';
 export * from './preferences.js';

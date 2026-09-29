@@ -2,6 +2,7 @@ import { HomeProfileSchema, celsius, minutes, pct, watt, type HvacMode } from '@
 import { exampleHomeProfile } from '@cold-reserve/contracts/fixtures';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { saturationVaporPressureHpa } from '../src/humidity.js';
 import { stepHome, type HomeInputs, type HomeState, type SimParams } from '../src/simulation.js';
 
 const profile = HomeProfileSchema.parse(exampleHomeProfile());
@@ -116,6 +117,19 @@ describe('stepHome', () => {
       const idle = run({ ...dark, rooms: [] }, empty);
       expect(drying.flows.servedLoadW).toBe(0);
       expect(rh(drying, 'bedroom-1')).toBeCloseTo(rh(idle, 'bedroom-1'), 9);
+    });
+
+    it('in very humid air the removal reaches the latent cap: 0.5 × cooling in use / 0.68 Wh/g', () => {
+      // Bedroom at 25 °C and 90 % RH, dry mode (share 0.6 of the 3.2 kW rated), grid up, 3.6 seconds.
+      const humid = { socPct: pct(50), rooms: profile.rooms.map((r) => ({ id: r.id, tempC: celsius(25), humidityPct: pct(90) })) };
+      const drying = { outC: celsius(25), outRhPct: pct(90), irradianceWm2: 0, rooms: [{ id: 'bedroom-1', occupants: [], hvac: { mode: 'dry' as const, setpointC: celsius(25) }, fanOn: false }] };
+      const step = (maxLatentShare: number) =>
+        stepHome({ state: humid, inputs: inputs(drying), profile, params: { ...params, humidity: { ...params.humidity, baseGainGph: 0, maxLatentShare } }, dt: minutes(0.06), noise: 0.5 });
+      const gramsPerPct = ((saturationVaporPressureHpa(celsius(25)) * 100 * 35) / (461.5 * 298.15) / 100) * 1000;
+      const removedGph = (s: ReturnType<typeof stepHome>) => ((90 - rh(s, 'bedroom-1')) * gramsPerPct) / 0.001;
+      const cap = (3200 * 0.5 * 0.6) / (2450 / 3600);
+      expect(removedGph(step(0.5))).toBeCloseTo(cap, -2);
+      expect(removedGph(step(10))).toBeGreaterThan(cap * 1.2);
     });
 
     it('a larger room (living, 70 m³) changes humidity more slowly than a 35 m³ one', () => {

@@ -207,6 +207,15 @@ describe('night recovery (feature queue item 1)', () => {
     expect(v.warnings[0]?.message).toMatch(/^Tonight the air conditioner can keep the Bedroom/);
   });
 
+  it('on the autumn clock-change night (10 hours long) it still requires only the configured hours', () => {
+    // Europe/Rome, 24-25 October 2026: 03:00 becomes 02:00, so 22:00-07:00 lasts 10 hours.
+    const start = Date.parse('2026-10-24T20:00:00+02:00');
+    const october = ForecastSchema.parse({ ...hotNight(), fetchedAt: iso(start), hourly: hotNight().hourly.map((h, i) => ({ ...h, ts: iso(start + i * H) })) });
+    const v = runGuard(input({ forecast: october, snapshot: snapshot({ ms: start }), plan: plan([step({ atMs: start })], start + 13 * H) }));
+    expect(v.nightRecovery?.window.end).toBe('2026-10-25T06:00:00.000Z');
+    expect(v.nightRecovery?.requiredHours).toBe(6);
+  });
+
   it('a re-plan at 02:00 only requires the hours still needed (no false infeasible during a blackout)', () => {
     // 6 of the 9 night hours are required; at 02:00 only 5 remain, so 2 of them are still needed.
     const two = T0 + 6 * H;
