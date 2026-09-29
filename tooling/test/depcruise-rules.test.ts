@@ -27,6 +27,7 @@ describe('dependency-cruiser: architecture rules (plan §10.4, §14.2)', () => {
     expect(rules('apps/alpha/src/uses-beta.ts')).toContain('apps-do-not-import-each-other');
     expect(rules('packages/adapters/store-memory/src/uses-guard.ts')).toContain('adapters-use-contracts-and-core-only');
     expect(rules('packages/guard/src/uses-app.ts')).toContain('packages-do-not-import-apps');
+    expect(rules('packages/adapters/store-memory/src/uses-testing.ts')).toContain('src-never-imports-test-support');
     expect(found.map((v) => v.rule)).toContain('no-circular');
   });
 

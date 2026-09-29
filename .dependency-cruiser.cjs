@@ -70,6 +70,13 @@ module.exports = {
       to: { path: '^infra/' },
     },
     {
+      name: 'src-never-imports-test-support',
+      severity: 'error',
+      comment: 'Contract suites and fakes under packages/*/testing are for tests only.',
+      from: { path: ['^(packages|apps|infra)/[^/]+/src/', '^packages/adapters/[^/]+/src/'] },
+      to: { path: ['^packages/[^/]+/testing/', '^packages/adapters/[^/]+/testing/'] },
+    },
+    {
       name: 'src-uses-declared-dependencies',
       severity: 'error',
       comment: 'Production code imports only what its own package.json declares.',

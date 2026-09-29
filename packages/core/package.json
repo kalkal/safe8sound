@@ -5,7 +5,8 @@
   "description": "Pure domain: thermal, energy, reserve, safe hours, level, season, planner. No I/O.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./testing/state-store-contract.ts"
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*"
