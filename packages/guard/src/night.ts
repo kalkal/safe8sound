@@ -28,7 +28,10 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
 
   const plan = measure(ctx.points);
   if (plan === undefined) return { warnings: [] };
-  const requiredHours = Math.min(cfg.requiredHours, plan.coveredHours);
+  // A partial window (a re-plan at 02:00, or a horizon that ends before 07:00) cannot see the hours outside
+  // it: those are given the benefit of the doubt, so only the hours still needed are required.
+  const windowHours = nightWindowHours(cfg.windowStartHour, cfg.windowEndHour);
+  const requiredHours = Math.max(0, cfg.requiredHours - (windowHours - plan.coveredHours));
   const meets = (m: NightMetrics | undefined) =>
     m !== undefined && m.achievedHours >= requiredHours - EPS && m.heatIndexDegreeHours <= cfg.budgetDegreeHours + EPS;
 
@@ -65,11 +68,15 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
     warnings: [
       {
         code: 'night_recovery_infeasible',
-        message: `Tonight the battery can keep the ${room} at or below ${thresholdC.toString()} °C for about ${best.toString()} hours, not the ${base.requiredHours.toString()} hours of the night-recovery target.`.slice(0, 300),
+        // With the grid up the limit is the air conditioner (or the room's humidity), not the battery.
+        message: `Tonight ${ctx.gridAvailable ? 'the air conditioner' : 'the battery'} can keep the ${room} at or below ${thresholdC.toString()} °C for about ${best.toString()} hours, not the ${base.requiredHours.toString()} hours of the night-recovery target.`.slice(0, 300),
       },
     ],
   };
 }
+
+/** Length of the night window in hours (22 → 7 is 9 hours). */
+export const nightWindowHours = (startHour: number, endHour: number): number => (endHour - startHour + 24) % 24;
 
 /** Safe room only, off until the night window, then cooling (or drying) below the threshold. */
 function referenceControl(ctx: GuardContext, windowStartMs: number, setpointC: number): (ms: number) => RoomControl[] {

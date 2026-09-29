@@ -75,6 +75,11 @@ describe('nightMetrics (CIBSE TM59 night window 22:00-07:00)', () => {
     expect(nightMetrics(p, { roomId: 'bedroom-1', tz: TZ, stepMinutes: 5, thresholdC: 26, config: cfg })?.achievedHours).toBeCloseTo(1, 9);
   });
 
+  it('in elderly mode a room at exactly 24 °C counts (boundary)', () => {
+    const p = points('2026-07-15T22:00:00+02:00', 12, 5, (i) => (i < 6 ? 24 : 24.01));
+    expect(nightMetrics(p, { roomId: 'bedroom-1', tz: TZ, stepMinutes: 5, thresholdC: 24, config: cfg })?.achievedHours).toBeCloseTo(0.5, 9);
+  });
+
   it('cuts the window to what the projection covers', () => {
     const p = points('2026-07-16T03:00:00+02:00', 24, 5, () => 25);
     const m = nightMetrics(p, { roomId: 'bedroom-1', tz: TZ, stepMinutes: 5, thresholdC: 26, config: cfg });

@@ -1,9 +1,10 @@
 import { HomeProfileSchema, pct, type HvacMode } from '@cold-reserve/contracts';
 import { exampleHomeProfile } from '@cold-reserve/contracts/fixtures';
-import { acLimitW, darkWindow, localHour, project, reserveFloorSocPct, reserveWh, weatherFromForecast } from '@cold-reserve/core';
+import { acLimitW, controlFromSteps, darkWindow, localHour, nightMetrics, project, reserveFloorSocPct, reserveWh, weatherFromForecast } from '@cold-reserve/core';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { runGuard } from '../src/index.js';
+import { buildContext, currentControls, projectFrom, runGuard } from '../src/index.js';
+import { nightWindowHours } from '../src/night.js';
 import { H, MIN, T0, config, hotNight, input, plan, snapshot, step } from './support.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
@@ -163,8 +164,20 @@ describe('guard invariants (fast-check, 10 000 cases)', () => {
         const n = v.nightRecovery;
         if (n === undefined) return;
         if (n.status === 'met') {
-          expect(n.achievedHours).toBeGreaterThanOrEqual(n.requiredHours - 1e-9);
-          expect(n.heatIndexDegreeHoursAbove26_7).toBeLessThanOrEqual(n.budgetDegreeHours + 1e-9);
+          // Recomputed independently: the plan's own projection, measured with core's nightMetrics.
+          const ctx = buildContext(c.guard);
+          const points = projectFrom(c.guard, controlFromSteps(c.guard.plan.steps, currentControls(c.guard.snapshot)), {
+            toMs: ctx.horizonMs,
+            dischargeFloorPct: ctx.dischargeFloorPct,
+          });
+          const cfg = c.guard.config.nightRecovery;
+          const thresholdC = cfg.thresholdC[c.guard.nightRecoveryMode];
+          const m = nightMetrics(points, { roomId: c.guard.preferences.safeRoomId, tz: c.guard.profile.location.tz, stepMinutes: c.guard.config.projection.stepMinutes, thresholdC, config: cfg });
+          expect(m).toBeDefined();
+          if (m === undefined) return;
+          const required = Math.max(0, cfg.requiredHours - (nightWindowHours(cfg.windowStartHour, cfg.windowEndHour) - m.coveredHours));
+          expect(m.achievedHours).toBeGreaterThanOrEqual(required - 1e-9);
+          expect(m.heatIndexDegreeHours).toBeLessThanOrEqual(cfg.budgetDegreeHours + 1e-9);
         }
         const codes: readonly string[] = v.warnings.map((w) => w.code);
         expect(codes.includes('night_recovery_infeasible')).toBe(n.status === 'infeasible');

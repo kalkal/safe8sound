@@ -33,7 +33,8 @@ export const GuardConfigSchema = z.strictObject({
       windowEndHour: hour,
       thresholdC: z.strictObject({ standard: z.number().min(18).max(30), elderly: z.number().min(18).max(30) }),
       requiredHours: nonNegative.max(24),
-      heatIndexBaseC: z.number(),
+      /** 26.7 °C (80 °F): where the NOAA heat index is defined, a definition, not a tunable. */
+      heatIndexBaseC: z.literal(26.7),
       budgetDegreeHours: nonNegative,
       /** The reference strategy that decides feasibility cools this far below the threshold. */
       referenceSetpointMarginK: nonNegative.max(5),
@@ -41,7 +42,8 @@ export const GuardConfigSchema = z.strictObject({
     .refine((n) => n.thresholdC.elderly <= n.thresholdC.standard, {
       path: ['thresholdC', 'elderly'],
       message: 'The elderly threshold is at most the standard one',
-    }),
+    })
+    .refine((n) => n.windowStartHour !== n.windowEndHour, { path: ['windowEndHour'], message: 'The night window starts and ends at different hours' }),
 });
 export type GuardConfig = z.infer<typeof GuardConfigSchema>;
 

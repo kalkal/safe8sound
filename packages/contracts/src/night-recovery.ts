@@ -38,7 +38,7 @@ export const NightRecoverySchema = z
     window: z
       .strictObject({ start: IsoDateTimeSchema, end: IsoDateTimeSchema })
       .refine((w) => epochMs(w.start) < epochMs(w.end), { message: 'The window ends after it starts' }),
-    /** At least this many hours at or below the threshold (config, capped by the window length). */
+    /** At least this many hours at or below the threshold (config; on a partial window only the hours still needed). */
     requiredHours: hours,
     /** Hours at or below the threshold with this plan. */
     achievedHours: hours,

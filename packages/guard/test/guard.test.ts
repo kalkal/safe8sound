@@ -203,6 +203,16 @@ describe('night recovery (feature queue item 1)', () => {
     const tight = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 30, maxPct: 40 } } });
     const v = runGuard(input({ preferences: tight, plan: plan([step({ mode: 'fan_only' })]) }));
     expect(v.nightRecovery?.status).toBe('infeasible');
+    // With the grid up the limit is the air conditioner, not the battery.
+    expect(v.warnings[0]?.message).toMatch(/^Tonight the air conditioner can keep the Bedroom/);
+  });
+
+  it('a re-plan at 02:00 only requires the hours still needed (no false infeasible during a blackout)', () => {
+    // 6 of the 9 night hours are required; at 02:00 only 5 remain, so 2 of them are still needed.
+    const two = T0 + 6 * H;
+    const v = runGuard(input({ snapshot: snapshot({ ms: two, gridAvailable: false, socPct: 60, tempC: 26 }), plan: plan([step({ atMs: two, setpointC: 25, targetPct: 10 })]) }));
+    expect(v.nightRecovery?.requiredHours).toBe(2);
+    expect(v.nightRecovery?.status).toBe('met');
   });
 
   it('reports the reference hours as the best when they beat the plan', () => {

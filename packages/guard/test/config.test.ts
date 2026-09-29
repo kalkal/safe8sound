@@ -31,6 +31,12 @@ describe('guard config errors', () => {
     expect(parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, thresholdC: { standard: 26, elderly: 26 } } }).ok).toBe(true);
   });
 
+  it('keeps the heat-index base at its definition (26.7 °C) and refuses an empty night window', () => {
+    expect(parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, heatIndexBaseC: 27 } }).ok).toBe(false);
+    const same = parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, windowStartHour: 7, windowEndHour: 7 } });
+    expect(!same.ok && same.error.details?.issues?.[0]?.path).toBe('nightRecovery.windowEndHour');
+  });
+
   it('reports at most 20 issues', () => {
     const c = parseGuardConfig({ schemaVersion: 2 });
     expect(!c.ok && c.error.details?.issues?.length).toBeLessThanOrEqual(20);
