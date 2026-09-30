@@ -23,6 +23,8 @@ export const ERROR_CATALOG = {
   invalid_input: { category: 'validation' },
   invalid_setpoint: { category: 'validation' },
   unknown_room: { category: 'validation' },
+  /** notify_family named only roles that are not registered contacts (approved in #23). */
+  recipient_not_registered: { category: 'validation' },
   plan_expired: { category: 'validation' },
   safety_threshold_out_of_range: { category: 'validation' },
   // HTTP transport (MCP server, F3): sent with their own status through toProblemDetails

@@ -20,4 +20,5 @@ export * from './rooms.js';
 export * from './rng.js';
 export * from './simulation.js';
 export * from './state-store.js';
+export * from './storm.js';
 export * from './thermal.js';

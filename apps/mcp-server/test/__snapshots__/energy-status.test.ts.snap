@@ -223,6 +223,7 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                   "invalid_input",
                   "invalid_setpoint",
                   "unknown_room",
+                  "recipient_not_registered",
                   "plan_expired",
                   "safety_threshold_out_of_range",
                   "method_not_allowed",
