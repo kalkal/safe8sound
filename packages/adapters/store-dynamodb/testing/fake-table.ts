@@ -45,13 +45,11 @@ export function createFakeTable(): TableClient {
       return Promise.resolve('ok');
     },
 
-    query: (pk, skPrefix) =>
-      Promise.resolve(
-        [...partition(pk)]
-          .filter(([sk]) => sk.startsWith(skPrefix))
-          .sort(([a], [b]) => (a < b ? -1 : 1))
-          .map(([, item]) => clone(item)),
-      ),
+    query: (pk, skPrefix, options = {}) => {
+      const sorted = [...partition(pk)].filter(([sk]) => sk.startsWith(skPrefix)).sort(([a], [b]) => (a < b ? -1 : 1));
+      if (options.newestFirst === true) sorted.reverse();
+      return Promise.resolve(sorted.slice(0, options.limit ?? sorted.length).map(([, item]) => clone(item)));
+    },
 
     transactPut(items) {
       // No conditions are used in transactions yet, so every item is written, in one step.

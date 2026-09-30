@@ -5,6 +5,7 @@ import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules } from './compose.js';
 import { startNodeServer } from './node-server.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
+import { stormModeWiring } from './storm-mode-config.js';
 
 // Local Node entry: 127.0.0.1 only (plan §13.2.3). Tokens from MCP_CLIENTS in the environment.
 // State lives in memory: it survives new MCP sessions, not a restart of this process.
@@ -24,7 +25,8 @@ const preferences = orExit(loadPreferencesConfig(preferencesConfigFile()));
 const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wallClock });
 const modules = orExit(composeModules({ preferences, storeFor, clock: wallClock }));
 const comfortPlan = orExit(comfortPlanWiring({ storeFor, preferences, clock: wallClock }));
-const app = orExit(createApp(process.env, { wallClock, logger: { log }, modules, comfortPlan }));
+const stormMode = orExit(stormModeWiring({ storeFor, preferences, clock: wallClock }));
+const app = orExit(createApp(process.env, { wallClock, logger: { log }, modules, comfortPlan, stormMode }));
 
 const server = await startNodeServer(app.handler, { host: '127.0.0.1', port: Number(process.env['PORT'] ?? 3316), path: app.config.path, maxBodyBytes: app.config.maxBodyBytes });
 console.log(JSON.stringify({ level: 'info', component: 'mcp-server', message: `listening on ${server.url}` }));

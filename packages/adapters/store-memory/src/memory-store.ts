@@ -141,7 +141,9 @@ class MemoryStateStore implements StateStore {
     if (session.homeId !== this.homeId) {
       return Promise.resolve(err(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } })));
     }
-    this.#put(`STORM#${session.id}`, { value: session, expiresAtMs: epochMs(session.startedAt) + this.#ttl.stormSessionDays * DAY_MS });
+    // Same key as store-dynamodb: the start time in UTC, then the id.
+    const sk = `STORM#${new Date(session.startedAt).toISOString()}#${session.id}`;
+    this.#put(sk, { value: session, expiresAtMs: epochMs(session.startedAt) + this.#ttl.stormSessionDays * DAY_MS });
     return Promise.resolve(ok(undefined));
   }
 

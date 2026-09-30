@@ -19,6 +19,18 @@ exports[`"What's my battery level?" through the agent and the local MCP server >
     "name": "get_reserve_outlook",
   },
   {
+    "description": "Prepares the home for a storm ("prepare"), or makes storm mode active ("active"). Active needs the grid measured down: with the grid up it only prepares, and the storm reserve stays locked. It also checks the grid first: a storm that began or ended is recorded and the registered family is told. Returns the safe hours of the safe room.",
+    "name": "start_storm_mode",
+  },
+  {
+    "description": "The safe room now: temperature, humidity, who is in it (roles), the comfort level and why, and how many hours the battery keeps it safe. Read-only.",
+    "name": "get_safe_room_status",
+  },
+  {
+    "description": "Sends the fixed family message for a storm transition that happened (storm_started, essential_level, power_back) to the contacts registered in the app, or to some of them by role. You cannot write the text or name a recipient. A person already told is not told twice.",
+    "name": "notify_family",
+  },
+  {
     "description": "The home's comfort setpoints per season, safety thresholds of the safe room with their hard limits, safe room, room priority and language. Contacts are listed by role only.",
     "name": "get_preferences",
   },

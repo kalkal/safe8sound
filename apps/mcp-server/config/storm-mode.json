@@ -1,0 +1,13 @@
+{
+  "$comment": "Storm mode (issue #23). capHours: the longest horizon safe hours are quoted for. stableGridMinutes: minutes of grid back before the storm ends (plan §9.2). minIntervalMinutes: one family message per transition and person within this interval. epsBaseLoadW: what the home draws on the EPS besides the safe-room split (fridge, router, lights; assumption to calibrate on the plant). occupantGainW: sensible heat of a resting adult in the safe room. inApp: the simulated phone's inbox.",
+  "schemaVersion": 1,
+  "capHours": 24,
+  "stableGridMinutes": 10,
+  "minIntervalMinutes": 60,
+  "epsBaseLoadW": 150,
+  "occupantGainW": 75,
+  "inApp": {
+    "maxPerHome": 50,
+    "ttlHours": 48
+  }
+}

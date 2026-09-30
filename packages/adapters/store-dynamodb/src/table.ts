@@ -14,13 +14,20 @@ export type Condition =
 
 export type WriteOutcome = 'ok' | 'condition_failed';
 
+export interface QueryOptions {
+  /** Highest sort key first (DynamoDB ScanIndexForward = false). */
+  readonly newestFirst?: boolean;
+  /** At most this many items. */
+  readonly limit?: number;
+}
+
 /** Infrastructure failures (network, throttling) are thrown; a failed condition is a value. */
 export interface TableClient {
   get(pk: string, sk: string): Promise<TableItem | undefined>;
   put(item: TableItem, conditions?: readonly Condition[]): Promise<WriteOutcome>;
   update(pk: string, sk: string, set: Readonly<Record<string, unknown>>, conditions: readonly Condition[]): Promise<WriteOutcome>;
-  /** Every item of the partition whose sort key starts with the prefix. */
-  query(pk: string, skPrefix: string): Promise<TableItem[]>;
+  /** Items of the partition whose sort key starts with the prefix, in sort-key order (or reversed). */
+  query(pk: string, skPrefix: string, options?: QueryOptions): Promise<TableItem[]>;
   /** Writes all the items or none (DynamoDB TransactWriteItems, at most 100 items). */
   transactPut(items: readonly TableItem[]): Promise<void>;
 }

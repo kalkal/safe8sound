@@ -185,14 +185,16 @@ class DynamoStateStore implements StateStore {
       if (session.homeId !== this.homeId) {
         fail(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } }));
       }
-      await this.#table.put(this.#item(`STORM#${session.id}`, session, epochMs(session.startedAt) + this.#ttl.stormSessionDays * DAY_MS));
+      await this.#table.put(this.#item(stormKey(session), session, epochMs(session.startedAt) + this.#ttl.stormSessionDays * DAY_MS));
     });
   }
 
   getLatestStormSession() {
     return this.#run('getLatestStormSession', async () => {
-      const sessions = (await this.#live('STORM#')).map((item) => parse(StormSessionSchema, item));
-      return sessions.sort((a, b) => epochMs(b.startedAt) - epochMs(a.startedAt))[0];
+      // SK = STORM#<startedAt in UTC>#<id>: the newest session is the highest key, one item read.
+      // If it has expired, every older one has too.
+      const [latest] = await this.#table.query(this.#pk, 'STORM#', { newestFirst: true, limit: 1 });
+      return latest && this.#isLive(latest) ? parse(StormSessionSchema, latest) : undefined;
     });
   }
 
@@ -288,6 +290,9 @@ function parse<T>(schema: z.ZodType<T>, item: TableItem): T {
   }
   return parsed.data;
 }
+
+/** Sort key of a storm session (plan §3.2): the start time in UTC orders the sessions, the id keeps it unique. */
+const stormKey = (session: StormSession) => `STORM#${new Date(session.startedAt).toISOString()}#${session.id}`;
 
 function fail(error: ErrorEnvelope): never {
   throw new Failure(error);

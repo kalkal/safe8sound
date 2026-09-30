@@ -85,4 +85,11 @@ describe('createDocumentTableClient', () => {
       },
     });
   });
+
+  it('queries newest first with a limit, and stops paginating once it has enough', async () => {
+    const { sent, table } = stub({ Items: [{ PK: 'HOME#demo', SK: 'STORM#2' }], LastEvaluatedKey: { PK: 'HOME#demo', SK: 'STORM#2' } });
+    expect((await table.query('HOME#demo', 'STORM#', { newestFirst: true, limit: 1 })).map((i) => i.SK)).toEqual(['STORM#2']);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.input).toMatchObject({ ScanIndexForward: false, Limit: 1 });
+  });
 });

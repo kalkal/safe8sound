@@ -55,6 +55,11 @@ describe('in-app notifier (the simulated phone; in memory, local runs and E2E on
     expect(await notifier.send(message('  ', 0))).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
   });
 
+  it('refuses a message whose time is not ISO 8601', async () => {
+    const { notifier } = setup();
+    expect(await notifier.send({ ...message('hi', 0), at: 'yesterday' })).toMatchObject({ ok: false, error: { code: 'invalid_input', details: { field: 'at' } } });
+  });
+
   it('refuses a configuration that would silently drop everything', () => {
     for (const bad of [0, -1, 1.5, Number.NaN]) {
       expect(createInAppNotifier({ maxPerHome: bad, ttlHours: 48, clock: { now: () => T0 } })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });

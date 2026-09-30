@@ -7,6 +7,8 @@ import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
 import type { ComfortPlanWiring } from './comfort-plan-config.js';
 import { comfortPlanModule } from './modules/comfort-plan/index.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
+import { stormModeModule } from './modules/storm-mode/index.js';
+import type { StormModeWiring } from './storm-mode-config.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
 
 export interface AppOptions {
@@ -19,6 +21,8 @@ export interface AppOptions {
   readonly sourceOverride?: (homeId: HomeId) => HomeDataSource | undefined;
   /** The comfort-plan module (#19): store, preferences, configs; registered over the same homes. */
   readonly comfortPlan?: ComfortPlanWiring;
+  /** The storm-mode module (#23): store, preferences, config and the family phone; over the same homes. */
+  readonly stormMode?: StormModeWiring;
 }
 
 export interface App {
@@ -87,21 +91,16 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     return entry && override ? { ...entry, source: override } : entry;
   };
 
+  const planningHome = (homeId: HomeId) => {
+    const entry = homeFor(homeId);
+    const forecast = forecasts.get(homeId);
+    return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly } : undefined;
+  };
+
   const registry = createRegistry([
     energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver }),
-    ...(opts.comfortPlan === undefined
-      ? []
-      : [
-          comfortPlanModule({
-            ...opts.comfortPlan,
-            model: params,
-            homes: (homeId) => {
-              const entry = homeFor(homeId);
-              const forecast = forecasts.get(homeId);
-              return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly } : undefined;
-            },
-          }),
-        ]),
+    ...(opts.comfortPlan === undefined ? [] : [comfortPlanModule({ ...opts.comfortPlan, model: params, homes: planningHome })]),
+    ...(opts.stormMode === undefined ? [] : [stormModeModule({ ...opts.stormMode, homes: planningHome })]),
     ...(opts.modules ?? []),
   ]);
   if (!registry.ok) return registry;

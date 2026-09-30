@@ -17,6 +17,8 @@
     "@cold-reserve/contracts": "workspace:*",
     "@cold-reserve/core": "workspace:*",
     "@cold-reserve/guard": "workspace:*",
+    "@cold-reserve/i18n": "workspace:*",
+    "@cold-reserve/notifier-inapp": "workspace:*",
     "@cold-reserve/source-fallback": "workspace:*",
     "@cold-reserve/source-simulator": "workspace:*",
     "@cold-reserve/store-dynamodb": "workspace:*",

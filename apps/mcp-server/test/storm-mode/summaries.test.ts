@@ -1,0 +1,81 @@
+import { describe, expect, it } from 'vitest';
+import { localIso } from '../../src/modules/storm-mode/observe.js';
+import { localTimeText, notifySummary, safeRoomSummary, startSummary } from '../../src/modules/storm-mode/summaries.js';
+import { notifyFamily, safeRoomStatus, startStormMode } from '../../src/modules/storm-mode/tools.js';
+import { world } from './support.js';
+
+// The agent reads only the text content (F7): safe hours, until when, the level and its reason, and
+// the roles messaged or skipped are all in it. Names and handles never are.
+
+const one = (x: number) => x.toFixed(1);
+
+describe('what the model reads', () => {
+  it('start_storm_mode with the grid up: prepared, reserve locked, why, and the hours', async () => {
+    const w = world(1);
+    const out = await startStormMode(w.deps, { mode: 'active' }, w.ctx);
+    if (!out.ok) throw new Error(out.error.message);
+    const text = startSummary(out.value);
+    expect(text).toContain('Storm mode is prepared: the grid is still up, so the storm reserve stays locked.');
+    expect(text).toContain(`about ${one(out.value.safeHours)} hours, until ${localTimeText(out.value.safeUntil)}`);
+    expect(text).toMatch(/until \d{1,2}:\d\d [AP]M \(\S+\+02:00\)/);
+    expect(text).not.toMatch(/Giulia|phone-/);
+    expect(text).toContain('No family message was sent.');
+  });
+
+  it('start_storm_mode with the grid down: active, reserve unlocked, and who was told', async () => {
+    const w = world(4);
+    const out = await startStormMode(w.deps, { mode: 'prepare' }, w.ctx);
+    if (!out.ok) throw new Error(out.error.message);
+    const text = startSummary(out.value);
+    expect(text).toContain('Storm mode is active: the grid is down, so the storm reserve is now the budget.');
+    expect(text).toContain('Family told that the storm started: daughter (in_app).');
+    expect(text).not.toMatch(/Giulia|phone-/);
+  });
+
+  it('get_safe_room_status: room, temperature, humidity, occupants, level with reason, hours, storm and data origin', async () => {
+    const w = world(4);
+    await startStormMode(w.deps, { mode: 'active' }, w.ctx);
+    const out = await safeRoomStatus(w.deps, w.ctx);
+    if (!out.ok) throw new Error(out.error.message);
+    const s = out.value;
+    const text = safeRoomSummary(s);
+    expect(text).toContain(`Safe room ${s.safeRoomId}: ${one(s.tempC)} °C, ${String(s.humidityPct)} % humidity, occupants: grandpa.`);
+    expect(text).toContain('Level essential (reason: storm).');
+    expect(text).toContain(`Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`);
+    expect(text).not.toMatch(/Giulia|phone-/);
+    expect(text).toContain('Storm mode: active.');
+    expect(text).toContain('simulated data (');
+  });
+
+  it('notify_family: sent and skipped roles, and the preview addressed to the role', async () => {
+    const w = world(4);
+    await startStormMode(w.deps, { mode: 'active' }, w.ctx);
+    const out = await notifyFamily(w.deps, { transition: 'essential_level', roles: ['daughter', 'neighbor'] }, w.ctx);
+    if (!out.ok) throw new Error(out.error.message);
+    const text = notifySummary(out.value);
+    expect(text).toContain('Message sent to: daughter (in_app).');
+    expect(text).toContain('Not sent to: neighbor (not a registered contact).');
+    expect(text).toContain(`Message: ${out.value.preview}`);
+    expect(text).not.toMatch(/Giulia|phone-/);
+  });
+
+  it('says the local clock time the way the family message does, then the exact time', () => {
+    expect(localTimeText('2026-07-17T21:05:00+02:00')).toBe('9:05 PM (2026-07-17T21:05:00+02:00)');
+    expect(localTimeText('2026-07-18T00:30:00+02:00')).toBe('12:30 AM (2026-07-18T00:30:00+02:00)');
+    expect(localTimeText('2026-07-18T12:00:00+02:00')).toBe('12:00 PM (2026-07-18T12:00:00+02:00)');
+  });
+
+  it('notify_family inside the interval says nothing was sent and why', () => {
+    expect(notifySummary({ sent: [], skipped: [{ role: 'daughter', reason: 'rate_limited' }], preview: 'x' })).toContain(
+      'Not sent to: daughter (already told recently).',
+    );
+  });
+});
+
+describe('localIso', () => {
+  it('writes the instant in the home time zone with its offset, summer and winter', () => {
+    expect(localIso(Date.parse('2026-07-17T19:30:00Z'), 'Europe/Rome')).toBe('2026-07-17T21:30:00+02:00');
+    expect(localIso(Date.parse('2026-01-10T23:15:00Z'), 'Europe/Rome')).toBe('2026-01-11T00:15:00+01:00');
+    expect(localIso(Date.parse('2026-01-10T23:15:00Z'), 'UTC')).toBe('2026-01-10T23:15:00+00:00');
+  });
+});

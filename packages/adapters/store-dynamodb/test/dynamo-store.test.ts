@@ -1,4 +1,4 @@
-import { HomeIdSchema, PlanSchema, PreferencesSchema, epochMs } from '@cold-reserve/contracts';
+import { HomeIdSchema, PlanSchema, PreferencesSchema, StormSessionSchema, epochMs } from '@cold-reserve/contracts';
 import { examplePlan, examplePreferences } from '@cold-reserve/contracts/fixtures';
 import { seededRng, type Rng } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
@@ -58,6 +58,17 @@ describe('store-dynamodb item layout (plan §3.2)', () => {
     await store.recordGuardRejection({ at: plan.createdAt, failed: ['storm_reserve'] });
     const [guard] = await table.query(`HOME#${HOME}`, 'GUARD#');
     expect(guard?.SK).toBe(`GUARD#${plan.createdAt}#${String(createdMs)}-1-${Math.floor(0.5 * 36 ** 6).toString(36)}`);
+  });
+
+  it('keys storm sessions by start time then id, so the newest is read with one query (plan §3.2)', async () => {
+    const { table, store } = setup();
+    const session = StormSessionSchema.parse({
+      schemaVersion: 1, id: 'storm_layout0001', homeId: HOME, phase: 'prepare', trigger: 'user',
+      startedAt: '2026-07-17T15:00:00+02:00', safeRoomId: 'bedroom-1', occupantRoles: [], hoursAtEssential: 10, notifications: [],
+    });
+    await store.saveStormSession(session);
+    const [item] = await table.query(`HOME#${HOME}`, 'STORM#');
+    expect(item?.SK).toBe('STORM#2026-07-17T13:00:00.000Z#storm_layout0001');
   });
 });
 

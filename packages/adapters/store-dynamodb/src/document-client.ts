@@ -97,10 +97,11 @@ export function createDocumentTableClient(options: { tableName: string; sender: 
       );
     },
 
-    async query(pk, skPrefix) {
+    async query(pk, skPrefix, options = {}) {
       const items: TableItem[] = [];
       let startKey: Record<string, unknown> | undefined;
       do {
+        const remaining = options.limit === undefined ? undefined : options.limit - items.length;
         const out = (await sender.send(
           new QueryCommand({
             TableName,
@@ -108,12 +109,14 @@ export function createDocumentTableClient(options: { tableName: string; sender: 
             ExpressionAttributeNames: { '#pk': 'PK', '#sk': 'SK' },
             ExpressionAttributeValues: { ':pk': pk, ':prefix': skPrefix },
             ConsistentRead: true,
+            ...(options.newestFirst === true && { ScanIndexForward: false }),
+            ...(remaining !== undefined && { Limit: remaining }),
             ...(startKey && { ExclusiveStartKey: startKey }),
           }),
         )) as QueryCommandOutput;
         items.push(...((out.Items ?? []) as TableItem[]));
         startKey = out.LastEvaluatedKey;
-      } while (startKey);
+      } while (startKey && (options.limit === undefined || items.length < options.limit));
       return items;
     },
 

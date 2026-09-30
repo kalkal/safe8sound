@@ -4,33 +4,50 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 const UNITS = 'Watt|Kilowatt|WattHour|Pct|Celsius|Minutes';
+const CAST = ':matches(TSAsExpression, TSTypeAssertion)';
 
 /** Branded units are created only by the Zod schemas in packages/contracts (plan §9.4). */
-/** @type {import('eslint').Linter.RuleEntry} */
-export const unitCastRule = [
-  'error',
+const UNIT_CASTS = [
   {
-    selector: `:matches(TSAsExpression, TSTypeAssertion)[typeAnnotation.typeName.name=/^(${UNITS})$/]`,
+    selector: `${CAST}[typeAnnotation.typeName.name=/^(${UNITS})$/]`,
     message: 'Do not cast to a branded unit: parse it with the schema from @cold-reserve/contracts.',
   },
 ];
 
 /**
- * The default everywhere: the unit casts, plus StormMessageText, the family message text that only
- * the i18n templates may produce (#23). packages/i18n uses `unitCastRule` instead.
+ * StormMessageText, the family message text, is made only by stormMessage in @cold-reserve/i18n (#23):
+ * no cast (plain or through a namespace), no renamed import that would hide it, no Zod brand forging it.
  */
-/** @type {import('eslint').Linter.RuleEntry} */
-export const brandCastRule = [
-  'error',
+const MESSAGE_BRAND = 'Family message text comes only from stormMessage in @cold-reserve/i18n: never forge it.';
+const MESSAGE_CASTS = [
+  { selector: `${CAST}[typeAnnotation.typeName.name="StormMessageText"]`, message: MESSAGE_BRAND },
+  { selector: `${CAST}[typeAnnotation.typeName.right.name="StormMessageText"]`, message: MESSAGE_BRAND },
+  { selector: 'ImportSpecifier[imported.name="StormMessageText"][local.name!="StormMessageText"]', message: MESSAGE_BRAND },
+  { selector: 'CallExpression[callee.property.name="brand"] Literal[value="StormMessageText"]', message: MESSAGE_BRAND },
+  // A type alias that rebuilds the brand (`string & z.$brand<'StormMessageText'>`) or renames the type.
+  { selector: 'TSTypeAliasDeclaration Literal[value="StormMessageText"]', message: MESSAGE_BRAND },
+  { selector: 'TSTypeAliasDeclaration[typeAnnotation.typeName.name="StormMessageText"]', message: MESSAGE_BRAND },
+];
+
+/** In production code `as never` fits any type, so it would forge every brand. */
+const NEVER_CASTS = [
   {
-    selector: `:matches(TSAsExpression, TSTypeAssertion)[typeAnnotation.typeName.name=/^(${UNITS})$/]`,
-    message: 'Do not cast to a branded unit: parse it with the schema from @cold-reserve/contracts.',
-  },
-  {
-    selector: ':matches(TSAsExpression, TSTypeAssertion)[typeAnnotation.typeName.name="StormMessageText"]',
-    message: 'Family message text comes only from stormMessage in @cold-reserve/i18n: never cast a string to it.',
+    selector: `${CAST}[typeAnnotation.type="TSNeverKeyword"]`,
+    message: 'Do not cast to never in production code: it would forge any branded type.',
   },
 ];
+
+/** @type {import('eslint').Linter.RuleEntry} */
+export const unitCastRule = ['error', ...UNIT_CASTS];
+/** Tests: the units and the message brand (a test may still build a fake with `as never`). */
+/** @type {import('eslint').Linter.RuleEntry} */
+export const brandCastRule = ['error', ...UNIT_CASTS, ...MESSAGE_CASTS];
+/** Production code: the units, the message brand and `as never`. */
+/** @type {import('eslint').Linter.RuleEntry} */
+export const srcCastRule = ['error', ...UNIT_CASTS, ...MESSAGE_CASTS, ...NEVER_CASTS];
+/** packages/i18n/src builds the message text from its templates; everything else still applies. */
+/** @type {import('eslint').Linter.RuleEntry} */
+export const i18nSrcCastRule = ['error', ...UNIT_CASTS, ...NEVER_CASTS];
 
 export default defineConfig(
   {
@@ -49,12 +66,16 @@ export default defineConfig(
     },
   },
   {
-    files: ['packages/contracts/src/**'],
-    rules: { 'no-restricted-syntax': 'off' },
+    files: ['packages/**/src/**', 'apps/**/src/**', 'infra/src/**'],
+    rules: { 'no-restricted-syntax': srcCastRule },
   },
   {
     files: ['packages/i18n/src/**'],
-    rules: { 'no-restricted-syntax': unitCastRule },
+    rules: { 'no-restricted-syntax': i18nSrcCastRule },
+  },
+  {
+    files: ['packages/contracts/src/**'],
+    rules: { 'no-restricted-syntax': 'off' },
   },
   {
     files: ['**/*.mjs', '**/*.cjs', '**/*.js'],

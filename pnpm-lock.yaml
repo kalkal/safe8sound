@@ -321,6 +321,12 @@ importers:
       '@cold-reserve/guard':
         specifier: workspace:*
         version: link:../../packages/guard
+      '@cold-reserve/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@cold-reserve/notifier-inapp':
+        specifier: workspace:*
+        version: link:../../packages/adapters/notifier-inapp
       '@cold-reserve/source-fallback':
         specifier: workspace:*
         version: link:../../packages/adapters/source-fallback

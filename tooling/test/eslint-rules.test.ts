@@ -1,7 +1,8 @@
-import { Linter } from 'eslint';
+import { fileURLToPath } from 'node:url';
+import { ESLint, Linter } from 'eslint';
 import tseslint from 'typescript-eslint';
 import { describe, expect, it } from 'vitest';
-import { brandCastRule, unitCastRule } from '../../eslint.config.mjs';
+import { brandCastRule, i18nSrcCastRule, srcCastRule, unitCastRule } from '../../eslint.config.mjs';
 
 const linter = new Linter({ configType: 'flat' });
 const lint = (code: string) =>
@@ -38,5 +39,46 @@ describe('ESLint: family message text is produced only by the i18n templates (#2
 
   it('lets packages/i18n (which uses the unit-only rule) build the text from its templates', () => {
     expect(lintWith(unitCastRule, "const t = 'Hi' as StormMessageText;")).toEqual([]);
+  });
+
+  it('also catches the forged forms: a namespace, a renamed import and a Zod brand', () => {
+    expect(lintWith(brandCastRule, "const t = 'Hi' as contracts.StormMessageText;")).toHaveLength(1);
+    expect(lintWith(brandCastRule, "import { type StormMessageText as Text } from '@cold-reserve/contracts';")).toHaveLength(1);
+    expect(lintWith(brandCastRule, "import { type StormMessageText } from '@cold-reserve/contracts';")).toEqual([]);
+    expect(lintWith(brandCastRule, "const Fake = z.string().brand<'StormMessageText'>();")).toHaveLength(1);
+    expect(lintWith(brandCastRule, "type Fake = string & z.$brand<'StormMessageText'>;")).toHaveLength(1);
+    expect(lintWith(brandCastRule, 'type Text = StormMessageText;')).toHaveLength(1);
+    expect(lintWith(brandCastRule, "type Other = string & z.$brand<'Other'>;")).toEqual([]);
+  });
+
+  it('forbids `as never` in production code, where it would forge any brand', () => {
+    expect(lintWith(srcCastRule, "send({ text: 'Hi' as never });")).toHaveLength(1);
+    expect(lintWith(srcCastRule, "const t = 'Hi' as StormMessageText;")).toHaveLength(1);
+    expect(lintWith(i18nSrcCastRule, "send({ text: 'Hi' as never });")).toHaveLength(1);
+    expect(lintWith(i18nSrcCastRule, "const t = 'Hi' as StormMessageText;")).toEqual([]);
+  });
+});
+
+describe('ESLint: which files get which cast rule (the real config)', () => {
+  const eslint = new ESLint({ cwd: fileURLToPath(new URL('../../', import.meta.url)) });
+  const ruleFor = async (file: string) => ((await eslint.calculateConfigForFile(file)) as { rules: Record<string, unknown> }).rules['no-restricted-syntax'];
+  // ESLint normalises the severity: 'error' becomes 2.
+  const normalised = (rule: typeof brandCastRule) => [2, ...(rule as unknown[]).slice(1)];
+
+  it('production code outside i18n: units, the message brand and `as never`', async () => {
+    expect(await ruleFor('packages/core/src/notifications.ts')).toEqual(normalised(srcCastRule));
+    expect(await ruleFor('apps/mcp-server/src/compose.ts')).toEqual(normalised(srcCastRule));
+  });
+
+  it('packages/i18n/src may build the message text, nothing else', async () => {
+    expect(await ruleFor('packages/i18n/src/index.ts')).toEqual(normalised(i18nSrcCastRule));
+  });
+
+  it('tests: units and the message brand (a test may still use `as never` for a fake)', async () => {
+    expect(await ruleFor('packages/core/test/notifications.test.ts')).toEqual(normalised(brandCastRule));
+  });
+
+  it('contracts define the brands, so the rule is off there', async () => {
+    expect(((await ruleFor('packages/contracts/src/storm.ts')) as unknown[])[0]).toBe(0);
   });
 });

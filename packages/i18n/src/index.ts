@@ -30,7 +30,7 @@ const enUS = {
     '{product} alert for {name}: a storm cut the power at home. {room} is at {tempC} °C and the battery keeps it safe until {safeUntil}. No action is needed now. Next message: when the level changes or power returns.',
   'storm.essential':
     '{product} update for {name}: to keep {room} safe until {safeUntil}, the battery switched to essential mode. {room} is at {tempC} °C. No action is needed now. Next message: when the level changes or power returns.',
-  'storm.powerBack': '{product} update for {name}: power came back at home at {at}. {room} is at {tempC} °C. Storm mode has ended. No action is needed.',
+  'storm.powerBack': '{product} update for {name}: power came back at home at {powerBackAt}. {room} is at {tempC} °C. Storm mode has ended. No action is needed.',
   'card.expand': 'Expand',
   'card.collapse': 'Collapse',
   'card.loading': 'Loading…',
@@ -154,6 +154,8 @@ export interface StormMessageFields {
   readonly atMs: number;
   /** Until when the safe room is covered (epoch ms); needed by the messages that quote it. */
   readonly safeUntilMs?: number;
+  /** When the grid came back (the session's gridBackAt, epoch ms); needed by power_back. */
+  readonly powerBackAtMs?: number;
   /** The home's time zone, for the times in the message. */
   readonly timeZone: string;
 }
@@ -168,6 +170,7 @@ function renderStorm(locale: Locale, transition: SendableTransition, addressee: 
     tempC: fields.tempC.toFixed(1),
     at: clockTime(locale, fields.atMs, fields.timeZone),
     ...(fields.safeUntilMs === undefined ? {} : { safeUntil: clockTime(locale, fields.safeUntilMs, fields.timeZone) }),
+    ...(fields.powerBackAtMs === undefined ? {} : { powerBackAt: clockTime(locale, fields.powerBackAtMs, fields.timeZone) }),
   });
 }
 

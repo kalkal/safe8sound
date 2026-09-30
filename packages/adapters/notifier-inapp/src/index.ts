@@ -1,4 +1,4 @@
-import { err, ok, toolError, type ErrorEnvelope, type HomeId, type Result, type SendableTransition } from '@cold-reserve/contracts';
+import { IsoDateTimeSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result, type SendableTransition } from '@cold-reserve/contracts';
 import type { Clock, Notifier } from '@cold-reserve/core';
 
 /**
@@ -36,6 +36,9 @@ export function createInAppNotifier(options: { maxPerHome: number; ttlHours: num
   return ok({
     notifier: {
       send(message) {
+        if (!IsoDateTimeSchema.safeParse(message.at).success) {
+          return Promise.resolve(err(toolError('invalid_input', 'A family message needs an ISO 8601 time.', { details: { field: 'at' } })));
+        }
         if (message.text.trim().length === 0) {
           return Promise.resolve(err(toolError('invalid_input', 'A family message cannot be empty.', { details: { field: 'text' } })));
         }
