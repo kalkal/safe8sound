@@ -16,6 +16,7 @@ describe('loadAgentConfig (cost rule caps, model from config)', () => {
         maxModelTurns: 7,
         maxToolCalls: 6,
         historyWindowMessages: 12,
+        turnDeadlineMs: 7000,
         mcpUrl: 'http://127.0.0.1:3316/mcp',
       },
     });
@@ -34,6 +35,7 @@ describe('loadAgentConfig (cost rule caps, model from config)', () => {
     ['model turns not above the tool calls', { AGENT_MAX_MODEL_TURNS: '6' }],
     ['a non-numeric cap', { AGENT_MAX_TOKENS: 'lots' }],
     ['an empty cap', { AGENT_MAX_TOKENS: '' }],
+    ['a turn deadline over 30 s', { AGENT_TURN_DEADLINE_MS: '30001' }],
     ['bedrock without a model id', { AGENT_MODEL_PROVIDER: 'bedrock', AGENT_REGION: 'us-east-1' }],
     ['bedrock without a region', { AGENT_MODEL_PROVIDER: 'bedrock', AGENT_MODEL_ID: 'x.y-v1:0' }],
     ['an unknown provider', { AGENT_MODEL_PROVIDER: 'openai' }],

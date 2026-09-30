@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`"What's my battery level?" through the agent and the local MCP server > receives the tool descriptions of the server (snapshot: every change shows up in review) 1`] = `
+[
+  {
+    "description": "Current state of the home: battery, solar, load and grid, the pacing level and why, whether the splits can be driven, each room with temperature and whether it is served or waiting, and where every group of data comes from (live or simulated).",
+    "name": "get_home_status",
+  },
+  {
+    "description": "Proposes a comfort plan for the coming hours (cool, heat, dry or auto) that the guard accepts: the five guarantees, the level ladder, the night recovery of the safe room and what would happen without the plan. Nothing changes in the home: confirm it with apply_plan. You may propose a setpoint and rooms; the guard then checks exactly that, and a refusal says why and what would be allowed.",
+    "name": "plan_comfort",
+  },
+  {
+    "description": "Applies a proposed plan by its planId after the person confirmed it. The guard checks it again on the current state. Safe to retry: a plan already applied returns the same outcome. On the real home it is advice with manual steps.",
+    "name": "apply_plan",
+  },
+  {
+    "description": "The battery counted in hours: at the current level, the same energy at Essential, and what the storm reserve alone would give.",
+    "name": "get_reserve_outlook",
+  },
+  {
+    "description": "The home's comfort setpoints per season, safety thresholds of the safe room with their hard limits, safe room, room priority and language. Contacts are listed by role only.",
+    "name": "get_preferences",
+  },
+  {
+    "description": "Changes comfort setpoints, safety thresholds (only inside the hard limits), the safe room, the room priority (safe room first) or the language. Call it only after the person confirmed the exact change; every change is logged.",
+    "name": "set_preferences",
+  },
+]
+`;

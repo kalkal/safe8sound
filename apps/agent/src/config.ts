@@ -7,6 +7,9 @@ import { z } from 'zod';
 const MAX_TOKENS_CEILING = 400;
 const MAX_TOOL_CALLS_CEILING = 6;
 const HISTORY_MESSAGES_CEILING = 12; // 6 turns = 6 user + 6 assistant messages
+const TURN_DEADLINE_CEILING_MS = 30_000;
+// Under sim-api's 8 s scripted fallback (plan §9.2), so the agent answers or fails first.
+const DEFAULT_TURN_DEADLINE_MS = 7_000;
 
 const intFromEnv = z
   .string()
@@ -27,6 +30,8 @@ export const AgentConfigSchema = z
     maxModelTurns: intFromEnv.pipe(z.number().max(MAX_TOOL_CALLS_CEILING + 1)),
     maxToolCalls: intFromEnv.pipe(z.number().max(MAX_TOOL_CALLS_CEILING)),
     historyWindowMessages: intFromEnv.pipe(z.number().max(HISTORY_MESSAGES_CEILING)),
+    /** Explicit deadline of a whole turn: the MCP client's own default is 60 s. */
+    turnDeadlineMs: intFromEnv.pipe(z.number().max(TURN_DEADLINE_CEILING_MS)),
     mcpUrl: z.url({ protocol: /^https?$/ }),
   })
   .refine((c) => c.maxModelTurns > c.maxToolCalls, { path: ['maxModelTurns'], message: 'Must leave one model call for the answer' });
@@ -40,6 +45,7 @@ export function loadAgentConfig(env: Readonly<Record<string, string | undefined>
     maxModelTurns: env['AGENT_MAX_MODEL_TURNS'] ?? String(MAX_TOOL_CALLS_CEILING + 1),
     maxToolCalls: env['AGENT_MAX_TOOL_CALLS'] ?? String(MAX_TOOL_CALLS_CEILING),
     historyWindowMessages: env['AGENT_HISTORY_WINDOW_MESSAGES'] ?? String(HISTORY_MESSAGES_CEILING),
+    turnDeadlineMs: env['AGENT_TURN_DEADLINE_MS'] ?? String(DEFAULT_TURN_DEADLINE_MS),
     mcpUrl: env['AGENT_MCP_URL'] ?? 'http://127.0.0.1:3316/mcp',
   });
   if (parsed.success) return ok(parsed.data);

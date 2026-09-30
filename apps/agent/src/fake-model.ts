@@ -8,6 +8,8 @@ export interface FakeCall {
   readonly toolResults: readonly string[];
   readonly systemPrompt: string;
   readonly toolNames: readonly string[];
+  /** The tool specs the model was offered: name and description. */
+  readonly tools: readonly { readonly name: string; readonly description: string }[];
 }
 
 export type FakeReply = { readonly text: string } | { readonly toolUse: { readonly name: string; readonly input: Record<string, unknown> } };
@@ -56,6 +58,7 @@ export class FakeModel extends Model {
       toolResults: turn.flatMap((m) => m.content.filter((b) => b.type === 'toolResultBlock').map((b) => textOf([b]))),
       systemPrompt: typeof options?.systemPrompt === 'string' ? options.systemPrompt : JSON.stringify(options?.systemPrompt ?? ''),
       toolNames: (options?.toolSpecs ?? []).map((s) => s.name),
+      tools: (options?.toolSpecs ?? []).map((s) => ({ name: s.name, description: s.description })),
     };
     this.calls.push(call);
     const reply = this.#policy(call);
