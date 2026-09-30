@@ -74,6 +74,17 @@ describe('storm tool contracts', () => {
     expect(StartStormModeOutputSchema.safeParse({ ...out, safeHours: -1 }).success).toBe(false);
   });
 
+  it('start_storm_mode output is consistent: reserve unlocked exactly when active, phase = mode, grid_still_up only with prepare', () => {
+    const active = { session, effectiveMode: 'active', reserveUnlocked: true, reason: 'grid_lost', safeHours: 18.5, safeUntil: '2026-07-18T07:30:00Z' };
+    expect(StartStormModeOutputSchema.safeParse(active).success).toBe(true);
+    expect(StartStormModeOutputSchema.safeParse({ ...active, reserveUnlocked: false }).success).toBe(false);
+    expect(StartStormModeOutputSchema.safeParse({ ...active, session: { ...session, phase: 'prepare', activeAt: undefined } }).success).toBe(false);
+    const prepared = { ...active, session: { ...session, phase: 'prepare', activeAt: undefined }, effectiveMode: 'prepare', reserveUnlocked: false };
+    expect(StartStormModeOutputSchema.safeParse({ ...prepared, reason: 'grid_still_up' }).success).toBe(true);
+    expect(StartStormModeOutputSchema.safeParse({ ...prepared, reserveUnlocked: true, reason: 'grid_still_up' }).success).toBe(false);
+    expect(StartStormModeOutputSchema.safeParse({ ...active, reason: 'grid_still_up' }).success).toBe(false);
+  });
+
   it('get_safe_room_status reports roles, level and reason, and the data origin', () => {
     const status = {
       safeRoomId: 'bedroom-1',

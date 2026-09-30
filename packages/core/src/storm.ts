@@ -1,4 +1,4 @@
-import { kilowattToWatt, type HvacUnit, type Level, type PacingState, type Pct, type Room } from '@cold-reserve/contracts';
+import { kilowatt, kilowattToWatt, type HvacUnit, type Level, type PacingState, type Pct, type Room } from '@cold-reserve/contracts';
 import type { BatterySpec } from './energy.js';
 import { usableWh } from './reserve.js';
 
@@ -8,13 +8,16 @@ import { usableWh } from './reserve.js';
 const HOUR_MS = 3_600_000;
 
 /**
- * Safe hours: (SOC - floor) x capacity x round-trip efficiency / (hold power + EPS base load).
+ * Safe hours: (SOC - floor) x capacity x round-trip efficiency / (hold power + EPS base load), quoted
+ * up to `capHours` (config: the longest horizon we speak about). With no load at all (cool outside,
+ * nothing on) the battery lasts beyond any horizon, so the answer is the cap, never an error.
  * The floor defaults to the hardware one: in a storm the reserve is the budget.
  */
-export function safeHours(input: { battery: BatterySpec; socPct: Pct; holdW: number; baseLoadW: number; floorPct?: Pct }): number {
-  const loadW = input.holdW + input.baseLoadW;
-  if (!(loadW > 0)) throw new RangeError(`Safe hours need a positive load, got ${String(loadW)} W`);
-  return usableWh(input.battery, input.socPct, input.floorPct ?? input.battery.minSocHwPct) / loadW;
+export function safeHours(input: { battery: BatterySpec; socPct: Pct; holdW: number; baseLoadW: number; capHours: number; floorPct?: Pct }): number {
+  const loadW = Math.max(0, input.holdW) + Math.max(0, input.baseLoadW);
+  if (loadW === 0) return input.capHours;
+  const hours = usableWh(input.battery, input.socPct, input.floorPct ?? input.battery.minSocHwPct) / loadW;
+  return Math.min(Math.max(0, hours), input.capHours);
 }
 
 /** The time the safe room is covered until, as ISO 8601. */
@@ -33,14 +36,17 @@ export interface HoldPower {
  * A running split never draws less than its modulation minimum, nor more than its maximum input.
  */
 export function holdPowerW(input: { unit: HvacUnit; thermal: Room['thermal']; outC: number; thresholdC: number; gainsW: number }): HoldPower {
-  const gainW = (Math.max(0, input.outC - input.thresholdC) / input.thermal.rKPerKw) * 1000 + Math.max(0, input.gainsW);
+  const wallGainW = kilowattToWatt(kilowatt(Math.max(0, input.outC - input.thresholdC) / input.thermal.rKPerKw));
+  const gainW = wallGainW + Math.max(0, input.gainsW);
   if (gainW <= 0) return { holdW: 0, canHold: true };
   const nominalInputW = kilowattToWatt(input.unit.inputKw.nominal);
   const cop = kilowattToWatt(input.unit.coolingKw) / nominalInputW;
   const minW = kilowattToWatt(input.unit.inputKw.min);
   const maxW = kilowattToWatt(input.unit.inputKw.max);
   const neededW = gainW / cop;
-  if (neededW > maxW) return { holdW: maxW, canHold: false };
+  // A milliwatt of tolerance: exactly the maximum input still holds.
+  if (neededW > maxW + 1e-3) return { holdW: maxW, canHold: false };
+  if (neededW >= maxW) return { holdW: maxW, canHold: true };
   return { holdW: Math.max(neededW, minW), canHold: true };
 }
 

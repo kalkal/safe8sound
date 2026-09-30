@@ -81,15 +81,27 @@ export type StormSession = z.infer<typeof StormSessionSchema>;
 
 export const StartStormModeInputSchema = z.strictObject({ mode: z.enum(['prepare', 'active']) });
 
-export const StartStormModeOutputSchema = z.strictObject({
-  session: StormSessionSchema,
-  /** `active` only with the grid measured down; otherwise `prepare`. */
-  effectiveMode: z.enum(['prepare', 'active']),
-  reserveUnlocked: z.boolean(),
-  reason: z.enum(['requested', 'grid_still_up', 'grid_lost']),
-  safeHours: z.number().nonnegative(),
-  safeUntil: IsoDateTimeSchema,
-});
+export const StartStormModeOutputSchema = z
+  .strictObject({
+    session: StormSessionSchema,
+    /** `active` only with the grid measured down; otherwise `prepare`. */
+    effectiveMode: z.enum(['prepare', 'active']),
+    reserveUnlocked: z.boolean(),
+    reason: z.enum(['requested', 'grid_still_up', 'grid_lost']),
+    safeHours: z.number().nonnegative(),
+    safeUntil: IsoDateTimeSchema,
+  })
+  .superRefine((o, ctx) => {
+    if (o.reserveUnlocked !== (o.effectiveMode === 'active')) {
+      ctx.addIssue({ code: 'custom', path: ['reserveUnlocked'], message: 'The reserve is unlocked exactly when the storm is active' });
+    }
+    if (o.session.phase !== o.effectiveMode) {
+      ctx.addIssue({ code: 'custom', path: ['session', 'phase'], message: 'The session phase is the effective mode' });
+    }
+    if ((o.reason === 'grid_lost') !== (o.effectiveMode === 'active')) {
+      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'grid_lost goes with active; requested and grid_still_up with prepare' });
+    }
+  });
 
 export const SafeRoomStatusSchema = z.strictObject({
   safeRoomId: EntityIdSchema,

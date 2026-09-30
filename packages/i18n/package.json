@@ -9,5 +9,8 @@
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "fast-check": "catalog:"
   }
 }

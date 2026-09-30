@@ -1,4 +1,4 @@
-import { err, ok, type Result } from '@cold-reserve/contracts';
+import { err, ok, type Result, type SendableTransition } from '@cold-reserve/contracts';
 
 // Every user-facing string lives in a catalog (plan §14.1). en-US for the hackathon; it-IT later.
 
@@ -25,6 +25,12 @@ const enUS = {
   'status.battery': 'Battery',
   'surface.failed': 'This part of the screen stopped working. Reload the page to try again.',
   'config.invalid': 'The simulator is not configured correctly. Check its settings and reload the page.',
+  // Family messages in storm mode, Mileti style: source, hazard, place, status, time, what to do.
+  'storm.started':
+    '{product} alert for {name}: a storm cut the power at home. {room} is at {tempC} °C and the battery keeps it safe until {safeUntil}. No action is needed now. Next message: when the level changes or power returns.',
+  'storm.essential':
+    '{product} update for {name}: to keep {room} safe until {safeUntil}, the battery switched to essential mode. {room} is at {tempC} °C. No action is needed now. Next message: when the level changes or power returns.',
+  'storm.powerBack': '{product} update for {name}: power is back at home. {room} is at {tempC} °C. Storm mode has ended.',
   'card.expand': 'Expand',
   'card.collapse': 'Collapse',
   'level.comfort': 'Comfort',
@@ -124,4 +130,34 @@ export function format(locale: Locale, key: MessageKey, values: Readonly<Record<
   const missing = [...template.matchAll(/\{(\w+)\}/g)].map((m) => m[1] ?? '').filter((name) => !(name in filled));
   if (missing.length > 0) return err({ key, missing });
   return ok(template.replace(/\{(\w+)\}/g, (_, name: string) => filled[name] ?? ''));
+}
+
+const STORM_KEYS = { storm_started: 'storm.started', essential_level: 'storm.essential', power_back: 'storm.powerBack' } as const satisfies Record<
+  SendableTransition,
+  MessageKey
+>;
+
+/**
+ * A family message for a storm transition. Only these fields are filled; the model never writes the
+ * text. Pass the contact's role as `name` to build the preview the model may see.
+ */
+export function stormMessage(
+  locale: Locale,
+  transition: SendableTransition,
+  fields: Readonly<{ name: string; room: string; tempC: string; safeUntil?: string }>,
+): Result<string, FormatError> {
+  return format(locale, STORM_KEYS[transition], fields);
+}
+
+/**
+ * The same message as the model may see it: addressed to the contact's role. The contact's name and
+ * handle are not even passed to the template, so they cannot leak into the preview.
+ */
+export function stormPreview(
+  locale: Locale,
+  transition: SendableTransition,
+  contact: Readonly<{ role: string }>,
+  fields: Readonly<{ room: string; tempC: string; safeUntil?: string }>,
+): Result<string, FormatError> {
+  return stormMessage(locale, transition, { ...fields, name: contact.role });
 }

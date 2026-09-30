@@ -544,6 +544,10 @@ importers:
       '@cold-reserve/contracts':
         specifier: workspace:*
         version: link:../contracts
+    devDependencies:
+      fast-check:
+        specifier: 4.10.2
+        version: 4.10.2
 
   packages/ui-cards:
     dependencies:
