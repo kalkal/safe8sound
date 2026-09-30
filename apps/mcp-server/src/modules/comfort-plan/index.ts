@@ -1,4 +1,5 @@
 import { ApplyPlanInputSchema, ApplyPlanOutputSchema, PlanComfortInputSchema, PlanSchema, ReserveOutlookInputSchema, ReserveOutlookSchema } from '@cold-reserve/contracts';
+import { nightWindowHours } from '@cold-reserve/guard';
 import type { CapabilityModule } from '../../registry.js';
 import { defineTool } from '../../tool.js';
 import { applyPlan } from './apply-plan.js';
@@ -14,6 +15,8 @@ export type { ComfortHome, ComfortPlanDeps } from './deps.js';
 // a second step, and count the reserve in hours. On only for the homes the server knows.
 
 export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
+  const night = deps.guard.nightRecovery;
+  const summaryOptions = { nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour) };
   return {
     id: 'comfort-plan',
     enabledFor: (homeId) => deps.homes(homeId) !== undefined,
@@ -29,7 +32,7 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         input: PlanComfortInputSchema,
         output: PlanSchema,
-        summarize: planSummary,
+        summarize: (plan) => planSummary(plan, summaryOptions),
         handler: (args, ctx) => planComfort(deps, args, ctx),
       }),
       defineTool({

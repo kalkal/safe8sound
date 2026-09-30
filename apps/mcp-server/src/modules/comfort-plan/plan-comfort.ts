@@ -141,7 +141,9 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     ladder: chosen.candidate.ladder,
     steps: chosen.candidate.steps,
     reserveWh: Math.round(chosen.verdict.reserveWh),
-    reserveFloorSocPct: chosen.verdict.reserveFloorSocPct,
+    // The floor holds only with the grid up; with the grid down the reserve is the budget itself.
+    ...(snapshot.gridAvailable ? { reserveFloorSocPct: chosen.verdict.reserveFloorSocPct } : {}),
+    gridAvailable: snapshot.gridAvailable,
     guarantees: chosen.verdict.guarantees,
     forecastConfidence: forecast.confidence,
     confidenceReason: forecast.confidenceReason,

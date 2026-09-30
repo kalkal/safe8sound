@@ -69,6 +69,7 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       expect(text).toContain('storm_reserve holds');
       expect(text).toMatch(/Without the plan the safe room \(bedroom-1\) would peak at \d+(\.\d)? °C/);
       expect(text).toContain('simulated data');
+      expect(text).toContain('Night recovery (elderly) not assessable yet: the plan covers only 2 of the 9 night hours.');
       expect(text).toMatch(/What it does: bedroom-1: (cool|dry) at \d+(\.\d)? °C/);
       expect(plan.counterfactual?.scenarios.noPlan.peakTempC).toBeGreaterThan(plan.counterfactual?.scenarios.plan.peakTempC ?? Infinity);
 
@@ -109,6 +110,8 @@ describe('storm (the grid is down at 15:00)', () => {
       expect(r.isError).toBeFalsy();
       const plan = PlanSchema.parse(r.structuredContent);
       expect(plan.guarantees.find((g) => g.id === 'pacing_on_track')?.ok).toBe(true);
+      expect(textOf(r)).toContain(`Storm reserve ${(plan.reserveWh / 1000).toFixed(1)} kWh.`);
+      expect(textOf(r)).not.toContain('while the grid is up');
       expect(plan.guarantees.find((g) => g.id === 'storm_reserve')?.reason).toMatch(/grid is down/);
       const c = plan.counterfactual;
       // The naive plan (the scenario's own dry 27 °C) empties the battery: its peak comes late in the night.

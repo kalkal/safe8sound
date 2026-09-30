@@ -1,15 +1,18 @@
 import { celsius } from '@cold-reserve/contracts';
+import { nightWindowHours } from '@cold-reserve/guard';
 import { describe, expect, it } from 'vitest';
 import { applySummary, outlookSummary, planSummary } from '../../src/modules/comfort-plan/summaries.js';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { reserveOutlook } from '../../src/modules/comfort-plan/reserve-outlook.js';
-import { REAL, world } from './support.js';
+import { REAL, guardConfig, world } from './support.js';
 
 // The agent (Strands) reads only the text content of a tool result, not structuredContent (F7): every
 // number and fact it may say must be in the summary.
 
 const one = (x: number) => x.toFixed(1);
+const night = guardConfig().nightRecovery;
+const NIGHT = { nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour) };
 
 describe('what the model reads', () => {
   it('plan_comfort: plan id, level, horizon, every guarantee with its reason, the reserve, the night and the counterfactual', async () => {
@@ -17,16 +20,17 @@ describe('what the model reads', () => {
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const p = r.value;
-    const text = planSummary(p);
+    const text = planSummary(p, NIGHT);
     expect(text).toContain(p.id);
     expect(text).toContain(`${p.steps[0]?.level ?? ''} level`);
     expect(text).toContain(p.horizonAt);
     for (const g of p.guarantees) expect(text).toContain(`${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`);
     expect(text).toContain(`${one(p.reserveWh / 1000)} kWh`);
     expect(text).toContain(`${one(p.reserveFloorSocPct ?? -1)} %`);
-    const n = p.nightRecovery;
-    expect(n).toBeDefined();
-    expect(text).toContain(`${n?.status ?? ''}: ${String(n?.achievedHours)} of ${String(n?.requiredHours)} hours at or below ${String(n?.thresholdC)} °C`);
+    // The 24-hour heatwave ends at local midnight: the plan sees 2 of the 9 night hours, so nothing is required yet.
+    expect(p.nightRecovery?.requiredHours).toBe(0);
+    expect(text).toContain('Night recovery (elderly) not assessable yet: the plan covers only 2 of the 9 night hours.');
+    expect(text).not.toContain('of 0 hours');
     for (const wn of p.warnings ?? []) expect(text).toContain(wn.message);
     const c = p.counterfactual;
     expect(c).toBeDefined();
@@ -38,12 +42,27 @@ describe('what the model reads', () => {
     expect(text).toContain('apply_plan');
   });
 
+  it('plan_comfort: a night the plan sees whole is reported with its hours, and with the grid down there is no grid-up floor', async () => {
+    const w = world('storm-blackout', 3);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const p = r.value;
+    const text = planSummary(p, NIGHT);
+    const n = p.nightRecovery;
+    expect(n?.requiredHours).toBeGreaterThan(0);
+    expect(text).toContain(`Night recovery (${n?.mode ?? ''}) ${n?.status ?? ''}: ${String(n?.achievedHours)} of ${String(n?.requiredHours)} hours at or below ${String(n?.thresholdC)} °C`);
+    expect(p.gridAvailable).toBe(false);
+    expect(p.reserveFloorSocPct).toBeUndefined();
+    expect(text).toContain(`Storm reserve ${one(p.reserveWh / 1000)} kWh.`);
+    expect(text).not.toContain('while the grid is up');
+  });
+
   it('plan_comfort: what the plan does in each room, and every step down the person pre-authorizes (plan §9.4)', async () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const p = r.value;
-    const text = planSummary(p);
+    const text = planSummary(p, NIGHT);
     for (const roomId of new Set(p.steps.map((s) => s.roomId))) {
       const s = [...p.steps].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts)).find((x) => x.roomId === roomId);
       if (s === undefined) throw new Error('no step');
@@ -60,13 +79,13 @@ describe('what the model reads', () => {
     const sim = world('heatwave', 14);
     const a = await planComfort(sim.deps, { goal: 'cool' }, sim.ctx);
     if (!a.ok) throw new Error(a.error.message);
-    expect(planSummary(a.value)).toContain('simulated data');
+    expect(planSummary(a.value, NIGHT)).toContain('simulated data');
     const live = { energy: 'live', rooms: 'live', weather: 'live' } as const;
     const real = world('heatwave', 14, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, origin: live }) });
     const b = await planComfort(real.deps, { goal: 'cool' }, real.ctx);
     if (!b.ok) throw new Error(b.error.message);
-    expect(planSummary(b.value)).toContain('live data');
-    expect(planSummary(b.value)).not.toContain('simulated');
+    expect(planSummary(b.value, NIGHT)).toContain('live data');
+    expect(planSummary(b.value, NIGHT)).not.toContain('simulated');
   });
 
   it('apply_plan: what happened, and on the real home every manual step', async () => {

@@ -6,5 +6,5 @@ export { counterfactualOf } from './counterfactual.js';
 export { CONSTRAINTS, type Constraint } from './constraints.js';
 export { buildContext, currentControls, projectFrom, reserveOf, type CandidatePlan, type GuardContext, type GuardInput } from './context.js';
 export { runGuard, type GuardVerdict } from './guard.js';
-export { evaluateNight } from './night.js';
+export { evaluateNight, nightWindowHours } from './night.js';
 export { rejectionOf } from './rejection.js';

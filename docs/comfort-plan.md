@@ -37,7 +37,8 @@ The agent reads only the text content of a tool result, not `structuredContent`,
   - whether the plan is built on live or simulated data;
   - each room's setting;
   - every step down that confirming pre-authorizes (plan §9.4);
-  - each guarantee with its reason, the storm reserve and its floor, and the night recovery;
+  - each guarantee with its reason, the storm reserve and, with the grid up, its floor (with the grid down the reserve is the budget, so the plan has no floor);
+  - the night recovery with its hours, or "not assessable yet" when the plan sees too little of the night to require any hour (for example the 24-hour heatwave, which ends at local midnight);
   - the warnings;
   - the counterfactual: peak and time, heat-index degree-hours and night hours at or below the threshold, for no plan, the naive plan and this plan.
 - **apply_plan:** what happened, and on the real home every manual step.

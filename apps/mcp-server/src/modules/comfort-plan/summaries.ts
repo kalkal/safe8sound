@@ -32,7 +32,12 @@ function lineText(l: CounterfactualLine): string {
   return `${String(l.peakTempC)} °C at ${l.peakAt} (${one(l.heatIndexDegreeHours)} heat-index degree-hours, ${one(l.hoursAtOrBelowThreshold)} night hours at or below the threshold)`;
 }
 
-export function planSummary(p: Plan): string {
+/** What the plan text needs besides the plan: the length of the night window (guard config). */
+export interface PlanSummaryOptions {
+  readonly nightWindowHours: number;
+}
+
+export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   const level = p.steps[0]?.level ?? p.ladder[0]?.level ?? 'comfort';
   const parts = [
     `Proposed plan ${p.id}: ${level} level until ${p.horizonAt} (${p.advisoryOnly ? 'advice only, nothing is commanded' : 'nothing changes until apply_plan'}), built on ${dataText(p.sourceOrigin)}.`,
@@ -42,7 +47,11 @@ export function planSummary(p: Plan): string {
     `Storm reserve ${one(p.reserveWh / 1000)} kWh${p.reserveFloorSocPct === undefined ? '' : `: the battery stays at or above ${one(p.reserveFloorSocPct)} % while the grid is up`}.`,
   ];
   const n = p.nightRecovery;
-  if (n !== undefined) {
+  const coveredHours = n === undefined ? 0 : Math.round(((Date.parse(n.window.end) - Date.parse(n.window.start)) / 3_600_000) * 100) / 100;
+  if (n !== undefined && n.requiredHours === 0 && n.status === 'met') {
+    // A plan that sees only part of the night requires nothing yet: "0.75 of 0 hours" would mislead.
+    parts.push(`Night recovery (${n.mode}) not assessable yet: the plan covers only ${String(coveredHours)} of the ${String(opts.nightWindowHours)} night hours.`);
+  } else if (n !== undefined) {
     const best = n.bestAchievableHours === undefined ? '' : `, best achievable ${String(n.bestAchievableHours)} hours`;
     parts.push(`Night recovery (${n.mode}) ${n.status}: ${String(n.achievedHours)} of ${String(n.requiredHours)} hours at or below ${String(n.thresholdC)} °C${best}.`);
   }

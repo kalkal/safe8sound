@@ -67,4 +67,16 @@ describe('PlanSchema', () => {
     expect(PlanSchema.safeParse({ ...examplePlan(), reserveFloorSocPct: 101 }).success).toBe(false);
     expect(PlanSchema.parse(examplePlan()).reserveFloorSocPct).toBeUndefined();
   });
+
+  it('may say whether the grid was up when it was made (optional, approved in #19)', () => {
+    expect(PlanSchema.parse({ ...examplePlan(), gridAvailable: false }).gridAvailable).toBe(false);
+    expect(PlanSchema.parse({ ...examplePlan(), gridAvailable: true, reserveFloorSocPct: 49.1 }).gridAvailable).toBe(true);
+    expect(PlanSchema.safeParse({ ...examplePlan(), gridAvailable: 'yes' }).success).toBe(false);
+    expect(PlanSchema.parse(examplePlan()).gridAvailable).toBeUndefined();
+  });
+
+  it('has no grid-up floor when it was made with the grid down', () => {
+    const r = PlanSchema.safeParse({ ...examplePlan(), gridAvailable: false, reserveFloorSocPct: 49.1 });
+    expect(!r.success && r.error.issues[0]?.path).toEqual(['reserveFloorSocPct']);
+  });
 });

@@ -16,6 +16,7 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(plan.guarantees.every((g) => g.ok)).toBe(true);
     expect(plan.nightRecovery?.status).not.toBe('unmet');
     expect(plan.reserveFloorSocPct).toBeGreaterThan(w.profile.battery.minSocHwPct);
+    expect(plan.gridAvailable).toBe(true);
     const saved = await w.store.getPlan(plan.id);
     expect(saved.ok && saved.value).toEqual(plan);
   });

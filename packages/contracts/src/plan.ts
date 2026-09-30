@@ -70,12 +70,20 @@ export const PlanSchema = z
      * `steps[].batteryTargetSocPct`, for the reserve line of the plan card (optional, added 2026-09-30, approved in #19).
      */
     reserveFloorSocPct: PctSchema.optional(),
+    /**
+     * Whether the grid was up when the plan was made. With the grid down the reserve is in use and there is no
+     * floor; absent on older plans, where a missing floor means "unknown" (optional, added 2026-09-30, approved in #19).
+     */
+    gridAvailable: z.boolean().optional(),
     /** The same scenario with no plan and with the naive plan, in the safe room (optional, added 2026-09-29). */
     counterfactual: CounterfactualSchema.optional(),
     /** What must be said even though the plan is accepted (optional, added 2026-09-29). */
     warnings: z.array(PlanWarningSchema).max(10).optional(),
   })
   .superRefine((plan, ctx) => {
+    if (plan.gridAvailable === false && plan.reserveFloorSocPct !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['reserveFloorSocPct'], message: 'With the grid down the reserve is in use: there is no floor' });
+    }
     if (epochMs(plan.expiresAt) <= epochMs(plan.createdAt)) {
       ctx.addIssue({ code: 'custom', path: ['expiresAt'], message: 'A plan expires after it is created' });
     }
