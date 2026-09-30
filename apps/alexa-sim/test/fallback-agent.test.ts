@@ -24,4 +24,10 @@ describe('degraded mode: RemoteAgent down → scripted answer + notice (error-ha
     const result = await withScriptedFallback(failing('demo_quota_exceeded'), scripted).ask('q', ctx);
     expect(result).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded' } });
   });
+
+  it('never passes cards from the script through the degraded mode', async () => {
+    const withCard: Agent = { ask: () => Promise.resolve(ok({ text: 'Scripted.', cards: [{ tool: 'invalid' as const }] })) };
+    const result = await withScriptedFallback(failing('agent_unavailable'), withCard).ask('q', ctx);
+    expect(result).toEqual(ok({ text: 'Scripted.', degradedBy: 'agent_unavailable' }));
+  });
 });

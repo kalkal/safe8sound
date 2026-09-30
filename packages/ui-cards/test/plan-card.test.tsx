@@ -28,7 +28,7 @@ describe('PlanCard', () => {
   });
 
   it('draws the expected charge with the storm reserve floor, and describes it in words', () => {
-    show(hotDayPlan(), { batteryUsableWh: 13_800 });
+    show(hotDayPlan());
     const chart = screen.getByRole('img', { name: /Expected charge/ });
     expect(chart.getAttribute('aria-label')).toBe('Expected charge from 80% at 15:00 to 46% at 06:40. Storm reserve 6 kWh (43%), never used for comfort.');
     expect(chart.querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(6);

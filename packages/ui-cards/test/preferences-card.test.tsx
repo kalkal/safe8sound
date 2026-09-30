@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, type Preferences } from '@cold-reserve/contracts';
+import {
+  PreferencesSchema,
+  ReserveOutlookSchema,
+  SafetyHardLimitsSchema,
+  SetPreferencesInputSchema,
+  toPublicPreferences,
+  type Preferences,
+} from '@cold-reserve/contracts';
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -14,10 +21,11 @@ const rooms = [
 ];
 
 function setup(onSave = vi.fn(), preferences: Preferences = PreferencesSchema.parse(examplePreferences())) {
+  // Exactly what get_preferences returns: names and handles never reach the card.
+  const view = { preferences: toPublicPreferences(preferences), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };
   render(
     <PreferencesCard
-      preferences={preferences}
-      limits={SafetyHardLimitsSchema.parse(exampleSafetyLimits())}
+      view={view}
       outlook={ReserveOutlookSchema.parse(exampleReserveOutlook())}
       rooms={rooms}
       onSave={onSave}
@@ -93,14 +101,21 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
     expect(document.body.textContent).not.toContain('phone-1');
   });
 
-  it('saves valid preferences only, as the contract parses them', () => {
+  it('saves only what changed, as a confirmed set_preferences input', () => {
     const onSave = setup();
     fireEvent.click(button('Cooler'));
+    fireEvent.click(button('Move Study up'));
     fireEvent.click(button('Save'));
     expect(onSave).toHaveBeenCalledOnce();
-    const saved = PreferencesSchema.parse(onSave.mock.calls[0]?.[0]);
-    expect(saved.comfortC.cooling).toBe(24.5);
-    expect(saved.roomPriority[0]).toBe(saved.safeRoomId);
+    const input = SetPreferencesInputSchema.parse(onSave.mock.calls[0]?.[0]);
+    expect(input).toEqual({ comfortC: { cooling: 24.5 }, roomPriority: ['bedroom-1', 'study', 'living'], confirmed: true });
+  });
+
+  it('says there is nothing to save when nothing changed', () => {
+    const onSave = setup();
+    fireEvent.click(button('Save'));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole('status').textContent).toBe('Nothing to save: no preference changed.');
   });
 
   it('refuses to save preferences the contract rejects, and says why in words', () => {
@@ -108,8 +123,24 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
     // A safety maximum below the comfort setpoint, as stale data could carry.
     const stale: Preferences = { ...valid, safety: { ...valid.safety, cooling: { maxC: valid.safety.heating.minC } } };
     const onSave = setup(vi.fn(), stale);
+    fireEvent.click(button('Cooler'));
     fireEvent.click(button('Save'));
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByRole('alert').textContent).toBe('These preferences cannot be saved: the comfort setpoint is above the cooling safety maximum.');
+  });
+
+  it('offers Save only when there is somewhere to send it; the voice hint stays', () => {
+    const valid = PreferencesSchema.parse(examplePreferences());
+    const view = { preferences: toPublicPreferences(valid), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };
+    render(<PreferencesCard view={view} rooms={rooms} />);
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.getByText('Or say "set comfort to 24".')).toBeTruthy();
+  });
+
+  it('shows readable room names from the ids when the host gives no names', () => {
+    const valid = PreferencesSchema.parse(examplePreferences());
+    render(<PreferencesCard view={{ preferences: toPublicPreferences(valid), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) }} />);
+    const list = screen.getByRole('list', { name: 'Room priority' });
+    expect(within(list).getAllByTestId('room-name').map((n) => n.textContent)).toEqual(['Bedroom 1', 'Living', 'Study']);
   });
 });

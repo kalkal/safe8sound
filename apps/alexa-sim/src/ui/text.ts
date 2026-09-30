@@ -7,5 +7,3 @@ export function t(key: MessageKey, values: Readonly<Record<string, string>> = {}
   return result.value;
 }
 
-/** "hh:mm" in the home's own offset, as the measurement reported it (no browser time zone involved). */
-export const homeClock = (isoTs: string): string => isoTs.slice(11, 16);

@@ -2,7 +2,11 @@
   "version": 1,
   "status": {
     "batterySocPct": 78,
-    "origin": { "energy": "simulated", "rooms": "simulated", "weather": "simulated" },
+    "origin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated"
+    },
     "ts": "2026-07-15T21:10:00+02:00"
   },
   "entries": [
@@ -11,7 +15,62 @@
       "patterns": ["battery level", "battery", "charge level", "soc"],
       "text": "Your battery is at {soc} percent.",
       "withStatus": true
+    },
+    {
+      "id": "hot-day-plan",
+      "patterns": ["36 degrees", "hot tomorrow", "heatwave", "hot day", "keep grandpa"],
+      "text": "Tomorrow hits 36. I'll pre-cool the bedroom with solar and keep 6 kWh for storms. Shall I apply it?",
+      "withStatus": false,
+      "cards": [
+        {
+          "tool": "plan_comfort",
+          "fixture": "hot-day-plan"
+        }
+      ]
+    },
+    {
+      "id": "apply-plan",
+      "patterns": ["apply the plan", "apply it", "yes apply"],
+      "text": "Done: the plan is applied. I'll tell you if the level changes.",
+      "withStatus": false,
+      "cards": [
+        {
+          "tool": "apply_plan",
+          "fixture": "hot-day-applied"
+        }
+      ]
+    },
+    {
+      "id": "dismiss-plan",
+      "patterns": ["not now"],
+      "text": "Okay, I won't change anything. The plan stays available for ten minutes.",
+      "withStatus": false
+    },
+    {
+      "id": "cold-reserve",
+      "patterns": ["cold reserve", "how long", "ice cubes"],
+      "text": "On the battery alone you have about 9 and a half hours at Comfort.",
+      "withStatus": false,
+      "cards": [
+        {
+          "tool": "get_reserve_outlook",
+          "fixture": "reserve-outlook"
+        }
+      ]
+    },
+    {
+      "id": "preferences",
+      "patterns": ["preferences", "settings"],
+      "text": "Here are your preferences. Say what you want to change.",
+      "withStatus": false,
+      "cards": [
+        {
+          "tool": "get_preferences",
+          "fixture": "preferences"
+        }
+      ]
     }
   ],
-  "fallback": "In scripted mode I can only answer a few questions. Try asking: what's my battery level?"
+  "fallback": "In scripted mode I can only answer a few questions. Try asking: what's my battery level?",
+  "degradedFallback": "I can't reach the assistant right now, so I can't do that. Nothing was changed. You can still ask for your battery level."
 }

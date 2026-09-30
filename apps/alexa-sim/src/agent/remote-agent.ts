@@ -1,6 +1,6 @@
 import { ProblemDetailsSchema, categoryOf, err, isRetryableCategory, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import type { Agent, AgentAnswer } from './agent.js';
-import { TurnReplySchema } from './wire.js';
+import { TurnReplySchema, readCards } from './wire.js';
 
 export interface RemoteAgentConfig {
   baseUrl: string;
@@ -48,7 +48,10 @@ function parseJson(body: string): unknown {
 
 function parseReply(body: string): Result<AgentAnswer, ErrorEnvelope> {
   const parsed = TurnReplySchema.safeParse(parseJson(body));
-  return parsed.success ? ok(parsed.data) : err(toolError('output_schema_violation', 'The assistant sent a reply in an unexpected format.'));
+  if (!parsed.success) return err(toolError('output_schema_violation', 'The assistant sent a reply in an unexpected format.'));
+  const { text, status, cards } = parsed.data;
+  const slots = readCards(cards);
+  return ok({ text, ...(status !== undefined && { status }), ...(slots !== undefined && { cards: slots }) });
 }
 
 function parseProblem(status: number, body: string): Result<never, ErrorEnvelope> {

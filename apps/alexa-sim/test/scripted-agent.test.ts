@@ -1,3 +1,4 @@
+import { PlanSchema } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { createScriptedAgent } from '../src/agent/scripted-agent.js';
 import script from '../src/agent/script.v1.json' with { type: 'json' };
@@ -51,5 +52,33 @@ describe('ScriptedAgent', () => {
   it('rejects a script whose text uses {soc} without a status', () => {
     const noStatus = { version: 1, entries: [{ id: 'x', patterns: ['battery'], text: 'At {soc}.', withStatus: true }], fallback: 'No.' };
     expect(createScriptedAgent(noStatus)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+
+  it('answers the hot-day request with the plan_comfort result, a Plan the contract accepts', async () => {
+    const reply = await agent().ask("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.", ctx);
+    expect(reply.ok).toBe(true);
+    const card = reply.ok ? reply.value.cards?.[0] : undefined;
+    expect(card?.tool).toBe('plan_comfort');
+    expect(PlanSchema.parse(card?.tool === 'plan_comfort' ? card.result : undefined)).toMatchObject({ status: 'proposed', goal: 'cool' });
+  });
+
+  it('applies the plan when asked, with the apply_plan result', async () => {
+    const reply = await agent().ask('Apply the plan', ctx);
+    const card = reply.ok ? reply.value.cards?.[0] : undefined;
+    expect(card?.tool).toBe('apply_plan');
+    expect(card?.tool === 'apply_plan' ? card.result.plan.status : undefined).toBe('applied');
+  });
+
+  it('rejects a script that points a card at an unknown fixture', () => {
+    const entry = { id: 'x', patterns: ['plan'], text: 'Here.', withStatus: false, cards: [{ tool: 'plan_comfort', fixture: 'nope' }] };
+    expect(createScriptedAgent({ ...script, entries: [entry] })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+
+  it('in degraded mode answers status only: never an action, a plan or any card', async () => {
+    const created = createScriptedAgent(script, { degraded: true });
+    if (!created.ok) throw new Error(created.error.message);
+    expect(await created.value.ask('Apply the plan', ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
+    expect(await created.value.ask('Keep Grandpa comfortable, it will be 36 degrees', ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
+    expect(await created.value.ask("What's my battery level?", ctx)).toMatchObject({ ok: true, value: { status: script.status } });
   });
 });

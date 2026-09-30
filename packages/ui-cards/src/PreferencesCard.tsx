@@ -1,38 +1,47 @@
-import { PreferencesSchema, type Preferences, type ReserveOutlook, type SafetyHardLimits } from '@cold-reserve/contracts';
+import { SetPreferencesInputSchema, type DataOriginValue, type GetPreferencesOutput, type ReserveOutlook, type SetPreferencesInput } from '@cold-reserve/contracts';
 import { CATALOGS, type MessageKey } from '@cold-reserve/i18n';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CardShell } from './CardShell.js';
 import { formatHours, t } from './text.js';
 
 const SETPOINT_STEP_C = 0.5;
-/** PreferencesSchema: `familyContacts` holds at most 3 (plan §11.2 p.14). */
+/** PublicPreferencesSchema: at most 3 contacts (plan §11.2 p.14). */
 const MAX_CONTACTS = 3;
 
 export interface PreferencesCardProps {
-  preferences: Preferences;
-  limits: SafetyHardLimits;
-  /** Room names from the home profile; ids only reach the card from the preferences. */
-  rooms: ReadonlyArray<{ id: string; name: string }>;
+  /** Exactly the get_preferences result: contacts by role and channel, never names or handles. */
+  view: GetPreferencesOutput;
+  /** Room names from the home profile, when the host has them; otherwise the ids are shown readably. */
+  rooms?: ReadonlyArray<{ id: string; name: string }>;
   outlook?: ReserveOutlook;
-  onSave?: (preferences: Preferences) => void;
+  /** Origin of the home's data, when the host knows it; else the reserve outlook's. */
+  origin?: DataOriginValue;
+  /** Receives a confirmed set_preferences input with only what changed. */
+  onSave?: (change: SetPreferencesInput) => void;
+}
+
+/** "bedroom-1" → "Bedroom 1": ids and roles are plain words in the contract. */
+function readableId(id: string): string {
+  const words = id.replace(/[_-]+/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** Roles are free words in the contract: known ones come from the catalog, others are shown as written. */
 function roleLabel(role: string): string {
   const key = `role.${role}`;
-  if (key in CATALOGS['en-US']) return t(key as MessageKey);
-  const words = role.replace(/[_-]+/g, ' ');
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  return key in CATALOGS['en-US'] ? t(key as MessageKey) : readableId(role);
 }
 
-/** The first contract problem, said in words (no codes, error-handling §3). */
-function saveProblem(path: ReadonlyArray<PropertyKey>): string {
-  const field = path.join('.');
-  if (field === 'comfortC.cooling') return t('prefs.error.comfortAboveMax');
-  if (field === 'comfortC.heating') return t('prefs.error.comfortBelowMin');
-  if (field.startsWith('roomPriority')) return t('prefs.error.priority');
-  return t('prefs.error.other');
+type Draft = GetPreferencesOutput['preferences'];
+
+/** The rules the tool will check, said in words before sending (no codes, error-handling §3). */
+function saveProblem(draft: Draft, cooling: number): string | null {
+  if (cooling > draft.safety.cooling.maxC) return t('prefs.error.comfortAboveMax');
+  if (draft.roomPriority[0] !== draft.safeRoomId || new Set(draft.roomPriority).size !== draft.roomPriority.length) return t('prefs.error.priority');
+  return null;
 }
+
+const sameOrder = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, i) => id === b[i]);
 
 /** A button that stays focusable when unavailable (`aria-disabled`), so keyboard focus is never dropped. */
 function StepButton(props: { label: string; unavailable: boolean; onPress: () => void; buttonRef?: (el: HTMLButtonElement | null) => void; children: ReactNode }) {
@@ -56,12 +65,15 @@ function StepButton(props: { label: string; unavailable: boolean; onPress: () =>
  * Preferences in one screen (plan §11.2 p.14): setpoint with − / +, safe room, room priority, reserve
  * read-only in hours, contacts by role and channel only (never names or handles). Cooling season for now.
  */
-export function PreferencesCard({ preferences, limits, rooms, outlook, onSave }: PreferencesCardProps) {
-  const [draft, setDraft] = useState(preferences);
+export function PreferencesCard({ view, rooms, outlook, origin, onSave }: PreferencesCardProps) {
+  const { preferences, hardLimits: limits } = view;
+  const [draft, setDraft] = useState<Draft>(preferences);
   // A plain number while editing: the contract schema brands it again on save.
   const [cooling, setCooling] = useState<number>(preferences.comfortC.cooling);
   const [problem, setProblem] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const contactsId = useId();
+  const badge = origin ?? outlook?.origin.energy;
   const moveButtons = useRef(new Map<string, HTMLButtonElement>());
   const pendingFocus = useRef<string | null>(null);
 
@@ -72,7 +84,8 @@ export function PreferencesCard({ preferences, limits, rooms, outlook, onSave }:
     if (key !== null) moveButtons.current.get(key)?.focus();
   });
 
-  const nameOf = (id: string) => rooms.find((r) => r.id === id)?.name ?? id;
+  const roomList = rooms ?? preferences.roomPriority.map((id) => ({ id, name: readableId(id) }));
+  const nameOf = (id: string) => roomList.find((r) => r.id === id)?.name ?? readableId(id);
   // Upper bound: the safety maximum. Lower bound: the heating comfort (cooling below it makes no sense);
   // the contract has no separate floor for the cooling setpoint.
   const coolingMax: number = draft.safety.cooling.maxC;
@@ -86,13 +99,20 @@ export function PreferencesCard({ preferences, limits, rooms, outlook, onSave }:
     setDraft({ ...draft, roomPriority: order });
   };
   const save = () => {
-    const parsed = PreferencesSchema.safeParse({ ...draft, comfortC: { ...draft.comfortC, cooling } });
-    setProblem(parsed.success ? null : t('prefs.invalid', { reason: saveProblem(parsed.error.issues[0]?.path ?? []) }));
-    if (parsed.success) onSave?.(parsed.data);
+    const reason = saveProblem(draft, cooling);
+    setProblem(reason === null ? null : t('prefs.invalid', { reason }));
+    if (reason !== null) return;
+    const change = {
+      ...(cooling !== preferences.comfortC.cooling && { comfortC: { cooling } }),
+      ...(draft.safeRoomId !== preferences.safeRoomId && { safeRoomId: draft.safeRoomId }),
+      ...(!sameOrder(draft.roomPriority, preferences.roomPriority) && { roomPriority: draft.roomPriority }),
+    };
+    setNotice(Object.keys(change).length === 0 ? t('prefs.nothingToSave') : null);
+    if (Object.keys(change).length > 0) onSave?.(SetPreferencesInputSchema.parse({ ...change, confirmed: true }));
   };
 
   return (
-    <CardShell title={t('prefs.title')} {...(outlook !== undefined && { origin: outlook.origin.energy })}>
+    <CardShell title={t('prefs.title')} {...(badge !== undefined && { origin: badge })}>
       <fieldset className="prefs-group">
         <legend className="eyebrow">{t('prefs.comfort')}</legend>
         <div className="stepper">
@@ -125,7 +145,7 @@ export function PreferencesCard({ preferences, limits, rooms, outlook, onSave }:
 
       <fieldset className="prefs-group">
         <legend className="eyebrow">{t('prefs.safeRoom')}</legend>
-        {rooms.map((room) => (
+        {roomList.map((room) => (
           <label key={room.id} className="choice">
             <input
               type="radio"
@@ -175,19 +195,26 @@ export function PreferencesCard({ preferences, limits, rooms, outlook, onSave }:
       {outlook !== undefined && <p className="muted">{t('prefs.reserve', { hours: formatHours(outlook.reserveHoursAtEssential) })}</p>}
 
       <p className="eyebrow" id={contactsId}>
-        {t('prefs.contacts', { count: String(draft.familyContacts.length), max: String(MAX_CONTACTS) })}
+        {t('prefs.contacts', { count: String(draft.contacts.length), max: String(MAX_CONTACTS) })}
       </p>
       <ul className="contacts" aria-labelledby={contactsId}>
-        {draft.familyContacts.map((c, i) => (
+        {draft.contacts.map((c, i) => (
           <li key={i}>{`${roleLabel(c.role)} · ${t(`prefs.channel.${c.channel}`)}`}</li>
         ))}
       </ul>
 
       {problem !== null && <p role="alert">{problem}</p>}
+      {notice !== null && (
+        <p className="muted" role="status">
+          {notice}
+        </p>
+      )}
       <div className="plan-actions">
-        <button type="button" className="button-primary" onClick={save}>
-          {t('prefs.save')}
-        </button>
+        {onSave !== undefined && (
+          <button type="button" className="button-primary" onClick={save}>
+            {t('prefs.save')}
+          </button>
+        )}
         <p className="muted">{t('prefs.voiceHint')}</p>
       </div>
     </CardShell>

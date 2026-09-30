@@ -27,6 +27,8 @@ export function hotDayPlan(): Plan {
     step('2026-07-16T03:00:00+02:00', 'saver', 52, 27),
     step('2026-07-16T06:40:00+02:00', 'saver', 46, 27),
   ];
+  // plan_comfort always fills the guard's SOC floor: 6 kWh of 13.8 kWh usable.
+  plan.reserveFloorSocPct = 43;
   plan.forecastConfidence = 'medium';
   plan.confidenceReason = 'Afternoon clouds possible; the weather models disagree after 15:00.';
   return PlanSchema.parse(plan);

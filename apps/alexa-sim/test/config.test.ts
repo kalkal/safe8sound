@@ -5,7 +5,7 @@ describe('simulator config', () => {
   it('defaults to the ScriptedAgent with explicit timeouts', () => {
     expect(parseConfig({}, '', false)).toEqual({
       ok: true,
-      value: { agent: 'scripted', simApiUrl: undefined, agentTimeoutMs: 8_000, turnBudgetMs: 10_000 },
+      value: { agent: 'scripted', simApiUrl: undefined, agentTimeoutMs: 8_000, turnBudgetMs: 10_000, homeTimeZone: 'Europe/Rome' },
     });
   });
 
@@ -22,5 +22,10 @@ describe('simulator config', () => {
   it('lets ?agent= switch the agent only in dev (fault-injection tests), with a same-origin sim-api', () => {
     expect(parseConfig({}, '?agent=remote', true)).toMatchObject({ ok: true, value: { agent: 'remote', simApiUrl: '/sim-api' } });
     expect(parseConfig({}, '?agent=remote', false)).toMatchObject({ ok: true, value: { agent: 'scripted' } });
+  });
+
+  it('reads the home time zone and refuses one that does not exist', () => {
+    expect(parseConfig({ VITE_HOME_TIME_ZONE: 'America/New_York' }, '', false)).toMatchObject({ ok: true, value: { homeTimeZone: 'America/New_York' } });
+    expect(parseConfig({ VITE_HOME_TIME_ZONE: 'Mars/Olympus' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 });

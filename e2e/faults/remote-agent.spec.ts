@@ -68,3 +68,15 @@ test('sim-api quota exceeded → a calm message and one retry, not a scripted an
   await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
   await expect(page.getByTestId('answer')).toHaveCount(0);
 });
+
+test('sim-api down + "Apply the plan" → an honest answer: nothing claimed as applied, no card', async ({ page }) => {
+  await page.route('**/sim-api/v1/turns', (route) => route.fulfill({ status: 503, body: 'Service Unavailable' }));
+  await page.goto('/?agent=remote');
+  await page.getByLabel('Ask a question').fill('Apply the plan');
+  await page.getByRole('button', { name: 'Ask' }).click();
+
+  await expect(page.getByRole('note')).toHaveText("I can't reach the assistant right now, so this is a scripted answer.");
+  await expect(page.getByTestId('answer')).toContainText("I can't reach the assistant right now, so I can't do that. Nothing was changed.");
+  await expect(page.getByText('Plan applied.')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Plan' })).toHaveCount(0);
+});

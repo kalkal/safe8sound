@@ -3,6 +3,7 @@ import { loadTokenSource } from '@cold-reserve/design-tokens/source';
 import { THEMES, contrastRatio, resolveTheme } from '@cold-reserve/design-tokens/themes';
 import { describe, expect, it } from 'vitest';
 import { cardThemeFor } from '../src/theme.js';
+import { textPairs } from './css-pairs.js';
 
 describe('cardThemeFor (hostContext.theme → card theme)', () => {
   it('follows the host, dark by default as in the Amazon card guide', () => {
@@ -12,22 +13,31 @@ describe('cardThemeFor (hostContext.theme → card theme)', () => {
   });
 });
 
-// Every text colour the card CSS uses, on the background it sits on: the rule's own background,
-// otherwise both card surfaces. WCAG AA 4.5:1 in every theme (plan §11.2 p.1).
-const css = readFileSync(new URL('../src/cards.css', import.meta.url), 'utf8');
-const CARD_SURFACES = ['surface-card', 'surface-card-raised'];
+describe('textPairs (which text colour sits on which background)', () => {
+  it('pairs a rule colour with its own background, or with both card surfaces', () => {
+    expect(textPairs('.a { color: var(--text-primary); background: var(--level-comfort); } .b { color: var(--text-secondary); }')).toEqual([
+      ['text-primary', 'level-comfort'],
+      ['text-secondary', 'surface-card'],
+      ['text-secondary', 'surface-card-raised'],
+    ]);
+  });
 
-function textPairs(source: string): Array<[string, string]> {
-  const pairs: Array<[string, string]> = [];
-  // Split on every brace so nested rules (CSS nesting) are read as their own declaration chunks.
-  for (const body of source.split(/[{}]/)) {
-    const fg = /(?:^|[;\s])color:\s*var\(--([a-z0-9-]+)\)/.exec(body)?.[1];
-    if (fg === undefined) continue;
-    const bg = /background(?:-color)?:\s*var\(--([a-z0-9-]+)\)/.exec(body)?.[1];
-    for (const surface of bg === undefined ? CARD_SURFACES : [bg]) pairs.push([fg, surface]);
-  }
-  return pairs;
-}
+  it('pairs a nested block that changes only the background with the colour it inherits', () => {
+    const css = '.btn { color: var(--button-primary-text); background: var(--button-primary-bg); &:hover { background: var(--button-primary-bg-hover); } }';
+    expect(textPairs(css)).toContainEqual(['button-primary-text', 'button-primary-bg-hover']);
+  });
+
+  it('uses the page text colour when no ancestor sets one', () => {
+    expect(textPairs('.chip { background: var(--surface-card-raised); }')).toEqual([['text-primary', 'surface-card-raised']]);
+  });
+
+  it('skips decorative pseudo-elements without text and non-text properties', () => {
+    expect(textPairs('.cube { &::after { background: var(--cube-fill); content: ""; } } .x { border-color: var(--accent); }')).toEqual([]);
+  });
+});
+
+// Every text colour the card CSS uses, on the background it sits on. WCAG AA 4.5:1 in every theme (plan §11.2 p.1).
+const css = readFileSync(new URL('../src/cards.css', import.meta.url), 'utf8');
 
 describe('card text contrast (WCAG AA, every theme)', () => {
   const pairs = textPairs(css);

@@ -1,8 +1,18 @@
+import type { DataOriginValue } from '@cold-reserve/contracts';
+import { homeClock } from '@cold-reserve/ui-cards';
 import type { AgentAnswer } from '../agent/index.js';
 import { OriginBadge } from './OriginBadge.js';
-import { homeClock, t } from './text.js';
+import { t } from './text.js';
+import { ToolCards } from './ToolCards.js';
 
-export function AnswerCard({ answer }: { answer: AgentAnswer }) {
+export interface AnswerCardProps {
+  answer: AgentAnswer;
+  timeZone: string;
+  origin?: DataOriginValue;
+  onAsk: (text: string) => void;
+}
+
+export function AnswerCard({ answer, timeZone, origin, onAsk }: AnswerCardProps) {
   const { status } = answer;
   return (
     <article className="answer" data-testid="answer">
@@ -21,11 +31,12 @@ export function AnswerCard({ answer }: { answer: AgentAnswer }) {
                 {status.batterySocPct}%
               </span>
               <OriginBadge origin={status.origin.energy} />
-              <span className="fact-asof">{t('data.asOf', { time: homeClock(status.ts) })}</span>
+              <span className="fact-asof">{t('data.asOf', { time: homeClock(status.ts, timeZone) })}</span>
             </dd>
           </div>
         </dl>
       )}
+      {answer.cards !== undefined && <ToolCards cards={answer.cards} timeZone={timeZone} onAsk={onAsk} {...(origin !== undefined && { origin })} />}
     </article>
   );
 }

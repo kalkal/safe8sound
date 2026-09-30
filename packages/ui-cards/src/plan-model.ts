@@ -42,7 +42,7 @@ export function levelSpans(plan: Plan, timeZone: string): LevelSpan[] {
 export interface PacingGeometry {
   /** x: 0–100 from plan creation to the horizon; y: 100 − expected charge in %. */
   points: Array<{ x: number; y: number }>;
-  /** The storm reserve as a share of the usable battery, when the battery size is known. */
+  /** The storm reserve floor in SOC %: the guard's floor from the plan, else computed from the battery size. */
   floorPct?: number;
 }
 
@@ -53,6 +53,7 @@ export function pacingGeometry(plan: Plan, batteryUsableWh?: number): PacingGeom
     .sort((a, b) => epochMs(a.ts) - epochMs(b.ts))
     // A plan whose horizon is its creation time has no time axis: every point sits at the end.
     .map((s) => ({ x: span > 0 ? Math.min(100, ((epochMs(s.ts) - start) / span) * 100) : 100, y: 100 - s.batteryTargetSocPct }));
+  if (plan.reserveFloorSocPct !== undefined) return { points, floorPct: Math.round(plan.reserveFloorSocPct) };
   if (batteryUsableWh === undefined || batteryUsableWh <= 0) return { points };
   return { points, floorPct: Math.round((plan.reserveWh / batteryUsableWh) * 100) };
 }

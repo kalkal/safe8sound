@@ -1,5 +1,6 @@
 import { ErrorEnvelopeSchema, PROBLEM_JSON_CONTENT_TYPE, toProblemDetails, toolError } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
+import { hotDayPlan } from '@cold-reserve/ui-cards';
 import { createRemoteAgent } from '../src/agent/remote-agent.js';
 
 const BASE = 'http://sim-api.test';
@@ -90,5 +91,12 @@ describe('RemoteAgent (sim-api over HTTP)', () => {
     const pending = agent(hang).ask('q', { correlationId: 'c', signal: controller.signal });
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('keeps the answer text and the good cards when one card breaks its contract', async () => {
+    const body = { text: 'Here is the plan.', cards: [{ tool: 'plan_comfort', result: hotDayPlan() }, { tool: 'plan_comfort', result: { broken: true } }] };
+    const result = await agent(() => json(body)).ask('q', { correlationId: 'c' });
+    expect(result.ok && result.value.text).toBe('Here is the plan.');
+    expect(result.ok && result.value.cards?.map((c) => c.tool)).toEqual(['plan_comfort', 'invalid']);
   });
 });

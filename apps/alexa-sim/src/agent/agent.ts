@@ -1,5 +1,5 @@
 import type { ErrorCode, ErrorEnvelope, Result } from '@cold-reserve/contracts';
-import type { TurnReply } from './wire.js';
+import type { CardSlot, StatusFacts } from './wire.js';
 
 export interface AskContext {
   /** One id per user turn, propagated to sim-api (error-handling §6). */
@@ -8,7 +8,10 @@ export interface AskContext {
   signal?: AbortSignal;
 }
 
-export interface AgentAnswer extends TurnReply {
+export interface AgentAnswer {
+  text: string;
+  status?: StatusFacts;
+  cards?: CardSlot[];
   /** Set when the answer comes from the degraded mode: the code of the failure it replaces. */
   degradedBy?: ErrorCode;
 }

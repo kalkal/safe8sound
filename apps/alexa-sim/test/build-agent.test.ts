@@ -3,7 +3,7 @@ import { buildAgent } from '../src/agent/index.js';
 import script from '../src/agent/script.v1.json' with { type: 'json' };
 import type { SimConfig } from '../src/config.js';
 
-const base: SimConfig = { agent: 'scripted', simApiUrl: undefined, agentTimeoutMs: 1_000, turnBudgetMs: 2_000 };
+const base: SimConfig = { agent: 'scripted', simApiUrl: undefined, agentTimeoutMs: 1_000, turnBudgetMs: 2_000, homeTimeZone: 'Europe/Rome' };
 const remote: SimConfig = { ...base, agent: 'remote', simApiUrl: 'http://sim-api.test' };
 const ctx = { correlationId: 'c' };
 
@@ -37,5 +37,14 @@ describe('buildAgent', () => {
     const broken = { ...script, version: 2 };
     expect(buildAgent(remote, broken)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
     expect(buildAgent(base, broken)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+
+  it('remote down + "Apply the plan": an honest answer, nothing claimed as applied, no card', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('fetch failed'))));
+    const agent = buildAgent(remote);
+    if (!agent.ok) throw new Error(agent.error.message);
+    const answer = await agent.value.ask('Apply the plan', ctx);
+    expect(answer).toEqual({ ok: true, value: { text: script.degradedFallback, degradedBy: 'agent_unavailable' } });
+    expect(JSON.stringify(answer)).not.toMatch(/applied/i);
   });
 });

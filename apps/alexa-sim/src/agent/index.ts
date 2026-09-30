@@ -15,5 +15,8 @@ export type { Agent, AgentAnswer } from './agent.js';
 export function buildAgent(config: SimConfig, scriptSource: unknown = script): Result<Agent, ErrorEnvelope> {
   const scripted = createScriptedAgent(scriptSource);
   if (!scripted.ok || config.agent === 'scripted' || config.simApiUrl === undefined) return scripted;
-  return ok(withScriptedFallback(createRemoteAgent({ baseUrl: config.simApiUrl, timeoutMs: config.agentTimeoutMs }), scripted.value));
+  // Behind the remote agent the script answers status questions only (degraded mode, error-handling §5).
+  const degraded = createScriptedAgent(scriptSource, { degraded: true });
+  if (!degraded.ok) return degraded;
+  return ok(withScriptedFallback(createRemoteAgent({ baseUrl: config.simApiUrl, timeoutMs: config.agentTimeoutMs }), degraded.value));
 }

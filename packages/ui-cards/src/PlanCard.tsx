@@ -7,7 +7,7 @@ export interface PlanCardProps {
   plan: Plan;
   /** IANA time zone of the home (home profile `location.tz`): every time is shown on the home's clock. */
   timeZone: string;
-  /** Usable battery energy, to draw the storm reserve floor; the floor is omitted without it. */
+  /** Usable battery energy: draws the reserve floor only when the plan has no `reserveFloorSocPct`. */
   batteryUsableWh?: number;
   onApply?: (planId: string) => void;
   onDismiss?: () => void;

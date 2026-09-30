@@ -48,9 +48,10 @@ describe('pacingGeometry (expected charge until the horizon)', () => {
     expect(points.every((p, i) => i === 0 || p.x > (points[i - 1]?.x ?? 0))).toBe(true);
   });
 
-  it('draws the storm reserve floor only when the battery size is known', () => {
-    expect(pacingGeometry(hotDayPlan(), 13_800).floorPct).toBe(43);
-    expect(pacingGeometry(hotDayPlan()).floorPct).toBeUndefined();
+  it("draws the storm reserve floor from the guard's SOC floor, same axis as the charge", () => {
+    expect(pacingGeometry(hotDayPlan()).floorPct).toBe(43);
+    expect(pacingGeometry({ ...hotDayPlan(), reserveFloorSocPct: undefined }, 13_800).floorPct).toBe(43);
+    expect(pacingGeometry({ ...hotDayPlan(), reserveFloorSocPct: undefined }).floorPct).toBeUndefined();
   });
 
   it('never divides by zero when the horizon equals the creation time', () => {

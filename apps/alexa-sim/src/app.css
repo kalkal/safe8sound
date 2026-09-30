@@ -198,3 +198,17 @@
     gap: var(--space-6);
   }
 }
+
+@layer surfaces {
+  /* The cards of an answer, one under the other at the chat's reading width. */
+  .tool-cards {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .manual {
+    margin: 0;
+    padding-inline-start: var(--space-6);
+    color: var(--text-primary);
+  }
+}

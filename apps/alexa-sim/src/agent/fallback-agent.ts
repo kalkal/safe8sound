@@ -11,7 +11,10 @@ export function withScriptedFallback(primary: Agent, scripted: Agent): Agent {
       const result = await primary.ask(question, context);
       if (result.ok || !DEGRADE_ON.has(result.error.category)) return result;
       const fallback = await scripted.ask(question, context);
-      return fallback.ok ? { ok: true, value: { ...fallback.value, degradedBy: result.error.code } } : result;
+      if (!fallback.ok) return result;
+      // The degraded mode never shows a card: a scripted plan or "applied" would claim what did not happen.
+      const { text, status } = fallback.value;
+      return { ok: true, value: { text, ...(status !== undefined && { status }), degradedBy: result.error.code } };
     },
   };
 }

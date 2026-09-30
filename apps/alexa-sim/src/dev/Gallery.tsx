@@ -1,5 +1,5 @@
 import '@cold-reserve/ui-cards/cards.css';
-import { HomeProfileSchema, PlanSchema, PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema } from '@cold-reserve/contracts';
+import { HomeProfileSchema, PlanSchema, PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
 import { exampleHomeProfile, examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import { GuardReceipt, IceCubesCard, PlanCard, PreferencesCard, advisoryPlan, cardThemeFor, hotDayPlan, rejectedPlan } from '@cold-reserve/ui-cards';
 
@@ -22,8 +22,11 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       <GuardReceipt plan={longIdPlan} />
       <IceCubesCard outlook={outlook} />
       <PreferencesCard
-        preferences={PreferencesSchema.parse(examplePreferences())}
-        limits={SafetyHardLimitsSchema.parse(exampleSafetyLimits())}
+        view={{
+          preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())),
+          isDefault: false,
+          hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()),
+        }}
         rooms={home.rooms}
         outlook={outlook}
       />
