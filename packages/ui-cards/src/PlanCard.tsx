@@ -70,8 +70,10 @@ function PacingLine({ plan, timeZone, batteryUsableWh }: { plan: Plan; timeZone:
   const first = steps[0];
   const last = steps.at(-1);
   if (first === undefined || last === undefined) return null;
-  const floor =
-    floorPct === undefined ? '' : ` ${t('plan.floor', { kwh: String(Math.round(plan.reserveWh / 100) / 10), pct: String(floorPct) })}`;
+  const kwh = String(Math.round(plan.reserveWh / 100) / 10);
+  let floor = '';
+  if (plan.gridAvailable === false) floor = ` ${t('plan.reserveInUse', { kwh })}`;
+  else if (floorPct !== undefined) floor = ` ${t('plan.floor', { kwh, pct: String(floorPct) })}`;
   const label =
     t('plan.chart', {
       from: String(first.batteryTargetSocPct),

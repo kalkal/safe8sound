@@ -2,7 +2,7 @@
 import type { Plan } from '@cold-reserve/contracts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { advisoryPlan, hotDayPlan, rejectedPlan } from '../src/fixtures.js';
+import { advisoryPlan, hotDayPlan, rejectedPlan, stormPlan } from '../src/fixtures.js';
 import { PlanCard, type PlanCardProps } from '../src/PlanCard.js';
 
 afterEach(cleanup);
@@ -81,5 +81,19 @@ describe('PlanCard', () => {
     fireEvent.click(expand);
     expect(screen.getByRole('button', { name: 'Collapse' }).getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByRole('region', { name: 'Plan' }).dataset['expanded']).toBe('true');
+  });
+
+  it('in a storm draws no floor and says the storm reserve is in use', () => {
+    show(stormPlan(), { batteryUsableWh: 13_800 });
+    const chart = screen.getByRole('img', { name: /Expected charge/ });
+    expect(chart.querySelector('[data-part="floor"]')).toBeNull();
+    expect(chart.getAttribute('aria-label')).toBe('Expected charge from 80% at 15:00 to 46% at 06:40. Storm reserve 6 kWh in use.');
+    expect(screen.getByText('Storm reserve 6 kWh in use.')).toBeTruthy();
+  });
+
+  it('on an older plan without grid state draws the floor only when it is known, and never says storm', () => {
+    show({ ...hotDayPlan(), reserveFloorSocPct: undefined });
+    expect(screen.getByRole('img', { name: /Expected charge/ }).querySelector('[data-part="floor"]')).toBeNull();
+    expect(screen.queryByText(/in use/)).toBeNull();
   });
 });

@@ -42,6 +42,8 @@ jobs:
       - run: pnpm lint:css
       - run: pnpm depcruise
       - run: pnpm test
+      # The ui:// card bundle: built, never committed; the build fails above the size budget.
+      - run: pnpm --filter @cold-reserve/ui-cards build:card
       # The demo script and the fault-injection scenarios (ScriptedAgent, no network, no LLM).
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e

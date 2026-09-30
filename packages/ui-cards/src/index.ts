@@ -1,11 +1,25 @@
 /** Shared MCP Apps card components (plan §11.1): data in, callbacks out, tokens only. */
 export const packageName = '@cold-reserve/ui-cards';
 
+export { CardApp, type CardAppProps } from './app/CardApp.js';
+export {
+  BUNDLE_BUDGET_BYTES,
+  CARD_KINDS,
+  checkBundleSize,
+  isCardKind,
+  isStormState,
+  parseCardResult,
+  renderCardHtml,
+  type CardAssets,
+  type CardKind,
+  type CardState,
+  type ToolResultLike,
+} from './app/card-kinds.js';
 export { CardShell, OriginBadge } from './CardShell.js';
 export { GuardReceipt } from './GuardReceipt.js';
 export { IceCubesCard, cubeFills } from './IceCubesCard.js';
 export { PlanCard, type PlanCardProps } from './PlanCard.js';
 export { PreferencesCard, type PreferencesCardProps } from './PreferencesCard.js';
-export { advisoryPlan, hotDayPlan, rejectedPlan } from './fixtures.js';
+export { advisoryPlan, hotDayPlan, rejectedPlan, stormPlan } from './fixtures.js';
 export { homeClock, levelSpans, pacingGeometry } from './plan-model.js';
 export { cardThemeFor, type CardTheme } from './theme.js';

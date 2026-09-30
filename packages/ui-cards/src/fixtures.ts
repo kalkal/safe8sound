@@ -29,8 +29,16 @@ export function hotDayPlan(): Plan {
   ];
   // plan_comfort always fills the guard's SOC floor: 6 kWh of 13.8 kWh usable.
   plan.reserveFloorSocPct = 43;
+  plan.gridAvailable = true;
   plan.forecastConfidence = 'medium';
   plan.confidenceReason = 'Afternoon clouds possible; the weather models disagree after 15:00.';
+  return PlanSchema.parse(plan);
+}
+
+/** Storm: the grid is measured down, the reserve becomes the budget, so there is no floor. */
+export function stormPlan(): Plan {
+  const plan: Partial<Plan> = { ...hotDayPlan(), gridAvailable: false };
+  delete plan.reserveFloorSocPct;
   return PlanSchema.parse(plan);
 }
 

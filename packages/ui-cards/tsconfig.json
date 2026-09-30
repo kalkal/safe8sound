@@ -3,7 +3,9 @@
   "extends": "../../tsconfig.bundler.json",
   "include": [
     "src",
-    "test"
+    "test",
+    "scripts",
+    "vite.card.config.ts"
   ],
   "compilerOptions": {
     "jsx": "react-jsx"

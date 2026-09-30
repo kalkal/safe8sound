@@ -53,6 +53,8 @@ export function pacingGeometry(plan: Plan, batteryUsableWh?: number): PacingGeom
     .sort((a, b) => epochMs(a.ts) - epochMs(b.ts))
     // A plan whose horizon is its creation time has no time axis: every point sits at the end.
     .map((s) => ({ x: span > 0 ? Math.min(100, ((epochMs(s.ts) - start) / span) * 100) : 100, y: 100 - s.batteryTargetSocPct }));
+  // With the grid down the reserve is the budget, not a floor (#90).
+  if (plan.gridAvailable === false) return { points };
   if (plan.reserveFloorSocPct !== undefined) return { points, floorPct: Math.round(plan.reserveFloorSocPct) };
   if (batteryUsableWh === undefined || batteryUsableWh <= 0) return { points };
   return { points, floorPct: Math.round((plan.reserveWh / batteryUsableWh) * 100) };
