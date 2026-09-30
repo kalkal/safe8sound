@@ -72,6 +72,13 @@ describe('stormReduce: the storm session as a pure state machine (plan §9.2)', 
     expect(transitions).toEqual(['storm_started', 'power_back']);
   });
 
+  it('does not end one millisecond before the stable-grid window closes', () => {
+    const back = T0 + 600 * 60_000;
+    const almost = stormReduce(run([reading(0, false), reading(600, true)]).session, { type: 'reading', at: new Date(back + 10 * 60_000 - 1).toISOString(), gridAvailable: true, level: 'comfort', previousLevel: 'comfort' }, ctx);
+    expect(almost.session?.phase).toBe('active');
+    expect(almost.transitions).toEqual([]);
+  });
+
   it('restarts the stable-grid window when the grid drops again', () => {
     const { session, transitions } = run([reading(0, false), reading(600, true), reading(605, false), reading(612, true), reading(620, true)]);
     expect(session?.phase).toBe('active');
@@ -113,6 +120,14 @@ describe('stormReduce: the storm session as a pure state machine (plan §9.2)', 
           const next = stormReduce(session, e, ctx);
           expect(next.transitions.length).toBeLessThanOrEqual(1);
           if (next.session) expect(StormSessionSchema.safeParse(next.session).success).toBe(true);
+          // A cancel never ends an active storm.
+          if (e.type === 'cancel' && session?.phase === 'active') expect(next.session?.phase).toBe('active');
+          // Power back only after the grid has been back for the whole window.
+          if (next.transitions.includes('power_back')) {
+            const backAt = session?.gridBackAt;
+            expect(backAt).toBeDefined();
+            expect(Date.parse(e.at) - Date.parse(backAt ?? e.at)).toBeGreaterThanOrEqual(ctx.stableGridMinutes * 60_000);
+          }
           session = next.session;
         });
       }),

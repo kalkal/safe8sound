@@ -5,6 +5,7 @@ import {
   PlanIdSchema,
   PlanSchema,
   PreferencesSchema,
+  StormSessionSchema,
   epochMs,
   err,
   ok,
@@ -16,6 +17,7 @@ import {
   type PlanId,
   type Preferences,
   type Result,
+  type StormSession,
 } from '@cold-reserve/contracts';
 import {
   DEFAULT_STATE_STORE_TTL,
@@ -175,6 +177,22 @@ class DynamoStateStore implements StateStore {
         return planId === undefined ? rest : { ...rest, planId };
       });
       return rejections.sort((a, b) => epochMs(b.at) - epochMs(a.at));
+    });
+  }
+
+  saveStormSession(session: StormSession) {
+    return this.#run('saveStormSession', async () => {
+      if (session.homeId !== this.homeId) {
+        fail(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } }));
+      }
+      await this.#table.put(this.#item(`STORM#${session.id}`, session, epochMs(session.startedAt) + this.#ttl.stormSessionDays * DAY_MS));
+    });
+  }
+
+  getLatestStormSession() {
+    return this.#run('getLatestStormSession', async () => {
+      const sessions = (await this.#live('STORM#')).map((item) => parse(StormSessionSchema, item));
+      return sessions.sort((a, b) => epochMs(b.startedAt) - epochMs(a.startedAt))[0];
     });
   }
 

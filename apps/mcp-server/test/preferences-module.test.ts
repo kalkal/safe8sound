@@ -91,6 +91,8 @@ describe('preferences module (MCP tools)', () => {
         applyPlan: (id) => base.applyPlan(id),
         recordGuardRejection: (r) => base.recordGuardRejection(r),
         listGuardRejections: () => base.listGuardRejections(),
+        saveStormSession: (s) => base.saveStormSession(s),
+        getLatestStormSession: () => base.getLatestStormSession(),
       };
     };
     const set = await call(deps({ storeFor }), 'set_preferences', { language: 'it-IT', confirmed: true });
@@ -143,6 +145,8 @@ describe('preferences module (MCP tools)', () => {
       applyPlan: () => Promise.reject(new Error('not used')),
       recordGuardRejection: () => Promise.reject(new Error('not used')),
       listGuardRejections: () => Promise.reject(new Error('not used')),
+      saveStormSession: () => Promise.reject(new Error('not used')),
+      getLatestStormSession: () => Promise.reject(new Error('not used')),
     };
     expect(await call(deps({ storeFor: () => failing }), 'get_preferences', {})).toMatchObject({
       isError: true,

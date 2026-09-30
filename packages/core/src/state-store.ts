@@ -7,6 +7,7 @@ import type {
   PlanId,
   Preferences,
   Result,
+  StormSession,
 } from '@cold-reserve/contracts';
 
 // StateStore port (plan §9.1, §14.1): preferences, plans, the config-change log and the guard
@@ -33,9 +34,10 @@ export interface StateStoreTtl {
   readonly planDays: number;
   readonly configChangeDays: number;
   readonly guardRejectionDays: number;
+  readonly stormSessionDays: number;
 }
 
-export const DEFAULT_STATE_STORE_TTL: StateStoreTtl = { planDays: 30, configChangeDays: 90, guardRejectionDays: 90 };
+export const DEFAULT_STATE_STORE_TTL: StateStoreTtl = { planDays: 30, configChangeDays: 90, guardRejectionDays: 90, stormSessionDays: 90 };
 
 export interface StateStore {
   readonly homeId: HomeId;
@@ -56,6 +58,10 @@ export interface StateStore {
   recordGuardRejection(rejection: GuardRejection): Promise<Result<void, ErrorEnvelope>>;
   /** Rejections still retained, newest first. */
   listGuardRejections(): Promise<Result<GuardRejection[], ErrorEnvelope>>;
+  /** Creates or replaces a storm session (by id) of this home. */
+  saveStormSession(session: StormSession): Promise<Result<void, ErrorEnvelope>>;
+  /** The most recently started storm session still retained, if any. */
+  getLatestStormSession(): Promise<Result<StormSession | undefined, ErrorEnvelope>>;
 }
 
 export type StateStoreFactory = (homeId: HomeId) => StateStore;

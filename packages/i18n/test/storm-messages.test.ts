@@ -3,26 +3,42 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { PRODUCT_NAME, stormMessage, stormPreview } from '../src/index.js';
 
-const fields = { name: 'Anna', room: 'Bedroom', tempC: '26.4', safeUntil: '7:30' };
+// 2026-07-17 in Rome is CEST (UTC+2).
+const fields = {
+  roomName: 'Bedroom',
+  tempC: 26.44,
+  atMs: Date.parse('2026-07-18T04:30:00Z'),
+  safeUntilMs: Date.parse('2026-07-18T05:30:00Z'),
+  timeZone: 'Europe/Rome',
+};
 
 describe('storm family messages (Mileti: source, hazard, place, status, time, what to do)', () => {
-  it('has a template for every transition that is sent, and none for storm_prepared', () => {
-    for (const t of SENDABLE_TRANSITIONS) expect(stormMessage('en-US', t, fields).ok).toBe(true);
+  it('has a template for every transition that is sent', () => {
+    for (const t of SENDABLE_TRANSITIONS) expect(stormMessage('en-US', t, 'Anna', fields).ok).toBe(true);
   });
 
-  it('storm started: says who it is from, the hazard, the room, its temperature, until when, and what to do', () => {
-    const r = stormMessage('en-US', 'storm_started', fields);
+  it('storm started: who it is from, the hazard, the room, its temperature (one decimal), until when (home time), what to do', () => {
+    const r = stormMessage('en-US', 'storm_started', 'Anna', fields);
     expect(r.ok && r.value).toBe(
-      `${PRODUCT_NAME} alert for Anna: a storm cut the power at home. Bedroom is at 26.4 °C and the battery keeps it safe until 7:30. No action is needed now. Next message: when the level changes or power returns.`,
+      `${PRODUCT_NAME} alert for Anna: a storm cut the power at home. Bedroom is at 26.4 °C and the battery keeps it safe until 7:30 AM. No action is needed now. Next message: when the level changes or power returns.`,
     );
   });
 
-  it('essential level and power back', () => {
-    const essential = stormMessage('en-US', 'essential_level', fields);
-    expect(essential.ok && essential.value).toContain('essential mode');
-    expect(essential.ok && essential.value).toContain('until 7:30');
-    const back = stormMessage('en-US', 'power_back', fields);
-    expect(back.ok && back.value).toBe(`${PRODUCT_NAME} update for Anna: power is back at home. Bedroom is at 26.4 °C. Storm mode has ended.`);
+  it('essential level says until when', () => {
+    const r = stormMessage('en-US', 'essential_level', 'Anna', fields);
+    expect(r.ok && r.value).toContain('essential mode');
+    expect(r.ok && r.value).toContain('until 7:30 AM');
+  });
+
+  it('power back says when, and that no action is needed', () => {
+    const r = stormMessage('en-US', 'power_back', 'Anna', fields);
+    expect(r.ok && r.value).toBe(`${PRODUCT_NAME} update for Anna: power came back at home at 6:30 AM. Bedroom is at 26.4 °C. Storm mode has ended. No action is needed.`);
+  });
+
+  it('needs the safe-until time for the messages that quote it', () => {
+    const noUntil = { roomName: fields.roomName, tempC: fields.tempC, atMs: fields.atMs, timeZone: fields.timeZone };
+    expect(stormMessage('en-US', 'storm_started', 'Anna', noUntil)).toMatchObject({ ok: false, error: { missing: ['safeUntil'] } });
+    expect(stormMessage('en-US', 'power_back', 'Anna', noUntil).ok).toBe(true);
   });
 
   it('the preview for the model uses the role and never the contact name or handle (property)', () => {
@@ -30,7 +46,7 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
     fc.assert(
       fc.property(fc.constantFrom(...SENDABLE_TRANSITIONS), token, token, (transition, name, handle) => {
         const contact = { role: 'daughter', name, channel: 'in_app' as const, handle };
-        const preview = stormPreview('en-US', transition, contact, { room: 'Bedroom', tempC: '26.4', safeUntil: '7:30' });
+        const preview = stormPreview('en-US', transition, contact, fields);
         expect(preview.ok).toBe(true);
         if (!preview.ok) return;
         expect(preview.value).toContain('daughter');
@@ -38,9 +54,5 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
         expect(preview.value).not.toContain(handle);
       }),
     );
-  });
-
-  it('never gives a half-filled message', () => {
-    expect(stormMessage('en-US', 'storm_started', { name: 'Anna', room: 'Bedroom', tempC: '26.4' })).toMatchObject({ ok: false, error: { missing: ['safeUntil'] } });
   });
 });

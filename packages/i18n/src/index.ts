@@ -1,4 +1,4 @@
-import { err, ok, type Result, type SendableTransition } from '@cold-reserve/contracts';
+import { err, ok, type Result, type SendableTransition, type StormMessageText } from '@cold-reserve/contracts';
 
 // Every user-facing string lives in a catalog (plan §14.1). en-US for the hackathon; it-IT later.
 
@@ -30,7 +30,7 @@ const enUS = {
     '{product} alert for {name}: a storm cut the power at home. {room} is at {tempC} °C and the battery keeps it safe until {safeUntil}. No action is needed now. Next message: when the level changes or power returns.',
   'storm.essential':
     '{product} update for {name}: to keep {room} safe until {safeUntil}, the battery switched to essential mode. {room} is at {tempC} °C. No action is needed now. Next message: when the level changes or power returns.',
-  'storm.powerBack': '{product} update for {name}: power is back at home. {room} is at {tempC} °C. Storm mode has ended.',
+  'storm.powerBack': '{product} update for {name}: power came back at home at {at}. {room} is at {tempC} °C. Storm mode has ended. No action is needed.',
   'card.expand': 'Expand',
   'card.collapse': 'Collapse',
   'level.comfort': 'Comfort',
@@ -141,16 +141,44 @@ const STORM_KEYS = { storm_started: 'storm.started', essential_level: 'storm.ess
   MessageKey
 >;
 
+/** What a storm message is built from: the server's own state, never text from the model. */
+export interface StormMessageFields {
+  /** Name of the configured safe room (from the home profile). */
+  readonly roomName: string;
+  readonly tempC: number;
+  /** When the message is sent (epoch ms). */
+  readonly atMs: number;
+  /** Until when the safe room is covered (epoch ms); needed by the messages that quote it. */
+  readonly safeUntilMs?: number;
+  /** The home's time zone, for the times in the message. */
+  readonly timeZone: string;
+}
+
+const clockTime = (locale: Locale, ms: number, timeZone: string) =>
+  new Intl.DateTimeFormat(locale, { timeZone, hour: 'numeric', minute: '2-digit' }).format(ms);
+
+function renderStorm(locale: Locale, transition: SendableTransition, addressee: string, fields: StormMessageFields): Result<string, FormatError> {
+  return format(locale, STORM_KEYS[transition], {
+    name: addressee,
+    room: fields.roomName,
+    tempC: fields.tempC.toFixed(1),
+    at: clockTime(locale, fields.atMs, fields.timeZone),
+    ...(fields.safeUntilMs === undefined ? {} : { safeUntil: clockTime(locale, fields.safeUntilMs, fields.timeZone) }),
+  });
+}
+
 /**
- * A family message for a storm transition. Only these fields are filled; the model never writes the
- * text. Pass the contact's role as `name` to build the preview the model may see.
+ * The family message for a storm transition, addressed to the contact's name. This is the only place
+ * a StormMessageText is made (lint rule): the model never writes the text, it only triggers a template.
  */
 export function stormMessage(
   locale: Locale,
   transition: SendableTransition,
-  fields: Readonly<{ name: string; room: string; tempC: string; safeUntil?: string }>,
-): Result<string, FormatError> {
-  return format(locale, STORM_KEYS[transition], fields);
+  name: string,
+  fields: StormMessageFields,
+): Result<StormMessageText, FormatError> {
+  const text = renderStorm(locale, transition, name, fields);
+  return text.ok ? ok(text.value as StormMessageText) : text;
 }
 
 /**
@@ -161,7 +189,7 @@ export function stormPreview(
   locale: Locale,
   transition: SendableTransition,
   contact: Readonly<{ role: string }>,
-  fields: Readonly<{ room: string; tempC: string; safeUntil?: string }>,
+  fields: StormMessageFields,
 ): Result<string, FormatError> {
-  return stormMessage(locale, transition, { ...fields, name: contact.role });
+  return renderStorm(locale, transition, contact.role, fields);
 }

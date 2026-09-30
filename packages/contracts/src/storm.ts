@@ -30,6 +30,12 @@ export const SENDABLE_TRANSITIONS = ['storm_started', 'essential_level', 'power_
 export const SendableTransitionSchema = z.enum(SENDABLE_TRANSITIONS);
 export type SendableTransition = z.infer<typeof SendableTransitionSchema>;
 
+/**
+ * A rendered family message. Only `stormMessage` in @cold-reserve/i18n produces it (from a template and
+ * fields); a cast anywhere else is a lint error, so no free text ever reaches a family contact.
+ */
+export type StormMessageText = string & z.$brand<'StormMessageText'>;
+
 /** One message sent to a family contact, by role and channel: names and handles are never stored here. */
 export const StormNotificationSchema = z.strictObject({
   at: IsoDateTimeSchema,

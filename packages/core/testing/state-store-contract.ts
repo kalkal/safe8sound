@@ -4,8 +4,10 @@ import {
   PlanIdSchema,
   PlanSchema,
   PreferencesSchema,
+  StormSessionSchema,
   type HomeId,
   type Plan,
+  type StormSession,
 } from '@cold-reserve/contracts';
 import { examplePlan, examplePreferences } from '@cold-reserve/contracts/fixtures';
 import { describe, expect, it } from 'vitest';
@@ -55,6 +57,20 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
       homeB: randomHome('b'),
       at: (offsetMs: number) => iso(start + offsetMs),
       prefs: () => PreferencesSchema.parse(examplePreferences()),
+      storm: (home: HomeId, id: string, offsetMs: number, phase: 'prepare' | 'active' = 'prepare'): StormSession =>
+        StormSessionSchema.parse({
+          schemaVersion: 1,
+          id,
+          homeId: home,
+          phase,
+          trigger: 'user',
+          startedAt: iso(start + offsetMs),
+          ...(phase === 'active' ? { activeAt: iso(start + offsetMs) } : {}),
+          safeRoomId: 'bedroom-1',
+          occupantRoles: ['grandpa'],
+          hoursAtEssential: 18,
+          notifications: [],
+        }),
       change: (offsetMs: number, to: number) =>
         ConfigChangeSchema.parse({ ts: iso(start + offsetMs), field: 'safety.cooling.maxC', from: 27, to, by: 'user', confirmed: true }),
     };
@@ -130,6 +146,48 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
       });
     });
 
+    describe('storm sessions', () => {
+      it('has none for a new home, and returns the latest saved one', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        expect(await store.getLatestStormSession()).toEqual({ ok: true, value: undefined });
+        const first = t.storm(t.homeA, 'storm_first00001', 0);
+        const second = t.storm(t.homeA, 'storm_second0001', 60 * MINUTE_MS);
+        expect((await store.saveStormSession(first)).ok).toBe(true);
+        expect((await store.saveStormSession(second)).ok).toBe(true);
+        expect(await store.getLatestStormSession()).toEqual({ ok: true, value: second });
+      });
+
+      it('updates a session in place (same id) and survives a new store instance', async () => {
+        const t = setup();
+        const prepared = t.storm(t.homeA, 'storm_update0001', 0);
+        await t.harness.factory(t.homeA).saveStormSession(prepared);
+        const active = StormSessionSchema.parse({ ...prepared, phase: 'active', activeAt: t.at(5 * MINUTE_MS) });
+        await t.harness.factory(t.homeA).saveStormSession(active);
+        expect(await t.harness.factory(t.homeA).getLatestStormSession()).toEqual({ ok: true, value: active });
+      });
+
+      it('never shows one home the storm of another, and refuses a session of another home', async () => {
+        const t = setup();
+        await t.harness.factory(t.homeA).saveStormSession(t.storm(t.homeA, 'storm_scoped0001', 0));
+        expect(await t.harness.factory(t.homeB).getLatestStormSession()).toEqual({ ok: true, value: undefined });
+        expect(await t.harness.factory(t.homeB).saveStormSession(t.storm(t.homeA, 'storm_foreign001', 0))).toMatchObject({
+          ok: false,
+          error: { code: 'invalid_input', details: { field: 'homeId' } },
+        });
+      });
+
+      it('keeps a session readable until its retention (TTL) ends', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        await store.saveStormSession(t.storm(t.homeA, 'storm_expiry0001', 0));
+        const end = t.start + DEFAULT_STATE_STORE_TTL.stormSessionDays * DAY_MS;
+        t.harness.setNow(end - 1);
+        expect((await store.getLatestStormSession()).ok && (await store.getLatestStormSession())).toMatchObject({ value: { id: 'storm_expiry0001' } });
+        t.harness.setNow(end);
+        expect(await store.getLatestStormSession()).toEqual({ ok: true, value: undefined });
+      });
+    });
     describe('home scoping', () => {
       it('never shows one home the data of another', async () => {
         const t = setup();

@@ -1,11 +1,15 @@
-import type { ErrorEnvelope, FamilyContact, HomeId, Result, SendableTransition, StormNotification } from '@cold-reserve/contracts';
+import type { ErrorEnvelope, FamilyContact, HomeId, Result, SendableTransition, StormMessageText, StormNotification } from '@cold-reserve/contracts';
 
 // Family messages (plan §11.2 p.8, §13.2.4): only to contacts registered in the preferences, never to
 // a recipient said in conversation; at most once per transition and person within an interval, except
-// "power is back", which always follows the earlier messages.
+// "power is back", which always follows the earlier messages. A failed delivery does not count
+// against the interval: the person was not told, so they may still be.
 
 export interface NotificationPlan {
-  readonly send: readonly FamilyContact[];
+  /** Internal: the registered contacts to deliver to. Never returned to the model. */
+  readonly deliveries: readonly FamilyContact[];
+  /** What the model may see: roles and channels only, in the same order as `deliveries`. */
+  readonly sent: ReadonlyArray<{ readonly role: string; readonly channel: FamilyContact['channel'] }>;
   readonly skipped: ReadonlyArray<{ readonly role: string; readonly reason: 'not_registered' | 'rate_limited' }>;
 }
 
@@ -19,7 +23,7 @@ export function planNotifications(input: {
   minIntervalMinutes: number;
 }): NotificationPlan {
   const wanted = [...new Set(input.roles ?? input.contacts.map((c) => c.role))];
-  const send: FamilyContact[] = [];
+  const deliveries: FamilyContact[] = [];
   const skipped: Array<NotificationPlan['skipped'][number]> = [];
   for (const role of wanted) {
     const target = input.contacts.find((c) => c.role === role);
@@ -28,20 +32,24 @@ export function planNotifications(input: {
       continue;
     }
     const recent = input.sent.some(
-      (n) => n.contactRole === role && n.transition === input.transition && input.nowMs - Date.parse(n.at) < input.minIntervalMinutes * 60_000,
+      (n) =>
+        n.delivered &&
+        n.contactRole === role &&
+        n.transition === input.transition &&
+        input.nowMs - Date.parse(n.at) < input.minIntervalMinutes * 60_000,
     );
     if (recent && input.transition !== 'power_back') skipped.push({ role, reason: 'rate_limited' });
-    else send.push(target);
+    else deliveries.push(target);
   }
-  return { send, skipped };
+  return { deliveries, sent: deliveries.map((c) => ({ role: c.role, channel: c.channel })), skipped };
 }
 
-/** One message to one registered contact, already rendered from a template. */
+/** One message to one registered contact. The text can only come from the i18n templates. */
 export interface OutgoingMessage {
   readonly homeId: HomeId;
   readonly contact: FamilyContact;
   readonly transition: SendableTransition;
-  readonly text: string;
+  readonly text: StormMessageText;
   readonly at: string;
 }
 

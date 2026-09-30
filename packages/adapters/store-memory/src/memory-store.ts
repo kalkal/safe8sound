@@ -11,6 +11,7 @@ import {
   type PlanId,
   type Preferences,
   type Result,
+  type StormSession,
 } from '@cold-reserve/contracts';
 import {
   DEFAULT_STATE_STORE_TTL,
@@ -134,6 +135,19 @@ class MemoryStateStore implements StateStore {
   listGuardRejections(): Promise<Result<GuardRejection[], ErrorEnvelope>> {
     const rejections = this.#query<GuardRejection>('GUARD#').sort((a, b) => epochMs(b.at) - epochMs(a.at));
     return Promise.resolve(ok(rejections));
+  }
+
+  saveStormSession(session: StormSession): Promise<Result<void, ErrorEnvelope>> {
+    if (session.homeId !== this.homeId) {
+      return Promise.resolve(err(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } })));
+    }
+    this.#put(`STORM#${session.id}`, { value: session, expiresAtMs: epochMs(session.startedAt) + this.#ttl.stormSessionDays * DAY_MS });
+    return Promise.resolve(ok(undefined));
+  }
+
+  getLatestStormSession(): Promise<Result<StormSession | undefined, ErrorEnvelope>> {
+    const [latest] = this.#query<StormSession>('STORM#').sort((a, b) => epochMs(b.startedAt) - epochMs(a.startedAt));
+    return Promise.resolve(ok(latest));
   }
 
   #partition(): Map<string, Item> {
