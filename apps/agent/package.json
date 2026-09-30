@@ -7,6 +7,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "evals": "node --import tsx scripts/evals.ts"
+  },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",
     "@cold-reserve/i18n": "workspace:*",

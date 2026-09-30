@@ -56,6 +56,8 @@ describe('createAgent on the Strands loop with the fake model', () => {
     );
     const turn = await answered(createAgent({ config: CONFIG, model, tools: [battery.tool] }).ask("What's my battery level?"));
     expect(turn.toolCalls).toEqual(['get_home_status']);
+    expect(turn.toolResults).toHaveLength(1);
+    expect(turn.toolResults[0]).toContain('64');
     expect(turn.text).toContain('64');
     expect(model.calls[0]?.toolNames).toEqual(['get_home_status']);
   });

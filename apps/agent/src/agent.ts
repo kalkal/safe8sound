@@ -1,4 +1,4 @@
-import { Agent, BeforeInvocationEvent, BeforeToolCallEvent, SlidingWindowConversationManager, type Model, type ToolList } from '@strands-agents/sdk';
+import { AfterToolCallEvent, Agent, BeforeInvocationEvent, BeforeToolCallEvent, SlidingWindowConversationManager, type Model, type ToolList } from '@strands-agents/sdk';
 import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import type { AgentConfig } from './config.js';
 import { classifyFailure } from './failure.js';
@@ -9,6 +9,8 @@ export interface AgentTurn {
   readonly stopReason: string;
   /** Tools the agent actually ran this turn, in order. */
   readonly toolCalls: readonly string[];
+  /** Text of each tool result, in order: what the model was told (evals check numbers against it). */
+  readonly toolResults: readonly string[];
 }
 
 /** One line for the error log: the code and the error type only, never the message (it may hold internals). */
@@ -45,8 +47,13 @@ export function createAgent(deps: { config: AgentConfig; model: Model; tools: To
   });
 
   let ran: string[] = [];
+  let results: string[] = [];
   agent.addHook(BeforeInvocationEvent, () => {
     ran = [];
+    results = [];
+  });
+  agent.addHook(AfterToolCallEvent, (event) => {
+    results.push(event.result.content.map((c) => (c.type === 'textBlock' ? c.text : c.type === 'jsonBlock' ? JSON.stringify(c.json) : '')).join(''));
   });
   agent.addHook(BeforeToolCallEvent, (event) => {
     if (ran.length >= config.maxToolCalls) {
@@ -84,7 +91,7 @@ export function createAgent(deps: { config: AgentConfig; model: Model; tools: To
         return err(toolError('agent_timeout', "The assistant took too long to answer. Try again in a moment."));
       }
       const text = result.lastMessage.content.map((b) => (b.type === 'textBlock' ? b.text : '')).join('');
-      return ok({ text, stopReason: result.stopReason, toolCalls: [...ran] });
+      return ok({ text, stopReason: result.stopReason, toolCalls: [...ran], toolResults: [...results] });
     },
     historyLength: () => agent.messages.length,
   };

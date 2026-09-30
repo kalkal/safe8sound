@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createAgent, type AgentLogEntry } from '../../src/agent.js';
 import type { AgentConfig } from '../../src/config.js';
 import { FakeModel, type FakePolicy } from '../../src/fake-model.js';
+import { McpToken } from '../../src/config.js';
 import { mcpTools } from '../../src/mcp.js';
 
 // Local E2E (issue #17, part 2): the agent on the Strands loop, the fake model choosing the tool,
@@ -52,7 +53,7 @@ afterAll(async () => {
 });
 
 const tools = (mcpUrl: string, token: string) => {
-  const client = mcpTools({ url: mcpUrl, token });
+  const client = mcpTools({ mcpUrl }, new McpToken(token));
   clients.push(client);
   return [client];
 };

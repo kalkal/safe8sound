@@ -11,6 +11,9 @@ const TURN_DEADLINE_CEILING_MS = 30_000;
 // Under sim-api's 8 s scripted fallback (plan §9.2), so the agent answers or fails first.
 const DEFAULT_TURN_DEADLINE_MS = 7_000;
 
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
+const MIN_TOKEN_LENGTH = 32;
+
 const intFromEnv = z
   .string()
   .regex(/^\d+$/, 'Expected a whole number')
@@ -32,7 +35,8 @@ export const AgentConfigSchema = z
     historyWindowMessages: intFromEnv.pipe(z.number().max(HISTORY_MESSAGES_CEILING)),
     /** Explicit deadline of a whole turn: the MCP client's own default is 60 s. */
     turnDeadlineMs: intFromEnv.pipe(z.number().max(TURN_DEADLINE_CEILING_MS)),
-    mcpUrl: z.url({ protocol: /^https?$/ }),
+    /** https, or plain http only on the loopback (the local MCP server). */
+    mcpUrl: z.url({ protocol: /^https?$/ }).refine((u) => new URL(u).protocol === 'https:' || LOOPBACK.has(new URL(u).hostname), { message: 'Use https, or http only on the loopback' }),
   })
   .refine((c) => c.maxModelTurns > c.maxToolCalls, { path: ['maxModelTurns'], message: 'Must leave one model call for the answer' });
 export type AgentConfig = z.output<typeof AgentConfigSchema>;
@@ -54,4 +58,33 @@ export function loadAgentConfig(env: Readonly<Record<string, string | undefined>
       details: { issues: parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message.slice(0, 200) })) },
     }),
   );
+}
+
+/** The agent's bearer token for the MCP server: never inside AgentConfig, redacted when printed. */
+export class McpToken {
+  readonly #value: string;
+
+  constructor(value: string) {
+    this.#value = value;
+  }
+
+  reveal(): string {
+    return this.#value;
+  }
+
+  toJSON(): string {
+    return '[redacted]';
+  }
+
+  toString(): string {
+    return '[redacted]';
+  }
+}
+
+/** AGENT_MCP_TOKEN from the environment (locally .env; on AgentCore a secret, after S2). */
+export function loadMcpToken(env: Readonly<Record<string, string | undefined>>): Result<McpToken, ErrorEnvelope> {
+  const raw = env['AGENT_MCP_TOKEN']?.trim();
+  if (!raw) return err(toolError('invalid_config', 'AGENT_MCP_TOKEN is not set.'));
+  if (raw.length < MIN_TOKEN_LENGTH) return err(toolError('invalid_config', `AGENT_MCP_TOKEN is shorter than ${String(MIN_TOKEN_LENGTH)} characters.`));
+  return ok(new McpToken(raw));
 }
