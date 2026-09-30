@@ -25,13 +25,15 @@ describe('get_reserve_outlook (the ice cubes)', () => {
       currentLoadW: w.deps.config.outlook.levelLoadW.comfort,
       essentialLoadW: w.deps.guard.reserve.essentialLoadW,
     });
-    expect(o).toEqual({ level: 'comfort', ...hours, origin: snap.value.origin, ts: snap.value.ts });
+    expect(o).toEqual({ level: 'comfort', ...hours, gridAvailable: true, origin: snap.value.origin, ts: snap.value.ts });
   });
 
   it('off grid (the storm) counts down to the hardware floor', async () => {
     const w = world('storm-blackout', 3);
     const r = await reserveOutlook(w.deps, {}, w.ctx);
     expect(r.ok && r.value.hoursAtEssential).toBeGreaterThan(20);
+    // The card switches to the storm theme from this, as it does for a plan (approved in #21).
+    expect(r.ok && r.value.gridAvailable).toBe(false);
   });
 
   it('a battery at the reserve floor on grid has nothing left for comfort', async () => {

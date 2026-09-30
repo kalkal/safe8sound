@@ -18,6 +18,11 @@ export const ReserveOutlookSchema = z
     hoursAtEssential: hours,
     /** The storm reserve alone, at Essential: what the reserve buys when the grid is lost. */
     reserveHoursAtEssential: hours,
+    /**
+     * Whether the grid was up when the hours were counted: false in a storm, when the cards switch to the
+     * storm theme (optional, added 2026-09-30, approved in #21; same meaning as Plan.gridAvailable).
+     */
+    gridAvailable: z.boolean().optional(),
     /** Per field group: simulated data is never shown as live (plan §9.4). */
     origin: DataOriginSchema,
     /** Measurement time of the snapshot behind the hours. */

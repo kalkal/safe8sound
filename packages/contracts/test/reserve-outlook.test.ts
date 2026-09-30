@@ -31,4 +31,10 @@ describe('ReserveOutlookSchema (ice cubes and reserve hours, approved in #21)', 
     expect(ReserveOutlookSchema.safeParse({ ...exampleReserveOutlook(), ts: '15 July' }).success).toBe(false);
     expect(ReserveOutlookSchema.safeParse({ ...exampleReserveOutlook(), batteryWh: 9000 }).success).toBe(false);
   });
+
+  it('may say whether the grid was up, for the storm theme of the card (optional, approved in #21)', () => {
+    expect(ReserveOutlookSchema.parse({ ...exampleReserveOutlook(), gridAvailable: false }).gridAvailable).toBe(false);
+    expect(ReserveOutlookSchema.parse(exampleReserveOutlook()).gridAvailable).toBeUndefined();
+    expect(ReserveOutlookSchema.safeParse({ ...exampleReserveOutlook(), gridAvailable: 'no' }).success).toBe(false);
+  });
 });

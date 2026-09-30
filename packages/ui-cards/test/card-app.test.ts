@@ -105,6 +105,13 @@ describe('isStormState: the card switches to the storm theme only with the grid 
     expect(isStormState({ kind: 'plan', data: { ...hotDayPlan(), gridAvailable: undefined } })).toBe(false);
     expect(isStormState({ kind: 'waiting' })).toBe(false);
   });
+
+  it('is true for the ice cubes counted with the grid down, false with it up or unknown', () => {
+    const outlook = ReserveOutlookSchema.parse(exampleReserveOutlook());
+    expect(isStormState({ kind: 'reserve', data: { ...outlook, gridAvailable: false } })).toBe(true);
+    expect(isStormState({ kind: 'reserve', data: { ...outlook, gridAvailable: true } })).toBe(false);
+    expect(isStormState({ kind: 'reserve', data: outlook })).toBe(false);
+  });
 });
 
 describe('safeTimeZone: a bad zone from the host never blanks the card', () => {

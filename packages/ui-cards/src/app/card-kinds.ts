@@ -40,6 +40,7 @@ export type CardState =
 export function isStormState(state: CardState): boolean {
   if (state.kind === 'plan') return state.data.gridAvailable === false;
   if (state.kind === 'applied') return state.data.plan.gridAvailable === false;
+  if (state.kind === 'reserve') return state.data.gridAvailable === false;
   return false;
 }
 

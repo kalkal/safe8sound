@@ -26,5 +26,5 @@ export async function reserveOutlook(deps: ComfortPlanDeps, _input: Record<strin
     currentLoadW: loads[CURRENT_LEVEL],
     essentialLoadW: loads.essential,
   });
-  return ok({ level: CURRENT_LEVEL, ...hours, origin: snapshot.origin, ts: snapshot.ts });
+  return ok({ level: CURRENT_LEVEL, ...hours, gridAvailable: snapshot.gridAvailable, origin: snapshot.origin, ts: snapshot.ts });
 }
