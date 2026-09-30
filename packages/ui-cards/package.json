@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./cards.css": "./src/cards.css"
+    "./cards.css": "./src/cards.css",
+    "./card-app.js": "./dist/card-app.js"
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",

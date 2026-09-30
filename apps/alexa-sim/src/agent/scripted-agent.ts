@@ -2,6 +2,7 @@ import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reser
 import { z } from 'zod';
 import type { Agent, AgentAnswer } from './agent.js';
 import { SCRIPT_FIXTURES, SCRIPT_FIXTURE_NAMES } from './script-fixtures.js';
+import { refuseAction, scriptedToolCall } from './scripted-tools.js';
 import { StatusFactsSchema, type ToolName } from './wire.js';
 
 const TOOL_NAMES = ['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences'] as const satisfies readonly ToolName[];
@@ -67,6 +68,8 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
   const fallback = options.degraded === true ? script.degradedFallback : script.fallback;
 
   return ok({
+    canCallTools: options.degraded !== true,
+    callTool: (name, args) => Promise.resolve(options.degraded === true ? refuseAction() : scriptedToolCall(name, args, script.status?.ts)),
     ask: (question) => {
       const q = normalise(question);
       const entry = entries.find((e) => e.patterns.some((p) => q.includes(p)));

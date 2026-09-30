@@ -16,7 +16,25 @@ export interface AgentAnswer {
   degradedBy?: ErrorCode;
 }
 
+/** The MCP CallToolResult shape a card receives: tool errors are values (isError + the envelope). */
+// A type alias, not an interface: the SDK's CallToolResult has an index signature.
+export type ToolCallResult = {
+  isError?: boolean;
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent?: Record<string, unknown>;
+};
+
+export const toolErrorResult = (envelope: ErrorEnvelope): ToolCallResult => ({
+  isError: true,
+  content: [{ type: 'text', text: envelope.message }],
+  structuredContent: envelope,
+});
+
 /** The port the UI talks to (plan §9.3): ScriptedAgent, RemoteAgent, or the remote one with a scripted fallback. */
 export interface Agent {
+  /** Whether card actions can run: the host announces serverTools to the cards only then. */
+  readonly canCallTools: boolean;
   ask(question: string, context: AskContext): Promise<Result<AgentAnswer, ErrorEnvelope>>;
+  /** A card action (MCP Apps tools/call through the host), already checked by the host. */
+  callTool(name: string, args: Record<string, unknown>, context: AskContext): Promise<ToolCallResult>;
 }

@@ -11,6 +11,8 @@ export interface CardAppProps {
   state: CardState;
   /** IANA zone from hostContext.timeZone: on an Echo Show at home it is the home's clock. */
   timeZone: string;
+  /** False when the host announces no serverTools: Apply and Save are hidden, and the card says so. */
+  canAct: boolean;
   /** A card action is a tool call through the host (MCP Apps callServerTool). */
   onCallTool: (name: string, args: Record<string, unknown>) => void;
   /** The outcome of the last action (e.g. "Preferences saved." or the error in words). */
@@ -34,7 +36,7 @@ export function CardApp({ notice, ...props }: CardAppProps) {
   );
 }
 
-function CardContent({ state, timeZone, onCallTool }: Omit<CardAppProps, 'notice'>) {
+function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps, 'notice'>) {
   switch (state.kind) {
     case 'waiting':
       return (
@@ -50,10 +52,13 @@ function CardContent({ state, timeZone, onCallTool }: Omit<CardAppProps, 'notice
           <PlanCard
             plan={state.data}
             timeZone={timeZone}
-            onApply={(planId) => {
-              onCallTool('apply_plan', { planId });
-            }}
+            {...(canAct && {
+              onApply: (planId: string) => {
+                onCallTool('apply_plan', { planId });
+              },
+            })}
           />
+          {!canAct && <p className="muted">{t('card.noActions')}</p>}
           <GuardReceipt plan={state.data} />
         </>
       );
@@ -63,12 +68,17 @@ function CardContent({ state, timeZone, onCallTool }: Omit<CardAppProps, 'notice
       return <IceCubesCard outlook={state.data} />;
     case 'preferences':
       return (
-        <PreferencesCard
-          view={state.data}
-          onSave={(change) => {
-            onCallTool('set_preferences', change);
-          }}
-        />
+        <>
+          <PreferencesCard
+            view={state.data}
+            {...(canAct && {
+              onSave: (change: Parameters<typeof onCallTool>[1]) => {
+                onCallTool('set_preferences', change);
+              },
+            })}
+          />
+          {!canAct && <p className="muted">{t('card.noActions')}</p>}
+        </>
       );
   }
 }

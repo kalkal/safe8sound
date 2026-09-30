@@ -1,5 +1,5 @@
 import { ProblemDetailsSchema, categoryOf, err, isRetryableCategory, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
-import type { Agent, AgentAnswer } from './agent.js';
+import { toolErrorResult, type Agent, type AgentAnswer } from './agent.js';
 import { TurnReplySchema, readCards } from './wire.js';
 
 export interface RemoteAgentConfig {
@@ -15,6 +15,10 @@ export function createRemoteAgent(config: RemoteAgentConfig): Agent {
   const url = `${config.baseUrl.replace(/\/$/, '')}/v1/turns`;
 
   return {
+    // Card actions are hidden in this mode until sim-api runs them (#55); the refusal is a safety net.
+    canCallTools: false,
+    // TODO(sim-api, #55): POST the card's tool call once sim-api has a tools endpoint. Until then an honest refusal.
+    callTool: () => Promise.resolve(toolErrorResult(toolError('agent_unavailable', "Card actions don't reach the assistant yet: say it instead."))),
     ask: async (question, context) => {
       const timeout = AbortSignal.timeout(config.timeoutMs);
       const signal = context.signal ? AbortSignal.any([timeout, context.signal]) : timeout;

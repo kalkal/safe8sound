@@ -1,7 +1,6 @@
 import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMachine } from '@xstate/react';
-import type { DataOriginValue } from '@cold-reserve/contracts';
 import { useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { fromPromise } from 'xstate';
 import type { Agent, AgentAnswer } from '../agent/index.js';
@@ -16,11 +15,9 @@ export interface ConversationProps {
   agent: Agent;
   turnBudgetMs: number;
   timeZone: string;
-  /** The home's data origin when the agent cannot say it itself (the ScriptedAgent is always simulated). */
-  origin?: DataOriginValue;
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone, origin }: ConversationProps) {
+export function Conversation({ agent, turnBudgetMs, timeZone }: ConversationProps) {
   const queryClient = useQueryClient();
   // The machine owns the flow; the answer itself stays in the query cache (plan §9.4).
   const machine = useMemo(
@@ -51,11 +48,6 @@ export function Conversation({ agent, turnBudgetMs, timeZone, origin }: Conversa
     inputRef.current?.focus();
   };
 
-  // A card action (Apply, Not now) is the same as saying it: it becomes the next turn.
-  const ask = (text: string) => {
-    sendAndRefocus({ type: 'TEXT_SUBMITTED', text, turnId: crypto.randomUUID() });
-  };
-
   const onSubmit = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     send({ type: 'TEXT_SUBMITTED', text: draft, turnId: crypto.randomUUID() });
@@ -83,7 +75,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone, origin }: Conversa
         )}
         {/* Status and alert announce themselves; the answer needs a live region that exists before it appears. */}
         <div aria-live="polite">
-          {snapshot.matches('showingAnswer') && turn.data?.ok === true && <AnswerCard answer={turn.data.value} timeZone={timeZone} onAsk={ask} {...(origin !== undefined && { origin })} />}
+          {snapshot.matches('showingAnswer') && turn.data?.ok === true && <AnswerCard answer={turn.data.value} timeZone={timeZone} />}
         </div>
         {snapshot.matches('failed') && error !== null && (
           <div className="failure" role="alert">

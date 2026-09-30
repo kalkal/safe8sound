@@ -1,4 +1,3 @@
-import type { DataOriginValue } from '@cold-reserve/contracts';
 import { homeClock } from '@cold-reserve/ui-cards';
 import type { AgentAnswer } from '../agent/index.js';
 import { OriginBadge } from './OriginBadge.js';
@@ -8,11 +7,9 @@ import { ToolCards } from './ToolCards.js';
 export interface AnswerCardProps {
   answer: AgentAnswer;
   timeZone: string;
-  origin?: DataOriginValue;
-  onAsk: (text: string) => void;
 }
 
-export function AnswerCard({ answer, timeZone, origin, onAsk }: AnswerCardProps) {
+export function AnswerCard({ answer, timeZone }: AnswerCardProps) {
   const { status } = answer;
   return (
     <article className="answer" data-testid="answer">
@@ -36,7 +33,7 @@ export function AnswerCard({ answer, timeZone, origin, onAsk }: AnswerCardProps)
           </div>
         </dl>
       )}
-      {answer.cards !== undefined && <ToolCards cards={answer.cards} timeZone={timeZone} onAsk={onAsk} {...(origin !== undefined && { origin })} />}
+      {answer.cards !== undefined && <ToolCards cards={answer.cards} />}
     </article>
   );
 }

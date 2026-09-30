@@ -7,6 +7,9 @@ const DEGRADE_ON: ReadonlySet<ErrorCategory> = new Set(['dependency_unavailable'
 
 export function withScriptedFallback(primary: Agent, scripted: Agent): Agent {
   return {
+    canCallTools: primary.canCallTools,
+    // Actions never fall back to the script: a scripted success would claim what did not happen.
+    callTool: (name, args, context) => primary.callTool(name, args, context),
     ask: async (question, context) => {
       const result = await primary.ask(question, context);
       if (result.ok || !DEGRADE_ON.has(result.error.category)) return result;

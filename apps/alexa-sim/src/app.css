@@ -212,3 +212,16 @@
     color: var(--text-primary);
   }
 }
+
+@layer surfaces {
+  /* A ui:// card frame: full width, height from the card (MCP Apps size change), no border of its own. */
+  .card-frame {
+    display: block;
+    inline-size: 100%;
+    border: 0;
+  }
+
+  .theme-toggle {
+    justify-self: end;
+  }
+}

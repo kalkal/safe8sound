@@ -3,13 +3,16 @@ import { describe, expect, it } from 'vitest';
 import type { Agent } from '../src/agent/agent.js';
 import { withScriptedFallback } from '../src/agent/fallback-agent.js';
 
-const scripted: Agent = { ask: () => Promise.resolve(ok({ text: 'Scripted answer.' })) };
-const failing = (code: ErrorCode): Agent => ({ ask: () => Promise.resolve(err(toolError(code, 'Failed.'))) });
+// These agents only answer; tool calls are covered in agent-tools.test.ts.
+const noTool = () => Promise.reject(new Error('not used here'));
+
+const scripted: Agent = { canCallTools: false, callTool: noTool, ask: () => Promise.resolve(ok({ text: 'Scripted answer.' })) };
+const failing = (code: ErrorCode): Agent => ({ canCallTools: false, callTool: noTool, ask: () => Promise.resolve(err(toolError(code, 'Failed.'))) });
 const ctx = { correlationId: 'c' };
 
 describe('degraded mode: RemoteAgent down → scripted answer + notice (error-handling §5)', () => {
   it('passes a remote answer through untouched', async () => {
-    const remote: Agent = { ask: () => Promise.resolve(ok({ text: 'Remote answer.' })) };
+    const remote: Agent = { canCallTools: false, callTool: noTool, ask: () => Promise.resolve(ok({ text: 'Remote answer.' })) };
     expect(await withScriptedFallback(remote, scripted).ask('q', ctx)).toEqual(ok({ text: 'Remote answer.' }));
   });
 
@@ -26,7 +29,7 @@ describe('degraded mode: RemoteAgent down → scripted answer + notice (error-ha
   });
 
   it('never passes cards from the script through the degraded mode', async () => {
-    const withCard: Agent = { ask: () => Promise.resolve(ok({ text: 'Scripted.', cards: [{ tool: 'invalid' as const }] })) };
+    const withCard: Agent = { canCallTools: false, callTool: noTool, ask: () => Promise.resolve(ok({ text: 'Scripted.', cards: [{ tool: 'invalid' as const }] })) };
     const result = await withScriptedFallback(failing('agent_unavailable'), withCard).ask('q', ctx);
     expect(result).toEqual(ok({ text: 'Scripted.', degradedBy: 'agent_unavailable' }));
   });

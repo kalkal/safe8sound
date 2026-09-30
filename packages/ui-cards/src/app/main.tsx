@@ -47,6 +47,7 @@ function Card({ kind }: { kind: CardKind }) {
     <CardApp
       state={state}
       timeZone={safeTimeZone(context.timeZone)}
+      canAct={app?.getHostCapabilities()?.serverTools !== undefined}
       {...(notice !== undefined && { notice })}
       onCallTool={(name, args) => {
         void app

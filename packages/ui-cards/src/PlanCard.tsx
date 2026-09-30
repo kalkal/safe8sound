@@ -16,7 +16,8 @@ export interface PlanCardProps {
 /** The hot-day plan (screen S1/plan, Signature mockup): estimate first, then the ribbon and the charge line. */
 export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }: PlanCardProps) {
   // The guard never modifies a plan: a rejected one can be read, never applied.
-  const applicable = plan.status === 'proposed' && plan.guarantees.every((g) => g.ok);
+  // Apply only when the host can run it (onApply given), the plan is proposed and every guarantee passes.
+  const applicable = onApply !== undefined && plan.status === 'proposed' && plan.guarantees.every((g) => g.ok);
   return (
     <CardShell title={t('plan.title')} origin={isSimulated(plan) ? 'simulated' : 'live'}>
       <div className="plan-hero">
@@ -38,7 +39,13 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
       {applicable && (
         <div className="plan-actions">
           <p className="muted">{t('plan.validUntil', { time: homeClock(plan.expiresAt, timeZone) })}</p>
-          <button type="button" className="button-primary" onClick={() => onApply?.(plan.id)}>
+          <button
+            type="button"
+            className="button-primary"
+            onClick={() => {
+              onApply(plan.id);
+            }}
+          >
             {t('plan.apply')}
           </button>
           <button type="button" className="button-secondary" onClick={() => onDismiss?.()}>

@@ -9,9 +9,9 @@ import { advisoryPlan, hotDayPlan } from '../src/fixtures.js';
 
 afterEach(cleanup);
 
-const show = (state: CardState, notice?: { ok: boolean; text: string }) => {
+const show = (state: CardState, notice?: { ok: boolean; text: string }, canAct = true) => {
   const onCallTool = vi.fn();
-  render(<CardApp state={state} timeZone="Europe/Rome" onCallTool={onCallTool} {...(notice !== undefined && { notice })} />);
+  render(<CardApp state={state} timeZone="Europe/Rome" canAct={canAct} onCallTool={onCallTool} {...(notice !== undefined && { notice })} />);
   return onCallTool;
 };
 
@@ -68,5 +68,15 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     const broken = { ...hotDayPlan(), steps: null } as unknown as ReturnType<typeof hotDayPlan>;
     show({ kind: 'plan', data: broken });
     expect(screen.getByRole('alert').textContent).toBe('This card could not be shown.');
+  });
+
+  it('offers no Apply or Save when the host cannot run card actions, and says so', () => {
+    show({ kind: 'plan', data: hotDayPlan() }, undefined, false);
+    expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();
+    expect(screen.getByText('Card actions are not available here: say it instead.')).toBeTruthy();
+    cleanup();
+    const view = { preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };
+    show({ kind: 'preferences', data: view }, undefined, false);
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
   });
 });

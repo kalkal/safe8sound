@@ -12,8 +12,15 @@ module.exports = {
     {
       name: 'not-to-unresolvable',
       severity: 'error',
-      from: {},
+      from: { pathNot: '^apps/alexa-sim/src/host/card-documents\\.ts$' },
       to: { couldNotResolve: true },
+    },
+    {
+      name: 'card-documents-raw-imports-only',
+      severity: 'error',
+      comment: 'The ui:// card documents inline the built card bundle and the CSS through Vite ?raw imports, which Vite resolves, not the cruiser.',
+      from: { path: '^apps/alexa-sim/src/host/card-documents\\.ts$' },
+      to: { couldNotResolve: true, pathNot: '^@cold-reserve/(ui-cards|design-tokens)/[a-z0-9.-]+\\?raw$' },
     },
     {
       name: 'contracts-is-a-leaf',
