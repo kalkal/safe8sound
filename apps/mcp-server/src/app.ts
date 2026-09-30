@@ -4,6 +4,8 @@ import { FallbackSource } from '@cold-reserve/source-fallback';
 import { SCENARIO_IDS, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
 import { loadConfig, type ServerConfig } from './config.js';
 import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
+import type { ComfortPlanWiring } from './comfort-plan-config.js';
+import { comfortPlanModule } from './modules/comfort-plan/index.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
 
@@ -15,6 +17,8 @@ export interface AppOptions {
   readonly modules?: readonly CapabilityModule[];
   /** Tests only: replace a home's data source (fault injection). */
   readonly sourceOverride?: (homeId: HomeId) => HomeDataSource | undefined;
+  /** The comfort-plan module (#19): store, preferences, configs; registered over the same homes. */
+  readonly comfortPlan?: ComfortPlanWiring;
 }
 
 export interface App {
@@ -66,20 +70,38 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const demo = demoProfile();
   const home = HomeProfileSchema.parse({ ...demo, homeId: HOME });
   const simulator = (profile: typeof demo) => new SimulatorSource({ profile, scenario, params, clock });
+  const demoSim = simulator(demo);
+  const homeSim = simulator(home);
   const homes = new Map<HomeId, HomeEntry>([
-    [DEMO, { source: simulator(demo), profile: demo, readOnly: false, levelSince }],
-    [HOME, { source: new FallbackSource({ primary: noLiveHome, fallback: simulator(home), clock }), profile: home, readOnly: true, levelSince }],
+    [DEMO, { source: demoSim, profile: demo, readOnly: false, levelSince }],
+    [HOME, { source: new FallbackSource({ primary: noLiveHome, fallback: homeSim, clock }), profile: home, readOnly: true, levelSince }],
   ]);
+  // TODO(#15): the cached Open-Meteo forecast; until then every home plans on the scenario weather.
+  const forecasts = new Map<HomeId, () => ReturnType<SimulatorSource['forecast']>>([
+    [DEMO, () => demoSim.forecast()],
+    [HOME, () => homeSim.forecast()],
+  ]);
+  const homeFor = (homeId: HomeId) => {
+    const entry = homes.get(homeId);
+    const override = opts.sourceOverride?.(homeId);
+    return entry && override ? { ...entry, source: override } : entry;
+  };
 
   const registry = createRegistry([
-    energyStatusModule({
-      homes: (homeId) => {
-        const entry = homes.get(homeId);
-        const override = opts.sourceOverride?.(homeId);
-        return entry && override ? { ...entry, source: override } : entry;
-      },
-      deriver: interimStatusDeriver,
-    }),
+    energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver }),
+    ...(opts.comfortPlan === undefined
+      ? []
+      : [
+          comfortPlanModule({
+            ...opts.comfortPlan,
+            model: params,
+            homes: (homeId) => {
+              const entry = homeFor(homeId);
+              const forecast = forecasts.get(homeId);
+              return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly } : undefined;
+            },
+          }),
+        ]),
     ...(opts.modules ?? []),
   ]);
   if (!registry.ok) return registry;

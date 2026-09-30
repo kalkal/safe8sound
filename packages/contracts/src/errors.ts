@@ -49,6 +49,8 @@ export const ERROR_CATALOG = {
   signature_expired: { category: 'unauthorized' },
   origin_not_allowed: { category: 'forbidden' },
   demo_disabled: { category: 'forbidden' },
+  // A plan built on simulated data is never applied to the real home (plan §9.4, approved in #19).
+  simulated_plan_on_real_home: { category: 'forbidden' },
   // conflict: idempotent success, return the original outcome
   plan_already_applied: { category: 'conflict' },
   // dependency_unavailable: transient, retry with backoff then degrade

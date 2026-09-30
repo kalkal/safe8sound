@@ -12,6 +12,7 @@ export * from './snapshot.js';
 export * from './counterfactual.js';
 export * from './night-recovery.js';
 export * from './plan.js';
+export * from './comfort-plan.js';
 export * from './preferences.js';
 export * from './home-status.js';
 export * from './reserve-outlook.js';

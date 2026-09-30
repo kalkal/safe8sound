@@ -155,7 +155,8 @@ export function dutyCycle(step: PlanStep, opts: { onMinutes: number; periodMinut
   const steps: PlanStep[] = [];
   for (let ms = opts.fromMs; ms < opts.toMs; ms += period) {
     steps.push({ ...step, ts: new Date(ms).toISOString() });
-    steps.push({ ...step, ts: new Date(ms + opts.onMinutes * 60_000).toISOString(), hvacMode: 'fan_only', fanOn: true });
+    const offMs = ms + opts.onMinutes * 60_000;
+    if (offMs < opts.toMs) steps.push({ ...step, ts: new Date(offMs).toISOString(), hvacMode: 'fan_only', fanOn: true });
   }
   return steps;
 }

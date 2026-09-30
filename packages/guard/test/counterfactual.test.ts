@@ -37,6 +37,11 @@ describe('counterfactualOf (feature queue item 2)', () => {
     }
   });
 
+  it('is left out outside the cooling season (its lines measure heat and night cooling)', () => {
+    expect(counterfactualOf(input({ season: 'heating' }))).toBeUndefined();
+    expect(counterfactualOf(input({ season: 'neutral' }))).toBeUndefined();
+  });
+
   it('is undefined when the safe room has no reading', () => {
     const s = snapshot();
     expect(counterfactualOf(input({ snapshot: { ...s, rooms: s.rooms.filter((r) => r.id !== 'bedroom-1') } }))).toBeUndefined();

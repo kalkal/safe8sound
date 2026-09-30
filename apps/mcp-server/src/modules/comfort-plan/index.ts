@@ -1,0 +1,60 @@
+import { ApplyPlanInputSchema, ApplyPlanOutputSchema, PlanComfortInputSchema, PlanSchema, ReserveOutlookInputSchema, ReserveOutlookSchema } from '@cold-reserve/contracts';
+import type { CapabilityModule } from '../../registry.js';
+import { defineTool } from '../../tool.js';
+import { applyPlan } from './apply-plan.js';
+import type { ComfortPlanDeps } from './deps.js';
+import { planComfort } from './plan-comfort.js';
+import { reserveOutlook } from './reserve-outlook.js';
+import { applySummary, outlookSummary, planSummary } from './summaries.js';
+
+export { parseComfortPlanConfig, type ComfortPlanConfig } from './config.js';
+export type { ComfortHome, ComfortPlanDeps } from './deps.js';
+
+// `comfort-plan` capability module (plan §14.1, issue #19): propose a plan the guard accepts, apply it in
+// a second step, and count the reserve in hours. On only for the homes the server knows.
+
+export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
+  return {
+    id: 'comfort-plan',
+    enabledFor: (homeId) => deps.homes(homeId) !== undefined,
+    tools: [
+      defineTool({
+        name: 'plan_comfort',
+        title: 'Plan comfort',
+        description:
+          'Proposes a comfort plan for the coming hours (cool, heat, dry or auto) that the guard accepts: the five guarantees, ' +
+          'the level ladder, the night recovery of the safe room and what would happen without the plan. Nothing changes in the home: ' +
+          'confirm it with apply_plan. You may propose a setpoint and rooms; the guard then checks exactly that, and a refusal says why ' +
+          'and what would be allowed.',
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+        input: PlanComfortInputSchema,
+        output: PlanSchema,
+        summarize: planSummary,
+        handler: (args, ctx) => planComfort(deps, args, ctx),
+      }),
+      defineTool({
+        name: 'apply_plan',
+        title: 'Apply plan',
+        description:
+          'Applies a proposed plan by its planId after the person confirmed it. The guard checks it again on the current state. ' +
+          'Safe to retry: a plan already applied returns the same outcome. On the real home it is advice with manual steps.',
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        input: ApplyPlanInputSchema,
+        output: ApplyPlanOutputSchema,
+        summarize: applySummary,
+        handler: (args, ctx) => applyPlan(deps, args, ctx),
+      }),
+      defineTool({
+        name: 'get_reserve_outlook',
+        title: 'Reserve outlook',
+        description:
+          'The battery counted in hours: at the current level, the same energy at Essential, and what the storm reserve alone would give.',
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        input: ReserveOutlookInputSchema,
+        output: ReserveOutlookSchema,
+        summarize: outlookSummary,
+        handler: (_args, ctx) => reserveOutlook(deps, {}, ctx),
+      }),
+    ],
+  };
+}

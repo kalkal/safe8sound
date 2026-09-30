@@ -65,6 +65,11 @@ export const PlanSchema = z
     advisoryOnly: z.boolean(),
     /** Night recovery of the safe room, when the plan covers part of a night (optional, added 2026-09-29). */
     nightRecovery: NightRecoverySchema.optional(),
+    /**
+     * The guard's SOC floor for the storm reserve: with the grid up the battery never goes below it. Same axis as
+     * `steps[].batteryTargetSocPct`, for the reserve line of the plan card (optional, added 2026-09-30, approved in #19).
+     */
+    reserveFloorSocPct: PctSchema.optional(),
     /** The same scenario with no plan and with the naive plan, in the safe room (optional, added 2026-09-29). */
     counterfactual: CounterfactualSchema.optional(),
     /** What must be said even though the plan is accepted (optional, added 2026-09-29). */

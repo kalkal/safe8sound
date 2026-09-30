@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "planTtlMinutes": 10,
+  "elderlyRoles": [
+    "grandpa",
+    "grandma"
+  ],
+  "planner": {
+    "levelOffsetK": {
+      "comfort": 0,
+      "balanced": 1,
+      "saver": 2
+    },
+    "essentialMarginK": 0.5,
+    "dryAboveRhPct": 60,
+    "targetEveryMinutes": 60,
+    "dutyCycles": [
+      {
+        "onMinutes": 40,
+        "periodMinutes": 60
+      },
+      {
+        "onMinutes": 20,
+        "periodMinutes": 40
+      },
+      {
+        "onMinutes": 10,
+        "periodMinutes": 30
+      },
+      {
+        "onMinutes": 8,
+        "periodMinutes": 30
+      },
+      {
+        "onMinutes": 5,
+        "periodMinutes": 20
+      }
+    ]
+  },
+  "outlook": {
+    "$comment": "Average load at each level for the ice cubes (assumption, to calibrate on the plant); Essential comes from the guard config (reserve.essentialLoadW).",
+    "levelLoadW": {
+      "comfort": 1200,
+      "balanced": 900,
+      "saver": 650
+    }
+  }
+}

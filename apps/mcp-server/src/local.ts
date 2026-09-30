@@ -1,6 +1,7 @@
 import type { ErrorEnvelope, Result } from '@cold-reserve/contracts';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { createApp } from './app.js';
+import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules } from './compose.js';
 import { startNodeServer } from './node-server.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
@@ -20,10 +21,10 @@ function orExit<T>(result: Result<T, ErrorEnvelope>): T {
 
 const wallClock = { now: Date.now };
 const preferences = orExit(loadPreferencesConfig(preferencesConfigFile()));
-const modules = orExit(
-  composeModules({ preferences, storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wallClock }), clock: wallClock }),
-);
-const app = orExit(createApp(process.env, { wallClock, logger: { log }, modules }));
+const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wallClock });
+const modules = orExit(composeModules({ preferences, storeFor, clock: wallClock }));
+const comfortPlan = orExit(comfortPlanWiring({ storeFor, preferences, clock: wallClock }));
+const app = orExit(createApp(process.env, { wallClock, logger: { log }, modules, comfortPlan }));
 
 const server = await startNodeServer(app.handler, { host: '127.0.0.1', port: Number(process.env['PORT'] ?? 3316), path: app.config.path, maxBodyBytes: app.config.maxBodyBytes });
 console.log(JSON.stringify({ level: 'info', component: 'mcp-server', message: `listening on ${server.url}` }));

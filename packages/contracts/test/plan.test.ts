@@ -61,4 +61,10 @@ describe('PlanSchema', () => {
     expect(plan.forecastConfidence).toBe('high');
     expect(plan.sourceOrigin.energy).toBe('simulated');
   });
+
+  it('may carry the reserve floor as a SOC percentage (optional, 0-100)', () => {
+    expect(PlanSchema.parse({ ...examplePlan(), reserveFloorSocPct: 49.1 }).reserveFloorSocPct).toBe(49.1);
+    expect(PlanSchema.safeParse({ ...examplePlan(), reserveFloorSocPct: 101 }).success).toBe(false);
+    expect(PlanSchema.parse(examplePlan()).reserveFloorSocPct).toBeUndefined();
+  });
 });

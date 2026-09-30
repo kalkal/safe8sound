@@ -1,0 +1,81 @@
+import { HomeIdSchema, PreferencesSchema, ok, type Forecast, type HomeId, type Snapshot } from '@cold-reserve/contracts';
+import { examplePreferences } from '@cold-reserve/contracts/fixtures';
+import { fixedClock, type Clock } from '@cold-reserve/core';
+import { parseGuardConfig } from '@cold-reserve/guard';
+import rawGuardConfig from '@cold-reserve/guard/config/guard.json' with { type: 'json' };
+import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
+import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
+import rawComfortConfig from '../../config/comfort-plan.json' with { type: 'json' };
+import { parseComfortPlanConfig } from '../../src/modules/comfort-plan/config.js';
+import type { ComfortPlanDeps } from '../../src/modules/comfort-plan/deps.js';
+import type { ToolContext } from '../../src/tool.js';
+
+// Shared inputs for the comfort-plan tests: the seeded simulator at a scenario hour, a settable wall
+// clock for the store (plan expiry), F5's in-memory StateStore, and the shipped configs.
+
+export const H = 3_600_000;
+export const MIN = 60_000;
+export const DEMO = HomeIdSchema.parse('demo');
+export const REAL = HomeIdSchema.parse('home');
+
+export function settableClock(ms: number): Clock & { set(ms: number): void } {
+  let now = ms;
+  return { now: () => now, set: (m: number) => (now = m) };
+}
+
+export const preferences = PreferencesSchema.parse({ ...examplePreferences(), roomPriority: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
+
+export function guardConfig() {
+  const c = parseGuardConfig(rawGuardConfig);
+  if (!c.ok) throw new Error(c.error.message);
+  return c.value;
+}
+
+export function comfortConfig() {
+  const c = parseComfortPlanConfig(rawComfortConfig);
+  if (!c.ok) throw new Error(c.error.message);
+  return c.value;
+}
+
+/** A simulator scenario at hour `atH`, with every dependency of the module. */
+export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast } = {}) {
+  const profile = demoProfile();
+  const scenario = builtInScenario(id);
+  const startMs = Date.parse(scenario.startAt);
+  const scenarioMs = startMs + atH * H;
+  const clock = settableClock(Date.parse('2026-09-30T10:00:00Z'));
+  const sim = new SimulatorSource({ profile, scenario, params: defaultSimParams(), clock: fixedClock(scenarioMs) });
+  const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock });
+  const homeId = over.homeId ?? DEMO;
+  let snapshotOf = (h: HomeId): Snapshot => {
+    const s = { ...sim.snapshotAt(scenarioMs), homeId: h };
+    return over.snapshot ? over.snapshot(s) : s;
+  };
+  let n = 0;
+  const deps: ComfortPlanDeps = {
+    homes: (h) =>
+      h === homeId
+        ? {
+            source: { snapshot: () => Promise.resolve(ok(snapshotOf(h))) },
+            forecast: () => (over.forecast ? over.forecast(sim.forecast()) : sim.forecast()),
+            profile: { ...profile, homeId: h },
+            readOnly: over.readOnly ?? false,
+          }
+        : undefined,
+    storeFor,
+    preferencesFor: () => Promise.resolve(ok(preferences)),
+    clock,
+    model: defaultSimParams(),
+    guard: guardConfig(),
+    config: comfortConfig(),
+    newPlanId: () => `plan_test_${String(++n).padStart(4, '0')}`,
+  };
+  const ctx: ToolContext = { correlationId: 'test-correlation', clientId: 'test', homeId };
+  const store = storeFor(homeId);
+  /** Replace the snapshot the home returns from now on (the state changed meanwhile). */
+  const setSnapshot = (f: (s: Snapshot) => Snapshot) => {
+    const before = snapshotOf;
+    snapshotOf = (h) => f(before(h));
+  };
+  return { deps, ctx, store, clock, profile, setSnapshot };
+}

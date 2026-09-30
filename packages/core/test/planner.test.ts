@@ -182,6 +182,16 @@ describe('dutyCycle (pacing inside the hour)', () => {
   it('is the plain setting when it runs the whole period', () => {
     expect(dutyCycle(on, { onMinutes: 60, periodMinutes: 60, fromMs: T0, toMs: T0 + 2 * H })).toEqual([on]);
   });
+
+  it('never adds a fan-only step at or after the end (boundary)', () => {
+    // The last period starts at T0 + 1 h; its fan step would fall exactly on the end.
+    const steps = dutyCycle(on, { onMinutes: 20, periodMinutes: 60, fromMs: T0, toMs: T0 + H + 20 * 60_000 });
+    expect(steps.map((s) => [(Date.parse(s.ts) - T0) / 60_000, s.hvacMode])).toEqual([
+      [0, 'dry'],
+      [20, 'fan_only'],
+      [60, 'dry'],
+    ]);
+  });
 });
 
 describe('planner details', () => {

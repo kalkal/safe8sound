@@ -32,6 +32,29 @@ export function hoursAtLoad(battery: BatterySpec, socPct: Pct, loadW: number, fl
 }
 
 /**
+ * The reserve counted in hours (ReserveOutlook, the ice cubes; semantics agreed in #21). Both level hours
+ * use the same energy: on grid only what comfort may spend (above the reserve floor), off grid everything
+ * down to the hardware floor, as the guard does. The reserve alone is its energy after the losses over the
+ * essential load; on grid it can exceed the spendable hours, so there is no invariant between them.
+ */
+export function reserveOutlookHours(input: {
+  battery: BatterySpec;
+  socPct: Pct;
+  gridAvailable: boolean;
+  reserveFloorSocPct: Pct;
+  reserveWh: number;
+  currentLoadW: number;
+  essentialLoadW: number;
+}): { hoursAtCurrentLevel: number; hoursAtEssential: number; reserveHoursAtEssential: number } {
+  const energy = input.gridAvailable ? usableWh(input.battery, input.socPct, input.reserveFloorSocPct) : usableWh(input.battery, input.socPct);
+  return {
+    hoursAtCurrentLevel: energy / input.currentLoadW,
+    hoursAtEssential: energy / input.essentialLoadW,
+    reserveHoursAtEssential: (input.reserveWh * input.battery.roundTripEff) / input.essentialLoadW,
+  };
+}
+
+/**
  * The same battery with a higher discharge floor (the inverter's backup reserve): the capacity per
  * percent stays the same, only the usable span shrinks. The floor never goes below the hardware one.
  */

@@ -1,0 +1,119 @@
+import { ApplyPlanOutputSchema, ErrorEnvelopeSchema, PlanSchema, ReserveOutlookSchema } from '@cold-reserve/contracts';
+import { fixedClock } from '@cold-reserve/core';
+import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { describe, expect, it } from 'vitest';
+import { createApp } from '../../src/app.js';
+import { comfortPlanWiring } from '../../src/comfort-plan-config.js';
+import { startNodeServer } from '../../src/node-server.js';
+import { loadPreferencesConfig, preferencesConfigFile } from '../../src/preferences-config.js';
+import { HOME_TOKEN, TOKEN } from '../helpers.js';
+
+// The hot-day and storm flows end to end: the official SDK client over real HTTP, the production
+// registry with the comfort-plan module, the seeded simulator and F5's in-memory store. Model turns are
+// scripted.
+
+const textOf = (r: Record<string, unknown>): string => (r['content'] as { type: string; text: string }[] | undefined)?.[0]?.text ?? '';
+
+const wall = fixedClock(Date.parse('2026-09-30T10:00:00Z'));
+
+async function withServer<T>(env: Record<string, string>, run: (call: (token: string, name: string, args: Record<string, unknown>) => Promise<Awaited<ReturnType<Client['callTool']>>>) => Promise<T>): Promise<T> {
+  const preferences = loadPreferencesConfig(preferencesConfigFile());
+  if (!preferences.ok) throw new Error(preferences.error.message);
+  const comfortPlan = comfortPlanWiring({ storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wall }), preferences: preferences.value, clock: wall });
+  if (!comfortPlan.ok) throw new Error(comfortPlan.error.message);
+  const app = createApp({ MCP_CLIENTS: `agent@demo=${TOKEN},video@home=${HOME_TOKEN}`, ...env }, { wallClock: wall, logger: { log: () => undefined }, comfortPlan: comfortPlan.value });
+  if (!app.ok) throw new Error(app.error.message);
+  const server = await startNodeServer(app.value.handler, { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: app.value.config.maxBodyBytes });
+  const clients: Client[] = [];
+  const call = async (token: string, name: string, args: Record<string, unknown>) => {
+    const client = new Client({ name: 'e2e-comfort', version: '0.0.0' });
+    clients.push(client);
+    const transport = new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers: { authorization: `Bearer ${token}` } } });
+    // SDK v1 types do not satisfy exactOptionalPropertyTypes (sessionId?: string vs undefined).
+    await client.connect(transport as unknown as Transport);
+    await client.listTools(); // loads the output validators, as a real agent would
+    return client.callTool({ name, arguments: args });
+  };
+  try {
+    return await run(call);
+  } finally {
+    for (const c of clients) await c.close();
+    await server.close();
+  }
+}
+
+describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confirm, retry', () => {
+  it('runs the whole flow through MCP', async () => {
+    await withServer({ MCP_SCENARIO: 'heatwave', MCP_SCENARIO_START_H: '14' }, async (call) => {
+      // 1. The model proposes "every room at 22 °C": the guard refuses it and says why.
+      const greedy = await call(TOKEN, 'plan_comfort', { goal: 'cool', setpointC: 22, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
+      expect(greedy.isError).toBe(true);
+      expect((greedy.content as { type: string; text: string }[])[0]?.text).toMatch(/Nearest allowed: 6000 W\.$/);
+      expect(ErrorEnvelopeSchema.parse(greedy.structuredContent)).toMatchObject({
+        code: 'inverter_limit_exceeded',
+        category: 'guard_rejection',
+        details: { guarantee: 'inverter_limit', nearestAllowed: 6000, unit: 'W' },
+      });
+
+      // 2. It asks the planner instead: the most comfortable plan the guard accepts.
+      const proposed = await call(TOKEN, 'plan_comfort', { goal: 'cool' });
+      expect(proposed.isError).toBeFalsy();
+      const plan = PlanSchema.parse(proposed.structuredContent);
+      expect(plan.guarantees.every((g) => g.ok)).toBe(true);
+      // What the agent actually reads: the text content, with the facts it may say.
+      const text = textOf(proposed);
+      expect(text).toContain(plan.id);
+      expect(text).toContain('storm_reserve holds');
+      expect(text).toMatch(/Without the plan the safe room \(bedroom-1\) would peak at \d+(\.\d)? °C/);
+      expect(text).toContain('simulated data');
+      expect(text).toMatch(/What it does: bedroom-1: (cool|dry) at \d+(\.\d)? °C/);
+      expect(plan.counterfactual?.scenarios.noPlan.peakTempC).toBeGreaterThan(plan.counterfactual?.scenarios.plan.peakTempC ?? Infinity);
+
+      // 3. The person confirms; the agent retries after a timeout: one application only.
+      const first = await call(TOKEN, 'apply_plan', { planId: plan.id });
+      const again = await call(TOKEN, 'apply_plan', { planId: plan.id });
+      const applied = ApplyPlanOutputSchema.parse(first.structuredContent);
+      const retried = ApplyPlanOutputSchema.parse(again.structuredContent);
+      expect([applied.alreadyApplied, retried.alreadyApplied]).toEqual([false, true]);
+      expect(retried.plan).toEqual(applied.plan);
+      expect(textOf(first)).toBe(`Plan ${plan.id} applied.`);
+      expect(textOf(again)).toBe(`Plan ${plan.id} was already applied.`);
+
+      // 4. The ice cubes.
+      const ice = await call(TOKEN, 'get_reserve_outlook', {});
+      const outlook = ReserveOutlookSchema.parse(ice.structuredContent);
+      expect(outlook.hoursAtEssential).toBeGreaterThanOrEqual(outlook.hoursAtCurrentLevel);
+      expect(textOf(ice)).toContain(`about ${outlook.hoursAtCurrentLevel.toFixed(1)} hours at ${outlook.level} level, or ${outlook.hoursAtEssential.toFixed(1)} hours at essential`);
+      expect(textOf(ice)).toContain('simulated data');
+    });
+  });
+
+  it('the real home never applies a plan built on simulated data', async () => {
+    await withServer({ MCP_SCENARIO: 'heatwave', MCP_SCENARIO_START_H: '14' }, async (call) => {
+      const plan = PlanSchema.parse((await call(HOME_TOKEN, 'plan_comfort', { goal: 'cool' })).structuredContent);
+      expect(plan.advisoryOnly).toBe(true);
+      const refused = await call(HOME_TOKEN, 'apply_plan', { planId: plan.id });
+      expect(refused.isError).toBe(true);
+      expect(ErrorEnvelopeSchema.parse(refused.structuredContent)).toMatchObject({ code: 'simulated_plan_on_real_home', category: 'forbidden' });
+    });
+  });
+});
+
+describe('storm (the grid is down at 15:00)', () => {
+  it('proposes a paced plan whose energy lasts until the recharge, where the naive one runs out', async () => {
+    await withServer({ MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '3' }, async (call) => {
+      const r = await call(TOKEN, 'plan_comfort', { goal: 'cool' });
+      expect(r.isError).toBeFalsy();
+      const plan = PlanSchema.parse(r.structuredContent);
+      expect(plan.guarantees.find((g) => g.id === 'pacing_on_track')?.ok).toBe(true);
+      expect(plan.guarantees.find((g) => g.id === 'storm_reserve')?.reason).toMatch(/grid is down/);
+      const c = plan.counterfactual;
+      // The naive plan (the scenario's own dry 27 °C) empties the battery: its peak comes late in the night.
+      expect(Date.parse(c?.scenarios.naive.peakAt ?? '')).toBeGreaterThan(Date.parse('2026-07-17T20:00:00Z'));
+      expect(c?.scenarios.naive.heatIndexDegreeHours).toBeGreaterThan(c?.scenarios.plan.heatIndexDegreeHours ?? Infinity);
+    });
+  });
+});

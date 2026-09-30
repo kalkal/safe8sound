@@ -33,7 +33,7 @@ pnpm tokens           # rebuild design tokens after editing tokens.json
 ```
 
 ## Mutation testing
-`pnpm heavy pnpm mutation <group...>` (or `--all`, only when the PC is idle) runs Stryker on the guard (`packages/guard`) and on the pacing, reserve, projection and night-recovery modules of `packages/core`. The threshold is 80 %. Run it by hand or weekly, never on every push, and in slices: one or a few groups per call, each under 15 minutes, so other sessions can take the heavy lock in between.
+`pnpm heavy pnpm mutation <group...>` (or `--all`, only when the PC is idle) runs Stryker on the guard (`packages/guard`) and on the pacing, reserve, projection, night-recovery, planner and counterfactual modules of `packages/core`. The threshold is 80 %. Run it by hand or weekly, never on every push, and in slices: one or a few groups per call, each under 15 minutes, so other sessions can take the heavy lock in between.
 
 It uses our script `tooling/src/mutation.mjs` instead of Stryker's Vitest runner:
 - **Why a script.** `@stryker-mutator/vitest-runner` 10.0.0 runs no test per mutant with Vitest 5, so every mutant "survives" (see the [friction log](docs/friction-log.md), 2026-09-29).

@@ -70,12 +70,19 @@ export const UNSERVED_TOLERANCE_W = 1;
 const HOUR_MS = 3_600_000;
 const MINUTE_MS = 60_000;
 
-export function buildContext(input: GuardInput): GuardContext {
-  const { snapshot, profile, config, plan } = input;
-  const nowMs = Date.parse(snapshot.ts);
+/**
+ * The storm reserve for the coming dark hours and the SOC floor it implies, and when the forecast shows
+ * the next recharge. The one definition, used by the guard and by the reserve outlook.
+ */
+export function reserveOf(input: Pick<GuardInput, 'snapshot' | 'forecast' | 'profile' | 'model' | 'config'>): {
+  reserveWh: number;
+  reserveFloorSocPct: Pct;
+  rechargeAtMs: number | undefined;
+} {
+  const { profile, config } = input;
   const dark = darkWindow({
     forecast: input.forecast,
-    fromMs: nowMs,
+    fromMs: Date.parse(input.snapshot.ts),
     pvPeakW: profile.pvPeakW,
     lossRatio: input.model.pv.lossRatio,
     essentialLoadW: config.reserve.essentialLoadW,
@@ -90,9 +97,15 @@ export function buildContext(input: GuardInput): GuardContext {
           roundTripEff: profile.battery.roundTripEff,
           capWh: config.reserve.capWh,
         });
-  const floor = reserveFloorSocPct(profile.battery, reserve);
+  return { reserveWh: reserve, reserveFloorSocPct: reserveFloorSocPct(profile.battery, reserve), rechargeAtMs: dark?.toMs };
+}
+
+export function buildContext(input: GuardInput): GuardContext {
+  const { snapshot, profile, config, plan } = input;
+  const nowMs = Date.parse(snapshot.ts);
+  const { reserveWh: reserve, reserveFloorSocPct: floor, rechargeAtMs } = reserveOf(input);
   const stepMs = config.projection.stepMinutes * MINUTE_MS;
-  const horizonMs = Math.max(Date.parse(plan.horizonAt), dark?.toMs ?? 0, nowMs + stepMs);
+  const horizonMs = Math.max(Date.parse(plan.horizonAt), rechargeAtMs ?? 0, nowMs + stepMs);
   const dischargeFloorPct = snapshot.gridAvailable ? floor : pct(profile.battery.minSocHwPct);
 
   return {

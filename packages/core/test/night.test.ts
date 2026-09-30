@@ -128,6 +128,14 @@ describe('nextNightWindow', () => {
     expect(nextNightWindow(from, Date.parse('2026-07-16T03:00:00+02:00'), TZ, cfg)?.endMs).toBe(Date.parse('2026-07-16T03:00:00+02:00'));
   });
 
+  it('on the autumn clock-change night (25/10) the window ends at 07:00 winter time, 06:00Z', () => {
+    const from = Date.parse('2026-10-24T20:00:00+02:00');
+    expect(nextNightWindow(from, from + 14 * 3_600_000, TZ, cfg)).toEqual({
+      startMs: Date.parse('2026-10-24T20:00:00Z'),
+      endMs: Date.parse('2026-10-25T06:00:00Z'),
+    });
+  });
+
   it('starts now when it is already night, and is undefined when the range has no night', () => {
     const late = Date.parse('2026-07-15T23:30:00+02:00');
     expect(nextNightWindow(late, late + 3_600_000, TZ, cfg)?.startMs).toBe(late);

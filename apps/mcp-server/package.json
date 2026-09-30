@@ -16,6 +16,7 @@
     "@aws-sdk/lib-dynamodb": "3.1141.0",
     "@cold-reserve/contracts": "workspace:*",
     "@cold-reserve/core": "workspace:*",
+    "@cold-reserve/guard": "workspace:*",
     "@cold-reserve/source-fallback": "workspace:*",
     "@cold-reserve/source-simulator": "workspace:*",
     "@cold-reserve/store-dynamodb": "workspace:*",
@@ -24,6 +25,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "2.8.0"
+    "@modelcontextprotocol/inspector": "2.8.0",
+    "fast-check": "catalog:"
   }
 }

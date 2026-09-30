@@ -23,7 +23,9 @@ export function rejectionOf(verdict: GuardVerdict): ErrorEnvelope | undefined {
       ...(failed.nearestAllowed === undefined ? {} : { nearestAllowed: failed.nearestAllowed }),
       ...(failed.unit === undefined ? {} : { unit: failed.unit }),
     };
-    return toolError(CODE[failed.id], failed.reason, { details });
+    // The model reads only this text (not the details): it carries the value the guard would accept.
+    const allowed = failed.nearestAllowed === undefined ? '' : ` Nearest allowed: ${failed.nearestAllowed.toString()}${failed.unit === undefined ? '' : ` ${failed.unit}`}.`;
+    return toolError(CODE[failed.id], `${failed.reason}${allowed}`.slice(0, 300), { details });
   }
   const night = verdict.nightRecovery;
   if (night?.status === 'unmet') {

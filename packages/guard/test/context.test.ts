@@ -1,7 +1,7 @@
 import { ForecastSchema, SnapshotSchema, celsius } from '@cold-reserve/contracts';
 import { indoorEquilibriumRh, weatherFromForecast } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
-import { buildContext, currentControls, projectFrom } from '../src/context.js';
+import { buildContext, currentControls, projectFrom, reserveOf } from '../src/context.js';
 import { H, MIN, T0, config, hotNight, input, iso, plan, snapshot, step } from './support.js';
 
 describe('currentControls', () => {
@@ -63,5 +63,18 @@ describe('projectFrom', () => {
     expect(points[0]?.rooms[0]?.humidityPct).toBeCloseTo(indoorEquilibriumRh({ outC: now.outC, outRhPct: now.outRhPct, inC: celsius(28) }), 9);
     expect(points[0]?.flows.fansW).toBe(0);
     expect(iso(points.at(-1)?.ms ?? 0)).toBe(iso(T0 + H - 5 * MIN));
+  });
+});
+
+describe('reserveOf', () => {
+  it('is the reserve and the floor the guard uses, without a plan', () => {
+    const i = input();
+    const ctx = buildContext(i);
+    expect(reserveOf(i)).toEqual({ reserveWh: ctx.reserveWh, reserveFloorSocPct: ctx.reserveFloorSocPct, rechargeAtMs: Date.parse('2026-07-16T07:00:00+02:00') });
+  });
+
+  it('keeps the whole cap when the forecast shows no recharge', () => {
+    const dark = ForecastSchema.parse({ ...hotNight(), hourly: hotNight().hourly.map((h) => ({ ...h, irradianceWm2: 0 })) });
+    expect(reserveOf(input({ forecast: dark }))).toMatchObject({ reserveWh: config().reserve.capWh, rechargeAtMs: undefined });
   });
 });

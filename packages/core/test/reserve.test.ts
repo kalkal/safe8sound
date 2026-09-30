@@ -3,7 +3,7 @@ import { exampleForecast, exampleHomeProfile } from '@cold-reserve/contracts/fix
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { batteryCapacityWh } from '../src/energy.js';
-import { darkWindow, hoursAtLoad, reserveFloorSocPct, reserveWh, usableWh, withDischargeFloor } from '../src/reserve.js';
+import { darkWindow, hoursAtLoad, reserveFloorSocPct, reserveOutlookHours, reserveWh, usableWh, withDischargeFloor } from '../src/reserve.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
 const runs = (n: number): number => Number(process.env['FC_RUNS'] ?? n);
@@ -124,5 +124,43 @@ describe('darkWindow: from when PV stops covering the essential load to the next
     const edge = 350 / (7360 * 0.86) * 1000;
     const w = darkWindow({ ...opts, forecast: forecast([0, edge, edge - 0.01, edge]), fromMs: Date.UTC(2026, 6, 15, 0) });
     expect(w).toEqual({ fromMs: Date.UTC(2026, 6, 15, 0), toMs: Date.UTC(2026, 6, 15, 1) });
+  });
+});
+
+describe('reserveOutlookHours (the ice cubes, agreed with F8b in #21)', () => {
+  const base = { battery, socPct: pct(60), reserveFloorSocPct: pct(40), reserveWh: 4000, currentLoadW: 1000, essentialLoadW: 350 };
+
+  it('on grid counts only the energy above the reserve floor, the same energy for both levels', () => {
+    const o = reserveOutlookHours({ ...base, gridAvailable: true });
+    const spendable = usableWh(battery, pct(60), pct(40));
+    expect(o.hoursAtCurrentLevel).toBeCloseTo(spendable / 1000, 9);
+    expect(o.hoursAtEssential).toBeCloseTo(spendable / 350, 9);
+  });
+
+  it('off grid counts down to the hardware floor', () => {
+    const o = reserveOutlookHours({ ...base, gridAvailable: false });
+    expect(o.hoursAtCurrentLevel).toBeCloseTo(usableWh(battery, pct(60)) / 1000, 9);
+  });
+
+  it('the reserve alone at Essential: its energy after the losses, over the essential load', () => {
+    expect(reserveOutlookHours({ ...base, gridAvailable: true }).reserveHoursAtEssential).toBeCloseTo((4000 * battery.roundTripEff) / 350, 9);
+  });
+
+  it('on grid just above the floor the reserve can outlast the spendable energy (no false invariant)', () => {
+    const o = reserveOutlookHours({ ...base, socPct: pct(41), gridAvailable: true });
+    expect(o.reserveHoursAtEssential).toBeGreaterThan(o.hoursAtEssential);
+  });
+
+  it('property: more charge never gives fewer hours; Essential never lasts less than the current level', () => {
+    const soc = fc.oneof(fc.constantFrom(10, 40, 41, 100), fc.double({ min: 0, max: 100, noNaN: true }));
+    fc.assert(
+      fc.property(soc, soc, fc.boolean(), fc.double({ min: 350, max: 5000, noNaN: true }), (a, b, grid, load) => {
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        const at = (s: number) => reserveOutlookHours({ ...base, socPct: pct(s), gridAvailable: grid, currentLoadW: load });
+        expect(at(hi).hoursAtCurrentLevel).toBeGreaterThanOrEqual(at(lo).hoursAtCurrentLevel);
+        expect(at(hi).hoursAtEssential).toBeGreaterThanOrEqual(at(hi).hoursAtCurrentLevel);
+      }),
+      { numRuns: runs(10_000) },
+    );
   });
 });

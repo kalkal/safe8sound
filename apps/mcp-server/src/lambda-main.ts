@@ -1,5 +1,6 @@
 import { err, ok, toolError } from '@cold-reserve/contracts';
 import { createApp } from './app.js';
+import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules, createDynamoStoreFactory } from './compose.js';
 import { createLambdaHandler } from './lambda.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
@@ -30,7 +31,9 @@ export const handler = createLambdaHandler(async () => {
   if (!storeFor.ok) return storeFor;
   const modules = composeModules({ preferences: preferences.value, storeFor: storeFor.value, clock: wallClock });
   if (!modules.ok) return modules;
+  const comfortPlan = comfortPlanWiring({ storeFor: storeFor.value, preferences: preferences.value, clock: wallClock });
+  if (!comfortPlan.ok) return comfortPlan;
 
-  const app = createApp({ ...process.env, MCP_CLIENTS: clients.value }, { wallClock, logger: { log }, modules: modules.value });
+  const app = createApp({ ...process.env, MCP_CLIENTS: clients.value }, { wallClock, logger: { log }, modules: modules.value, comfortPlan: comfortPlan.value });
   return app.ok ? ok(app.value.handler) : app;
 });

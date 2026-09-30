@@ -44,7 +44,7 @@ describe('rejectionOf', () => {
     expect(rejectionOf(verdict(all(failing)))).toEqual({
       code,
       category: 'guard_rejection',
-      message: 'Too much.',
+      message: 'Too much. Nearest allowed: 5 W.',
       retryable: false,
       details: { guarantee: id, measured: 7, limit: 5, nearestAllowed: 5, unit: 'W' },
     });
@@ -52,7 +52,7 @@ describe('rejectionOf', () => {
 
   it('leaves out the numbers a guarantee does not have', () => {
     const failing: GuaranteeResult = { id: 'safe_room_comfort', ok: false, reason: 'No reading.' };
-    expect(rejectionOf(verdict(all(failing)))?.details).toEqual({ guarantee: 'safe_room_comfort' });
+    expect(rejectionOf(verdict(all(failing)))).toMatchObject({ message: 'No reading.', details: { guarantee: 'safe_room_comfort' } });
   });
 
   it('takes the first failing guarantee in contract order', () => {

@@ -6,11 +6,15 @@ import { buildContext, currentControls, projectFrom, type GuardInput } from './c
 // guard's projection of the plan, with (a) nothing running and (b) the naive plan "AC until the battery
 // dies": the settings running now, kept as they are (or, when nothing runs, the comfort setpoint in the
 // safe and occupied rooms), with no pacing and no reserve. Measured in the safe room exactly like the plan.
+// Cooling season only.
 
 const round1 = (x: number) => Math.round(x * 10) / 10 + 0;
 const round2 = (x: number) => Math.round(x * 100) / 100 + 0;
 
 export function counterfactualOf(input: GuardInput): Counterfactual | undefined {
+  // Its lines (peak temperature, heat index, night hours at or below the threshold) describe heat: they
+  // have no meaning when the home is being heated, so outside the cooling season there is none.
+  if (input.season !== 'cooling') return undefined;
   const ctx = buildContext(input);
   const { profile, preferences, snapshot, config } = input;
   const hardwareFloor = pct(profile.battery.minSocHwPct);
