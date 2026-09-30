@@ -15,3 +15,4 @@ export * from './plan.js';
 export * from './preferences.js';
 export * from './home-status.js';
 export * from './reserve-outlook.js';
+export * from './preferences-view.js';
