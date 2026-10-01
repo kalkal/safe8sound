@@ -1,5 +1,5 @@
 import type { ErrorEnvelope, Forecast, HomeId, HomeProfile, Preferences, Result } from '@cold-reserve/contracts';
-import type { Clock, HomeDataSource, SimParams, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, HomeDataSource, Logger, SimParams, StateStoreFactory } from '@cold-reserve/core';
 import type { GuardConfig } from '@cold-reserve/guard';
 import type { ComfortPlanConfig } from './config.js';
 
@@ -27,4 +27,6 @@ export interface ComfortPlanDeps {
   readonly guard: GuardConfig;
   readonly config: ComfortPlanConfig;
   readonly newPlanId: () => string;
+  /** The shared log (#111): failures the module survives, and the audit trail of a last resort. */
+  readonly logger: Logger;
 }

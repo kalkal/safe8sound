@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { PROBLEM_JSON_CONTENT_TYPE, categoryOf, toProblemDetails, toolError, type ErrorCategory, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { CORRELATION_ID_HEADER, PROBLEM_JSON_CONTENT_TYPE, categoryOf, correlationIdFrom, toProblemDetails, toolError, type ErrorCategory, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import type { StoreErrorEvent } from '@cold-reserve/store-dynamodb';
 import type { McpHandler } from './handler.js';
 
 /** The subset of the Lambda Function URL event (payload 2.0) the adapter reads. */
@@ -39,7 +40,6 @@ export interface LambdaLogEntry {
 
 const levelOf = (category: ErrorCategory): LambdaLogEntry['level'] => (category === 'internal' ? 'error' : 'warn');
 const nameOf = (e: unknown): string => (e instanceof Error ? e.name : typeof e);
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const defaultLog = (entry: LambdaLogEntry) => {
   console.error(JSON.stringify(entry));
@@ -60,7 +60,7 @@ async function toResult(res: Response): Promise<FunctionUrlResult> {
 
 function problem(error: ErrorEnvelope, correlationId: string): FunctionUrlResult {
   const body = toProblemDetails(error, { instance: `urn:uuid:${correlationId}` });
-  return { statusCode: body.status, headers: { 'content-type': PROBLEM_JSON_CONTENT_TYPE, 'x-correlation-id': correlationId }, body: JSON.stringify(body), isBase64Encoded: false };
+  return { statusCode: body.status, headers: { 'content-type': PROBLEM_JSON_CONTENT_TYPE, [CORRELATION_ID_HEADER]: correlationId }, body: JSON.stringify(body), isBase64Encoded: false };
 }
 
 /** What the caller learns about a startup failure: transient ones keep their code (503, retry); the rest is a generic 500. */
@@ -88,8 +88,7 @@ export function createLambdaHandler(
   };
 
   return async (event) => {
-    const presented = event.headers['x-correlation-id'];
-    const correlationId = presented !== undefined && UUID.test(presented) ? presented : randomUUID();
+    const correlationId = correlationIdFrom(event.headers[CORRELATION_ID_HEADER], randomUUID);
 
     let app: Result<McpHandler, ErrorEnvelope>;
     try {
@@ -132,7 +131,7 @@ export function installProcessHooks(
 }
 
 /** The DynamoDB store's error event as a log line: the SDK error name, HTTP status and request id, never the cause text. */
-export function storeErrorLine(event: { readonly code: 'store_unavailable' | 'unexpected_error'; readonly operation: string; readonly cause: unknown }): LambdaLogEntry {
+export function storeErrorLine(event: StoreErrorEvent): LambdaLogEntry {
   const category = categoryOf(event.code);
   const metadata = (event.cause as { $metadata?: { httpStatusCode?: unknown; requestId?: unknown } } | null | undefined)?.$metadata;
   return {
@@ -142,8 +141,16 @@ export function storeErrorLine(event: { readonly code: 'store_unavailable' | 'un
     code: event.code,
     category,
     operation: event.operation,
+    ...(event.correlationId === undefined ? {} : { correlationId: event.correlationId }),
     errorName: nameOf(event.cause),
     ...(typeof metadata?.httpStatusCode === 'number' ? { httpStatus: metadata.httpStatusCode } : {}),
     ...(typeof metadata?.requestId === 'string' ? { requestId: metadata.requestId } : {}),
   };
 }
+
+/** The store's onError hook as lambda-main wires it: every failure becomes one log line, with its correlation id. */
+export const storeErrorLogger =
+  (log: (entry: LambdaLogEntry) => void) =>
+  (event: StoreErrorEvent): void => {
+    log(storeErrorLine(event));
+  };

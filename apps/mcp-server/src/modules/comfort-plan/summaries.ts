@@ -1,5 +1,5 @@
 import { DATA_GROUPS, isFullyLive, type ApplyPlanOutput, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
-import { localTimeText } from '../storm-mode/summaries.js';
+import { localTimeText } from '../../time.js';
 
 // The text content of each tool result. The agent (Strands) reads only this text, not structuredContent
 // (F7 finding): every number and fact the model may say is here. The JSON is for the cards and clients.

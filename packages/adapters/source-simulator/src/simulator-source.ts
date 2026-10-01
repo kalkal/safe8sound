@@ -12,7 +12,7 @@ import {
   type RoomReading,
   type Snapshot,
 } from '@cold-reserve/contracts';
-import { resolveOrigin, rngAt, stepHome, type Clock, type HomeDataSource, type HomeState, type SimParams } from '@cold-reserve/core';
+import { epsBaseLoadW, resolveOrigin, rngAt, stepHome, type Clock, type HomeDataSource, type HomeState, type SimParams } from '@cold-reserve/core';
 import { inputsAt, type Scenario } from './scenario.js';
 
 export interface SimulatorSourceOptions {
@@ -47,6 +47,10 @@ export class SimulatorSource implements HomeDataSource {
   }
 
   snapshot(): Promise<Result<Snapshot, ErrorEnvelope>> {
+    // A simulated home declares what its EPS circuits draw: without it the blackout physics would rest on an
+    // assumed figure, so the source gives no readings at all (#107).
+    const eps = epsBaseLoadW(this.#opts.profile);
+    if (!eps.ok) return Promise.resolve(eps);
     return Promise.resolve(ok(this.snapshotAt(this.#opts.clock.now())));
   }
 

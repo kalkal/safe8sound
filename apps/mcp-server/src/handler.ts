@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import {
+  CORRELATION_ID_HEADER,
   HOME_HEADER,
   PROBLEM_JSON_CONTENT_TYPE,
   SandboxHomeIdSchema,
+  correlationIdFrom,
   toProblemDetails,
   toolError,
   type ErrorCategory,
-  type ErrorCode,
   type ErrorEnvelope,
   type HttpErrorStatus,
 } from '@cold-reserve/contracts';
@@ -29,23 +30,10 @@ import type { ModuleRegistry, UiResource } from './registry.js';
 import type { Sandboxes } from './sandboxes.js';
 import { listTool, type ToolContext, type ToolDefinition } from './tool.js';
 
-/** One line of the error log (docs/error-handling.md §6.1): no secrets, no personal data. */
-export interface LogEntry {
-  ts: string;
-  level: 'error' | 'warn';
-  component: 'mcp-server';
-  code: ErrorCode;
-  category: ErrorCategory;
-  message: string;
-  correlationId: string;
-  homeId?: string;
-  clientId?: string;
-  details?: Record<string, unknown>;
-}
-
-export interface Logger {
-  log(entry: LogEntry): void;
-}
+// One log line for every component: the shared LogEntry of contracts and the Logger port of core (#111).
+export type { LogEntry } from '@cold-reserve/contracts';
+export type { Logger } from '@cold-reserve/core';
+import type { Logger } from '@cold-reserve/core';
 
 export interface HandlerDeps {
   readonly registry: ModuleRegistry;
@@ -59,7 +47,6 @@ export type McpHandler = (req: Request) => Promise<Response>;
 // Categories kept in the error log (docs/error-handling.md §6.1).
 // forbidden and rate_limited too: a refused sandbox header or a full daily cap is worth a line (#101).
 const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unavailable', 'guard_rejection', 'unauthorized', 'forbidden', 'rate_limited']);
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_ISSUES = 20;
 /** MCP "resource not found" (spec 2025-11-25, server/resources); the SDK has no name for it. */
 const RESOURCE_NOT_FOUND = -32002;
@@ -244,11 +231,10 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
   }
 
   return async (req) => {
-    const presented = req.headers.get('x-correlation-id');
-    const correlationId = presented && UUID.test(presented) ? presented : randomUUID();
+    const correlationId = correlationIdFrom(req.headers.get(CORRELATION_ID_HEADER), randomUUID);
     const res = await route(req, correlationId);
     const headers = new Headers(res.headers);
-    headers.set('x-correlation-id', correlationId);
+    headers.set(CORRELATION_ID_HEADER, correlationId);
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   };
 }

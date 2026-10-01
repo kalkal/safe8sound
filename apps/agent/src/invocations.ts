@@ -1,7 +1,9 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
+  CORRELATION_ID_HEADER,
   SandboxHomeIdSchema,
   PROBLEM_JSON_CONTENT_TYPE,
+  correlationIdFrom,
   toProblemDetails,
   toolError,
   type ErrorEnvelope,
@@ -52,8 +54,7 @@ export function createInvocationHandler(deps: {
 
   return async (req) => {
     // The turn id from sim-api (header or body); a new one when the caller sent none or a bad one.
-    const presented = req.headers.get('x-correlation-id');
-    const correlationId = presented !== null && z.uuid().safeParse(presented).success ? presented : randomUUID();
+    const correlationId = correlationIdFrom(req.headers.get(CORRELATION_ID_HEADER), randomUUID);
     const path = new URL(req.url).pathname;
     if (path === '/ping' && req.method === 'GET') return json(200, { status: 'Healthy' });
     if (path !== '/invocations') return refuse(toolError('route_not_found', 'Unknown endpoint.'), correlationId, 404);

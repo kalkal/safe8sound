@@ -16,7 +16,7 @@ import {
   type ToolCallRequest,
   type TurnReply,
 } from '@cold-reserve/contracts';
-import { SandboxHomeIdSchema } from '@cold-reserve/contracts';
+import { CORRELATION_ID_HEADER, SandboxHomeIdSchema, correlationIdFrom } from '@cold-reserve/contracts';
 import type { Clock } from '@cold-reserve/core';
 import type { SimApiConfig } from './config.js';
 import { createQuota, type QuotaStore } from './quota.js';
@@ -61,7 +61,6 @@ export type SimApiHandler = (req: Request, meta: { clientIp: string }) => Promis
 const ROUTES = new Set(['/v1/session', '/v1/turns', '/v1/tools/call']);
 const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unavailable', 'unauthorized', 'rate_limited']);
 const nameOf = (e: unknown): string => (e instanceof Error ? e.name : typeof e);
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): SimApiHandler {
   const quota = createQuota({ store: deps.quota, limits: config.limits, clock: deps.clock });
@@ -70,8 +69,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
   if (!signingKey) throw new Error('sim-api needs a signing key');
 
   return async (req, meta) => {
-    const presented = req.headers.get('x-correlation-id');
-    const correlationId = presented && UUID.test(presented) ? presented : randomUUID();
+    const correlationId = correlationIdFrom(req.headers.get(CORRELATION_ID_HEADER), randomUUID);
     const origin = req.headers.get('origin');
     /** Set only for an allowlisted Origin: CORS headers go back to that origin alone. */
     const allowedOrigin = origin !== null && origins.has(origin) ? origin : undefined;

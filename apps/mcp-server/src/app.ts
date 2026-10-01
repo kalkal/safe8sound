@@ -95,7 +95,7 @@ export function warnMissingEpsLoad(profiles: readonly HomeProfile[], logger: Log
       component: 'mcp-server',
       code: 'missing_eps_load',
       category: 'internal',
-      message: 'The home profile gives no epsBaseLoadW: its storm calculations refuse until it does.',
+      message: 'The home profile gives no epsBaseLoadW: a simulated home gives no readings, and storm calculations refuse, until it does.',
       correlationId: 'startup',
       homeId: profile.homeId,
     });
@@ -168,7 +168,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
 
   const modules = [
     energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver }),
-    ...(opts.comfortPlan === undefined ? [] : [comfortPlanModule({ ...opts.comfortPlan, model: params, homes: planningHome })]),
+    ...(opts.comfortPlan === undefined ? [] : [comfortPlanModule({ ...opts.comfortPlan, model: params, homes: planningHome, logger: opts.logger })]),
     ...(opts.stormMode === undefined ? [] : [stormModeModule({ ...opts.stormMode, homes: planningHome })]),
     ...(opts.modules ?? []),
   ];

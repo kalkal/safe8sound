@@ -1,4 +1,4 @@
-import { HOME_HEADER, StatusFactsSchema, ToolCardSchema, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
+import { CORRELATION_ID_HEADER, HOME_HEADER, StatusFactsSchema, ToolCardSchema, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -97,7 +97,7 @@ export function withCorrelationHeader(fetchFn: (url: string | URL, init?: Reques
     const id = current();
     if (id === undefined) return fetchFn(url, init);
     const headers = new Headers(init?.headers);
-    headers.set('x-correlation-id', id);
+    headers.set(CORRELATION_ID_HEADER, id);
     return fetchFn(url, { ...init, headers });
   };
 }

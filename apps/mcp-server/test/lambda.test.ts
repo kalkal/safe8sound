@@ -1,6 +1,8 @@
-import { err, ok, toolError } from '@cold-reserve/contracts';
+import { HomeIdSchema, err, ok, toolError } from '@cold-reserve/contracts';
+import { seededRng } from '@cold-reserve/core';
+import { dynamoStateStoreFactory, type TableClient } from '@cold-reserve/store-dynamodb';
 import { describe, expect, it, vi } from 'vitest';
-import { createLambdaHandler, installProcessHooks, storeErrorLine, type FunctionUrlEvent, type LambdaLogEntry } from '../src/lambda.js';
+import { createLambdaHandler, installProcessHooks, storeErrorLine, storeErrorLogger, type FunctionUrlEvent, type LambdaLogEntry } from '../src/lambda.js';
 import { readParameter } from '../src/ssm.js';
 import { TOKEN, initializeRequest, makeHandler } from './helpers.js';
 
@@ -181,6 +183,20 @@ describe('store error log line (#112)', () => {
     const line = storeErrorLine({ code: 'store_unavailable', operation: 'getPreferences', cause });
     expect(line).toMatchObject({ level: 'warn', component: 'store-dynamodb', code: 'store_unavailable', category: 'dependency_unavailable', operation: 'getPreferences', errorName: 'AccessDeniedException', httpStatus: 400, requestId: 'REQ123' });
     expect(JSON.stringify(line)).not.toContain('arn:aws');
+  });
+
+  it('names the correlation id of the request the store was serving (#111)', () => {
+    const line = storeErrorLine({ code: 'store_unavailable', operation: 'getPlan', cause: new Error('x'), correlationId: '3f6c1a9e-8b2d-4c7e-9a1f-2b3c4d5e6f70' });
+    expect(line.correlationId).toBe('3f6c1a9e-8b2d-4c7e-9a1f-2b3c4d5e6f70');
+  });
+
+  it("wired as in lambda-main: a store opened for a request logs its failure with that request's id", async () => {
+    const lines: LambdaLogEntry[] = [];
+    const down = () => Promise.reject(Object.assign(new Error('slow'), { name: 'ThrottlingException' }));
+    const failing: TableClient = { get: down, put: down, update: down, query: down, transactPut: down };
+    const factory = dynamoStateStoreFactory({ table: failing, clock: { now: () => 0 }, rng: seededRng(1), onError: storeErrorLogger((l) => lines.push(l)) });
+    await factory(HomeIdSchema.parse('demo'), { correlationId: '3f6c1a9e-8b2d-4c7e-9a1f-2b3c4d5e6f70' }).getPreferences();
+    expect(lines[0]).toMatchObject({ component: 'store-dynamodb', code: 'store_unavailable', correlationId: '3f6c1a9e-8b2d-4c7e-9a1f-2b3c4d5e6f70' });
   });
 
   it('copes with a cause that is not an Error', () => {

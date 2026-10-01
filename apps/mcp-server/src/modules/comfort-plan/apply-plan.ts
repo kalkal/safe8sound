@@ -16,7 +16,7 @@ import { recordRejection } from './rejections.js';
 export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ctx: ToolContext): Promise<Result<ApplyPlanOutput, ErrorEnvelope>> {
   const home = deps.homes(ctx.homeId);
   if (home === undefined) return err(toolError('home_not_found', 'This client is not linked to a configured home.'));
-  const store = deps.storeFor(ctx.homeId);
+  const store = deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId });
   const stored = await store.getPlan(input.planId);
   if (!stored.ok) return stored;
   if (stored.value.status === 'applied') return ok(outcome(stored.value, true, home.profile));
@@ -47,8 +47,7 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
     config: deps.guard,
   });
   if (!verdict.ok) {
-    const recorded = await recordRejection(store, verdict, deps.clock, input.planId);
-    if (!recorded.ok) return recorded;
+    await recordRejection(store, verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId }, input.planId);
     return err(rejectionOf(verdict) ?? toolError('unexpected_error', 'The guard refused the plan without a reason.'));
   }
 

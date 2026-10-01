@@ -102,6 +102,15 @@ describe('store-dynamodb failures (docs/error-handling.md)', () => {
     expect(errors[0]).toMatchObject({ code: 'store_unavailable', operation: 'getPreferences', cause });
   });
 
+  it('reports the correlation id of the request the store serves, so the failure is found with its request (#111)', async () => {
+    const cause = sdkError('ThrottlingException');
+    const errors: StoreErrorEvent[] = [];
+    const factory = dynamoStateStoreFactory({ table: failing(cause), clock: { now: () => createdMs }, rng: seededRng(7), onError: (e) => errors.push(e) });
+    await factory(HOME, { correlationId: 'corr-42' }).getPreferences();
+    await factory(HOME).getPreferences();
+    expect(errors.map((e) => e.correlationId)).toEqual(['corr-42', undefined]);
+  });
+
   it.each([
     ['a 400 ValidationException', sdkError('ValidationException')],
     ['AccessDeniedException', sdkError('AccessDeniedException')],
@@ -142,7 +151,17 @@ describe('store-dynamodb failures (docs/error-handling.md)', () => {
     expect(await store.getPreferences()).toMatchObject({ ok: false, error: { code: 'unexpected_error', category: 'internal' } });
   });
 
-  it('refuses to read an item written with another schema version', async () => {
+  it('reads an item a newer version wrote with an additive field: the unknown field is dropped (R7, #111)', async () => {
+    const table = createFakeTable();
+    await table.put({ PK: `HOME#${HOME}`, SK: 'PREFS', schemaVersion: 1, data: { ...prefs(), addedLater: { theme: 'dark' } } });
+    await table.put({ PK: `HOME#${HOME}`, SK: `PLAN#${plan.id}`, schemaVersion: 1, data: { ...plan, futureHint: 'x' } });
+    const { store } = setup(table);
+    expect(await store.getPreferences()).toEqual({ ok: true, value: prefs() });
+    const read = await store.getPlan(plan.id);
+    expect(read.ok && read.value).toEqual(plan);
+  });
+
+  it('refuses to read an item written with a newer schema version', async () => {
     const table = createFakeTable();
     await table.put({ PK: `HOME#${HOME}`, SK: 'PREFS', schemaVersion: 2, data: prefs() });
     const { store } = setup(table);

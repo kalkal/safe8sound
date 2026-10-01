@@ -2,7 +2,7 @@ import { err, ok, toolError } from '@cold-reserve/contracts';
 import { createApp } from './app.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules, createDynamoStoreFactory } from './compose.js';
-import { createLambdaHandler, installProcessHooks, storeErrorLine } from './lambda.js';
+import { createLambdaHandler, installProcessHooks, storeErrorLogger } from './lambda.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 import { readParameter } from './ssm.js';
 import { stormModeWiring } from './storm-mode-config.js';
@@ -33,9 +33,7 @@ export const handler = createLambdaHandler(
     if (!preferences.ok) return preferences;
     const storeFor = createDynamoStoreFactory(process.env, {
       clock: wallClock,
-      onError: (event) => {
-        log(storeErrorLine(event));
-      },
+      onError: storeErrorLogger(log),
     });
     if (!storeFor.ok) return storeFor;
     const modules = composeModules({ preferences: preferences.value, storeFor: storeFor.value, clock: wallClock });

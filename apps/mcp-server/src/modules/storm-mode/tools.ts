@@ -17,7 +17,8 @@ import { stormPreview } from '@cold-reserve/i18n';
 import type { z } from 'zod';
 import type { ToolContext } from '../../tool.js';
 import type { StormModeDeps } from './deps.js';
-import { deliver, detect, levelOf, localIso, localeOf, messageFields, readHome, readingEvent, type Observed } from './observe.js';
+import { localIso } from '../../time.js';
+import { deliver, detect, levelOf, localeOf, messageFields, readHome, readingEvent, type Observed } from './observe.js';
 
 const HOUR_MS = 3_600_000;
 

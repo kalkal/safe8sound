@@ -1,6 +1,6 @@
-import { HomeIdSchema, PreferencesSchema, ok, type Forecast, type HomeId, type Preferences, type Snapshot } from '@cold-reserve/contracts';
+import { HomeIdSchema, PreferencesSchema, err, ok, toolError, type Forecast, type HomeId, type Preferences, type Snapshot } from '@cold-reserve/contracts';
 import { examplePreferences } from '@cold-reserve/contracts/fixtures';
-import { fixedClock, type Clock } from '@cold-reserve/core';
+import { fixedClock, memoryLogger, type Clock, type StateStoreFactory, type StoreScope } from '@cold-reserve/core';
 import { parseGuardConfig } from '@cold-reserve/guard';
 import rawGuardConfig from '@cold-reserve/guard/config/guard.json' with { type: 'json' };
 import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
@@ -38,14 +38,30 @@ export function comfortConfig() {
 }
 
 /** A simulator scenario at hour `atH`, with every dependency of the module. */
-export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences } = {}) {
+export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean } = {}) {
   const profile = demoProfile();
   const scenario = builtInScenario(id);
   const startMs = Date.parse(scenario.startAt);
   const scenarioMs = startMs + atH * H;
   const clock = settableClock(Date.parse('2026-09-30T10:00:00Z'));
   const sim = new SimulatorSource({ profile, scenario, params: defaultSimParams(), clock: fixedClock(scenarioMs) });
-  const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock });
+  const memory = memoryStateStoreFactory({ backing: createMemoryBacking(), clock });
+  const scopes: (StoreScope | undefined)[] = [];
+  // Records what each store was opened for; optionally fails the refusal log, for fault injection.
+  const storeFor: StateStoreFactory = (h, scope) => {
+    scopes.push(scope);
+    const store = memory(h, scope);
+    if (!over.failRejections) return store;
+    const failed = () => Promise.resolve(err(toolError('store_unavailable', 'The state store did not answer.')));
+    return new Proxy(store, {
+      get: (target, key) => {
+        if (key === 'recordGuardRejection') return failed;
+        const value: unknown = Reflect.get(target, key);
+        return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+      },
+    });
+  };
+  const logger = memoryLogger();
   const homeId = over.homeId ?? DEMO;
   let snapshotOf = (h: HomeId): Snapshot => {
     const s = { ...sim.snapshotAt(scenarioMs), homeId: h };
@@ -68,6 +84,7 @@ export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; read
     model: defaultSimParams(),
     guard: guardConfig(),
     config: comfortConfig(),
+    logger,
     newPlanId: () => `plan_test_${String(++n).padStart(4, '0')}`,
   };
   const ctx: ToolContext = { correlationId: 'test-correlation', clientId: 'test', homeId };
@@ -77,5 +94,6 @@ export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; read
     const before = snapshotOf;
     snapshotOf = (h) => f(before(h));
   };
-  return { deps, ctx, store, clock, profile, setSnapshot };
+  return { deps, ctx, store, clock, profile, setSnapshot, logger, scopes };
 }
+

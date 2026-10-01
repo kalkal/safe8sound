@@ -1,4 +1,4 @@
-import { ProblemDetailsSchema, categoryOf, err, isRetryableCategory, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { CORRELATION_ID_HEADER, ProblemDetailsSchema, categoryOf, err, isRetryableCategory, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { toolErrorResult, type Agent, type AgentAnswer } from './agent.js';
 import { TurnReplySchema, readCards } from './wire.js';
 
@@ -27,7 +27,7 @@ export function createRemoteAgent(config: RemoteAgentConfig): Agent {
       try {
         response = await doFetch(url, {
           method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-correlation-id': context.correlationId },
+          headers: { 'content-type': 'application/json', [CORRELATION_ID_HEADER]: context.correlationId },
           body: JSON.stringify({ question }),
           signal,
         });

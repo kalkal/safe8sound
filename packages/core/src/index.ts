@@ -24,3 +24,4 @@ export * from './state-store.js';
 export * from './storm-session.js';
 export * from './storm.js';
 export * from './thermal.js';
+export * from './logger.js';

@@ -1,6 +1,10 @@
 import {
   InboxMessageSchema,
   IsoDateTimeSchema,
+  PlanSchema,
+  PreferencesSchema,
+  StormSessionSchema,
+  readStored,
   epochMs,
   err,
   ok,
@@ -15,6 +19,7 @@ import {
   type Preferences,
   type Result,
   type StormSession,
+  type StoredSchema,
 } from '@cold-reserve/contracts';
 import {
   DEFAULT_STATE_STORE_TTL,
@@ -70,7 +75,7 @@ class MemoryStateStore implements StateStore {
   }
 
   getPreferences(): Promise<Result<Preferences | undefined, ErrorEnvelope>> {
-    return Promise.resolve(ok(this.#get('PREFS') as Preferences | undefined));
+    return Promise.resolve(this.#read('PREFS', PreferencesSchema));
   }
 
   putPreferences(preferences: Preferences, changes: readonly ConfigChange[]): Promise<Result<void, ErrorEnvelope>> {
@@ -105,14 +110,17 @@ class MemoryStateStore implements StateStore {
   }
 
   getPlan(planId: PlanId): Promise<Result<Plan, ErrorEnvelope>> {
-    const plan = this.#get(`PLAN#${planId}`) as Plan | undefined;
-    return Promise.resolve(plan ? ok(plan) : err(notFound(planId)));
+    const plan = this.#read(`PLAN#${planId}`, PlanSchema);
+    if (!plan.ok) return Promise.resolve(plan);
+    return Promise.resolve(plan.value ? ok(plan.value) : err(notFound(planId)));
   }
 
   applyPlan(planId: PlanId): Promise<Result<PlanApplication, ErrorEnvelope>> {
     // Synchronous from read to write: the in-memory equivalent of a conditional update.
     const sk = `PLAN#${planId}`;
-    const plan = this.#get(sk) as Plan | undefined;
+    const read = this.#read(sk, PlanSchema);
+    if (!read.ok) return Promise.resolve(read);
+    const plan = read.value;
     if (!plan) return Promise.resolve(err(notFound(planId)));
     if (plan.status === 'applied') return Promise.resolve(ok({ plan, alreadyApplied: true }));
     if (plan.status !== 'proposed' || this.#options.clock.now() >= epochMs(plan.expiresAt)) {
@@ -152,7 +160,9 @@ class MemoryStateStore implements StateStore {
   }
 
   getLatestStormSession(): Promise<Result<StormSession | undefined, ErrorEnvelope>> {
-    const [latest] = this.#query<StormSession>('STORM#').sort((a, b) => epochMs(b.startedAt) - epochMs(a.startedAt));
+    const sessions = this.#readAll(this.#query<unknown>('STORM#'), StormSessionSchema, 'STORM#');
+    if (!sessions.ok) return Promise.resolve(sessions);
+    const [latest] = sessions.value.sort((a, b) => epochMs(b.startedAt) - epochMs(a.startedAt));
     return Promise.resolve(ok(latest));
   }
 
@@ -173,8 +183,8 @@ class MemoryStateStore implements StateStore {
       .filter(([sk, item]) => sk.startsWith('INBOX#') && this.#live(item))
       .sort(([a], [b]) => (a < b ? 1 : -1))
       .slice(0, Math.max(0, limit))
-      .map(([, item]) => structuredClone(item.value) as InboxMessage);
-    return Promise.resolve(ok(newest));
+      .map(([, item]) => structuredClone(item.value));
+    return Promise.resolve(this.#readAll(newest, InboxMessageSchema, 'INBOX#'));
   }
 
   #partition(): Map<string, Item> {
@@ -189,6 +199,25 @@ class MemoryStateStore implements StateStore {
 
   #live(item: Item | undefined): item is Item {
     return item !== undefined && (item.expiresAtMs === undefined || this.#options.clock.now() < item.expiresAtMs);
+  }
+
+  /** Reads an item with the same policy as store-dynamodb (R7, #111): unknown fields dropped, the rest checked. */
+  #read<T>(sk: string, schema: StoredSchema<T>): Result<T | undefined, ErrorEnvelope> {
+    const value = this.#get(sk);
+    if (value === undefined) return ok(undefined);
+    const parsed = readStored(schema, value);
+    return parsed.success ? ok(parsed.data) : err(toolError('unexpected_error', `Stored item ${sk} does not match its schema.`));
+  }
+
+  /** The same read policy over several items of one kind. */
+  #readAll<T>(values: readonly unknown[], schema: StoredSchema<T>, kind: string): Result<T[], ErrorEnvelope> {
+    const read: T[] = [];
+    for (const value of values) {
+      const parsed = readStored(schema, value);
+      if (!parsed.success) return err(toolError('unexpected_error', `A stored ${kind} item does not match its schema.`));
+      read.push(parsed.data);
+    }
+    return ok(read);
   }
 
   #get(sk: string): unknown {

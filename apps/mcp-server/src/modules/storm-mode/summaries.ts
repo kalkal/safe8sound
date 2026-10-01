@@ -1,5 +1,6 @@
 import { DATA_GROUPS, isFullyLive, type DataOrigin, type NotifyFamilyOutputSchema, type SafeRoomStatus, type StartStormModeOutputSchema } from '@cold-reserve/contracts';
 import type { z } from 'zod';
+import { localTimeText } from '../../time.js';
 
 // The text content of each storm tool result. The agent (Strands) reads only this text (F7 finding):
 // safe hours, until when, the level and its reason, and the roles told or skipped are all here.
@@ -7,14 +8,6 @@ import type { z } from 'zod';
 
 const one = (x: number) => x.toFixed(1);
 
-/**
- * "9:30 PM (2026-07-17T21:30:00+02:00)": the clock time as the family message says it, from a time
- * already in the home's zone (localIso), then the exact time.
- */
-export function localTimeText(iso: string): string {
-  const hour = Number(iso.slice(11, 13));
-  return `${String(hour % 12 || 12)}:${iso.slice(14, 16)} ${hour < 12 ? 'AM' : 'PM'} (${iso})`;
-}
 
 function dataText(o: DataOrigin): string {
   if (isFullyLive(o)) return 'live data';

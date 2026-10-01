@@ -29,23 +29,6 @@ import type { StormHome, StormModeDeps } from './deps.js';
 const HOUR_MS = 3_600_000;
 const MAX_NOTIFICATIONS = 50;
 
-/** ISO 8601 in the home's time zone, with its offset: the times the model reads match the family message. */
-export function localIso(ms: number, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZoneName: 'longOffset',
-  }).formatToParts(ms);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
-  const offset = part('timeZoneName').replace('GMT', '') || '+00:00';
-  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:${part('second')}${offset}`;
-}
 
 export interface Observed {
   readonly home: StormHome;
@@ -152,7 +135,7 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext): Promise<R
   if (!safeRoom) return err(toolError('home_data_stale', `No reading from the safe room ${safeRoomId}.`, { details: { roomId: safeRoomId } }));
   const hours = countSafeHours(deps, home.profile, snapshot.value, home.forecast(), preferences.value, safeRoom);
   if (!hours.ok) return hours;
-  const store = deps.storeFor(ctx.homeId);
+  const store = deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId });
   const latest = await store.getLatestStormSession();
   if (!latest.ok) return latest;
   return ok({ home, store, preferences: preferences.value, snapshot: snapshot.value, safeRoom, nowMs: deps.clock.now(), safeHours: hours.value, session: latest.value });

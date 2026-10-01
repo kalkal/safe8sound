@@ -1,4 +1,4 @@
-import { ForecastSchema, SnapshotSchema, epochMs } from '@cold-reserve/contracts';
+import { ForecastSchema, HomeProfileSchema, SnapshotSchema, epochMs } from '@cold-reserve/contracts';
 import { fixedClock } from '@cold-reserve/core';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -35,6 +35,13 @@ describe('SimulatorSource', () => {
       }),
       { numRuns: 50 },
     );
+  });
+
+  it('a simulated home without its EPS load gives no readings: missing_eps_load, never an assumed figure (#107)', async () => {
+    const bare = HomeProfileSchema.parse(Object.fromEntries(Object.entries(profile).filter(([k]) => k !== 'epsBaseLoadW')));
+    const scenario = builtInScenario('storm-blackout');
+    const sim = new SimulatorSource({ profile: bare, scenario, params: defaultSimParams(), clock: fixedClock(Date.parse(scenario.startAt)) });
+    expect(await sim.snapshot()).toMatchObject({ ok: false, error: { code: 'missing_eps_load' } });
   });
 
   it('the same seed gives the same series', () => {

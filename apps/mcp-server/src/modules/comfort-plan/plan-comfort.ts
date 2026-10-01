@@ -21,8 +21,7 @@ import {
 import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, seasonFor, withTargets, type HumidityMode } from '@cold-reserve/core';
 import { buildContext, counterfactualOf, currentControls, projectFrom, rejectionOf, reserveOf, runGuard, safeUntil, type CandidatePlan, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import type { ToolContext } from '../../tool.js';
-import { localIso } from '../storm-mode/observe.js';
-import { localTimeText } from '../storm-mode/summaries.js';
+import { localIso, localTimeText } from '../../time.js';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
 import { recordRejection } from './rejections.js';
 
@@ -130,7 +129,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     const paced = cycled(cycle);
     if (paced?.verdict.ok === true) chosen = paced;
   }
-  const store = deps.storeFor(ctx.homeId);
+  const store = deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId });
   // No plan holds every guarantee: the planner's own candidates still give the safest one, as long as it
   // breaks no hard limit. A plan the model proposed is answered with the refusal.
   const safest = chosen === undefined && !overridden ? lastResortOf(tried, deps, guardInput) : undefined;
@@ -138,8 +137,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   if (chosen === undefined) {
     const rejection = last === undefined ? undefined : rejectionOf(last.verdict);
     if (last !== undefined) {
-      const recorded = await recordRejection(store, last.verdict, deps.clock);
-      if (!recorded.ok) return recorded;
+      await recordRejection(store, last.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId });
     }
     return err(rejection ?? toolError('unexpected_error', 'The planner produced no candidate.'));
   }
@@ -175,6 +173,19 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   if (!parsed.success) return err(toolError('output_schema_violation', 'The proposed plan does not match its schema.'));
   const saved = await store.savePlan(parsed.data);
   if (!saved.ok) return saved;
+  if (safest !== undefined) {
+    // Audit trail of a last resort: the guard did refuse it, and the log says it was proposed anyway.
+    await recordRejection(store, safest.attempt.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId }, parsed.data.id);
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'info',
+      component: 'mcp-server',
+      message: `Last-resort plan proposed: safe until ${safest.lastResort.safeUntil}, limited by ${safest.lastResort.limitedBy}.`,
+      correlationId: ctx.correlationId,
+      homeId: ctx.homeId,
+      details: { planId: parsed.data.id, failed: safest.attempt.verdict.guarantees.filter((g) => !g.ok).map((g) => g.id) },
+    });
+  }
   return ok(parsed.data);
 }
 

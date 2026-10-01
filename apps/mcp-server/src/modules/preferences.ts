@@ -80,7 +80,7 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
         confirmedVia: 'tool',
       });
       if (!next.ok) return next;
-      const saved = await deps.storeFor(ctx.homeId).putPreferences(next.value.preferences, next.value.changes);
+      const saved = await deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId }).putPreferences(next.value.preferences, next.value.changes);
       if (!saved.ok) return saved;
       return ok({ preferences: toPublicPreferences(next.value.preferences), changes: next.value.changes });
     },

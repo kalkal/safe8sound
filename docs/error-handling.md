@@ -81,6 +81,15 @@ Three places, one format (JSON: `ts`, `level`, `code`, `category`, `component`, 
 
 A small CLI (`pnpm errors [--since 24h] [--code ...]`) reads the database log for quick checks from the terminal.
 
+**One line, one shape (#111).**
+- `LogEntrySchema` in `packages/contracts` is the line every component writes: `ts`, `level`, `component`, `message`, `correlationId`, plus `code` and `category` (required on warnings and errors, in the category the catalogue gives the code), and the optional `homeId`, `clientId`, `errorName`, `stack` and `details`.
+- The schema is strict, so a field nobody declared cannot slip in. `details` carries ids and codes only (a plan id, an operation name), never free text or personal data. `withoutStack` is the copy that may leave the server.
+- The `Logger` port in `packages/core` writes those lines. `causeFields(cause, { withStack })` keeps the cause's name, and its stack only server side, never its text.
+- The correlation id has one definition: `CORRELATION_ID_HEADER` and `CorrelationIdSchema` (a UUID). `correlationIdFrom(header, fresh)` keeps a well-formed id and makes a fresh one otherwise.
+- A store opened with `storeFor(homeId, { correlationId })` reports its failures with that id (`StoreErrorEvent.correlationId`).
+
+**Reading what is stored (R7).** Inputs stay strict. Stored items are read with `readStored`, which drops the fields this version does not know at any depth, and with `isReadableSchemaVersion`, which accepts every version up to the current one. So an additive field never breaks an older reader, and a newer version is still refused.
+
 ## 7. Tests (unit first, then code, then E2E)
 - Every error code has at least one unit test that produces it.
 - Contract tests: every tool returns valid `structuredContent` in success **and** failure.

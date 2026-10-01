@@ -3,6 +3,8 @@ import {
   GuaranteeIdSchema,
   InboxMessageSchema,
   IsoDateTimeSchema,
+  isReadableSchemaVersion,
+  readStored,
   PlanIdSchema,
   PlanSchema,
   PreferencesSchema,
@@ -29,6 +31,7 @@ import {
   type PlanApplication,
   type StateStore,
   type StateStoreFactory,
+  type StoreScope,
   type StateStoreTtl,
 } from '@cold-reserve/core';
 import { z } from 'zod';
@@ -63,12 +66,14 @@ export interface StoreErrorEvent {
   readonly code: 'store_unavailable' | 'unexpected_error';
   readonly operation: string;
   readonly cause: unknown;
+  /** The request the store was serving, when the caller said (#111). */
+  readonly correlationId?: string;
 }
 
 export const dynamoStateStoreFactory =
   (options: DynamoStateStoreOptions): StateStoreFactory =>
-  (homeId) =>
-    new DynamoStateStore(homeId, options);
+  (homeId, scope) =>
+    new DynamoStateStore(homeId, options, scope);
 
 /** An expected outcome carried out of a #run body; converted back to a Result there. */
 class Failure extends Error {
@@ -83,16 +88,18 @@ class DynamoStateStore implements StateStore {
   readonly #clock: Clock;
   readonly #rng: Rng;
   readonly #onError: ((event: StoreErrorEvent) => void) | undefined;
+  readonly #correlationId: string | undefined;
   readonly #ttl: StateStoreTtl;
   readonly #pk: string;
   #sequence = 0;
 
-  constructor(homeId: HomeId, options: DynamoStateStoreOptions) {
+  constructor(homeId: HomeId, options: DynamoStateStoreOptions, scope?: StoreScope) {
     this.homeId = homeId;
     this.#table = options.table;
     this.#clock = options.clock;
     this.#rng = options.rng;
     this.#onError = options.onError;
+    this.#correlationId = scope?.correlationId;
     this.#ttl = options.ttl ?? DEFAULT_STATE_STORE_TTL;
     this.#pk = `HOME#${homeId}`;
   }
@@ -258,7 +265,7 @@ class DynamoStateStore implements StateStore {
       if (error instanceof Failure) return err(error.error);
       // Only the table and the network fail transiently; anything else is a bug and must not be retried.
       const code = isTransient(error) ? 'store_unavailable' : 'unexpected_error';
-      this.#onError?.({ code, operation, cause: error });
+      this.#onError?.({ code, operation, cause: error, ...(this.#correlationId === undefined ? {} : { correlationId: this.#correlationId }) });
       return err(
         code === 'store_unavailable'
           ? toolError('store_unavailable', 'The saved settings are not reachable right now; try again shortly.')
@@ -301,13 +308,14 @@ function isTransient(error: unknown): boolean {
   return typeof e.code === 'string' && /^E(CONN|TIMEDOUT|AI_AGAIN|PIPE|NOTFOUND|HOSTUNREACH|NETUNREACH)/.test(e.code);
 }
 
+/** Reads a stored item (R7, #111): any version up to the current one; fields a newer version added are dropped. */
 function parse<T>(schema: z.ZodType<T>, item: TableItem): T {
-  if (item['schemaVersion'] !== SCHEMA_VERSION) {
+  if (!isReadableSchemaVersion(item['schemaVersion'], SCHEMA_VERSION)) {
     throw new Failure(
       toolError('unexpected_error', `Stored item ${item.SK} has schemaVersion ${String(item['schemaVersion'])}; this version reads ${String(SCHEMA_VERSION)}.`),
     );
   }
-  const parsed = schema.safeParse(item['data']);
+  const parsed = readStored(schema, item['data']);
   if (!parsed.success) {
     throw new Failure(toolError('unexpected_error', `Stored item ${item.SK} does not match its schema.`));
   }

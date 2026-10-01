@@ -72,4 +72,9 @@ export interface StateStore {
   listInbox(limit: number): Promise<Result<InboxMessage[], ErrorEnvelope>>;
 }
 
-export type StateStoreFactory = (homeId: HomeId) => StateStore;
+/** What a store knows of the request it serves: its failures are logged with this correlation id (#111). */
+export interface StoreScope {
+  readonly correlationId?: string;
+}
+
+export type StateStoreFactory = (homeId: HomeId, scope?: StoreScope) => StateStore;
