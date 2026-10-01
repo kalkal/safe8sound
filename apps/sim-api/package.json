@@ -8,6 +8,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@cold-reserve/contracts": "workspace:*"
+    "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*",
+    "zod": "catalog:"
   }
 }
