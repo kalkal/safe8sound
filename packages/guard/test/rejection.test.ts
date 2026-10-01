@@ -69,4 +69,22 @@ describe('rejectionOf', () => {
       details: { roomId: 'bedroom-1', measured: 150, limit: 360, nearestAllowed: 360, unit: 'min' },
     });
   });
+
+  it('an unmet night over the heat budget names the heat as well', () => {
+    const n = { ...night('unmet'), heatIndexDegreeHoursAbove26_7: 7.2 };
+    expect(rejectionOf(verdict(all(), n))?.message).toBe(
+      'The plan keeps the safe room at or below 26 °C for 2.5 of the 6 night hours it can reach, and lets the heat reach 7.2 heat-index degree-hours above 26.7 °C, over the 4 allowed.',
+    );
+  });
+
+  it('with no hour required, an unmet night is the heat budget alone, without hours', () => {
+    const n = { ...night('unmet'), requiredHours: 0, achievedHours: 0.5, heatIndexDegreeHoursAbove26_7: 7.2 };
+    expect(rejectionOf(verdict(all(), n))).toEqual({
+      code: 'night_recovery_unmet',
+      category: 'guard_rejection',
+      message: 'The plan lets the heat in the safe room reach 7.2 heat-index degree-hours above 26.7 °C tonight, over the 4 allowed.',
+      retryable: false,
+      details: { roomId: 'bedroom-1' },
+    });
+  });
 });

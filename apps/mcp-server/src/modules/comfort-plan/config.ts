@@ -25,6 +25,10 @@ export const ComfortPlanConfigSchema = z.strictObject({
         }),
       )
       .max(10),
+    /** Dry or cool in the safe room by projected humidity: dry above `dryOnPct`, cool again below `dryOffPct`. */
+    humidityBand: z
+      .strictObject({ dryOnPct: z.number().min(30).max(90), dryOffPct: z.number().min(30).max(90), marginPct: z.number().min(0).max(10) })
+      .refine((h) => h.dryOffPct < h.dryOnPct, { message: 'The lower edge of the band is below the upper one' }),
   }),
   /** Average load at each level for the reserve outlook; Essential comes from the guard config. */
   outlook: z.strictObject({

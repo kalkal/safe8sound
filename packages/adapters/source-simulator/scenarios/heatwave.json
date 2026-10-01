@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "id": "heatwave",
-  "version": "1.0.0",
-  "description": "A heatwave day, 38 degrees in the afternoon and a warm night. The safe room is cooled all day with the fan on.",
+  "version": "1.1.0",
+  "description": "A heatwave day, 38 degrees in the afternoon, a warm night and the next hot morning (36 hours, so a plan sees the whole night). The safe room is cooled all day with the fan on.",
   "startAt": "2026-07-16T00:00:00+02:00",
-  "durationH": 24,
+  "durationH": 36,
   "stepSeconds": 60,
   "seed": 20260716,
   "simulatedGroups": ["weather"],
@@ -41,7 +41,19 @@
     { "tempOutC": 30.5, "humidityOutPct": 48, "irradianceWm2": 10, "stormProb": 0.03, "baseLoadW": 700 },
     { "tempOutC": 29.5, "humidityOutPct": 52, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 550 },
     { "tempOutC": 28.5, "humidityOutPct": 55, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 400 },
-    { "tempOutC": 27.5, "humidityOutPct": 58, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 300 }
+    { "tempOutC": 27.5, "humidityOutPct": 58, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 300 },
+    { "tempOutC": 27, "humidityOutPct": 60, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 250 },
+    { "tempOutC": 26.5, "humidityOutPct": 62, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 230 },
+    { "tempOutC": 26, "humidityOutPct": 64, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 220 },
+    { "tempOutC": 26, "humidityOutPct": 65, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 220 },
+    { "tempOutC": 25.5, "humidityOutPct": 66, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 220 },
+    { "tempOutC": 25.5, "humidityOutPct": 66, "irradianceWm2": 0, "stormProb": 0.03, "baseLoadW": 240 },
+    { "tempOutC": 26.5, "humidityOutPct": 62, "irradianceWm2": 3, "stormProb": 0.03, "baseLoadW": 300 },
+    { "tempOutC": 29, "humidityOutPct": 55, "irradianceWm2": 48, "stormProb": 0.03, "baseLoadW": 450 },
+    { "tempOutC": 31.5, "humidityOutPct": 48, "irradianceWm2": 209, "stormProb": 0.03, "baseLoadW": 500 },
+    { "tempOutC": 33.5, "humidityOutPct": 42, "irradianceWm2": 398, "stormProb": 0.03, "baseLoadW": 400 },
+    { "tempOutC": 35.5, "humidityOutPct": 37, "irradianceWm2": 573, "stormProb": 0.03, "baseLoadW": 350 },
+    { "tempOutC": 37, "humidityOutPct": 34, "irradianceWm2": 687, "stormProb": 0.03, "baseLoadW": 350 }
   ],
   "sun": {
     "sunrise": ["2026-07-16T05:46:00+02:00", "2026-07-17T05:47:00+02:00"],
@@ -49,17 +61,19 @@
   },
   "gridOutages": [],
   "occupancy": [
-    { "roomId": "bedroom-1", "roles": ["grandpa"], "fromH": 0, "toH": 24 },
+    { "roomId": "bedroom-1", "roles": ["grandpa"], "fromH": 0, "toH": 36 },
     { "roomId": "bedroom-2", "roles": ["daughter"], "fromH": 0, "toH": 7.5 },
     { "roomId": "study", "roles": ["daughter"], "fromH": 9, "toH": 17 },
     { "roomId": "living", "roles": ["daughter"], "fromH": 18, "toH": 21 },
-    { "roomId": "bedroom-2", "roles": ["daughter"], "fromH": 21, "toH": 24 }
+    { "roomId": "bedroom-2", "roles": ["daughter"], "fromH": 21, "toH": 31.5 },
+    { "roomId": "study", "roles": ["daughter"], "fromH": 33, "toH": 36 }
   ],
   "hvac": [
-    { "roomId": "bedroom-1", "mode": "cool", "setpointC": 26, "fanOn": true, "fromH": 0, "toH": 24 },
+    { "roomId": "bedroom-1", "mode": "cool", "setpointC": 26, "fanOn": true, "fromH": 0, "toH": 36 },
     { "roomId": "bedroom-2", "mode": "cool", "setpointC": 26, "fanOn": false, "fromH": 0, "toH": 7 },
     { "roomId": "study", "mode": "cool", "setpointC": 27, "fanOn": false, "fromH": 9, "toH": 17 },
     { "roomId": "living", "mode": "cool", "setpointC": 26, "fanOn": false, "fromH": 12, "toH": 23 },
-    { "roomId": "bedroom-2", "mode": "cool", "setpointC": 26, "fanOn": false, "fromH": 21, "toH": 24 }
+    { "roomId": "bedroom-2", "mode": "cool", "setpointC": 26, "fanOn": false, "fromH": 21, "toH": 31 },
+    { "roomId": "study", "mode": "cool", "setpointC": 27, "fanOn": false, "fromH": 33, "toH": 36 }
   ]
 }

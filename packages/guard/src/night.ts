@@ -1,4 +1,4 @@
-import { celsius, type NightRecovery, type PlanWarning } from '@cold-reserve/contracts';
+import { celsius, type HomeProfile, type NightRecovery, type PlanWarning } from '@cold-reserve/contracts';
 import { nightMetrics, type NightMetrics, type ProjectionPoint, type RoomControl } from '@cold-reserve/core';
 import { UNSERVED_TOLERANCE_W, projectFrom, type GuardContext } from './context.js';
 
@@ -33,8 +33,7 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
   const windowHours = nightWindowHours(cfg.windowStartHour, cfg.windowEndHour);
   // Clamped: on the autumn clock change the night lasts 10 hours, one more than the window's 9.
   const requiredHours = Math.min(cfg.requiredHours, Math.max(0, cfg.requiredHours - (windowHours - plan.coveredHours)));
-  const meets = (m: NightMetrics | undefined) =>
-    m !== undefined && m.achievedHours >= requiredHours - EPS && m.heatIndexDegreeHours <= cfg.budgetDegreeHours + EPS;
+  const meets = (m: NightMetrics | undefined) => nightMeets(m, requiredHours, cfg.budgetDegreeHours);
 
   const base = {
     roomId,
@@ -48,29 +47,28 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
   };
   if (meets(plan)) return { nightRecovery: { ...base, status: 'met' }, warnings: [] };
 
-  const referencePoints = projectFrom(input, referenceControl(ctx, plan.window.startMs, thresholdC - cfg.referenceSetpointMarginK), {
+  const referencePoints = projectFrom(input, referenceControl(input.profile, roomId, plan.window.startMs, thresholdC - cfg.referenceSetpointMarginK), {
     toMs: ctx.horizonMs,
     dischargeFloorPct: ctx.dischargeFloorPct,
   });
-  const sustainable = ctx.gridAvailable || !referencePoints.some((p) => p.flows.unservedLoadW > UNSERVED_TOLERANCE_W);
-  const { humidity } = input.preferences.safety;
-  const windowEndMs = plan.window.endMs;
-  const safe = referencePoints
-    .filter((p) => p.ms >= plan.window.startMs && p.ms < windowEndMs)
-    .flatMap((p) => p.rooms.filter((r) => r.id === roomId))
-    .every((r) => r.humidityPct >= humidity.minPct && r.humidityPct <= humidity.maxPct);
-  const reference = sustainable && safe ? measure(referencePoints) : undefined;
+  const proven = referenceProves(referencePoints, { gridAvailable: ctx.gridAvailable, window: plan.window, roomId, band: input.preferences.safety.humidity });
+  const reference = proven ? measure(referencePoints) : undefined;
   if (meets(reference)) return { nightRecovery: { ...base, status: 'unmet' }, warnings: [] };
 
   const best = round2(Math.max(plan.achievedHours, reference?.achievedHours ?? 0));
   const room = input.profile.rooms.find((r) => r.id === roomId)?.name ?? roomId;
+  const limit = ctx.gridAvailable ? 'the air conditioner' : 'the battery';
   return {
     nightRecovery: { ...base, status: 'infeasible', bestAchievableHours: best },
     warnings: [
       {
         code: 'night_recovery_infeasible',
-        // With the grid up the limit is the air conditioner (or the room's humidity), not the battery.
-        message: `Tonight ${ctx.gridAvailable ? 'the air conditioner' : 'the battery'} can keep the ${room} at or below ${thresholdC.toString()} °C for about ${best.toString()} hours, not the ${base.requiredHours.toString()} hours of the night-recovery target.`.slice(0, 300),
+        // With the grid up the limit is the air conditioner (or the room's humidity), not the battery. When the
+        // hours are reached, what cannot be kept is the heat budget: say that, not "x hours, not the 0".
+        message: (plan.achievedHours >= requiredHours - EPS
+          ? `Tonight ${limit} cannot keep the heat in the ${room} within the night budget: about ${base.heatIndexDegreeHoursAbove26_7.toString()} heat-index degree-hours above 26.7 °C, over the ${cfg.budgetDegreeHours.toString()} allowed.`
+          : `Tonight ${limit} can keep the ${room} at or below ${thresholdC.toString()} °C for about ${best.toString()} hours, not the ${base.requiredHours.toString()} hours of the night-recovery target.`
+        ).slice(0, 300),
       },
     ],
   };
@@ -79,15 +77,35 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
 /** Length of the night window in hours (22 → 7 is 9 hours). */
 export const nightWindowHours = (startHour: number, endHour: number): number => (endHour - startHour + 24) % 24;
 
+/** A night counts as met with the required hours at or below the threshold and the heat within the budget. */
+export function nightMeets(m: Pick<NightMetrics, 'achievedHours' | 'heatIndexDegreeHours'> | undefined, requiredHours: number, budgetDegreeHours: number): boolean {
+  return m !== undefined && m.achievedHours >= requiredHours - EPS && m.heatIndexDegreeHours <= budgetDegreeHours + EPS;
+}
+
+/**
+ * Whether the reference strategy proves anything: it must be sustainable (off grid, the battery must not run
+ * out, so no load is left unserved) and keep the safe room inside its humidity band through the window.
+ */
+export function referenceProves(
+  points: readonly ProjectionPoint[],
+  opts: { gridAvailable: boolean; window: { startMs: number; endMs: number }; roomId: string; band: { minPct: number; maxPct: number } },
+): boolean {
+  const sustainable = opts.gridAvailable || !points.some((p) => p.flows.unservedLoadW > UNSERVED_TOLERANCE_W);
+  const inBand = points
+    .filter((p) => p.ms >= opts.window.startMs && p.ms < opts.window.endMs)
+    .flatMap((p) => p.rooms.filter((r) => r.id === opts.roomId))
+    .every((r) => r.humidityPct >= opts.band.minPct && r.humidityPct <= opts.band.maxPct);
+  return sustainable && inBand;
+}
+
 /** Safe room only, off until the night window, then cooling (or drying) below the threshold. */
-function referenceControl(ctx: GuardContext, windowStartMs: number, setpointC: number): (ms: number) => RoomControl[] {
-  const { profile, preferences } = ctx.input;
-  const safe = profile.rooms.find((r) => r.id === preferences.safeRoomId);
+export function referenceControl(profile: HomeProfile, safeRoomId: string, windowStartMs: number, setpointC: number): (ms: number) => RoomControl[] {
+  const safe = profile.rooms.find((r) => r.id === safeRoomId);
   const modes = safe?.hvacUnits.flatMap((u) => u.modes) ?? [];
   const mode = modes.includes('cool') ? 'cool' : modes.includes('dry') ? 'dry' : undefined;
   return (ms) =>
     profile.rooms.map((r): RoomControl =>
-      r.id === preferences.safeRoomId && mode !== undefined && ms >= windowStartMs
+      r.id === safeRoomId && mode !== undefined && ms >= windowStartMs
         ? { id: r.id, hvac: { mode, setpointC: celsius(setpointC) }, fanOn: false }
         : { id: r.id, fanOn: false },
     );

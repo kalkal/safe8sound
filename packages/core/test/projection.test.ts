@@ -125,6 +125,19 @@ describe('project', () => {
     expect(points.at(-1)?.ms).toBe(T0 + 6 * H - 5 * 60_000);
   });
 
+  it('hands the control the room states at the start of each step, so a controller can react to them', () => {
+    const seen: number[] = [];
+    const points = project(
+      base({
+        controlAt: (_ms, rooms) => {
+          seen.push(rooms.find((r) => r.id === 'bedroom-1')?.tempC ?? NaN);
+          return [cool('bedroom-1'), off('living'), off('study')];
+        },
+      }),
+    );
+    expect(seen).toEqual(points.map((p) => p.rooms.find((r) => r.id === 'bedroom-1')?.tempC));
+  });
+
   it('is deterministic', () => {
     expect(project(base())).toEqual(project(base()));
   });

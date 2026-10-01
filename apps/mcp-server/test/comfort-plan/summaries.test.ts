@@ -27,9 +27,10 @@ describe('what the model reads', () => {
     for (const g of p.guarantees) expect(text).toContain(`${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`);
     expect(text).toContain(`${one(p.reserveWh / 1000)} kWh`);
     expect(text).toContain(`${one(p.reserveFloorSocPct ?? -1)} %`);
-    // The 24-hour heatwave ends at local midnight: the plan sees 2 of the 9 night hours, so nothing is required yet.
-    expect(p.nightRecovery?.requiredHours).toBe(0);
-    expect(text).toContain('Night recovery (elderly) not assessable yet: the plan covers only 2 of the 9 night hours.');
+    // The 36-hour heatwave shows the whole night: the hours are required and reported.
+    const n = p.nightRecovery;
+    expect(n?.requiredHours).toBeGreaterThan(0);
+    expect(text).toContain(`Night recovery (elderly) ${n?.status ?? ''}: ${String(n?.achievedHours)} of ${String(n?.requiredHours)} hours at or below 24 °C`);
     expect(text).not.toContain('of 0 hours');
     for (const wn of p.warnings ?? []) expect(text).toContain(wn.message);
     const c = p.counterfactual;
@@ -40,6 +41,35 @@ describe('what the model reads', () => {
       expect(text).toContain(`${one(line.heatIndexDegreeHours)} heat-index degree-hours, ${one(line.hoursAtOrBelowThreshold)} night hours at or below the threshold`);
     }
     expect(text).toContain('apply_plan');
+  });
+
+  it('plan_comfort: a night the plan sees only in part is not assessable yet', async () => {
+    // The 24-hour clear day ends at local midnight: the plan sees 2 of the 9 night hours, so nothing is required yet.
+    const w = world('clear-day', 14);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value.nightRecovery?.requiredHours).toBe(0);
+    const text = planSummary(r.value, NIGHT);
+    expect(text).toContain('not assessable yet: the plan covers only 2 of the 9 night hours.');
+    expect(text).not.toContain('of 0 hours');
+  });
+
+  it('plan_comfort: the night line says the heat budget when it fails, and "not assessable" only on a partial night', async () => {
+    const w = world('heatwave', 14);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const n = r.value.nightRecovery;
+    if (n === undefined) throw new Error('no night');
+    const say = (over: Partial<typeof n>) => planSummary({ ...r.value, nightRecovery: { ...n, ...over } }, NIGHT);
+    // A full night with no hour required by config is not "not assessable".
+    expect(say({ requiredHours: 0, status: 'met' })).not.toContain('not assessable');
+    // No hour required and over the budget: the reason is the heat, not "0.5 of 0 hours".
+    const hot = say({ requiredHours: 0, achievedHours: 0.5, status: 'unmet', heatIndexDegreeHoursAbove26_7: 7.2, budgetDegreeHours: 4 });
+    expect(hot).toContain('Night recovery (elderly) unmet: the heat would reach 7.2 heat-index degree-hours above 26.7 °C, over the 4 allowed.');
+    expect(hot).not.toContain('of 0 hours');
+    // Hours missed and over the budget: both.
+    const both = say({ requiredHours: 6, achievedHours: 2, status: 'unmet', heatIndexDegreeHoursAbove26_7: 7.2, budgetDegreeHours: 4 });
+    expect(both).toContain('Night recovery (elderly) unmet: 2 of 6 hours at or below 24 °C, and the heat would reach 7.2 heat-index degree-hours above 26.7 °C, over the 4 allowed.');
   });
 
   it('plan_comfort: a night the plan sees whole is reported with its hours, and with the grid down there is no grid-up floor', async () => {

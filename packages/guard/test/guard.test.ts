@@ -179,6 +179,27 @@ describe('night recovery (feature queue item 1)', () => {
     expect(rejectionOf(v)?.code).not.toBe('night_recovery_unmet');
   });
 
+  it('on a hot end of night that requires no hour, a fan-only plan still answers for the heat budget', () => {
+    // 05:00, 32 °C in the bedroom, only the fan: the 2 hours left of the window require no hour at or
+    // below the threshold, but the heat goes far over the budget.
+    const at = T0 + 9 * H;
+    const v = runGuard(input({ snapshot: snapshot({ ms: at, tempC: 32 }), plan: plan([step({ atMs: at, mode: 'fan_only', targetPct: 40 })], at + 6 * H) }));
+    const n = v.nightRecovery;
+    expect(n?.requiredHours).toBe(0);
+    expect(n?.heatIndexDegreeHoursAbove26_7).toBeGreaterThan(n?.budgetDegreeHours ?? Infinity);
+    expect(n?.status).not.toBe('met');
+    const said = n?.status === 'unmet' ? rejectionOf(v)?.message : v.warnings[0]?.message;
+    expect(said).toMatch(/heat-index degree-hours above 26\.7 °C/);
+    expect(said).not.toMatch(/of the 0|not the 0/);
+  });
+
+  it('an infeasible night over the heat budget says the heat, not "0 hours"', () => {
+    const at = T0 + 9 * H;
+    const v = runGuard(input({ snapshot: snapshot({ ms: at, tempC: 32, gridAvailable: false, socPct: 11 }), plan: plan([step({ atMs: at, mode: 'fan_only', targetPct: 11 })], at + 6 * H) }));
+    expect(v.nightRecovery?.status).toBe('infeasible');
+    expect(v.warnings[0]?.message).toMatch(/^Tonight the battery cannot keep the heat in the Bedroom within the night budget: about [\d.]+ heat-index degree-hours above 26\.7 °C, over the 4 allowed\.$/);
+  });
+
   it('does not call a target feasible when reaching it would run the battery out before dawn', () => {
     // Off grid at 30 %: cooling the bedroom to 23.5 °C all night would reach the hours, then leave the
     // safe room without power before the 07:00 recharge.

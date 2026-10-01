@@ -2,7 +2,7 @@ import { HomeProfileSchema, LevelStepSchema, PlanStepSchema, PreferencesSchema, 
 import { exampleHomeProfile, examplePreferences } from '@cold-reserve/contracts/fixtures';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { buildLadder, candidateSteps, dutyCycle, seasonFor, withTargets, type PlannerConfig } from '../src/planner.js';
+import { buildLadder, candidateSteps, dutyCycle, humidityBandWithin, nextHumidityMode, seasonFor, withTargets, type HumidityMode, type PlannerConfig } from '../src/planner.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
 const runs = (n: number): number => Number(process.env['FC_RUNS'] ?? n);
@@ -15,6 +15,7 @@ const cfg: PlannerConfig = {
   dryAboveRhPct: 60,
   targetEveryMinutes: 60,
   dutyCycles: [{ onMinutes: 30, periodMinutes: 60 }],
+  humidityBand: { dryOnPct: 55, dryOffPct: 45, marginPct: 3 },
 };
 const rung = (ladder: ReturnType<typeof buildLadder>, i: number) => {
   const r = ladder[i];
@@ -259,5 +260,140 @@ describe('planner details', () => {
     const seen: [number, number][] = [];
     withTargets([first], { socMin: (a, b) => (seen.push([a - T0, b - T0]), 50), fromMs: T0, toMs: T0 + 30 * 60_000, safeRoomId: 'bedroom-1', config: cfg });
     expect(seen).toEqual([[0, H]]);
+  });
+});
+
+describe('withTargets between the interval marks', () => {
+  const step = (ms: number) => PlanStepSchema.parse({ ts: new Date(ms).toISOString(), roomId: 'bedroom-1', hvacMode: 'cool', setpointC: 25, fanOn: false, level: 'comfort', batteryTargetSocPct: 50 });
+  const MIN = 60_000;
+  /** Lowest SOC over [from, to) of a battery whose SOC is `soc(ms)`, sampled every 5 minutes. */
+  const lowest = (soc: (ms: number) => number) => (from: number, to: number) => {
+    let min = Infinity;
+    for (let ms = from; ms < to; ms += 5 * MIN) min = Math.min(min, soc(ms));
+    return min === Infinity ? soc(from) : min;
+  };
+  const targetsOf = (steps: readonly { ts: string; batteryTargetSocPct: number }[]) =>
+    [...new Map(steps.map((s) => [Date.parse(s.ts), s.batteryTargetSocPct])).entries()].sort((a, b) => a[0] - b[0]);
+
+  it('gives a step between two marks the target interpolated between theirs', () => {
+    // Draining 6 % per hour: the marks get 84 (lowest of the first hour) and 78; a step at 30 min gets 81.
+    const soc = (ms: number) => 90 - ((ms - T0) / H) * 6;
+    const steps = withTargets([step(T0), step(T0 + 30 * MIN)], { socMin: lowest(soc), fromMs: T0, toMs: T0 + 2 * H, safeRoomId: 'bedroom-1', config: cfg });
+    expect(targetsOf(steps).map(([ms, t]) => [(ms - T0) / MIN, Math.round(t * 10) / 10])).toEqual([
+      [0, 84.5],
+      [30, 81.5],
+      [60, 78.5],
+    ]);
+  });
+
+  it('property: steps between the marks never make the battery look faster than the marks do, and the SOC stays above each target', () => {
+    fc.assert(
+      fc.property(
+        fc.boolean(),
+        fc.array(fc.double({ min: 0, max: 12, noNaN: true }), { minLength: 4, maxLength: 4 }),
+        fc.uniqueArray(fc.integer({ min: 1, max: 47 }), { maxLength: 10 }),
+        (charging, ratesPerHour, fiveMinuteSlots) => {
+          // A monotone battery: piecewise linear, each hour at its own rate.
+          const soc = (ms: number) => {
+            let v = 50;
+            for (let h = 0; h < 4; h++) {
+              const inHour = Math.min(Math.max((ms - T0) / H - h, 0), 1);
+              v += (charging ? 1 : -1) * (ratesPerHour[h] ?? 0) * inHour;
+            }
+            return v;
+          };
+          const toMs = T0 + 4 * H;
+          const extra = fiveMinuteSlots.map((k) => T0 + k * 5 * MIN).filter((ms) => (ms - T0) % H !== 0);
+          const steps = withTargets([step(T0), ...extra.map(step)], { socMin: lowest(soc), fromMs: T0, toMs, safeRoomId: 'bedroom-1', config: cfg });
+          const all = targetsOf(steps);
+          const marks = all.filter(([ms]) => (ms - T0) % H === 0);
+          const steepest = (list: [number, number][]) => Math.max(0, ...list.slice(1).map(([ms, t], i) => Math.abs(t - (list[i]?.[1] ?? t)) / ((ms - (list[i]?.[0] ?? ms)) / H)));
+          expect(steepest(all)).toBeLessThanOrEqual(steepest(marks) + 1e-6);
+          all.forEach(([ms, t], i) => {
+            const until = all[i + 1]?.[0] ?? toMs;
+            for (let x = ms; x < until; x += 5 * MIN) expect(soc(x)).toBeGreaterThanOrEqual(t - 1e-6);
+          });
+        },
+      ),
+      { numRuns: runs(10_000) },
+    );
+  }, 120_000);
+});
+
+describe("humidityBandWithin (the planner aims inside the person's humidity limits)", () => {
+  const cfgBand = { dryOnPct: 55, dryOffPct: 45, marginPct: 3 };
+
+  it('keeps the configured band when the limits are wider', () => {
+    expect(humidityBandWithin(cfgBand, { minPct: 40, maxPct: 60 })).toEqual({ dryOnPct: 55, dryOffPct: 45 });
+  });
+
+  it('narrows it a margin inside the limits', () => {
+    expect(humidityBandWithin(cfgBand, { minPct: 40, maxPct: 50 })).toEqual({ dryOnPct: 47, dryOffPct: 45 });
+    expect(humidityBandWithin(cfgBand, { minPct: 50, maxPct: 70 })).toEqual({ dryOnPct: 55, dryOffPct: 53 });
+  });
+
+  it('on limits too close for a band, aims at their middle', () => {
+    expect(humidityBandWithin(cfgBand, { minPct: 48, maxPct: 52 })).toEqual({ dryOnPct: 50, dryOffPct: 50 });
+  });
+
+  it('property: the band is always inside the limits, with the lower edge not above the upper', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 30, max: 60 }), fc.integer({ min: 0, max: 40 }), (minPct, width) => {
+        const b = humidityBandWithin(cfgBand, { minPct, maxPct: minPct + width });
+        expect(b.dryOffPct).toBeLessThanOrEqual(b.dryOnPct);
+        expect(b.dryOffPct).toBeGreaterThanOrEqual(minPct);
+        expect(b.dryOnPct).toBeLessThanOrEqual(minPct + width);
+      }),
+      { numRuns: runs(10_000) },
+    );
+  });
+});
+
+describe('nextHumidityMode (dry or cool by humidity, with hysteresis)', () => {
+  const band = { dryOnPct: 55, dryOffPct: 45 };
+
+  it('starts dry only above the upper edge of the band', () => {
+    expect(nextHumidityMode(undefined, 55.1, band)).toBe('dry');
+    expect(nextHumidityMode(undefined, 55, band)).toBe('cool');
+  });
+
+  it('turns cool to dry only above the upper edge, and dry to cool only below the lower edge', () => {
+    expect(nextHumidityMode('cool', 55, band)).toBe('cool');
+    expect(nextHumidityMode('cool', 55.1, band)).toBe('dry');
+    expect(nextHumidityMode('dry', 45, band)).toBe('dry');
+    expect(nextHumidityMode('dry', 44.9, band)).toBe('cool');
+  });
+
+  it('alternates on a humid night: dries down to the lower edge, then cools up to the upper one', () => {
+    // Each step of dry takes 4 points off, each step of cool adds 3.
+    let rh = 50;
+    let mode: HumidityMode | undefined;
+    const modes: HumidityMode[] = [];
+    for (let i = 0; i < 9; i++) {
+      mode = nextHumidityMode(mode, rh, band);
+      modes.push(mode);
+      rh += mode === 'dry' ? -4 : 3;
+    }
+    // 50 → 53 → 56 (dry) → 52 → 48 → 44 (cool) → 47 → 50 → 53
+    expect(modes).toEqual(['cool', 'cool', 'dry', 'dry', 'dry', 'cool', 'cool', 'cool', 'cool']);
+  });
+
+  it('property: inside the band the mode never changes (no flip-flop)', () => {
+    fc.assert(
+      fc.property(fc.constantFrom<HumidityMode>('dry', 'cool'), fc.double({ min: 45, max: 55, noNaN: true }), (mode, rh) => {
+        expect(nextHumidityMode(mode, rh, band)).toBe(mode);
+      }),
+      { numRuns: runs(10_000) },
+    );
+  });
+
+  it('property: above the band it dries, below it cools, whatever the mode before', () => {
+    fc.assert(
+      fc.property(fc.constantFrom<HumidityMode | undefined>('dry', 'cool', undefined), fc.double({ min: 0, max: 100, noNaN: true }), (mode, rh) => {
+        fc.pre(rh < 45 || rh > 55);
+        expect(nextHumidityMode(mode, rh, band)).toBe(rh > 55 ? 'dry' : 'cool');
+      }),
+      { numRuns: runs(10_000) },
+    );
   });
 });

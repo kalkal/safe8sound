@@ -31,6 +31,40 @@ export interface PlannerConfig {
   readonly targetEveryMinutes: number;
   /** How the essential rung may run the unit part of the time when it cannot run all the time, most first. */
   readonly dutyCycles: readonly { readonly onMinutes: number; readonly periodMinutes: number }[];
+  /** Dry or cool in the safe room: dry once the projected humidity rises above `dryOnPct`, cool again below `dryOffPct`. */
+  readonly humidityBand: HumidityBandConfig;
+}
+
+export interface HumidityBandConfig {
+  readonly dryOnPct: number;
+  readonly dryOffPct: number;
+  /** How far inside the person's humidity limits the band is kept. */
+  readonly marginPct: number;
+}
+
+/**
+ * The band the planner aims at, inside the person's humidity limits: the configured edges, narrowed to a
+ * margin within the limits (a 40-50 % preference must not be aimed at with 45-55 %). Limits too close for a
+ * band give a single point, their middle.
+ */
+export function humidityBandWithin(band: HumidityBandConfig, limits: { minPct: number; maxPct: number }): { dryOnPct: number; dryOffPct: number } {
+  const dryOnPct = Math.min(band.dryOnPct, limits.maxPct - band.marginPct);
+  const dryOffPct = Math.max(band.dryOffPct, limits.minPct + band.marginPct);
+  if (dryOffPct <= dryOnPct) return { dryOnPct, dryOffPct };
+  const middle = (limits.minPct + limits.maxPct) / 2;
+  return { dryOnPct: middle, dryOffPct: middle };
+}
+
+export type HumidityMode = 'dry' | 'cool';
+
+/**
+ * Dry or cool for the safe room at the next step, from its humidity now, with hysteresis: cool turns to dry
+ * once the humidity is above `dryOnPct`, dry turns back to cool once it is below `dryOffPct`. One mode for the
+ * whole evening and night either over-humidifies (cool) or over-dries (dry); inside the band the mode never flips.
+ */
+export function nextHumidityMode(current: HumidityMode | undefined, rhPct: number, config: { dryOnPct: number; dryOffPct: number }): HumidityMode {
+  if (current === 'dry') return rhPct < config.dryOffPct ? 'cool' : 'dry';
+  return rhPct > config.dryOnPct ? 'dry' : 'cool';
 }
 
 /**
@@ -136,12 +170,25 @@ export function withTargets(
     if (inForce !== undefined) repeats.push({ ...inForce, ts: new Date(ms).toISOString() });
   }
   const all = [...steps, ...repeats];
-  const times = [...new Set(all.map((s) => Date.parse(s.ts)))].sort((a, b) => a - b);
-  const next = (ms: number) => times.find((t) => t > ms) ?? Math.max(opts.toMs, ms + every);
-  return all.map((s) => {
-    const ms = Date.parse(s.ts);
-    return { ...s, batteryTargetSocPct: pct(opts.socMin(ms, next(ms))) };
-  });
+  // The marks every interval carry the lowest SOC up to the next mark. A step between two marks (a pacing
+  // cycle, a change of mode) is interpolated between theirs: a target of its own, the lowest SOC up to the next
+  // step, would compare windows of different lengths and make the battery look many times faster than it is.
+  const marks: number[] = [];
+  for (let ms = opts.fromMs; ms < opts.toMs; ms += every) marks.push(ms);
+  const markTarget = marks.map((ms, i) => opts.socMin(ms, marks[i + 1] ?? Math.max(opts.toMs, ms + every)));
+  const targetAt = (ms: number): number => {
+    const i = marks.findLastIndex((m) => m <= ms);
+    const from = marks[i];
+    const at = markTarget[i];
+    if (from === undefined || at === undefined) return opts.socMin(ms, ms + every);
+    if (from === ms) return at;
+    const to = marks[i + 1];
+    const then = markTarget[i + 1];
+    if (to === undefined || then === undefined) return Math.min(at, opts.socMin(ms, Math.max(opts.toMs, from + every)));
+    const interpolated = at + ((then - at) * (ms - from)) / (to - from);
+    return Math.min(interpolated, opts.socMin(ms, to));
+  };
+  return all.map((s) => ({ ...s, batteryTargetSocPct: pct(targetAt(Date.parse(s.ts))) }));
 }
 
 /**

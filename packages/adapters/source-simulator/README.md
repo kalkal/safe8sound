@@ -28,7 +28,8 @@ The 1R1C constants are in K/kW and kWh/K as in the contract.
 - `data/simulator-params.json`: physics parameters (config, never constants in code). Dry-mode
   factors, fan-only power, internal gains and humidity rates are S6 assumptions to calibrate on real data.
 - `scenarios/*.json`: `clear-day`, `heatwave`, `storm-blackout`. Each has a semantic `version`, a `seed`,
-  24 hourly values (weather + base load, interpolated inside the hour), half-open `[fromH, toH)` windows
+  one hourly value per hour of `durationH` (weather + base load, interpolated inside the hour; 24 hours, 36 for
+  `heatwave` so a plan made in the afternoon sees the whole night), half-open `[fromH, toH)` windows
   for grid outages, occupancy (roles only) and HVAC settings, and `simulatedGroups`: the field groups the
   scenario replaces even over a live home. `storm-blackout` lists all three groups, so it is always
   fully simulated. The clear-day and heatwave weather is the PVGIS July profile of S6 turned into irradiance.

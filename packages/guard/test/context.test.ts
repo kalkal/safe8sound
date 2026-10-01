@@ -64,6 +64,20 @@ describe('projectFrom', () => {
     expect(points[0]?.flows.fansW).toBe(0);
     expect(iso(points.at(-1)?.ms ?? 0)).toBe(iso(T0 + H - 5 * MIN));
   });
+
+  it('hands the control the states of the known rooms at each step', () => {
+    const s = snapshot();
+    const seen: string[][] = [];
+    const points = projectFrom(
+      input({ snapshot: s }),
+      (_ms, rooms) => {
+        seen.push(rooms.map((r) => `${r.id} ${r.humidityPct.toFixed(3)}`));
+        return [];
+      },
+      { toMs: T0 + H, dischargeFloorPct: s.batterySocPct },
+    );
+    expect(seen).toEqual(points.map((p) => p.rooms.map((r) => `${r.id} ${r.humidityPct.toFixed(3)}`)));
+  });
 });
 
 describe('reserveOf', () => {

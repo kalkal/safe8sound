@@ -69,7 +69,9 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       expect(text).toContain('storm_reserve holds');
       expect(text).toMatch(/Without the plan the safe room \(bedroom-1\) would peak at \d+(\.\d)? °C/);
       expect(text).toContain('simulated data');
-      expect(text).toContain('Night recovery (elderly) not assessable yet: the plan covers only 2 of the 9 night hours.');
+      // The 36-hour heatwave shows the whole night: the night-recovery guarantee is met and said with its hours.
+      expect(plan.nightRecovery?.status).toBe('met');
+      expect(text).toMatch(/Night recovery \(elderly\) met: [\d.]+ of 6 hours at or below 24 °C/);
       expect(text).toMatch(/What it does: bedroom-1: (cool|dry) at \d+(\.\d)? °C/);
       expect(plan.counterfactual?.scenarios.noPlan.peakTempC).toBeGreaterThan(plan.counterfactual?.scenarios.plan.peakTempC ?? Infinity);
 

@@ -18,6 +18,13 @@ describe('comfort-plan config', () => {
     expect(c.ok).toBe(false);
   });
 
+  it('reads the humidity band and refuses one whose lower edge is not below the upper', () => {
+    const c = parseComfortPlanConfig(raw);
+    expect(c.ok && c.value.planner.humidityBand).toEqual({ dryOnPct: 55, dryOffPct: 45, marginPct: 3 });
+    const wrong = parseComfortPlanConfig({ ...raw, planner: { ...raw.planner, humidityBand: { dryOnPct: 50, dryOffPct: 50, marginPct: 3 } } });
+    expect(!wrong.ok && wrong.error.details?.issues?.[0]?.path).toBe('planner.humidityBand');
+  });
+
   it('reads the level loads of the reserve outlook and refuses them out of order', () => {
     const c = parseComfortPlanConfig(raw);
     expect(c.ok && c.value.outlook.levelLoadW).toEqual({ comfort: 1200, balanced: 900, saver: 650 });

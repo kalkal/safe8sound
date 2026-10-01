@@ -30,7 +30,8 @@ export interface ProjectionInput {
     readonly occupants: Readonly<Record<string, readonly string[]>>;
   };
   readonly weatherAt: (ms: number) => Weather;
-  readonly controlAt: (ms: number) => readonly RoomControl[];
+  /** The room settings at an instant; it gets the room states at that instant, so a controller can react to them. */
+  readonly controlAt: (ms: number, rooms: readonly RoomState[]) => readonly RoomControl[];
   readonly gridAvailable: boolean;
   /** The battery stops discharging here (the reserve floor on grid, the hardware floor off grid). */
   readonly dischargeFloorPct: Pct;
@@ -61,7 +62,7 @@ export function project(input: ProjectionInput): ProjectionPoint[] {
   let state = { socPct: input.start.socPct, rooms: input.start.rooms };
   for (let ms = input.start.ms; ms < input.toMs; ms += stepMs) {
     const weather = input.weatherAt(ms);
-    const rooms = input.controlAt(ms).map((c) => ({
+    const rooms = input.controlAt(ms, state.rooms).map((c) => ({
       id: c.id,
       occupants: input.start.occupants[c.id] ?? [],
       ...(c.hvac === undefined ? {} : { hvac: c.hvac }),

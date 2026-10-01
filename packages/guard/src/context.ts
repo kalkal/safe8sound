@@ -21,6 +21,7 @@ import {
   weatherFromForecast,
   type ProjectionPoint,
   type RoomControl,
+  type RoomState,
   type SimParams,
 } from '@cold-reserve/core';
 import type { GuardConfig } from './config.js';
@@ -130,7 +131,7 @@ export function currentControls(snapshot: Snapshot): RoomControl[] {
 /** Projects any control schedule from the snapshot: the plan, or the night-recovery reference. */
 export function projectFrom(
   input: GuardInput,
-  controlAt: (ms: number) => readonly RoomControl[],
+  controlAt: (ms: number, rooms: readonly RoomState[]) => readonly RoomControl[],
   opts: { toMs: number; dischargeFloorPct: Pct },
 ): ProjectionPoint[] {
   const { snapshot, profile } = input;
@@ -152,7 +153,7 @@ export function projectFrom(
       occupants: Object.fromEntries(known.map((r) => [r.id, r.occupants])),
     },
     weatherAt,
-    controlAt: (ms) => controlAt(ms).filter((c) => known.some((r) => r.id === c.id)),
+    controlAt: (ms, rooms) => controlAt(ms, rooms).filter((c) => known.some((r) => r.id === c.id)),
     gridAvailable: snapshot.gridAvailable,
     dischargeFloorPct: opts.dischargeFloorPct,
     baseLoadAt: (ms) => {

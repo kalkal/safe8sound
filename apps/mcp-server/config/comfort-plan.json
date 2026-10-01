@@ -35,7 +35,12 @@
         "onMinutes": 5,
         "periodMinutes": 20
       }
-    ]
+    ],
+    "humidityBand": {
+      "dryOnPct": 55,
+      "dryOffPct": 45,
+      "marginPct": 3
+    }
   },
   "outlook": {
     "$comment": "Average load at each level for the ice cubes (assumption, to calibrate on the plant); Essential comes from the guard config (reserve.essentialLoadW).",

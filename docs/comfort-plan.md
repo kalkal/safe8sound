@@ -11,8 +11,14 @@ Input: `goal` (`cool | heat | dry | auto`), plus optional `setpointC` and `roomI
    - fans run from balanced down;
    - dry is preferred from balanced down;
    - essential serves the safe room only, a little inside its safety threshold.
-3. **Candidates.** Each rung sets the safe room and the occupied rooms. Rooms whose maximum input does not fit the inverter budget are switched off in priority order, safe room first. Battery targets come from the projection of the candidate itself: each is the lowest SOC expected before the next target.
-4. **Night recovery in the plan.** During the 22:00–07:00 window the safe room is cooled a little below the night threshold: 26 °C, or 24 °C when an elderly person is in the room (roles from config). Dry stays dry. Each rung is tried with this night cooling first, then without it.
+3. **Candidates.** Each rung sets the safe room and the occupied rooms. Rooms whose maximum input does not fit the inverter budget are switched off in priority order, safe room first. Battery targets come from the projection of the candidate itself. Every `targetEveryMinutes` a mark gets the lowest SOC expected before the next mark. A step between two marks (a pacing cycle, a change of mode) gets a target interpolated between theirs, never above the lowest SOC up to the next mark. A target of its own would compare windows of different lengths and make the battery look many times faster than it is.
+4. **Night recovery in the plan.** During the 22:00–07:00 window the safe room is cooled a little below the night threshold: 26 °C, or 24 °C when an elderly person is in the room (roles from config). Each rung is tried with this night cooling first, then without it.
+4b. **Dry or cool by humidity.** On the planner's own plans in the cooling season, the safe room's dry and cool settings take their mode step by step, every 5 minutes until the horizon, from the projected humidity (`nextHumidityMode`, config `planner.humidityBand`):
+   - dry once the humidity is above `dryOnPct` (55 %);
+   - cool again once it is below `dryOffPct` (45 %);
+   - inside the band the mode never flips.
+
+   One mode for the whole evening and night fails both ways: cool lets humid night air push the room above 60 %, and dry takes it below 40 % (dry removes about 18 points of RH in half an hour). The modes come from one closed-loop projection, where the control reads the room states. They become plan steps, so the guard projects exactly the same plan. Setpoints, fans and pacing stay as planned. A plan the model proposes is left as it is.
 5. **Pacing inside the hour.** If no rung is accepted, the essential rung runs the safe room's unit part of the time: dry for N minutes per period, then only the fan (config `dutyCycles`, most first). This keeps the room dry and cool for much less energy.
 6. **Decision.** The first candidate the guard accepts is proposed:
    - it carries the ladder from its rung down, so later steps down need no new consent;
@@ -38,7 +44,10 @@ The agent reads only the text content of a tool result, not `structuredContent`,
   - each room's setting;
   - every step down that confirming pre-authorizes (plan §9.4);
   - each guarantee with its reason, the storm reserve and, with the grid up, its floor (with the grid down the reserve is the budget, so the plan has no floor);
-  - the night recovery with its hours, or "not assessable yet" when the plan sees too little of the night to require any hour (for example the 24-hour heatwave, which ends at local midnight);
+  - the night recovery:
+    - with its hours, and the heat (heat-index degree-hours against the budget) when the budget fails;
+    - only the heat, when no hour is required and the budget fails;
+    - "not assessable yet" when the plan sees only part of the night and requires no hour yet (for example the 24-hour clear day, which ends at local midnight);
   - the warnings;
   - the counterfactual: peak and time, heat-index degree-hours and night hours at or below the threshold, for no plan, the naive plan and this plan.
 - **apply_plan:** what happened, and on the real home every manual step.

@@ -47,14 +47,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
     `Storm reserve ${one(p.reserveWh / 1000)} kWh${p.reserveFloorSocPct === undefined ? '' : `: the battery stays at or above ${one(p.reserveFloorSocPct)} % while the grid is up`}.`,
   ];
   const n = p.nightRecovery;
-  const coveredHours = n === undefined ? 0 : Math.round(((Date.parse(n.window.end) - Date.parse(n.window.start)) / 3_600_000) * 100) / 100;
-  if (n !== undefined && n.requiredHours === 0 && n.status === 'met') {
-    // A plan that sees only part of the night requires nothing yet: "0.75 of 0 hours" would mislead.
-    parts.push(`Night recovery (${n.mode}) not assessable yet: the plan covers only ${String(coveredHours)} of the ${String(opts.nightWindowHours)} night hours.`);
-  } else if (n !== undefined) {
-    const best = n.bestAchievableHours === undefined ? '' : `, best achievable ${String(n.bestAchievableHours)} hours`;
-    parts.push(`Night recovery (${n.mode}) ${n.status}: ${String(n.achievedHours)} of ${String(n.requiredHours)} hours at or below ${String(n.thresholdC)} °C${best}.`);
-  }
+  if (n !== undefined) parts.push(nightText(n, opts));
   for (const w of p.warnings ?? []) parts.push(`Warning: ${w.message}`);
   const c = p.counterfactual;
   if (c !== undefined) {
@@ -67,6 +60,23 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   }
   parts.push(`Say it to the person and ask to confirm; then call apply_plan with planId ${p.id}.`);
   return parts.join(' ');
+}
+
+/** The night-recovery line: the hours, the heat budget when it fails, or "not assessable" on a partial night. */
+function nightText(n: NonNullable<Plan['nightRecovery']>, opts: PlanSummaryOptions): string {
+  const coveredHours = Math.round(((Date.parse(n.window.end) - Date.parse(n.window.start)) / 3_600_000) * 100) / 100;
+  const head = `Night recovery (${n.mode})`;
+  // A plan that sees only part of the night requires nothing yet: "0.75 of 0 hours" would mislead.
+  if (n.requiredHours === 0 && n.status === 'met' && coveredHours < opts.nightWindowHours) {
+    return `${head} not assessable yet: the plan covers only ${String(coveredHours)} of the ${String(opts.nightWindowHours)} night hours.`;
+  }
+  const heat = `the heat would reach ${String(n.heatIndexDegreeHoursAbove26_7)} heat-index degree-hours above 26.7 °C, over the ${String(n.budgetDegreeHours)} allowed`;
+  const overBudget = n.heatIndexDegreeHoursAbove26_7 > n.budgetDegreeHours;
+  // With no hour required, only the heat budget can fail: say that, not "0.5 of 0 hours".
+  if (n.requiredHours === 0 && n.status !== 'met') return `${head} ${n.status}: ${heat}.`;
+  const best = n.bestAchievableHours === undefined ? '' : `, best achievable ${String(n.bestAchievableHours)} hours`;
+  const hours = `${String(n.achievedHours)} of ${String(n.requiredHours)} hours at or below ${String(n.thresholdC)} °C${best}`;
+  return `${head} ${n.status}: ${hours}${overBudget ? `, and ${heat}` : ''}.`;
 }
 
 export function applySummary(o: ApplyPlanOutput): string {

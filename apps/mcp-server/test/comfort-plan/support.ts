@@ -1,4 +1,4 @@
-import { HomeIdSchema, PreferencesSchema, ok, type Forecast, type HomeId, type Snapshot } from '@cold-reserve/contracts';
+import { HomeIdSchema, PreferencesSchema, ok, type Forecast, type HomeId, type Preferences, type Snapshot } from '@cold-reserve/contracts';
 import { examplePreferences } from '@cold-reserve/contracts/fixtures';
 import { fixedClock, type Clock } from '@cold-reserve/core';
 import { parseGuardConfig } from '@cold-reserve/guard';
@@ -38,7 +38,7 @@ export function comfortConfig() {
 }
 
 /** A simulator scenario at hour `atH`, with every dependency of the module. */
-export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast } = {}) {
+export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences } = {}) {
   const profile = demoProfile();
   const scenario = builtInScenario(id);
   const startMs = Date.parse(scenario.startAt);
@@ -63,7 +63,7 @@ export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; read
           }
         : undefined,
     storeFor,
-    preferencesFor: () => Promise.resolve(ok(preferences)),
+    preferencesFor: () => Promise.resolve(ok(over.preferences ?? preferences)),
     clock,
     model: defaultSimParams(),
     guard: guardConfig(),

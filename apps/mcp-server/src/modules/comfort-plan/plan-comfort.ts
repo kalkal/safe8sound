@@ -3,6 +3,7 @@ import {
   celsius,
   err,
   ok,
+  pct,
   toolError,
   type ErrorEnvelope,
   type Forecast,
@@ -15,8 +16,8 @@ import {
   type Result,
   type Snapshot,
 } from '@cold-reserve/contracts';
-import { acLimitW, buildLadder, candidateSteps, darkWindow, dutyCycle, nextNightWindow, seasonFor, withTargets } from '@cold-reserve/core';
-import { buildContext, counterfactualOf, rejectionOf, runGuard, type CandidatePlan, type GuardInput, type GuardVerdict } from '@cold-reserve/guard';
+import { acLimitW, buildLadder, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, seasonFor, withTargets, type HumidityMode } from '@cold-reserve/core';
+import { buildContext, counterfactualOf, currentControls, projectFrom, rejectionOf, reserveOf, runGuard, type CandidatePlan, type GuardInput, type GuardVerdict } from '@cold-reserve/guard';
 import type { ToolContext } from '../../tool.js';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
 import { recordRejection } from './rejections.js';
@@ -207,26 +208,28 @@ function tryRung(
     cycle === undefined
       ? base
       : base.flatMap((s) => (s.roomId === preferences.safeRoomId && s.hvacMode !== 'off' ? dutyCycle(s, { ...cycle, fromMs: atMs, toMs: cycleEndMs }) : [s]));
-  const nightly = season === 'cooling' && nightCooling ? withNightCooling(paced, deps, guardInput, atMs, horizonMs, rung.preferredModes.includes('dry')) : paced;
-  const untargeted: CandidatePlan = { horizonAt: new Date(horizonMs).toISOString(), steps: nightly, ladder };
+  const nightly = season === 'cooling' && nightCooling ? withNightCooling(paced, deps, guardInput, atMs, horizonMs) : paced;
+  // A plan the model proposed is checked exactly as it is; the planner's own plans follow the humidity.
+  const humid = season === 'cooling' && !exact ? withHumidityControl(nightly, deps, guardInput, horizonMs) : nightly;
+  const untargeted: CandidatePlan = { horizonAt: new Date(horizonMs).toISOString(), steps: humid, ladder };
   const context = buildContext({ ...guardInput, plan: untargeted });
   // Each target is the lowest SOC the projection expects until the next target (see withTargets).
   const socMin = (fromMs: number, toMs: number) => {
     const socs = context.points.filter((p) => p.ms >= fromMs && p.ms < toMs).map((p) => p.socPct);
     return socs.length === 0 ? (context.points.at(-1)?.socPct ?? snapshot.batterySocPct) : Math.min(...socs);
   };
-  const steps = withTargets(nightly, { socMin, fromMs: atMs, toMs: context.horizonMs, safeRoomId: preferences.safeRoomId, config: deps.config.planner });
+  const steps = withTargets(humid, { socMin, fromMs: atMs, toMs: context.horizonMs, safeRoomId: preferences.safeRoomId, config: deps.config.planner });
   const candidate: CandidatePlan = { horizonAt: new Date(context.horizonMs).toISOString(), steps, ladder };
   return { candidate, verdict: runGuard({ ...guardInput, plan: candidate }), guardInput };
 }
 
 /**
  * Night recovery in the plan itself: during the night window the safe room is cooled a little below the
- * night threshold (26 °C, or 24 °C for an elderly person) in the rung's mode (dry stays dry), then goes back to
- * the rung's setting. Outside the
- * window nothing changes; inside it, any pacing cycle of the safe room gives way to steady cooling.
+ * night threshold (26 °C, or 24 °C for an elderly person), then goes back to the rung's setting. Outside the
+ * window nothing changes; inside it, any pacing cycle of the safe room gives way to steady cooling. Whether it
+ * dries or cools is left to withHumidityControl.
  */
-function withNightCooling(steps: readonly PlanStep[], deps: ComfortPlanDeps, guardInput: GuardInput, atMs: number, horizonMs: number, rungPrefersDry: boolean): PlanStep[] {
+function withNightCooling(steps: readonly PlanStep[], deps: ComfortPlanDeps, guardInput: GuardInput, atMs: number, horizonMs: number): PlanStep[] {
   const { profile, preferences } = guardInput;
   const cfg = deps.guard.nightRecovery;
   const window = nextNightWindow(atMs, horizonMs, profile.location.tz, cfg);
@@ -235,9 +238,57 @@ function withNightCooling(steps: readonly PlanStep[], deps: ComfortPlanDeps, gua
   if (window === undefined || safe === undefined || !cools) return [...steps];
   const nightC = Math.min(safe.setpointC, cfg.thresholdC[guardInput.nightRecoveryMode] - cfg.referenceSetpointMarginK);
   const inside = (s: PlanStep) => s.roomId === preferences.safeRoomId && Date.parse(s.ts) >= window.startMs && Date.parse(s.ts) < window.endMs;
-  // Dry keeps drying while it cools: used whenever the rung prefers it (night air is humid).
-  const mode = safe.hvacMode === 'dry' || rungPrefersDry ? 'dry' : 'cool';
+  const mode = safe.hvacMode === 'dry' ? 'dry' : 'cool';
   const night: PlanStep = { ...safe, ts: new Date(window.startMs).toISOString(), hvacMode: mode, setpointC: celsius(Math.round(nightC * 10) / 10) };
   const morning: PlanStep[] = window.endMs < horizonMs ? [{ ...safe, ts: new Date(window.endMs).toISOString() }] : [];
   return [...steps.filter((s) => !inside(s) && !(s.roomId === preferences.safeRoomId && Date.parse(s.ts) === window.endMs)), night, ...morning];
+}
+
+/**
+ * Dry or cool in the safe room, step by step until the horizon, from its projected humidity (nextHumidityMode,
+ * with hysteresis): dry while the humid evening and night air would push the room above the band, cool once
+ * dry would push it below. One mode for the whole evening and night either over-humidifies or over-dries.
+ * Setpoints, fans and pacing stay as planned; only a dry or cool setting changes mode. The modes come from one
+ * closed-loop projection and become plan steps, so the guard's projection of the plan is the same.
+ */
+function withHumidityControl(steps: readonly PlanStep[], deps: ComfortPlanDeps, guardInput: GuardInput, horizonMs: number): PlanStep[] {
+  const { profile, preferences, snapshot } = guardInput;
+  const safeId = preferences.safeRoomId;
+  const modes = profile.rooms.find((r) => r.id === safeId)?.hvacUnits.flatMap((u) => u.modes) ?? [];
+  const own = steps.filter((s) => s.roomId === safeId).sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  if (!modes.includes('dry') || !modes.includes('cool') || own.length === 0) return [...steps];
+  const switches = (s: PlanStep | undefined) => s !== undefined && (s.hvacMode === 'dry' || s.hvacMode === 'cool');
+  const inForce = (ms: number) => own.filter((s) => Date.parse(s.ts) <= ms).at(-1);
+
+  // Aim inside the person's limits, or the planner would propose plans its own guard refuses. The mode is
+  // decided at every projection step (5 minutes): dry takes about 3 points of RH off per step, so one step of
+  // overshoot past an edge stays within the margin (config `marginPct`, 3).
+  const band = humidityBandWithin(deps.config.planner.humidityBand, preferences.safety.humidity);
+  const changes: { ms: number; mode: HumidityMode }[] = [];
+  let mode: HumidityMode | undefined;
+  const planned = controlFromSteps(steps, currentControls(snapshot));
+  const dischargeFloorPct = snapshot.gridAvailable ? reserveOf(guardInput).reserveFloorSocPct : pct(profile.battery.minSocHwPct);
+  projectFrom(
+    guardInput,
+    (ms, rooms) => {
+      if (!switches(inForce(ms))) return planned(ms);
+      const rh = rooms.find((r) => r.id === safeId)?.humidityPct ?? 0;
+      const next = nextHumidityMode(mode, rh, band);
+      if (next !== mode) changes.push({ ms, mode: next });
+      mode = next;
+      return planned(ms).map((c) => (c.id === safeId && c.hvac !== undefined ? { ...c, hvac: { ...c.hvac, mode: next } } : c));
+    },
+    { toMs: horizonMs, dischargeFloorPct },
+  );
+
+  // The same control as plan steps: every dry or cool setting takes the mode in force, and each change of
+  // mode between two settings becomes a step of its own.
+  const modeAt = (ms: number) => changes.filter((c) => c.ms <= ms).at(-1)?.mode;
+  const rewritten = steps.map((s) => (s.roomId === safeId && switches(s) ? { ...s, hvacMode: modeAt(Date.parse(s.ts)) ?? s.hvacMode } : s));
+  const added = changes.flatMap((c): PlanStep[] => {
+    const setting = inForce(c.ms);
+    if (setting === undefined || Date.parse(setting.ts) === c.ms) return [];
+    return [{ ...setting, ts: new Date(c.ms).toISOString(), hvacMode: c.mode }];
+  });
+  return [...rewritten, ...added];
 }
