@@ -34,6 +34,8 @@ export const handler = createLambdaHandler(async () => {
   const comfortPlan = comfortPlanWiring({ storeFor: storeFor.value, preferences: preferences.value, clock: wallClock });
   if (!comfortPlan.ok) return comfortPlan;
 
+  // No cardDocuments yet: the built card bundle is not shipped with the function, so the Lambda serves
+  // the tools without their ui:// cards. TODO(#104): ship the card bundle with the MCP Lambda.
   const app = createApp({ ...process.env, MCP_CLIENTS: clients.value }, { wallClock, logger: { log }, modules: modules.value, comfortPlan: comfortPlan.value });
   return app.ok ? ok(app.value.handler) : app;
 });

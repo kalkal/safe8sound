@@ -2,6 +2,7 @@ import { HomeIdSchema, HomeProfileSchema, err, ok, toolError, type ErrorEnvelope
 import { scenarioClock, type Clock, type HomeDataSource } from '@cold-reserve/core';
 import { FallbackSource } from '@cold-reserve/source-fallback';
 import { SCENARIO_IDS, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
+import { withCardResources, type CardDocuments } from './cards.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
 import type { ComfortPlanWiring } from './comfort-plan-config.js';
@@ -23,6 +24,8 @@ export interface AppOptions {
   readonly comfortPlan?: ComfortPlanWiring;
   /** The storm-mode module (#23): store, preferences, config and the family phone; over the same homes. */
   readonly stormMode?: StormModeWiring;
+  /** The ui:// card documents (#92): when given, the tools that show a card link it. */
+  readonly cardDocuments?: CardDocuments;
 }
 
 export interface App {
@@ -97,12 +100,13 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly } : undefined;
   };
 
-  const registry = createRegistry([
+  const modules = [
     energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver }),
     ...(opts.comfortPlan === undefined ? [] : [comfortPlanModule({ ...opts.comfortPlan, model: params, homes: planningHome })]),
     ...(opts.stormMode === undefined ? [] : [stormModeModule({ ...opts.stormMode, homes: planningHome })]),
     ...(opts.modules ?? []),
-  ]);
+  ];
+  const registry = createRegistry(opts.cardDocuments === undefined ? modules : withCardResources(modules, opts.cardDocuments));
   if (!registry.ok) return registry;
 
   return ok({

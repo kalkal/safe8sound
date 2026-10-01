@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./card-kinds": "./src/app/card-kinds.ts",
     "./cards.css": "./src/cards.css",
     "./card-app.js": "./dist/card-app.js"
   },

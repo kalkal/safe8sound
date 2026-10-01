@@ -12,7 +12,13 @@ const TIMEOUT = 120_000;
 
 interface Run {
   status: number;
-  result?: { tools?: { name: string }[]; structuredContent?: unknown; isError?: boolean };
+  result?: {
+    tools?: { name: string; _meta?: { ui?: { resourceUri?: string } } }[];
+    resources?: { uri: string; mimeType?: string }[];
+    contents?: { uri: string; mimeType?: string; text?: string; _meta?: unknown }[];
+    structuredContent?: unknown;
+    isError?: boolean;
+  };
   stderr: string;
 }
 
@@ -29,7 +35,7 @@ afterAll(() => {
 function once(args: string[], headers: string[]): Promise<Run> {
   const argv = [INSPECTOR, '--cli', server.url, '--transport', 'http', '--format', 'json', ...headers.flatMap((h) => ['--header', h]), ...args];
   return new Promise((resolve) => {
-    execFile(process.execPath, argv, { cwd: APP_ROOT, timeout: 60_000 }, (error, stdout, stderr) => {
+    execFile(process.execPath, argv, { cwd: APP_ROOT, timeout: 60_000, maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
       let result: Run['result'];
       try {
         result = (JSON.parse(stdout) as { result?: Run['result'] }).result;
@@ -66,6 +72,37 @@ describe('MCP Inspector CLI against the local entry', () => {
     expect(run.result?.isError).toBeFalsy();
     const status = HomeStatusSchema.parse(run.result?.structuredContent);
     expect(status.origin).toMatchObject({ energy: 'simulated', rooms: 'simulated', weather: 'simulated' });
+  });
+
+  it('shows the four cards as ui:// MCP Apps resources (#92)', { timeout: TIMEOUT }, async () => {
+    const run = await inspect(['--method', 'resources/list']);
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.result?.resources?.map((r) => [r.uri, r.mimeType])).toEqual(
+      ['plan-card', 'applied-plan', 'reserve-outlook', 'preferences'].map((card) => [`ui://cold-reserve/${card}`, 'text/html;profile=mcp-app']),
+    );
+  });
+
+  // Needs the built card bundle: CI and `pnpm check` build it before `pnpm test`.
+  it('reads the plan card: one self-contained document that declares its CSP', { timeout: TIMEOUT }, async () => {
+    const run = await inspect(['--method', 'resources/read', '--uri', 'ui://cold-reserve/plan-card']);
+    expect(run.status, run.stderr).toBe(0);
+    const [document] = run.result?.contents ?? [];
+    expect(document).toMatchObject({ uri: 'ui://cold-reserve/plan-card', mimeType: 'text/html;profile=mcp-app', _meta: { ui: { csp: { connectDomains: [] } } } });
+    expect(document?.text).toMatch(/^<!doctype html>/);
+    expect(document?.text).toContain('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'');
+    expect(document?.text).toContain('<div id="root" data-card="plan"></div>');
+  });
+
+  it('links plan_comfort, apply_plan, get_reserve_outlook and get_preferences to their cards', { timeout: TIMEOUT }, async () => {
+    const run = await inspect(['--method', 'tools/list']);
+    expect(run.status, run.stderr).toBe(0);
+    const linked = Object.fromEntries((run.result?.tools ?? []).filter((t) => t._meta).map((t) => [t.name, t._meta?.ui?.resourceUri]));
+    expect(linked).toEqual({
+      plan_comfort: 'ui://cold-reserve/plan-card',
+      apply_plan: 'ui://cold-reserve/applied-plan',
+      get_reserve_outlook: 'ui://cold-reserve/reserve-outlook',
+      get_preferences: 'ui://cold-reserve/preferences',
+    });
   });
 
   it('is refused without a token (401 missing_token) and with a wrong one (401 wrong_client)', { timeout: TIMEOUT }, async () => {

@@ -324,6 +324,9 @@ importers:
       '@cold-reserve/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@cold-reserve/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
       '@cold-reserve/guard':
         specifier: workspace:*
         version: link:../../packages/guard
@@ -345,6 +348,9 @@ importers:
       '@cold-reserve/store-memory':
         specifier: workspace:*
         version: link:../../packages/adapters/store-memory
+      '@cold-reserve/ui-cards':
+        specifier: workspace:*
+        version: link:../../packages/ui-cards
       '@modelcontextprotocol/sdk':
         specifier: 1.30.1
         version: 1.30.1(supports-color@10.2.2)(zod@4.6.5)

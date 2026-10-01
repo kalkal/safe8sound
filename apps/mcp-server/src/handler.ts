@@ -10,10 +10,19 @@ import {
 } from '@cold-reserve/contracts';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { CallToolRequestSchema, ErrorCode as RpcErrorCode, ListToolsRequestSchema, McpError, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  ErrorCode as RpcErrorCode,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+  McpError,
+  ReadResourceRequestSchema,
+  type CallToolResult,
+  type ReadResourceResult,
+} from '@modelcontextprotocol/sdk/types.js';
 import type { z } from 'zod';
 import type { ClientGrant, ServerConfig } from './config.js';
-import type { ModuleRegistry } from './registry.js';
+import type { ModuleRegistry, UiResource } from './registry.js';
 import { listTool, type ToolContext, type ToolDefinition } from './tool.js';
 
 /** One line of the error log (docs/error-handling.md §6.1): no secrets, no personal data. */
@@ -45,6 +54,10 @@ export type McpHandler = (req: Request) => Promise<Response>;
 const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unavailable', 'guard_rejection', 'unauthorized']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_ISSUES = 20;
+/** MCP "resource not found" (spec 2025-11-25, server/resources); the SDK has no name for it. */
+const RESOURCE_NOT_FOUND = -32002;
+/** MCP Apps mime type of a ui:// document. */
+export const CARD_MIME_TYPE = 'text/html;profile=mcp-app';
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest();
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
@@ -125,17 +138,46 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
     return { content: [{ type: 'text', text }], structuredContent: output.data as Record<string, unknown> };
   }
 
+  function readResource(resource: UiResource, ctx: ToolContext): ReadResourceResult {
+    let document;
+    try {
+      document = resource.read();
+    } catch (e) {
+      const error = toolError('unexpected_error', `The server hit an unexpected error. Quote correlation id ${ctx.correlationId} when reporting it.`);
+      record(error, ctx.correlationId, ctx, { resource: resource.uri, errorName: e instanceof Error ? e.name : typeof e });
+      throw new McpError(RpcErrorCode.InternalError, error.message);
+    }
+    if (!document.ok) {
+      record(document.error, ctx.correlationId, ctx, { resource: resource.uri });
+      throw new McpError(RpcErrorCode.InternalError, document.error.message);
+    }
+    // The document needs no network at all (plan §9.4): the host may deny every domain.
+    return { contents: [{ uri: resource.uri, mimeType: CARD_MIME_TYPE, text: document.value, _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } } } }] };
+  }
+
   // The low-level Server (not McpServer) is the decision of spike S1 (#5): structured input errors
   // and unknown tool -> JSON-RPC -32602 need our own tools/call handler.
   // eslint-disable-next-line @typescript-eslint/no-deprecated -- see above
   function buildServer(ctx: ToolContext): Server {
     // eslint-disable-next-line @typescript-eslint/no-deprecated -- see above
-    const server = new Server({ name: config.serverName, version: config.serverVersion }, { capabilities: { tools: { listChanged: false } } });
+    const server = new Server({ name: config.serverName, version: config.serverVersion }, {
+      capabilities: { tools: { listChanged: false }, resources: { listChanged: false } },
+    });
     server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: deps.registry.toolsFor(ctx.homeId).map(listTool) }));
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const tool = deps.registry.findTool(request.params.name, ctx.homeId);
       if (!tool) throw new McpError(RpcErrorCode.InvalidParams, `Unknown tool: ${request.params.name}`);
       return runTool(tool, request.params.arguments, ctx);
+    });
+    server.setRequestHandler(ListResourcesRequestSchema, () => ({
+      resources: deps.registry
+        .resourcesFor(ctx.homeId)
+        .map((r) => ({ uri: r.uri, name: r.name, title: r.title, description: r.description, mimeType: CARD_MIME_TYPE })),
+    }));
+    server.setRequestHandler(ReadResourceRequestSchema, (request) => {
+      const resource = deps.registry.findResource(request.params.uri, ctx.homeId);
+      if (!resource) throw new McpError(RESOURCE_NOT_FOUND, `Resource not found: ${request.params.uri}`);
+      return readResource(resource, ctx);
     });
     return server;
   }

@@ -26,6 +26,8 @@ export interface ToolDefinition<I extends z.ZodObject = z.ZodObject, O extends z
   readonly handler: (args: z.output<I>, ctx: ToolContext) => Promise<Result<z.input<O>, ErrorEnvelope>>;
   /** Short English text for `content`; defaults to the JSON of the output. */
   readonly summarize?: (output: z.output<O>) => string;
+  /** The MCP Apps card that shows the result (#92): a `ui://` resource of the same module. */
+  readonly ui?: { readonly resourceUri: string };
 }
 
 /** Keeps the handler typed against its own schemas. */
@@ -40,6 +42,7 @@ export interface ListedTool {
   inputSchema: JsonObjectSchema;
   outputSchema: JsonObjectSchema;
   annotations: ToolAnnotations;
+  _meta?: { ui: { resourceUri: string }; 'ui/resourceUri': string };
 }
 
 export function listTool(tool: ToolDefinition): ListedTool {
@@ -52,5 +55,7 @@ export function listTool(tool: ToolDefinition): ListedTool {
     inputSchema: { ...input, type: 'object' },
     outputSchema: toolOutputJsonSchema(tool.output),
     annotations: { ...tool.annotations },
+    // The flat `ui/resourceUri` key is the older MCP Apps form, still read by some hosts (spike S3).
+    ...(tool.ui === undefined ? {} : { _meta: { ui: { resourceUri: tool.ui.resourceUri }, 'ui/resourceUri': tool.ui.resourceUri } }),
   };
 }
