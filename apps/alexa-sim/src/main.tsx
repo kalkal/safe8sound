@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, Suspense, lazy, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Agent } from './agent/agent.js';
-import { buildAgent } from './agent/index.js';
+import { buildAgent, buildSession, type DemoSession } from './agent/index.js';
 import { parseConfig, type SimConfig } from './config.js';
 import { cardDocument } from './host/card-documents.js';
 import { CardHostProvider } from './host/card-host.js';
@@ -24,7 +24,9 @@ document.title = t('sim.title');
 const config = parseConfig(import.meta.env, window.location.search, import.meta.env.DEV);
 // The family phone (surface C, #24): fed by the scripted scene. TODO(#24): a feed that polls GET /phone/inbox for the remote agent.
 const phone = createScriptedPhone();
-const agent = config.ok ? buildAgent(config.value, undefined, phone) : config;
+// The demo session of remote mode (#101): the code is exchanged for a token, never stored.
+const session = config.ok ? buildSession(config.value) : undefined;
+const agent = config.ok ? buildAgent(config.value, undefined, phone, session) : config;
 if (!agent.ok) log(configErrorEvent(agent.error));
 const queryClient = new QueryClient();
 
@@ -37,7 +39,7 @@ const Gallery =
     : null;
 
 /** The simulated Alexa+ host: its theme is the hostContext.theme every card frame receives. */
-function Simulator({ agent, config }: { agent: Agent; config: SimConfig }) {
+function Simulator({ agent, config, session }: { agent: Agent; config: SimConfig; session: DemoSession | undefined }) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   useEffect(() => {
     document.documentElement.dataset['cardTheme'] = cardThemeFor(theme);
@@ -56,7 +58,7 @@ function Simulator({ agent, config }: { agent: Agent; config: SimConfig }) {
       </button>
       <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone }}>
         <QueryClientProvider client={queryClient}>
-          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} />
+          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} {...(session === undefined ? {} : { session })} />
         </QueryClientProvider>
       </CardHostProvider>
       {config.agent === 'scripted' && (
@@ -80,7 +82,7 @@ createRoot(container).render(
             <Gallery />
           </Suspense>
         ) : config.ok && agent.ok ? (
-          <Simulator agent={agent.value} config={config.value} />
+          <Simulator agent={agent.value} config={config.value} session={session} />
         ) : (
           <p role="alert">{t('config.invalid')}</p>
         )}

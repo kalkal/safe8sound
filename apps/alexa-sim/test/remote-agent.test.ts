@@ -100,3 +100,65 @@ describe('RemoteAgent (sim-api over HTTP)', () => {
     expect(result.ok && result.value.cards?.map((c) => c.tool)).toEqual(['plan_comfort', 'invalid']);
   });
 });
+
+describe('RemoteAgent with a demo session (#101): the token travels, card actions run', () => {
+  /** `null` starts with no token. */
+  const withSession = (fetch: FakeFetch, token: string | null = 'h.p.s') => {
+    let current: string | undefined = token ?? undefined;
+    const invalidated: string[] = [];
+    const session = {
+      token: () => current,
+      invalidate: (code: string) => {
+        invalidated.push(code);
+        current = undefined;
+      },
+    };
+    return { agent: createRemoteAgent({ baseUrl: BASE, timeoutMs: 1_000, fetch, session }), invalidated };
+  };
+
+  it('sends the demo token as a Bearer header', async () => {
+    let auth: string | null = null;
+    await withSession((_url, init) => {
+      auth = new Headers(init.headers).get('authorization');
+      return json(reply);
+    }).agent.ask('q', { correlationId: 'c' });
+    expect(auth).toBe('Bearer h.p.s');
+  });
+
+  it('asks for the code instead of calling sim-api when there is no token', async () => {
+    let called = false;
+    const result = await withSession(() => {
+      called = true;
+      return json(reply);
+    }, null).agent.ask('q', { correlationId: 'c' });
+    expect(result).toMatchObject({ ok: false, error: { code: 'missing_token' } });
+    expect(called).toBe(false);
+  });
+
+  it('forgets a token sim-api refuses (401), keeping the reason for the UI', async () => {
+    const problem = toProblemDetails(toolError('signature_expired', 'Expired.'), { instance: 'urn:uuid:x' });
+    const { agent: a, invalidated } = withSession(() => json(problem, 401, PROBLEM_JSON_CONTENT_TYPE));
+    expect(await a.ask('q', { correlationId: 'c' })).toMatchObject({ ok: false, error: { code: 'signature_expired' } });
+    expect(invalidated).toEqual(['signature_expired']);
+  });
+
+  it('runs a card action through /v1/tools/call and returns the CallToolResult', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const { agent: a } = withSession((url, init) => {
+      calls.push({ url, init });
+      return json({ content: [{ type: 'text', text: 'Applied.' }], structuredContent: { alreadyApplied: false } });
+    });
+    expect(a.canCallTools).toBe(true);
+    const result = await a.callTool('apply_plan', { planId: 'plan-0001' }, { correlationId: 'c' });
+    expect(result).toEqual({ content: [{ type: 'text', text: 'Applied.' }], structuredContent: { alreadyApplied: false } });
+    expect(calls[0]?.url).toBe(`${BASE}/v1/tools/call`);
+    expect(JSON.parse(calls[0]?.init.body as string)).toEqual({ name: 'apply_plan', arguments: { planId: 'plan-0001' } });
+  });
+
+  it('turns a failed card action into a tool error result, never a throw', async () => {
+    const problem = toProblemDetails(toolError('demo_quota_exceeded', 'Limit reached.', { retryAfterMs: 1000 }), { instance: 'urn:uuid:x' });
+    const result = await withSession(() => json(problem, 429, PROBLEM_JSON_CONTENT_TYPE)).agent.callTool('apply_plan', { planId: 'plan-0001' }, { correlationId: 'c' });
+    expect(result.isError).toBe(true);
+    expect(ErrorEnvelopeSchema.parse(result.structuredContent).code).toBe('demo_quota_exceeded');
+  });
+});

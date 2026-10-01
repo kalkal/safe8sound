@@ -1,7 +1,9 @@
 import { expect, test } from '../no-network.js';
+import { openRemote } from '../remote-session.js';
 
 // Fault injection (error-handling §7): the remote agent fails → scripted answer + a clear notice.
 // `?agent=remote` works only on the dev server; sim-api is intercepted at the same origin.
+// Remote mode starts with the demo code (#101): openRemote enters it first.
 
 const ask = async (page: import('@playwright/test').Page) => {
   await page.getByLabel('Ask a question').fill("What's my battery level?");
@@ -10,7 +12,7 @@ const ask = async (page: import('@playwright/test').Page) => {
 
 test('sim-api answers 503 → degraded scripted answer, still marked SIMULATED', async ({ page }) => {
   await page.route('**/sim-api/v1/turns', (route) => route.fulfill({ status: 503, body: 'Service Unavailable' }));
-  await page.goto('/?agent=remote');
+  await openRemote(page);
   await ask(page);
 
   await expect(page.getByRole('note')).toHaveText("I can't reach the assistant right now, so this is a scripted answer.");
@@ -20,7 +22,7 @@ test('sim-api answers 503 → degraded scripted answer, still marked SIMULATED',
 
 test('sim-api sends malformed JSON → degraded scripted answer', async ({ page }) => {
   await page.route('**/sim-api/v1/turns', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"text":' }));
-  await page.goto('/?agent=remote');
+  await openRemote(page);
   await ask(page);
 
   await expect(page.getByRole('note')).toBeVisible();
@@ -37,7 +39,7 @@ test('sim-api answers → the remote reply is shown with its own origin, no noti
     correlationId = route.request().headers()['x-correlation-id'] ?? null;
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) });
   });
-  await page.goto('/?agent=remote');
+  await openRemote(page);
   await ask(page);
 
   await expect(page.getByTestId('battery-soc')).toHaveText('64%');
@@ -58,7 +60,7 @@ test('sim-api quota exceeded → a calm message and one retry, not a scripted an
   await page.route('**/sim-api/v1/turns', (route) =>
     route.fulfill({ status: 429, contentType: 'application/problem+json', body: JSON.stringify(problem) }),
   );
-  await page.goto('/?agent=remote');
+  await openRemote(page);
   await ask(page);
 
   await expect(page.getByRole('alert')).toContainText("I can't answer right now. Try again in a moment.");
@@ -71,7 +73,7 @@ test('sim-api quota exceeded → a calm message and one retry, not a scripted an
 
 test('sim-api down + "Apply the plan" → an honest answer: nothing claimed as applied, no card', async ({ page }) => {
   await page.route('**/sim-api/v1/turns', (route) => route.fulfill({ status: 503, body: 'Service Unavailable' }));
-  await page.goto('/?agent=remote');
+  await openRemote(page);
   await page.getByLabel('Ask a question').fill('Apply the plan');
   await page.getByRole('button', { name: 'Ask' }).click();
 
@@ -96,7 +98,7 @@ test('sim-api answers 503 → the degraded mode leaves one JSON log line with th
       // not one of our JSON lines (Vite, React dev messages)
     }
   });
-  await page.goto('/?agent=remote');
+  await openRemote(page);
   await ask(page);
 
   await expect(page.getByRole('note')).toBeVisible();

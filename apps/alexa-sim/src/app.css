@@ -129,6 +129,9 @@
 @layer surfaces {
   .surface {
     display: grid;
+    /* One column that never grows past the viewport: an auto column took the min-content width of its
+       widest child, and the page scrolled sideways on a 375 px phone (found by the gate test of #101). */
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-6);
     /* Reading measure of the text chat (about 70 characters), not a style token; the surface frames (F8c/F8d) own their layout. */
     max-inline-size: 40rem;
@@ -144,6 +147,7 @@
 
   .conversation {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
   }
 
@@ -169,6 +173,8 @@
 
   .ask {
     display: grid;
+    /* Lets the question field shrink: an auto column took the input's natural width plus the buttons. */
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
 
     & label {

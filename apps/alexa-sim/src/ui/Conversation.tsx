@@ -1,15 +1,16 @@
 import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMachine } from '@xstate/react';
-import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
 import { fromPromise } from 'xstate';
-import type { Agent, AgentAnswer } from '../agent/index.js';
+import type { Agent, AgentAnswer, DemoSession } from '../agent/index.js';
 import type { VoiceConfig } from '../config.js';
 import { conversationMachine, type AskInput, type AskOutput, type ConversationEvent } from '../machine.js';
 import { log, voiceFailureEvent } from '../log.js';
 import { useVoice } from '../voice/use-voice.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { AnswerCard } from './AnswerCard.js';
+import { DemoCodeGate } from './DemoCodeGate.js';
 import { t } from './text.js';
 
 type TurnResult = Result<AgentAnswer, ErrorEnvelope>;
@@ -20,9 +21,13 @@ export interface ConversationProps {
   turnBudgetMs: number;
   timeZone: string;
   voice: VoiceConfig;
+  /** Remote mode only: without a token the demo code field replaces the question field. */
+  session?: DemoSession;
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig }: ConversationProps) {
+export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session }: ConversationProps) {
+  const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
+  const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
   // The voice adapters send machine events; the machine exists only after them, hence the ref.
   const sendRef = useRef<(event: ConversationEvent) => void>(() => undefined);
@@ -70,6 +75,12 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
   const inputRef = useRef<HTMLInputElement>(null);
   const micRef = useRef<HTMLButtonElement>(null);
   const stopSpeakingRef = useRef<HTMLButtonElement>(null);
+  // A valid demo code brings the question field back: the focus goes there (review of #140).
+  const hadToken = useRef(token !== undefined);
+  useEffect(() => {
+    if (session !== undefined && token !== undefined && !hadToken.current) inputRef.current?.focus();
+    hadToken.current = token !== undefined;
+  }, [session, token]);
   // After Cancel or Retry the clicked button disappears: keep keyboard users on the question field.
   // While the answer is read, the mic is disabled: keep keyboard users on the one control that acts now.
   const speakingNow = snapshot.matches('speaking');
@@ -140,7 +151,8 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
             )}
           </div>
         )}
-        {snapshot.matches('failed') && error !== null && (
+        {/* A refused demo session is explained by the gate alone, not as a failed answer (review of #140). */}
+        {snapshot.matches('failed') && error !== null && error.category !== 'unauthorized' && (
           <div className="failure" role="alert">
             <p>{t(error.retryable ? 'chat.errorTransient' : 'chat.errorOther')}</p>
             {canRetry && (
@@ -157,6 +169,9 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
           </div>
         )}
       </section>
+      {session !== undefined && token === undefined ? (
+        <DemoCodeGate session={session} />
+      ) : (
       <form className="ask" onSubmit={onSubmit}>
         <label htmlFor="question">{t('chat.label')}</label>
         <div className="ask-row">
@@ -191,6 +206,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
         </div>
         {privacy !== null && <p className="notice">{t(privacy)}</p>}
       </form>
+      )}
     </>
   );
 }
