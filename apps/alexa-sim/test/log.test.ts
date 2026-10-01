@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createLogger, logUnhandled, type LogLine } from '../src/log.js';
+import { toolError } from '@cold-reserve/contracts';
+import { configErrorEvent, createLogger, logUnhandled, voiceFailureEvent, type LogLine } from '../src/log.js';
 
 // One JSON line per event, in the fields of the shared log entry (audit L1/L6): never plain text,
 // never a message or a stack from the browser (they can carry personal data).
@@ -54,5 +55,31 @@ describe('logUnhandled', () => {
     stop();
     target.dispatchEvent(rejection);
     expect(log).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('configErrorEvent (#125)', () => {
+  it('logs the paths of the config issues, never their messages', () => {
+    const error = toolError('invalid_config', 'The simulator configuration is invalid.', {
+      details: { issues: [{ path: 'voice.listenTimeoutMs', message: 'Too small: 0' }, { path: 'homeTimeZone', message: 'Unknown IANA time zone' }] },
+    });
+    expect(configErrorEvent(error)).toEqual({ level: 'error', code: 'invalid_config', details: { step: 'config', issues: ['voice.listenTimeoutMs', 'homeTimeZone'] } });
+    expect(configErrorEvent(toolError('invalid_config', 'x'))).toEqual({ level: 'error', code: 'invalid_config', details: { step: 'config', issues: [] } });
+  });
+});
+
+describe('voiceFailureEvent (#133 review)', () => {
+  it('logs a voice failure by code and phase, with the turn when there is one, never words', () => {
+    expect(voiceFailureEvent({ code: 'mic_permission_denied', phase: 'listening', turnId: null })).toEqual({
+      level: 'warn',
+      code: 'mic_permission_denied',
+      details: { phase: 'listening' },
+    });
+    expect(voiceFailureEvent({ code: 'speech_start_missing', phase: 'speaking', turnId: 't9' })).toEqual({
+      level: 'warn',
+      code: 'speech_start_missing',
+      correlationId: 't9',
+      details: { phase: 'speaking' },
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { ReserveOutlookSchema } from '@cold-reserve/contracts';
+import { ReserveOutlookSchema, toolError } from '@cold-reserve/contracts';
 import { exampleReserveOutlook } from '@cold-reserve/contracts/fixtures';
 import { hotDayPlan } from '@cold-reserve/ui-cards';
 import { describe, expect, it, vi } from 'vitest';
@@ -71,5 +71,23 @@ describe('answerCardCall: a card action runs under the turn that showed the card
     const result = await answerCardCall({ name: 'apply_plan', arguments: { planId: 'plan_7Hq2mX9vK3' } }, planCard, { agent: agentWith(() => Promise.reject(boom)), turnId: 'turn-5', log });
     expect(result).toMatchObject({ isError: true, structuredContent: { code: 'unexpected_error', message: 'Something went wrong: nothing was changed.' } });
     expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'error', code: 'unexpected_error', correlationId: 'turn-5', error: boom, details: { tool: 'apply_plan' } });
+  });
+
+  it('logs a tool that answered with an error, with its code and the turn id, and passes the answer on (#125)', async () => {
+    const failed = { isError: true, content: [{ type: 'text' as const, text: 'The plan expired.' }], structuredContent: toolError('plan_expired', 'The plan expired.') };
+    const log = vi.fn();
+    const result = await answerCardCall({ name: 'apply_plan', arguments: { planId: 'plan_7Hq2mX9vK3' } }, planCard, { agent: agentWith(() => Promise.resolve(failed)), turnId: 'turn-6', log });
+    expect(result).toBe(failed);
+    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'warn', code: 'plan_expired', correlationId: 'turn-6', details: { tool: 'apply_plan' } });
+  });
+
+  it('logs an error answer without an envelope as output_schema_violation', async () => {
+    const log = vi.fn();
+    await answerCardCall({ name: 'apply_plan', arguments: { planId: 'plan_7Hq2mX9vK3' } }, planCard, {
+      agent: agentWith(() => Promise.resolve({ isError: true, content: [] })),
+      turnId: 'turn-7',
+      log,
+    });
+    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'warn', code: 'output_schema_violation', correlationId: 'turn-7', details: { tool: 'apply_plan' } });
   });
 });

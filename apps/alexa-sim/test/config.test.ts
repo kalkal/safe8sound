@@ -5,7 +5,23 @@ describe('simulator config', () => {
   it('defaults to the ScriptedAgent with explicit timeouts', () => {
     expect(parseConfig({}, '', false)).toEqual({
       ok: true,
-      value: { agent: 'scripted', simApiUrl: undefined, agentTimeoutMs: 8_000, turnBudgetMs: 10_000, homeTimeZone: 'Europe/Rome' },
+      value: {
+        agent: 'scripted',
+        simApiUrl: undefined,
+        agentTimeoutMs: 8_000,
+        turnBudgetMs: 10_000,
+        homeTimeZone: 'Europe/Rome',
+        voice: {
+          speech: 'browser',
+          lang: 'en-US',
+          voiceName: undefined,
+          speakReplies: true,
+          listenTimeoutMs: 8_000,
+          speakStartTimeoutMs: 2_000,
+          speakTimeoutBaseMs: 4_000,
+          speakTimeoutPerCharMs: 80,
+        },
+      },
     });
   });
 
@@ -27,5 +43,20 @@ describe('simulator config', () => {
   it('reads the home time zone and refuses one that does not exist', () => {
     expect(parseConfig({ VITE_HOME_TIME_ZONE: 'America/New_York' }, '', false)).toMatchObject({ ok: true, value: { homeTimeZone: 'America/New_York' } });
     expect(parseConfig({ VITE_HOME_TIME_ZONE: 'Mars/Olympus' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+
+  it('reads the voice settings from the environment and refuses nonsense', () => {
+    const env = { VITE_VOICE_LANG: 'en-GB', VITE_VOICE_NAME: 'Google UK English Female', VITE_SPEAK_REPLIES: 'false', VITE_LISTEN_TIMEOUT_MS: '5000' };
+    expect(parseConfig(env, '', false)).toMatchObject({
+      ok: true,
+      value: { voice: { lang: 'en-GB', voiceName: 'Google UK English Female', speakReplies: false, listenTimeoutMs: 5000 } },
+    });
+    expect(parseConfig({ VITE_SPEAK_REPLIES: 'maybe' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    expect(parseConfig({ VITE_LISTEN_TIMEOUT_MS: '0' }, '', false)).toMatchObject({ ok: false });
+  });
+
+  it('lets ?voice=fake switch to scripted speech events only in dev (voice E2E tests)', () => {
+    expect(parseConfig({}, '?voice=fake', true)).toMatchObject({ ok: true, value: { voice: { speech: 'fake' } } });
+    expect(parseConfig({}, '?voice=fake', false)).toMatchObject({ ok: true, value: { voice: { speech: 'browser' } } });
   });
 });

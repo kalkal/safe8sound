@@ -10,7 +10,7 @@ import { parseConfig, type SimConfig } from './config.js';
 import { cardDocument } from './host/card-documents.js';
 import { CardHostProvider } from './host/card-host.js';
 import { Conversation } from './ui/Conversation.js';
-import { log, logUnhandled } from './log.js';
+import { configErrorEvent, log, logUnhandled } from './log.js';
 import { createScriptedPhone } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
@@ -25,7 +25,7 @@ const config = parseConfig(import.meta.env, window.location.search, import.meta.
 // The family phone (surface C, #24): fed by the scripted scene. TODO(#24): a feed that polls GET /phone/inbox for the remote agent.
 const phone = createScriptedPhone();
 const agent = config.ok ? buildAgent(config.value, undefined, phone) : config;
-if (!agent.ok) log({ level: 'error', code: agent.error.code, details: { step: 'config', ...(agent.error.details?.field !== undefined && { field: agent.error.details.field }) } });
+if (!agent.ok) log(configErrorEvent(agent.error));
 const queryClient = new QueryClient();
 
 // Dev-only card gallery (`?gallery&theme=light`): never part of a production build.
@@ -56,7 +56,7 @@ function Simulator({ agent, config }: { agent: Agent; config: SimConfig }) {
       </button>
       <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone }}>
         <QueryClientProvider client={queryClient}>
-          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} />
+          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} />
         </QueryClientProvider>
       </CardHostProvider>
       {config.agent === 'scripted' && (

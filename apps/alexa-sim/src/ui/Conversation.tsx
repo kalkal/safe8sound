@@ -1,10 +1,14 @@
 import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMachine } from '@xstate/react';
-import { useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { fromPromise } from 'xstate';
 import type { Agent, AgentAnswer } from '../agent/index.js';
-import { conversationMachine, type AskInput } from '../machine.js';
+import type { VoiceConfig } from '../config.js';
+import { conversationMachine, type AskInput, type AskOutput, type ConversationEvent } from '../machine.js';
+import { log, voiceFailureEvent } from '../log.js';
+import { useVoice } from '../voice/use-voice.js';
+import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { AnswerCard } from './AnswerCard.js';
 import { t } from './text.js';
 
@@ -15,34 +19,64 @@ export interface ConversationProps {
   agent: Agent;
   turnBudgetMs: number;
   timeZone: string;
+  voice: VoiceConfig;
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone }: ConversationProps) {
+export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig }: ConversationProps) {
   const queryClient = useQueryClient();
+  // The voice adapters send machine events; the machine exists only after them, hence the ref.
+  const sendRef = useRef<(event: ConversationEvent) => void>(() => undefined);
+  const voice = useVoice(voiceConfig, (event) => {
+    sendRef.current(event);
+  });
+  const { recognizer, speaker } = voice;
   // The machine owns the flow; the answer itself stays in the query cache (plan §9.4).
   const machine = useMemo(
     () =>
       conversationMachine.provide({
         actors: {
-          askAgent: fromPromise<Result<null, ErrorEnvelope>, AskInput>(async ({ input, signal }) => {
+          askAgent: fromPromise<Result<AskOutput, ErrorEnvelope>, AskInput>(async ({ input, signal }) => {
             const result = await queryClient.query<TurnResult>({
               queryKey: turnKey(input.turnId),
               queryFn: () => agent.ask(input.question, { correlationId: input.turnId, signal }),
               staleTime: Infinity,
               retry: false,
             });
-            return result.ok ? ok(null) : result;
+            // The answer text is at most two sentences (plan §11.2 p.10): it is what the voice reads.
+            return result.ok ? ok({ speech: result.value.text }) : result;
           }),
         },
+        actions: {
+          startRecognition: () => recognizer?.start(),
+          stopRecognition: () => recognizer?.stop(),
+          speak: ({ context }) => speaker?.speak(context.speech ?? ''),
+          cancelSpeech: () => speaker?.cancel(),
+          logVoiceFailure: (_, failure) => {
+            log(voiceFailureEvent(failure));
+          },
+        },
       }),
-    [agent, queryClient],
+    [agent, queryClient, recognizer, speaker],
   );
-  const [snapshot, send] = useMachine(machine, { input: { replyTimeoutMs: turnBudgetMs } });
-  const { question, turnId, error, canRetry } = snapshot.context;
+  const [snapshot, send] = useMachine(machine, { input: { replyTimeoutMs: turnBudgetMs, voice: voice.settings } });
+  sendRef.current = send;
+  const { question, turnId, error, canRetry, micAvailable, speakReplies } = snapshot.context;
+  const privacy = privacyNotice({ micAvailable, speakReplies });
+  const notice = voiceNotice(snapshot.context);
+  const listening = snapshot.matches('listening');
+  const speaking = snapshot.matches('speaking');
   const turn = useQuery<TurnResult>({ queryKey: turnKey(turnId), queryFn: skipToken });
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const micRef = useRef<HTMLButtonElement>(null);
+  const stopSpeakingRef = useRef<HTMLButtonElement>(null);
   // After Cancel or Retry the clicked button disappears: keep keyboard users on the question field.
+  // While the answer is read, the mic is disabled: keep keyboard users on the one control that acts now.
+  const speakingNow = snapshot.matches('speaking');
+  useEffect(() => {
+    const focused = document.activeElement;
+    if (speakingNow && (focused === null || focused === document.body || focused === micRef.current)) stopSpeakingRef.current?.focus();
+  }, [speakingNow]);
   const sendAndRefocus = (event: Parameters<typeof send>[0]) => {
     send(event);
     inputRef.current?.focus();
@@ -58,7 +92,17 @@ export function Conversation({ agent, turnBudgetMs, timeZone }: ConversationProp
   return (
     <>
       <section className="conversation">
-        {question !== null && !snapshot.matches('idle') && <p className="bubble">{question}</p>}
+        {question !== null && !snapshot.matches('idle') && !listening && <p className="bubble">{question}</p>}
+        {listening && (
+          <p className="thinking" role="status">
+            {t('voice.listening')}
+          </p>
+        )}
+        {notice !== null && !listening && (
+          <p className="notice" role="status">
+            {t(notice)}
+          </p>
+        )}
         {thinking && (
           <p className="thinking" role="status">
             {t('chat.thinking')}{' '}
@@ -75,8 +119,27 @@ export function Conversation({ agent, turnBudgetMs, timeZone }: ConversationProp
         )}
         {/* Status and alert announce themselves; the answer needs a live region that exists before it appears. */}
         <div aria-live="polite">
-          {snapshot.matches('showingAnswer') && turn.data?.ok === true && turnId !== null && <AnswerCard answer={turn.data.value} timeZone={timeZone} turnId={turnId} />}
+          {(snapshot.matches('showingAnswer') || speaking) && turn.data?.ok === true && turnId !== null && (
+            <AnswerCard answer={turn.data.value} timeZone={timeZone} turnId={turnId} />
+          )}
         </div>
+        {/* The row keeps its place even when empty: the form never moves under a finger when the voice starts or stops. */}
+        {speakReplies && (
+          <div className="voice-row">
+            {speaking && (
+              <button
+                ref={stopSpeakingRef}
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  sendAndRefocus({ type: 'CANCEL' });
+                }}
+              >
+                {t('voice.stopSpeaking')}
+              </button>
+            )}
+          </div>
+        )}
         {snapshot.matches('failed') && error !== null && (
           <div className="failure" role="alert">
             <p>{t(error.retryable ? 'chat.errorTransient' : 'chat.errorOther')}</p>
@@ -111,7 +174,22 @@ export function Conversation({ agent, turnBudgetMs, timeZone }: ConversationProp
           <button type="submit" className="button" disabled={thinking}>
             {t('chat.send')}
           </button>
+          {micAvailable && (
+            <button
+              ref={micRef}
+              type="button"
+              className="button"
+              aria-pressed={listening}
+              disabled={thinking || speaking}
+              onClick={() => {
+                send(listening ? { type: 'CANCEL' } : { type: 'MIC_PRESSED' });
+              }}
+            >
+              {t(listening ? 'voice.stop' : 'voice.speak')}
+            </button>
+          )}
         </div>
+        {privacy !== null && <p className="notice">{t(privacy)}</p>}
       </form>
     </>
   );

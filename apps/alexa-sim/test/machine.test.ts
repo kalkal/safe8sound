@@ -1,9 +1,9 @@
 import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { createActor, fromPromise } from 'xstate';
-import { conversationMachine, type AskInput } from '../src/machine.js';
+import { conversationMachine, type AskInput, type AskOutput } from '../src/machine.js';
 
-type Outcome = Result<null, ErrorEnvelope>;
+type Outcome = Result<AskOutput, ErrorEnvelope>;
 
 function start(ask: (input: AskInput) => Promise<Outcome>, replyTimeoutMs = 1_000) {
   const machine = conversationMachine.provide({ actors: { askAgent: fromPromise<Outcome, AskInput>(({ input }) => ask(input)) } });
@@ -25,7 +25,7 @@ describe('conversation machine (plan §9.3)', () => {
     const asked: AskInput[] = [];
     const actor = start((input) => {
       asked.push(input);
-      return Promise.resolve(ok(null));
+      return Promise.resolve(ok({}));
     });
     actor.send(submit("  What's my battery level?  "));
     expect(actor.getSnapshot().value).toBe('thinking');
@@ -68,7 +68,7 @@ describe('conversation machine (plan §9.3)', () => {
   });
 
   it('accepts a new question from showingAnswer, and DISMISS goes back to idle', async () => {
-    const actor = start(() => Promise.resolve(ok(null)));
+    const actor = start(() => Promise.resolve(ok({})));
     actor.send(submit('one', 't1'));
     await settle();
     actor.send(submit('two', 't2'));

@@ -1,4 +1,5 @@
-import { ERROR_CATALOG, categoryOf, type ErrorCategory, type ErrorCode } from '@cold-reserve/contracts';
+import { ERROR_CATALOG, categoryOf, type ErrorCategory, type ErrorCode, type ErrorEnvelope } from '@cold-reserve/contracts';
+import type { VoiceFailure } from './machine.js';
 
 // One JSON line per event, in the fields of the shared log entry (docs/error-handling.md §6.1).
 // TODO(audit L1): replace with the shared logger port once it lands in contracts/core.
@@ -68,4 +69,14 @@ export function logUnhandled(target: EventTarget, logEvent: Log = log): () => vo
     target.removeEventListener('unhandledrejection', onRejection);
     target.removeEventListener('error', onError);
   };
+}
+
+/** A configuration error: which settings are wrong (their paths), never the values or the messages. */
+export function configErrorEvent(error: ErrorEnvelope): LogEvent {
+  return { level: 'error', code: error.code, details: { step: 'config', issues: (error.details?.issues ?? []).map((issue) => issue.path) } };
+}
+
+/** A voice failure (#25): its code and phase, the turn when there is one; never what was said. */
+export function voiceFailureEvent({ code, phase, turnId }: VoiceFailure): LogEvent {
+  return { level: 'warn', code, ...(turnId !== null && { correlationId: turnId }), details: { phase } };
 }

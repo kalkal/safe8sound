@@ -88,6 +88,10 @@
     color: var(--text-secondary);
   }
 
+  .voice-row {
+    min-block-size: var(--target-min);
+  }
+
   .facts {
     margin: 0;
   }

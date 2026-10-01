@@ -1,4 +1,4 @@
-import { ApplyPlanInputSchema, SetPreferencesInputSchema, err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { ApplyPlanInputSchema, ErrorEnvelopeSchema, SetPreferencesInputSchema, err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import type { z } from 'zod';
 import { toolErrorResult, type Agent, type ToolCallResult } from '../agent/agent.js';
 import type { ToolCard } from '../agent/wire.js';
@@ -48,7 +48,13 @@ export async function answerCardCall(
     return toolErrorResult(call.error);
   }
   try {
-    return await agent.callTool(call.value.name, call.value.args, { correlationId: turnId });
+    const result = await agent.callTool(call.value.name, call.value.args, { correlationId: turnId });
+    if (result.isError === true) {
+      // The card shows the answer as it is; the log keeps the code for the turn.
+      const envelope = ErrorEnvelopeSchema.safeParse(result.structuredContent);
+      log({ level: 'warn', code: envelope.success ? envelope.data.code : 'output_schema_violation', correlationId: turnId, details: { tool: params.name } });
+    }
+    return result;
   } catch (error) {
     log({ level: 'error', code: 'unexpected_error', correlationId: turnId, error, details: { tool: params.name } });
     return toolErrorResult(toolError('unexpected_error', 'Something went wrong: nothing was changed.'));
