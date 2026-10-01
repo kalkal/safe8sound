@@ -1,6 +1,6 @@
 import { ProblemDetailsSchema } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { createMcpHandler } from '../src/handler.js';
+import { createMcpHandler, type LogEntry } from '../src/handler.js';
 import { createRegistry } from '../src/registry.js';
 import { createSandboxes } from '../src/sandboxes.js';
 import { HOME_TOKEN, TOKEN, callTool, homeId, post, probeModule, testConfig, toolResult } from './helpers.js';
@@ -11,6 +11,7 @@ const SANDBOX = 'demo#0123456789abcdef';
 
 function setup(maxNewPerDay = 10) {
   const created: string[] = [];
+  const logs: LogEntry[] = [];
   const registry = createRegistry([probeModule]);
   if (!registry.ok) throw new Error(registry.error.message);
   const config = testConfig({
@@ -29,9 +30,9 @@ function setup(maxNewPerDay = 10) {
       return h;
     },
   });
-  const handler = createMcpHandler(config, { registry: registry.value, logger: { log: () => undefined }, sandboxes });
+  const handler = createMcpHandler(config, { registry: registry.value, logger: { log: (e) => logs.push(e) }, sandboxes });
   const whoami = (token: string, home?: string) => post(handler, callTool('whoami', {}), { authorization: `Bearer ${token}`, 'x-cold-reserve-home': home });
-  return { whoami, created };
+  return { whoami, created, logs };
 }
 
 async function refused(res: Response, status: number, code: string) {
@@ -72,5 +73,17 @@ describe('x-cold-reserve-home: sandbox homes for the demo#* grant only', () => {
     const { whoami } = setup(1);
     expect((await whoami(SANDBOX_TOKEN, SANDBOX)).status).toBe(200);
     await refused(await whoami(SANDBOX_TOKEN, 'demo#fedcba9876543210'), 429, 'demo_quota_exceeded');
+  });
+
+  it('logs a refused header and a refused new sandbox with the client id, never the requested home', async () => {
+    const { whoami, logs } = setup(1);
+    await whoami(TOKEN, SANDBOX);
+    await whoami(SANDBOX_TOKEN, SANDBOX);
+    await whoami(SANDBOX_TOKEN, 'demo#fedcba9876543210');
+    expect(logs).toMatchObject([
+      { level: 'warn', code: 'home_not_allowed', category: 'forbidden', clientId: 'agent' },
+      { level: 'warn', code: 'demo_quota_exceeded', category: 'rate_limited', clientId: 'agent-sandbox' },
+    ]);
+    expect(logs.every((l) => typeof l.correlationId === 'string')).toBe(true);
   });
 });

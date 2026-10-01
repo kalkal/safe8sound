@@ -1,4 +1,4 @@
-import { StatusFactsSchema, ToolCardSchema, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
+import { HOME_HEADER, StatusFactsSchema, ToolCardSchema, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -88,7 +88,7 @@ export async function mcpToolset(session: McpSession, recorder: TurnRecorder): P
  * token), never from the model: tool arguments cannot reach this function.
  */
 export function mcpRequestHeaders(token: McpToken, home: HomeId | undefined): Record<string, string> {
-  return { authorization: `Bearer ${token.reveal()}`, ...(home === undefined ? {} : { 'x-cold-reserve-home': home }) };
+  return { authorization: `Bearer ${token.reveal()}`, ...(home === undefined ? {} : { [HOME_HEADER]: home }) };
 }
 
 /** Adds the turn's x-correlation-id to every MCP HTTP request (one session serves one home, one turn at a time). */

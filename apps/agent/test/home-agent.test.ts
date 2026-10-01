@@ -91,3 +91,47 @@ describe('createHomeAgent: one sandbox home, its agent, its MCP session and its 
     expect(await agent.ask('Battery?', 'a')).toMatchObject({ ok: false, error: { code: 'agent_unavailable', retryable: true } });
   });
 });
+
+describe('createHomeAgent: two turns at once for the same home (review of #121)', () => {
+  it('runs them one after the other, each with its own cards, status and correlation id', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const base = session();
+    // The first turn's plan_comfort waits until the second turn has been asked.
+    const s: McpSession = {
+      listTools: () => base.listTools(),
+      callTool: async (name, args, signal, correlationId) => {
+        if (name === 'plan_comfort') await gate;
+        return base.callTool(name, args, signal, correlationId);
+      },
+    };
+    const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(s) });
+
+    const first = agent.ask('Make a plan', 'turn-a');
+    const second = agent.ask("What's my battery level?", 'turn-b');
+    release();
+    const [a, b] = await Promise.all([first, second]);
+
+    expect(a).toMatchObject({ ok: true, value: { text: 'Plan proposed.', cards: [{ tool: 'plan_comfort' }] } });
+    expect(a.ok && a.value.status).toBeUndefined();
+    expect(b).toMatchObject({ ok: true, value: { text: 'Battery at 45%.', status: STATUS } });
+    expect(b.ok && b.value.cards).toBeUndefined();
+    expect(base.correlationIds).toEqual(['turn-a', 'turn-b']);
+  });
+
+  it('a failed turn does not block the next one', async () => {
+    const base = session();
+    let calls = 0;
+    const s: McpSession = {
+      listTools: () => base.listTools(),
+      callTool: (name, args, signal, correlationId) => (++calls === 1 ? Promise.reject(new RangeError('bug in the first turn')) : base.callTool(name, args, signal, correlationId)),
+    };
+    const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(s) });
+    const first = agent.ask("What's my battery level?", 'turn-a').catch(() => 'threw');
+    const second = agent.ask("What's my battery level?", 'turn-b');
+    await first;
+    expect(await second).toMatchObject({ ok: true, value: { text: 'Battery at 45%.' } });
+  });
+});

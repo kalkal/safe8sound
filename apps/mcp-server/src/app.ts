@@ -1,4 +1,4 @@
-import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result } from '@cold-reserve/contracts';
+import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result } from '@cold-reserve/contracts';
 import { scenarioClock, utcDayStart, type Clock, type HomeDataSource } from '@cold-reserve/core';
 import { FallbackSource } from '@cold-reserve/source-fallback';
 import { SCENARIO_IDS, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
@@ -10,7 +10,7 @@ import { comfortPlanModule } from './modules/comfort-plan/index.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
 import { stormModeModule } from './modules/storm-mode/index.js';
 import type { StormModeWiring } from './storm-mode-config.js';
-import { SANDBOX_HOME, createSandboxes } from './sandboxes.js';
+import { createSandboxes } from './sandboxes.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
 
 export interface AppOptions {
@@ -117,7 +117,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
       return { entry: { source: sim, profile: demo, readOnly: false, levelSince } satisfies HomeEntry, forecast: () => sim.forecast() };
     },
   });
-  const sandboxFor = (homeId: HomeId) => (SANDBOX_HOME.test(homeId) ? sandboxes.get(homeId) : undefined);
+  const sandboxFor = (homeId: HomeId) => (SandboxHomeIdSchema.safeParse(homeId).success ? sandboxes.get(homeId) : undefined);
 
   const homeFor = (homeId: HomeId) => {
     const entry = homes.get(homeId) ?? sandboxFor(homeId)?.entry;

@@ -26,24 +26,33 @@ export function createHomeAgent(deps: {
     return createAgent({ config: deps.config, model: deps.model, tools, ...(deps.log ? { log: deps.log } : {}) });
   };
 
+  const turn = async (question: string, correlationId: string): Promise<Result<TurnReply, ErrorEnvelope>> => {
+    let agent: ColdReserveAgent;
+    try {
+      agent = await (ready ??= start());
+    } catch (e) {
+      ready = undefined; // the next turn tries to connect again
+      const failure = classifyFailure(e);
+      if (failure.kind === 'bug') throw failure.error;
+      deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId }));
+      return err(failure.error);
+    }
+    recorder.reset(correlationId);
+    const answer = await agent.ask(question, { correlationId });
+    if (!answer.ok) return answer;
+    const cards = recorder.cards();
+    const status = recorder.status();
+    return ok({ text: answer.value.text, ...(status === undefined ? {} : { status }), ...(cards.length === 0 ? {} : { cards: [...cards] }) });
+  };
+
+  // One turn at a time per home (review of #121): the recorder and the conversation history belong to
+  // the running turn, so a second question waits for the first instead of resetting its cards.
+  let queue: Promise<unknown> = Promise.resolve();
   return {
-    async ask(question, correlationId): Promise<Result<TurnReply, ErrorEnvelope>> {
-      let agent: ColdReserveAgent;
-      try {
-        agent = await (ready ??= start());
-      } catch (e) {
-        ready = undefined; // the next turn tries to connect again
-        const failure = classifyFailure(e);
-        if (failure.kind === 'bug') throw failure.error;
-        deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId }));
-        return err(failure.error);
-      }
-      recorder.reset(correlationId);
-      const turn = await agent.ask(question, { correlationId });
-      if (!turn.ok) return turn;
-      const cards = recorder.cards();
-      const status = recorder.status();
-      return ok({ text: turn.value.text, ...(status === undefined ? {} : { status }), ...(cards.length === 0 ? {} : { cards: [...cards] }) });
+    ask(question, correlationId) {
+      const run = queue.then(() => turn(question, correlationId));
+      queue = run.catch(() => undefined); // a failed turn never blocks the next one
+      return run;
     },
   };
 }

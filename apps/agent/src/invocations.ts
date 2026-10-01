@@ -1,6 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
-  HomeIdSchema,
+  SandboxHomeIdSchema,
   PROBLEM_JSON_CONTENT_TYPE,
   toProblemDetails,
   toolError,
@@ -21,12 +21,10 @@ export interface HomeAgent {
   ask(question: string, correlationId: string): Promise<Result<TurnReply, ErrorEnvelope>>;
 }
 
-/** Invocations serve visitor sandboxes only: the real home is never reachable from here. */
-const SandboxHomeSchema = HomeIdSchema.refine((h) => /^demo#[0-9a-f]{16}$/.test(h), { message: 'Only sandbox homes' });
-
 const InvocationSchema = z.strictObject({
   prompt: z.string().trim().min(1).max(500),
-  home: SandboxHomeSchema,
+  /** Invocations serve visitor sandboxes only: the real home is never reachable from here. */
+  home: SandboxHomeIdSchema,
   correlationId: z.uuid().optional(),
 });
 

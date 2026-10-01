@@ -57,6 +57,13 @@ describe('demo token: compact JWS HS256 (plan §13.2 point 2)', () => {
     expect(verify(`${otherKid}.${p}.${s}`, NOW, [KEY_A, KEY_B]).ok).toBe(false);
   });
 
+  it('refuses a correctly signed token for anything but a demo# sandbox home', () => {
+    const header = { alg: 'HS256', typ: 'JWT', kid: 'k1' };
+    for (const home of ['home', 'demo', 'demo#0123456789ABCDEF']) {
+      expect(verify(forge(header, { ...payloadOf(claims()), home }))).toMatchObject({ ok: false, error: { code: 'invalid_signature' } });
+    }
+  });
+
   it('refuses a signature that is not canonical base64url, though it decodes to the same bytes', () => {
     const token = signToken(claims(), KEY_A);
     const [h = '', p = '', s = ''] = token.split('.');

@@ -1,7 +1,8 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
-  HomeIdSchema,
+  HOME_HEADER,
   PROBLEM_JSON_CONTENT_TYPE,
+  SandboxHomeIdSchema,
   toProblemDetails,
   toolError,
   type ErrorCategory,
@@ -24,7 +25,7 @@ import {
 import type { z } from 'zod';
 import type { ClientGrant, ServerConfig } from './config.js';
 import type { ModuleRegistry, UiResource } from './registry.js';
-import { SANDBOX_HOME, type Sandboxes } from './sandboxes.js';
+import type { Sandboxes } from './sandboxes.js';
 import { listTool, type ToolContext, type ToolDefinition } from './tool.js';
 
 /** One line of the error log (docs/error-handling.md §6.1): no secrets, no personal data. */
@@ -55,7 +56,8 @@ export interface HandlerDeps {
 export type McpHandler = (req: Request) => Promise<Response>;
 
 // Categories kept in the error log (docs/error-handling.md §6.1).
-const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unavailable', 'guard_rejection', 'unauthorized']);
+// forbidden and rate_limited too: a refused sandbox header or a full daily cap is worth a line (#101).
+const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unavailable', 'guard_rejection', 'unauthorized', 'forbidden', 'rate_limited']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_ISSUES = 20;
 /** MCP "resource not found" (spec 2025-11-25, server/resources); the SDK has no name for it. */
@@ -223,17 +225,20 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
     // The home comes from the token; a demo#* grant may name a visitor sandbox instead (#101).
     // The real home is never reachable this way: only demo#<16 hex> passes, and only for that grant.
     let homeId = grant.homeId;
-    const requested = req.headers.get('x-cold-reserve-home');
+    const requested = req.headers.get(HOME_HEADER);
     if (requested !== null) {
-      if (grant.sandboxes !== true || !SANDBOX_HOME.test(requested) || deps.sandboxes === undefined) {
+      const sandbox = SandboxHomeIdSchema.safeParse(requested);
+      if (grant.sandboxes !== true || !sandbox.success || deps.sandboxes === undefined) {
         const error = toolError('home_not_allowed', 'This client may not reach that home.');
-        record(error, correlationId);
+        record(error, correlationId, { clientId: grant.clientId });
         return problem(error, correlationId);
       }
-      const sandbox = HomeIdSchema.parse(requested);
-      const admitted = deps.sandboxes.admit(sandbox);
-      if (!admitted.ok) return problem(admitted.error, correlationId);
-      homeId = sandbox;
+      const admitted = deps.sandboxes.admit(sandbox.data);
+      if (!admitted.ok) {
+        record(admitted.error, correlationId, { clientId: grant.clientId });
+        return problem(admitted.error, correlationId);
+      }
+      homeId = sandbox.data;
     }
 
     const ctx: ToolContext = { correlationId, clientId: grant.clientId, homeId };

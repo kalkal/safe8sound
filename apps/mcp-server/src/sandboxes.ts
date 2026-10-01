@@ -1,9 +1,6 @@
 import { err, ok, toolError, type ErrorEnvelope, type HomeId, type Result } from '@cold-reserve/contracts';
 import type { Clock } from '@cold-reserve/core';
 
-/** A visitor sandbox home: `demo#` + 16 lowercase hex, nothing else (#101). */
-export const SANDBOX_HOME = /^demo#[0-9a-f]{16}$/;
-
 const DAY_MS = 86_400_000;
 
 export interface Sandboxes<T> {
@@ -16,6 +13,10 @@ export interface Sandboxes<T> {
 /**
  * Visitor sandboxes (plan §3.2, approved in #101): created from the demo profile on first use, forgotten
  * `ttlMs` after their last use, and at most `maxNewPerDay` new ones per UTC day, so the cost cannot grow.
+ *
+ * Everything here lives in one process: on Lambda the cap and the live sandboxes are per warm instance,
+ * so the real daily ceiling is `maxNewPerDay` × concurrent instances (10 on a new account). A store-backed
+ * counter replaces it if the demo goes public.
  */
 export function createSandboxes<T>(opts: { clock: Clock; ttlMs: number; maxNewPerDay: number; create: (home: HomeId) => T }): Sandboxes<T> {
   const live = new Map<HomeId, { value: T; lastUsedMs: number }>();

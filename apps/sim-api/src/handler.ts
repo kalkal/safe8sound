@@ -16,7 +16,7 @@ import {
   type ToolCallRequest,
   type TurnReply,
 } from '@cold-reserve/contracts';
-import { HomeIdSchema } from '@cold-reserve/contracts';
+import { SandboxHomeIdSchema } from '@cold-reserve/contracts';
 import type { Clock } from '@cold-reserve/core';
 import type { SimApiConfig } from './config.js';
 import { createQuota, type QuotaStore } from './quota.js';
@@ -127,7 +127,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
           return fail(toolError('invalid_demo_code', 'That demo code is not valid.'));
         }
         const iat = Math.floor(deps.clock.now() / 1000);
-        const claims: DemoClaims = { sub: codeId, home: HomeIdSchema.parse(`demo#${deps.randomHex()}`), iat, exp: iat + config.tokenTtlS, jti: randomUUID() };
+        const claims: DemoClaims = { sub: codeId, home: SandboxHomeIdSchema.parse(`demo#${deps.randomHex()}`), iat, exp: iat + config.tokenTtlS, jti: randomUUID() };
         const reply: SessionReply = { token: signToken(claims, signingKey), expiresAt: new Date(claims.exp * 1000).toISOString() };
         return respond(200, reply);
       }

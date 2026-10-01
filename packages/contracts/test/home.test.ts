@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { exampleHomeProfile } from '../src/fixtures.js';
-import { HOME_SCHEMA_VERSION, HomeIdSchema, HomeProfileSchema, HvacUnitSchema, RoomSchema } from '../src/index.js';
+import { HOME_HEADER, HOME_SCHEMA_VERSION, HomeIdSchema, HomeProfileSchema, HvacUnitSchema, RoomSchema, SandboxHomeIdSchema, type HomeId } from '../src/index.js';
 
 describe('HomeProfileSchema', () => {
   it('parses the example profile of the real plant (values are data, not constants)', () => {
@@ -90,5 +90,23 @@ describe('HomeIdSchema', () => {
 
   it('rejects ids that could carry an address or a serial number', () => {
     for (const id of ['', 'Via Roma 1', 'HOME', 'a'.repeat(65)]) expect(HomeIdSchema.safeParse(id).success).toBe(false);
+  });
+});
+
+describe('visitor sandbox homes (#101)', () => {
+  it('names the sandbox header once, for both sides of the wire', () => {
+    expect(HOME_HEADER).toBe('x-cold-reserve-home');
+  });
+
+  it('accepts only demo#<16 lowercase hex>: never "demo", "home" or anything else from a header', () => {
+    expect(SandboxHomeIdSchema.parse('demo#0123456789abcdef')).toBe('demo#0123456789abcdef');
+    for (const bad of ['demo', 'home', 'demo#0123456789ABCDEF', 'demo#0123456789abcde', 'demo#0123456789abcdef0', 'home#0123456789abcdef', ' demo#0123456789abcdef']) {
+      expect(SandboxHomeIdSchema.safeParse(bad).success, bad).toBe(false);
+    }
+  });
+
+  it('is still a HomeId (same brand), so stores and modules take it unchanged', () => {
+    const id: HomeId = SandboxHomeIdSchema.parse('demo#ffffffffffffffff');
+    expect(HomeIdSchema.parse(id)).toBe(id);
   });
 });

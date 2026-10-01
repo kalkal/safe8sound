@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { HomeIdSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result } from '@cold-reserve/contracts';
+import { SandboxHomeIdSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result } from '@cold-reserve/contracts';
 import { z } from 'zod';
 
 // The demo token (plan §13.2 point 2, design approved in #101): a compact JWS signed with HS256
@@ -30,7 +30,7 @@ const PayloadSchema = z.strictObject({
   iss: z.literal(ISSUER),
   aud: z.literal(AUDIENCE),
   sub: z.string().min(1).max(32),
-  home: HomeIdSchema,
+  home: SandboxHomeIdSchema,
   iat: z.number().int(),
   exp: z.number().int(),
   jti: z.string().min(1).max(64),
