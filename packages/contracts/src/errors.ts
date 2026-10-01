@@ -46,6 +46,8 @@ export const ERROR_CATALOG = {
   missing_token: { category: 'unauthorized' },
   wrong_client: { category: 'unauthorized' },
   invalid_signature: { category: 'unauthorized' },
+  // A wrong demo code at POST /v1/session (approved in #101); never says whether the code exists.
+  invalid_demo_code: { category: 'unauthorized' },
   signature_expired: { category: 'unauthorized' },
   origin_not_allowed: { category: 'forbidden' },
   demo_disabled: { category: 'forbidden' },

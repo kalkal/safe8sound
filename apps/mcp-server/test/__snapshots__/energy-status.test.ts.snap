@@ -241,6 +241,7 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                   "missing_token",
                   "wrong_client",
                   "invalid_signature",
+                  "invalid_demo_code",
                   "signature_expired",
                   "origin_not_allowed",
                   "demo_disabled",
