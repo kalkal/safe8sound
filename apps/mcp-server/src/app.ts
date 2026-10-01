@@ -10,6 +10,7 @@ import { comfortPlanModule } from './modules/comfort-plan/index.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
 import { stormModeModule } from './modules/storm-mode/index.js';
 import type { StormModeWiring } from './storm-mode-config.js';
+import { SANDBOX_HOME, createSandboxes } from './sandboxes.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
 
 export interface AppOptions {
@@ -64,6 +65,10 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     return err(toolError('invalid_config', `MCP_SCENARIO must be one of ${SCENARIO_IDS.join(', ')}.`));
   }
   const startH = number(env, 'MCP_SCENARIO_START_H', 0);
+  const sandboxTtlH = number(env, 'MCP_SANDBOX_TTL_H', 24);
+  const sandboxMaxNew = number(env, 'MCP_SANDBOX_MAX_NEW_PER_DAY', 100);
+  if (!sandboxTtlH.ok) return sandboxTtlH;
+  if (!sandboxMaxNew.ok) return sandboxMaxNew;
   const speed = number(env, 'MCP_SCENARIO_SPEED', 1);
   if (!startH.ok) return startH;
   if (!speed.ok) return speed;
@@ -88,15 +93,27 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     [DEMO, () => demoSim.forecast()],
     [HOME, () => homeSim.forecast()],
   ]);
+  // Visitor sandboxes (#101): a copy of the demo home per visitor, created on first use, 24 h TTL, daily cap.
+  const sandboxes = createSandboxes({
+    clock: opts.wallClock,
+    ttlMs: sandboxTtlH.value * HOUR_MS,
+    maxNewPerDay: sandboxMaxNew.value,
+    create: (homeId) => {
+      const sim = simulator(HomeProfileSchema.parse({ ...demo, homeId }));
+      return { entry: { source: sim, profile: demo, readOnly: false, levelSince } satisfies HomeEntry, forecast: () => sim.forecast() };
+    },
+  });
+  const sandboxFor = (homeId: HomeId) => (SANDBOX_HOME.test(homeId) ? sandboxes.get(homeId) : undefined);
+
   const homeFor = (homeId: HomeId) => {
-    const entry = homes.get(homeId);
+    const entry = homes.get(homeId) ?? sandboxFor(homeId)?.entry;
     const override = opts.sourceOverride?.(homeId);
     return entry && override ? { ...entry, source: override } : entry;
   };
 
   const planningHome = (homeId: HomeId) => {
     const entry = homeFor(homeId);
-    const forecast = forecasts.get(homeId);
+    const forecast = forecasts.get(homeId) ?? sandboxFor(homeId)?.forecast;
     return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly } : undefined;
   };
 
@@ -112,6 +129,6 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   return ok({
     config: config.value,
     registry: registry.value,
-    handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger }),
+    handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes }),
   });
 }

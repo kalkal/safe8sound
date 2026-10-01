@@ -4,6 +4,8 @@ import { HomeIdSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type
 export interface ClientGrant {
   readonly clientId: string;
   readonly homeId: HomeId;
+  /** `<client>@demo#*`: may also serve the demo#<16 hex> sandbox homes named by x-cold-reserve-home (#101). */
+  readonly sandboxes?: true;
 }
 
 export interface ServerConfig {
@@ -34,8 +36,10 @@ export function parseClients(raw: string | undefined): Result<ReadonlyMap<string
   const seen = new Set<string>();
   for (const [index, entry] of raw.split(',').entries()) {
     const match = /^\s*([^@=\s]+)@([^=]+)=(\S+)\s*$/.exec(entry);
-    const [, clientId = '', home = '', token = ''] = match ?? [];
-    const homeId = HomeIdSchema.safeParse(home);
+    const [, clientId = '', rawHome = '', token = ''] = match ?? [];
+    // `demo#*` is the only home pattern: demo itself plus the visitor sandboxes.
+    const sandboxes = rawHome === 'demo#*';
+    const homeId = HomeIdSchema.safeParse(sandboxes ? 'demo' : rawHome);
     if (!match || !CLIENT_ID.test(clientId) || !homeId.success) {
       return invalid(`MCP_CLIENTS entry ${String(index + 1)} is not <client>@<homeId>=<token>.`);
     }
@@ -43,7 +47,7 @@ export function parseClients(raw: string | undefined): Result<ReadonlyMap<string
     if (clients.has(token)) return invalid(`Client "${clientId}" reuses another client's token.`);
     if (seen.has(clientId)) return invalid(`Client "${clientId}" is listed twice.`);
     seen.add(clientId);
-    clients.set(token, { clientId, homeId: homeId.data });
+    clients.set(token, { clientId, homeId: homeId.data, ...(sandboxes ? { sandboxes: true as const } : {}) });
   }
   return ok(clients);
 }

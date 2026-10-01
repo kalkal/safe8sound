@@ -1,5 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
+  HomeIdSchema,
   PROBLEM_JSON_CONTENT_TYPE,
   toProblemDetails,
   toolError,
@@ -23,6 +24,7 @@ import {
 import type { z } from 'zod';
 import type { ClientGrant, ServerConfig } from './config.js';
 import type { ModuleRegistry, UiResource } from './registry.js';
+import { SANDBOX_HOME, type Sandboxes } from './sandboxes.js';
 import { listTool, type ToolContext, type ToolDefinition } from './tool.js';
 
 /** One line of the error log (docs/error-handling.md §6.1): no secrets, no personal data. */
@@ -46,6 +48,8 @@ export interface Logger {
 export interface HandlerDeps {
   readonly registry: ModuleRegistry;
   readonly logger: Logger;
+  /** Visitor sandboxes (#101): without it, no request can name a home. */
+  readonly sandboxes?: Sandboxes<unknown>;
 }
 
 export type McpHandler = (req: Request) => Promise<Response>;
@@ -216,7 +220,23 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       return problem(toolError('missing_protocol_version', 'Send the MCP-Protocol-Version header negotiated at initialization.'), correlationId);
     }
 
-    const ctx: ToolContext = { correlationId, clientId: grant.clientId, homeId: grant.homeId };
+    // The home comes from the token; a demo#* grant may name a visitor sandbox instead (#101).
+    // The real home is never reachable this way: only demo#<16 hex> passes, and only for that grant.
+    let homeId = grant.homeId;
+    const requested = req.headers.get('x-cold-reserve-home');
+    if (requested !== null) {
+      if (grant.sandboxes !== true || !SANDBOX_HOME.test(requested) || deps.sandboxes === undefined) {
+        const error = toolError('home_not_allowed', 'This client may not reach that home.');
+        record(error, correlationId);
+        return problem(error, correlationId);
+      }
+      const sandbox = HomeIdSchema.parse(requested);
+      const admitted = deps.sandboxes.admit(sandbox);
+      if (!admitted.ok) return problem(admitted.error, correlationId);
+      homeId = sandbox;
+    }
+
+    const ctx: ToolContext = { correlationId, clientId: grant.clientId, homeId };
     const server = buildServer(ctx);
     // Stateless: no sessionIdGenerator (the documented `undefined` breaks exactOptionalPropertyTypes).
     const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });

@@ -65,3 +65,11 @@ describe('card tool calls: POST /v1/tools/call', () => {
     expect(ToolCallReplySchema.safeParse({ content: [] }).success).toBe(false);
   });
 });
+
+describe('sandbox homes (#101)', () => {
+  it('refuses a home the client may not reach with home_not_allowed as a 403', () => {
+    expect(categoryOf('home_not_allowed')).toBe('forbidden');
+    const problem = toProblemDetails(toolError('home_not_allowed', 'This client may not reach that home.'), { instance: 'urn:uuid:00000000-0000-4000-8000-000000000000' });
+    expect(ProblemDetailsSchema.parse(problem)).toMatchObject({ status: 403, code: 'home_not_allowed' });
+  });
+});

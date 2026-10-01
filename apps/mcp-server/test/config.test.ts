@@ -43,3 +43,16 @@ describe('loadConfig', () => {
     expect(JSON.stringify(result.error)).not.toContain('tooshort-secret');
   });
 });
+
+describe('sandbox grants (#101): <client>@demo#*', () => {
+  const T = 's'.repeat(32);
+
+  it('lets a client serve demo and the demo# sandboxes', () => {
+    const result = loadConfig({ MCP_CLIENTS: `agent@demo#*=${T}` });
+    expect(result.ok && result.value.clients.get(T)).toEqual({ clientId: 'agent', homeId: 'demo', sandboxes: true });
+  });
+
+  it.each(['home#*', 'demo#a*', 'other#*'])('refuses the pattern %s', (pattern) => {
+    expect(loadConfig({ MCP_CLIENTS: `agent@${pattern}=${T}` })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+});

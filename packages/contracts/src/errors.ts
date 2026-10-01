@@ -51,6 +51,8 @@ export const ERROR_CATALOG = {
   signature_expired: { category: 'unauthorized' },
   origin_not_allowed: { category: 'forbidden' },
   demo_disabled: { category: 'forbidden' },
+  // A sandbox home header the client may not use (approved in #101).
+  home_not_allowed: { category: 'forbidden' },
   // A plan built on simulated data is never applied to the real home (plan §9.4, approved in #19).
   simulated_plan_on_real_home: { category: 'forbidden' },
   // conflict: idempotent success, return the original outcome

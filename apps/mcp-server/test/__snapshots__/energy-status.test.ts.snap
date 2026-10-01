@@ -245,6 +245,7 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                   "signature_expired",
                   "origin_not_allowed",
                   "demo_disabled",
+                  "home_not_allowed",
                   "simulated_plan_on_real_home",
                   "plan_already_applied",
                   "home_data_stale",

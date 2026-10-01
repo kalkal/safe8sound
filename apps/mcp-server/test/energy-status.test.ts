@@ -6,7 +6,8 @@ import type { LogEntry } from '../src/handler.js';
 import { HOME_TOKEN, TOKEN, callTool, post, toolResult, toolsList } from './helpers.js';
 
 const WALL = Date.UTC(2026, 8, 29, 7, 0, 0);
-const ENV = { MCP_CLIENTS: `agent@demo=${TOKEN},video@home=${HOME_TOKEN},stranger@nowhere=${'n'.repeat(32)}`, MCP_SCENARIO_START_H: '14' };
+const SANDBOX_TOKEN = 's'.repeat(32);
+const ENV = { MCP_CLIENTS: `agent@demo=${TOKEN},video@home=${HOME_TOKEN},stranger@nowhere=${'n'.repeat(32)},sandbox@demo#*=${SANDBOX_TOKEN}`, MCP_SCENARIO_START_H: '14' };
 
 function app(env: Record<string, string> = ENV, extra: Partial<AppOptions> = {}) {
   const logs: LogEntry[] = [];
@@ -38,6 +39,21 @@ describe('get_home_status on the demo home (simulator, clear-day, fixed seed)', 
     const a = await toolResult(await post(app().handler, callTool('get_home_status', {})));
     const b = await toolResult(await post(app().handler, callTool('get_home_status', {})));
     expect(a.structuredContent).toEqual(b.structuredContent);
+  });
+});
+
+describe('get_home_status on a visitor sandbox (#101)', () => {
+  it('serves a sandbox copy of the demo home, named by the header of a demo#* client', async () => {
+    const res = await post(app().handler, callTool('get_home_status', {}), { authorization: `Bearer ${SANDBOX_TOKEN}`, 'x-cold-reserve-home': 'demo#0123456789abcdef' });
+    const status = HomeStatusSchema.parse((await toolResult(res)).structuredContent);
+    expect(status).toMatchObject({ homeId: 'demo#0123456789abcdef', homeLink: 'ok', controlAvailability: 'ok' });
+  });
+
+  it('refuses a new sandbox past MCP_SANDBOX_MAX_NEW_PER_DAY', async () => {
+    const { handler } = app({ ...ENV, MCP_SANDBOX_MAX_NEW_PER_DAY: '1' });
+    const ask = (home: string) => post(handler, callTool('get_home_status', {}), { authorization: `Bearer ${SANDBOX_TOKEN}`, 'x-cold-reserve-home': home });
+    expect((await ask('demo#0123456789abcdef')).status).toBe(200);
+    expect((await ask('demo#fedcba9876543210')).status).toBe(429);
   });
 });
 
