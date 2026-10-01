@@ -6,7 +6,7 @@ Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server
 
 > **Honesty box.** Everything below describes what is merged on `main`.
 > - **The demo home is simulated.** A seeded physics simulator (`packages/adapters/source-simulator`, scenarios `clear-day`, `heatwave`, `storm-blackout`) stands in for the house. Every number carries its origin, and the screen shows a **SIMULATED** badge next to it ([OriginBadge.tsx](apps/alexa-sim/src/ui/OriginBadge.tsx)).
-> - **The storm is a scenario.** No real blackout is involved; the family messages land in an in-memory inbox ([notifier-inapp](packages/adapters/notifier-inapp/src/index.ts)), not on real phones.
+> - **The storm is a scenario.** No real blackout is involved; the family messages go to a simulated in-app phone: an inbox kept in the home's state store for two days ([notifier-inapp](packages/adapters/notifier-inapp/src/index.ts), [state-store.ts:44](packages/core/src/state-store.ts:44)), not to real phones.
 > - **The real home is read-only.** The `home` id is served by the simulator until the home bridge exists ([app.ts:42](apps/mcp-server/src/app.ts:42), issue #15), and on it a plan is advice with manual steps, never a command ([docs/comfort-plan.md](docs/comfort-plan.md)).
 > - **The model is fake until AWS.** Locally and in CI the agent runs on a scripted fake model; Bedrock (Nova 2 Lite) is wired in config but not called yet ([config.ts:24](apps/agent/src/config.ts:24)).
 > - **Not done yet:** the sim-api (#101), real voice (#25), the Agent Skill (#22), the storm screen and phone (#24), the card bundle on Lambda (#104), the database error log, and the deploy. See [What is not done yet](#what-is-not-done-yet).
@@ -34,7 +34,7 @@ Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server
 ### Counterfactual: "without the plan"
 - **What it means:** next to our plan, the same hours projected with no plan and with the naive "AC until the battery dies", so the voice can say how hot the safe room would get without it.
 - **Where:** `counterfactual` in the plan ([counterfactual.ts](packages/contracts/src/counterfactual.ts), [core/counterfactual.ts](packages/core/src/counterfactual.ts)). It is in the data the model reads; the plan card does not draw it yet.
-- **Proof:** [plan-comfort.test.ts:24](apps/mcp-server/test/comfort-plan/plan-comfort.test.ts:24), [hot-day.test.ts:107](apps/mcp-server/test/e2e/hot-day.test.ts:107).
+- **Proof:** [plan-comfort.test.ts:28](apps/mcp-server/test/comfort-plan/plan-comfort.test.ts:28), [hot-day.test.ts:107](apps/mcp-server/test/e2e/hot-day.test.ts:107).
 
 ### Reserve "ice cubes"
 - **You ask:** "How long will the battery last?" You see the battery counted in hours: at the current level, at Essential, and from the storm reserve alone.
@@ -51,7 +51,7 @@ Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server
 - **You ask:** "A storm is coming tonight." The assistant prepares; if the grid goes down, storm mode becomes active and tells you how many hours the safe room is safe, and the registered family gets a fixed message.
 - **Tools:** `start_storm_mode` (`prepare` or `active`), `get_safe_room_status`, `notify_family` ([storm-mode](apps/mcp-server/src/modules/storm-mode/index.ts)). Safe hours come from [core/storm.ts](packages/core/src/storm.ts).
 - **Guarantees:** the storm reserve is never spent while the grid is up: "active" with the grid up is only a preparation ([start-storm-mode.test.ts:10](apps/mcp-server/test/storm-mode/start-storm-mode.test.ts:10)). `notify_family` sends only fixed texts to saved contacts; the model cannot write the text or name a recipient, and nobody is told twice ([notify-family.test.ts](apps/mcp-server/test/storm-mode/notify-family.test.ts), with a property test at line 94).
-- **Simulated:** the blackout (scenario `storm-blackout`) and the phone inbox.
+- **Simulated:** the blackout (scenario `storm-blackout`) and the phone. Each delivered message is saved in the home's state store (`INBOX#` items, kept two days), so the phone can read it from any process; the inbox is never exposed through an MCP tool, because the text carries the contact's name. Storm mode is wired on the Lambda entry too ([lambda-main.ts:39](apps/mcp-server/src/lambda-main.ts:39)).
 - **Proof:** [e2e/storm-blackout.test.ts](apps/mcp-server/test/e2e/storm-blackout.test.ts) runs the whole flow through MCP, with safe hours within 5 % of the formula.
 
 ### Cards (MCP Apps, `ui://`)
@@ -79,19 +79,18 @@ Not built yet: `apps/sim-api` is a skeleton (#101). It will hold the demo codes,
 Not built yet (#22).
 
 ## How it fits together
+The design, in one picture. What runs today is in the honesty box at the top: locally the agent uses a fake model, the home is simulated, and nothing is deployed yet.
+
 ```mermaid
 flowchart LR
-  U[Person] --> SIM[alexa-sim<br/>web simulator + card host]
-  SIM -. "x-correlation-id (planned: sim-api #101)" .-> API[sim-api]
-  API -.-> AG[agent<br/>Strands, fake model locally]
-  SIM -->|offline| SCR[scripted agent]
-  AG -->|MCP Streamable HTTP, bearer token| MCP[mcp-server<br/>9 tools]
-  MCP --> G[guard<br/>5 guarantees]
-  MCP --> C[core<br/>physics, pacing, storm]
-  MCP --> S[(state store<br/>memory / DynamoDB)]
-  MCP --> SRC[home source<br/>simulator, real home read-only]
+  U["Alexa+ / Echo simulator<br/>(voice, chat, cards)"] --> A["Agent<br/>Strands · Nova 2 Lite"]
+  A -- "tool calls (MCP)" --> M["MCP server<br/>capability modules"]
+  M -- "LLM proposes" --> G{{"Guard<br/>decides"}}
+  G --> C["Pure core<br/>thermal · energy · reserve · planner"]
+  M --> P["Adapters<br/>simulator · real home (read-only) · DynamoDB · family phone"]
+  P --> W[("AWS<br/>Lambda · DynamoDB · Bedrock · Polly")]
 ```
-- **Correlation id.** The simulator creates one per turn and sends it as `x-correlation-id` ([remote-agent.ts:30](apps/alexa-sim/src/agent/remote-agent.ts:30)). The MCP server accepts it (or creates one), echoes it in the response and writes it in every error log ([handler.ts:190](apps/mcp-server/src/handler.ts:190)). The hop through sim-api and the agent comes with #101.
+- **Correlation id.** The simulator creates one per turn and sends it as `x-correlation-id` ([remote-agent.ts:30](apps/alexa-sim/src/agent/remote-agent.ts:30)). The MCP server accepts it (or creates one), echoes it in the response and writes it in every error log ([handler.ts:232](apps/mcp-server/src/handler.ts:232)). The hop through sim-api and the agent comes with #101.
 - **Boundaries.** `contracts` is a leaf; `core` and `guard` are pure; adapters plug in behind ports; apps never import each other (enforced by `pnpm depcruise`).
 - **Cloud.** `infra/` synthesises the MCP server as a Lambda with a Function URL and a DynamoDB table; synth and cdk-nag only, nothing is deployed yet.
 
