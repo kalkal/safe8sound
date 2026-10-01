@@ -1,4 +1,4 @@
-import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   HOME_HEADER,
   PROBLEM_JSON_CONTENT_TYPE,
@@ -23,7 +23,8 @@ import {
   type ReadResourceResult,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { z } from 'zod';
-import type { ClientGrant, ServerConfig } from './config.js';
+import { bearerAuthenticator } from './auth.js';
+import type { ServerConfig } from './config.js';
 import type { ModuleRegistry, UiResource } from './registry.js';
 import type { Sandboxes } from './sandboxes.js';
 import { listTool, type ToolContext, type ToolDefinition } from './tool.js';
@@ -65,7 +66,6 @@ const RESOURCE_NOT_FOUND = -32002;
 /** MCP Apps mime type of a ui:// document. */
 export const CARD_MIME_TYPE = 'text/html;profile=mcp-app';
 
-const sha256 = (value: string) => createHash('sha256').update(value).digest();
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 function problem(error: ErrorEnvelope, correlationId: string, status?: HttpErrorStatus, headers: Record<string, string> = {}): Response {
@@ -87,19 +87,8 @@ function invalidInput(tool: ToolDefinition, issues: readonly z.core.$ZodIssue[])
 }
 
 export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHandler {
-  const tokens = [...config.clients].map(([token, grant]) => ({ digest: sha256(token), grant }));
+  const authenticate = bearerAuthenticator(config.clients);
   const allowedOrigins = new Set(config.allowedOrigins);
-
-  /** undefined = no bearer token; null = a token nobody was issued. */
-  function authenticate(header: string | null): ClientGrant | null | undefined {
-    const match = header?.match(/^Bearer (\S+)$/);
-    if (!match?.[1]) return undefined;
-    const presented = sha256(match[1]);
-    let grant: ClientGrant | null = null;
-    // Compare against every token so timing does not reveal which one matched.
-    for (const entry of tokens) if (timingSafeEqual(presented, entry.digest)) grant = entry.grant;
-    return grant;
-  }
 
   function record(error: ErrorEnvelope, correlationId: string, ctx?: Partial<ToolContext>, details?: Record<string, unknown>) {
     if (!LOGGED.has(error.category)) return;
@@ -206,7 +195,8 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       record(error, correlationId);
       return problem(error, correlationId, undefined, { 'www-authenticate': 'Bearer realm="mcp"' });
     }
-    if (grant === null) {
+    // A phone token opens the family inbox only, never a tool (#24).
+    if (grant === null || grant.scope !== undefined) {
       const error = toolError('wrong_client', 'The token was not issued for this server.');
       record(error, correlationId);
       return problem(error, correlationId, undefined, { 'www-authenticate': 'Bearer realm="mcp", error="invalid_token"' });
