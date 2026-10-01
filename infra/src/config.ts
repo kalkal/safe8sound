@@ -28,6 +28,11 @@ export const McpConfigSchema = z.strictObject({
   ssmTimeoutMs: positiveInt,
   allowedOrigins: z.array(z.url()),
   scenario: z.string().regex(/^[a-z0-9][a-z0-9-]{0,47}$/),
+  /**
+   * Where scenario time starts (R1): `daily` = the start of the UTC day, or a fixed ISO instant. Never
+   * the container start (the server default for local runs): two warm Lambdas would disagree.
+   */
+  scenarioAnchor: z.union([z.literal('daily'), z.iso.datetime({ offset: true })]),
 });
 export type McpConfig = z.infer<typeof McpConfigSchema>;
 

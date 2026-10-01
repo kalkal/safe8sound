@@ -13,6 +13,7 @@ export const exampleConfig = (): InfraConfig => ({
     ssmTimeoutMs: 2000,
     allowedOrigins: [],
     scenario: 'clear-day',
+    scenarioAnchor: 'daily',
   },
   state: { connectTimeoutMs: 500, requestTimeoutMs: 1500, maxAttempts: 3 },
 });

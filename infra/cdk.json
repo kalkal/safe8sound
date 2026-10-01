@@ -23,7 +23,8 @@
       "p95AlarmMs": 500,
       "ssmTimeoutMs": 2000,
       "allowedOrigins": [],
-      "scenario": "clear-day"
+      "scenario": "clear-day",
+      "scenarioAnchor": "daily"
     },
     "cold-reserve:state": {
       "connectTimeoutMs": 500,

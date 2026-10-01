@@ -106,6 +106,8 @@ describe('mcp stack: the MCP server Lambda', () => {
           STATE_STORE_REQUEST_TIMEOUT_MS: '1500',
           STATE_STORE_MAX_ATTEMPTS: '3',
           MCP_SCENARIO: 'clear-day',
+          // R1: every container anchors the scenario on the UTC day, never on its own start.
+          MCP_SCENARIO_ANCHOR: 'daily',
         }),
       },
     });
@@ -180,6 +182,8 @@ describe('loadInfraConfig for the mcp and state settings', () => {
     ['a parameter name outside the per-function /mcp-server/ prefix', { ...config.mcp, clientsParameter: '/cold-reserve/{stage}/mcp-clients' }],
     ['a missing log retention', { ...config.mcp, logRetentionDays: undefined }],
     ['a log retention CloudWatch does not offer', { ...config.mcp, logRetentionDays: 15 }],
+    ['a scenario anchor on the container start (R1)', { ...config.mcp, scenarioAnchor: 'start' }],
+    ['a missing scenario anchor', { ...config.mcp, scenarioAnchor: undefined }],
   ])('rejects %s with invalid_config', (_name, mcp) => {
     expect(loadInfraConfig(context({ 'cold-reserve:mcp': mcp }))).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });

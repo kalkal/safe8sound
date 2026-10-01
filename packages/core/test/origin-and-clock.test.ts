@@ -1,7 +1,7 @@
 import { DATA_GROUPS, DataOriginSchema, type DataGroup } from '@cold-reserve/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { fixedClock, scenarioClock } from '../src/clock.js';
+import { fixedClock, scenarioClock, utcDayStart } from '../src/clock.js';
 import { resolveOrigin } from '../src/origin.js';
 
 const storm = { id: 'storm-blackout', simulatedGroups: DATA_GROUPS };
@@ -58,5 +58,24 @@ describe('clocks', () => {
   it('runs in real time by default', () => {
     const clock = scenarioClock({ wall: fixedClock(7_000), anchorMs: 5_000, scenarioStartMs: 0 });
     expect(clock.now()).toBe(2_000);
+  });
+
+  it('anchors on the start of the UTC day: a pure function of wall time, so every container agrees', () => {
+    const at = (iso: string) => scenarioClock({ wall: fixedClock(Date.parse(iso)), anchorMs: utcDayStart, scenarioStartMs: 1_000_000, speed: 2 }).now();
+    expect(at('2026-10-01T00:00:00Z')).toBe(1_000_000);
+    expect(at('2026-10-01T05:00:00Z')).toBe(1_000_000 + 10 * 3_600_000);
+    // The next day replays the scenario from its start.
+    expect(at('2026-10-02T05:00:00Z')).toBe(at('2026-10-01T05:00:00Z'));
+  });
+
+  it('utcDayStart drops the time of day, for any instant', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 4_102_444_800_000 }), (ms) => {
+        const start = utcDayStart(ms);
+        expect(new Date(start).toISOString()).toMatch(/T00:00:00\.000Z$/);
+        expect(ms - start).toBeGreaterThanOrEqual(0);
+        expect(ms - start).toBeLessThan(86_400_000);
+      }),
+    );
   });
 });

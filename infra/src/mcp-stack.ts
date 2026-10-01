@@ -68,6 +68,7 @@ export class McpStack extends Stack {
         SSM_TIMEOUT_MS: String(mcp.ssmTimeoutMs),
         MCP_ALLOWED_ORIGINS: mcp.allowedOrigins.join(','),
         MCP_SCENARIO: mcp.scenario,
+        MCP_SCENARIO_ANCHOR: mcp.scenarioAnchor,
         STATE_TABLE_NAME: table.tableName,
         STATE_STORE_CONNECT_TIMEOUT_MS: String(state.connectTimeoutMs),
         STATE_STORE_REQUEST_TIMEOUT_MS: String(state.requestTimeoutMs),
