@@ -148,24 +148,44 @@ describe('stepRoomMoisture: water balance of the room air', () => {
 });
 
 describe('feelsLikeC (comfort only, never safety)', () => {
+  const fan = { effectC: 1.5, maxAirC: 35 };
+
   it('is the air temperature below the heat-index range', () => {
-    expect(feelsLikeC({ tempC: celsius(24), rhPct: pct(60), fanOn: false, fanEffectC: 1.5 })).toBe(24);
+    expect(feelsLikeC({ tempC: celsius(24), rhPct: pct(60) })).toBe(24);
   });
 
   it('follows the NOAA heat index: 90 F at 60 % feels like about 100 F', () => {
-    expect(feelsLikeC({ tempC: celsius((90 - 32) / 1.8), rhPct: pct(60), fanOn: false, fanEffectC: 1.5 })).toBeCloseTo((99.7 - 32) / 1.8, 1);
+    expect(feelsLikeC({ tempC: celsius((90 - 32) / 1.8), rhPct: pct(60) })).toBeCloseTo((99.7 - 32) / 1.8, 1);
   });
 
   it('a fan lowers the feels-like temperature by the configured effect', () => {
-    const still = feelsLikeC({ tempC: celsius(27), rhPct: pct(50), fanOn: false, fanEffectC: 1.5 });
-    const breeze = feelsLikeC({ tempC: celsius(27), rhPct: pct(50), fanOn: true, fanEffectC: 1.5 });
+    const still = feelsLikeC({ tempC: celsius(27), rhPct: pct(50) });
+    const breeze = feelsLikeC({ tempC: celsius(27), rhPct: pct(50), fan });
     expect(still - breeze).toBeCloseTo(1.5, 9);
+  });
+
+  it('from 35 °C of air a fan brings no benefit (UKHSA; Lancet Planet Health 2024): only below the threshold', () => {
+    const benefit = (t: number) => feelsLikeC({ tempC: celsius(t), rhPct: pct(30) }) - feelsLikeC({ tempC: celsius(t), rhPct: pct(30), fan });
+    expect(benefit(34.9)).toBeCloseTo(1.5, 9);
+    expect(benefit(35)).toBe(0);
+    expect(benefit(35.1)).toBe(0);
   });
 
   it('never feels colder than the air without a fan in the heat', () => {
     fc.assert(
       fc.property(fc.double({ min: 27, max: 38, noNaN: true }), fc.double({ min: 0, max: 70, noNaN: true }), (t, rh) => {
-        expect(feelsLikeC({ tempC: celsius(t), rhPct: pct(rh), fanOn: false, fanEffectC: 1.5 })).toBeGreaterThanOrEqual(t - 1e-9);
+        expect(feelsLikeC({ tempC: celsius(t), rhPct: pct(rh) })).toBeGreaterThanOrEqual(t - 1e-9);
+      }),
+    );
+  });
+
+  it('property: a fan never makes it feel colder than the air minus its effect, nor warmer than without it', () => {
+    fc.assert(
+      fc.property(fc.double({ min: 20, max: 40, noNaN: true }), fc.double({ min: 0, max: 70, noNaN: true }), (t, rh) => {
+        const still = feelsLikeC({ tempC: celsius(t), rhPct: pct(rh) });
+        const breeze = feelsLikeC({ tempC: celsius(t), rhPct: pct(rh), fan });
+        expect(breeze).toBeLessThanOrEqual(still);
+        expect(still - breeze).toBeCloseTo(t < fan.maxAirC ? fan.effectC : 0, 9);
       }),
     );
   });

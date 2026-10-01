@@ -1,5 +1,5 @@
-import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result } from '@cold-reserve/contracts';
-import { scenarioClock, utcDayStart, type Clock, type HomeDataSource } from '@cold-reserve/core';
+import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
+import { epsBaseLoadW, scenarioClock, utcDayStart, type Clock, type HomeDataSource } from '@cold-reserve/core';
 import { FallbackSource } from '@cold-reserve/source-fallback';
 import { SCENARIO_IDS, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
 import { withCardResources, type CardDocuments } from './cards.js';
@@ -68,6 +68,27 @@ function scenarioAnchor(raw: string | undefined, startedAtMs: number): Result<nu
   return instant.success ? ok(Date.parse(instant.data)) : err(toolError('invalid_config', 'MCP_SCENARIO_ANCHOR must be start, daily or an ISO instant.'));
 }
 
+/**
+ * Off grid the simulator, the guard and the storm safe hours read the EPS load from the home profile. A profile
+ * without it gets no assumed figure: its storm calculations refuse (`missing_eps_load`), and start-up says so.
+ */
+export function warnMissingEpsLoad(profiles: readonly HomeProfile[], logger: Logger): void {
+  for (const profile of profiles) {
+    const eps = epsBaseLoadW(profile);
+    if (eps.ok) continue;
+    logger.log({
+      ts: new Date().toISOString(),
+      level: 'warn',
+      component: 'mcp-server',
+      code: 'missing_eps_load',
+      category: 'internal',
+      message: 'The home profile gives no epsBaseLoadW: its storm calculations refuse until it does.',
+      correlationId: 'startup',
+      homeId: profile.homeId,
+    });
+  }
+}
+
 export function createApp(env: Readonly<Record<string, string | undefined>>, opts: AppOptions): Result<App, ErrorEnvelope> {
   const config = loadConfig(env);
   if (!config.ok) return config;
@@ -98,6 +119,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const simulator = (profile: typeof demo) => new SimulatorSource({ profile, scenario, params, clock });
   const demoSim = simulator(demo);
   const homeSim = simulator(home);
+  warnMissingEpsLoad([demo, home], opts.logger);
   const homes = new Map<HomeId, HomeEntry>([
     [DEMO, { source: demoSim, profile: demo, readOnly: false, levelSince }],
     [HOME, { source: new FallbackSource({ primary: noLiveHome, fallback: homeSim, clock }), profile: home, readOnly: true, levelSince }],

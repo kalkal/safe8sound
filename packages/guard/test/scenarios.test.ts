@@ -1,4 +1,4 @@
-import { GUARANTEE_IDS, PreferencesSchema, type HvacMode } from '@cold-reserve/contracts';
+import { GUARANTEE_IDS, PreferencesSchema, pct, type HvacMode } from '@cold-reserve/contracts';
 import { examplePreferences } from '@cold-reserve/contracts/fixtures';
 import { fixedClock } from '@cold-reserve/core';
 import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
@@ -12,14 +12,14 @@ const H = 3_600_000;
 const profile = demoProfile();
 const preferences = PreferencesSchema.parse({ ...examplePreferences(), roomPriority: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
 
-function verdictAt(id: ScenarioId, atH: number, s: { mode: HvacMode; setpointC: number; fanOn: boolean; targetPct: number }): GuardVerdict {
+function verdictAt(id: ScenarioId, atH: number, s: { mode: HvacMode; setpointC: number; fanOn: boolean; targetPct: number }, socPct?: number): GuardVerdict {
   const scenario = builtInScenario(id);
   const startMs = Date.parse(scenario.startAt);
   const nowMs = startMs + atH * H;
   const sim = new SimulatorSource({ profile, scenario, params: defaultSimParams(), clock: fixedClock(nowMs) });
   return runGuard({
     plan: { horizonAt: iso(nowMs + 12 * H), steps: [step({ atMs: nowMs, ...s })], ladder: LADDER },
-    snapshot: sim.snapshotAt(nowMs),
+    snapshot: socPct === undefined ? sim.snapshotAt(nowMs) : { ...sim.snapshotAt(nowMs), batterySocPct: pct(socPct) },
     forecast: sim.forecast(),
     profile,
     preferences,
@@ -33,17 +33,25 @@ function verdictAt(id: ScenarioId, atH: number, s: { mode: HvacMode; setpointC: 
 const byId = (v: GuardVerdict, id: string) => v.guarantees.find((g) => g.id === id);
 
 describe('storm-blackout: the grid goes down at 15:00 and returns at 06:30', () => {
-  // The scenario's own HVAC (dry 27 °C + fan) drains the battery at about 04:00 in the simulator, before
-  // the grid is back at 06:30: the case pacing_on_track exists to refuse.
+  // The scenario's own HVAC (dry 27 °C + fan). Off grid only the EPS circuits draw (150 W besides the safe
+  // room's split, #19): from the scenario's 87.5 % it lasts until the grid is back at 06:30, but dry all night
+  // takes the room under its 40 % humidity minimum. Until 2026-10-01 the whole house drew from the battery in a
+  // blackout and this plan ran it out at about 04:00 instead.
   const naive = verdictAt('storm-blackout', 3, { mode: 'dry', setpointC: 27, fanOn: true, targetPct: 10 });
 
-  it('refuses the naive plan: the battery runs out before the next recharge', () => {
-    const pacing = byId(naive, 'pacing_on_track');
+  it('refuses the naive plan: dry all night takes the safe room under its humidity minimum', () => {
+    expect(byId(naive, 'pacing_on_track')).toMatchObject({ ok: true, reason: 'The energy lasts until the next recharge at 08:00.' });
+    expect(byId(naive, 'safe_room_comfort')?.reason).toMatch(/^Humidity in the safe room would drop to \d+ %, below 40 %\.$/);
+    expect(naive.ok).toBe(false);
+  });
+
+  it('with a battery at 20 %, the same plan runs out before the next recharge: the case pacing_on_track refuses', () => {
+    const low = verdictAt('storm-blackout', 3, { mode: 'dry', setpointC: 27, fanOn: true, targetPct: 10 }, 20);
+    const pacing = byId(low, 'pacing_on_track');
     expect(pacing?.ok).toBe(false);
     expect(pacing?.unit).toBe('min');
     expect(pacing?.measured).toBeGreaterThan(0);
-    expect(pacing?.reason).toMatch(/runs out at 0[3-7]:\d\d, \d+ min before the next recharge at 08:00/);
-    expect(naive.ok).toBe(false);
+    expect(pacing?.reason).toMatch(/runs out at \d\d:\d\d, \d+ min before the next recharge at 08:00/);
   });
 
   it('with the grid down, the reserve is the budget and the inverter limit is the EPS rating', () => {

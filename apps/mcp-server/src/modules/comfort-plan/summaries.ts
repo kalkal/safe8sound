@@ -1,4 +1,5 @@
 import { DATA_GROUPS, isFullyLive, type ApplyPlanOutput, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
+import { localTimeText } from '../storm-mode/summaries.js';
 
 // The text content of each tool result. The agent (Strands) reads only this text, not structuredContent
 // (F7 finding): every number and fact the model may say is here. The JSON is for the cards and clients.
@@ -58,7 +59,12 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
         `with this plan at ${lineText(plan)}.`,
     );
   }
-  parts.push(`Say it to the person and ask to confirm; then call apply_plan with planId ${p.id}.`);
+  // A last resort cannot be applied (whether it may be is not decided yet): say until when, do not offer it.
+  parts.push(
+    p.lastResort === undefined
+      ? `Say it to the person and ask to confirm; then call apply_plan with planId ${p.id}.`
+      : `Last resort: the safest plan there is, but not every guarantee holds, so it cannot be applied. Tell the person the safe room is safe until ${localTimeText(p.lastResort.safeUntil)}.`,
+  );
   return parts.join(' ');
 }
 

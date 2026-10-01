@@ -3,7 +3,7 @@ import { exampleHomeProfile } from '@cold-reserve/contracts/fixtures';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { saturationVaporPressureHpa } from '../src/humidity.js';
-import { stepHome, type HomeInputs, type HomeState, type SimParams } from '../src/simulation.js';
+import { epsBaseLoadW, stepHome, type HomeInputs, type HomeState, type RoomInputs, type SimParams } from '../src/simulation.js';
 
 const profile = HomeProfileSchema.parse(exampleHomeProfile());
 
@@ -182,5 +182,40 @@ describe('stepHome', () => {
         }
       }),
     );
+  });
+});
+
+describe('off grid only the EPS circuits are powered', () => {
+  // A dark hour, so no PV: every watt is load. Mean noise, so the base load is exact.
+  const dark = (over: Partial<HomeInputs> = {}) => inputs({ irradianceWm2: 0, baseLoadW: watt(700), ...over });
+  const step = (p: typeof profile, i: HomeInputs) => stepHome({ state: state(80, 28), inputs: i, profile: p, params, dt: minutes(5), noise: 0.5 }).flows;
+  const withEps = HomeProfileSchema.parse({ ...exampleHomeProfile(), epsBaseLoadW: 150 });
+  const everyRoom: RoomInputs[] = ['bedroom-1', 'living', 'study'].map((id) => ({ id, occupants: [], hvac: { mode: 'cool', setpointC: celsius(24) }, fanOn: true }));
+
+  it('on grid the whole house draws: the base load of the hour and every room', () => {
+    const f = step(withEps, dark({ rooms: everyRoom }));
+    expect(f.loadW - f.hvacW - f.fansW).toBeCloseTo(700, 9);
+    expect(f.hvacW).toBeGreaterThan(0);
+  });
+
+  it('off grid the base load is the EPS load of the profile, whatever the hour asks', () => {
+    const f = step(withEps, dark({ gridAvailable: false, rooms: [] }));
+    expect(f.loadW).toBeCloseTo(150, 9);
+  });
+
+  it('off grid only the safe room runs its unit and its fans', () => {
+    const f = step(withEps, dark({ gridAvailable: false, rooms: everyRoom }));
+    const safeOnly = step(withEps, dark({ gridAvailable: false, rooms: everyRoom.filter((r) => r.id === 'bedroom-1') }));
+    expect(f.hvacW).toBeCloseTo(safeOnly.hvacW, 9);
+    expect(f.fansW).toBeCloseTo(safeOnly.fansW, 9);
+    expect(f.hvacW).toBeGreaterThan(0);
+  });
+
+  it('without the EPS load in the profile it is missing, and off grid the whole house is drawn: never an assumed number', () => {
+    const bare = HomeProfileSchema.parse(Object.fromEntries(Object.entries(exampleHomeProfile()).filter(([k]) => k !== 'epsBaseLoadW')));
+    expect(epsBaseLoadW(withEps)).toEqual({ ok: true, value: 150 });
+    expect(epsBaseLoadW(bare)).toMatchObject({ ok: false, error: { code: 'missing_eps_load' } });
+    // The pessimistic bound: the hour's whole-house base load, as if every circuit stayed powered.
+    expect(step(bare, dark({ gridAvailable: false, rooms: [] })).loadW).toBeCloseTo(700, 9);
   });
 });

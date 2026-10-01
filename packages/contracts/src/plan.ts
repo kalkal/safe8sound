@@ -79,6 +79,19 @@ export const PlanSchema = z
     counterfactual: CounterfactualSchema.optional(),
     /** What must be said even though the plan is accepted (optional, added 2026-09-29). */
     warnings: z.array(PlanWarningSchema).max(10).optional(),
+    /**
+     * Present when no plan keeps the safe room within its limits until the next recharge: this is the safest
+     * one, proposed so the person hears until when the room is safe and why (optional, added 2026-10-01,
+     * approved in #19). Whether it can be applied is not decided yet: today apply_plan refuses it.
+     */
+    lastResort: z
+      .strictObject({
+        safeUntil: IsoDateTimeSchema,
+        safeHours: z.number().nonnegative(),
+        /** What ends the safe hours: the battery runs out, or the room leaves its temperature or humidity limits. */
+        limitedBy: z.enum(['battery', 'temperature', 'humidity']),
+      })
+      .optional(),
   })
   .superRefine((plan, ctx) => {
     if (plan.gridAvailable === false && plan.reserveFloorSocPct !== undefined) {
@@ -96,6 +109,12 @@ export const PlanSchema = z
       ctx.addIssue({ code: 'custom', path: ['ladder'], message: 'Ladder goes from comfort down, without repeats' });
     }
     const warningCodes: readonly string[] = (plan.warnings ?? []).map((w) => w.code);
+    if (plan.lastResort !== undefined && plan.guarantees.every((g) => g.ok)) {
+      ctx.addIssue({ code: 'custom', path: ['lastResort'], message: 'A last resort is proposed only when a guarantee fails' });
+    }
+    if (plan.lastResort !== undefined && !warningCodes.includes('last_resort_plan')) {
+      ctx.addIssue({ code: 'custom', path: ['warnings'], message: 'A last-resort plan needs its warning' });
+    }
     if (plan.nightRecovery?.status === 'infeasible' && !warningCodes.includes('night_recovery_infeasible')) {
       ctx.addIssue({ code: 'custom', path: ['warnings'], message: 'An infeasible night recovery needs its warning' });
     }

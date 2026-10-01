@@ -79,4 +79,27 @@ describe('PlanSchema', () => {
     const r = PlanSchema.safeParse({ ...examplePlan(), gridAvailable: false, reserveFloorSocPct: 49.1 });
     expect(!r.success && r.error.issues[0]?.path).toEqual(['reserveFloorSocPct']);
   });
+
+  describe('last resort (approved in #19: proposal only)', () => {
+    const failing = () => examplePlan().guarantees.map((g) => (g.id === 'safe_room_comfort' ? { ...g, ok: false, reason: 'Humidity in the safe room would reach 86 %, above 60 %.' } : g));
+    const lastResort = { safeUntil: '2026-07-18T01:20:00.000Z', safeHours: 7.33, limitedBy: 'humidity' };
+    const warning = { code: 'last_resort_plan', message: 'Safe for about 7.3 hours, until 03:20; then the humidity in the Bedroom goes above 60 %.' };
+    const plan = (over: Record<string, unknown>) => ({ ...examplePlan(), guarantees: failing(), lastResort, warnings: [warning], ...over });
+
+    it('carries until when the safe room is safe, and what limits it', () => {
+      expect(PlanSchema.parse(plan({})).lastResort).toEqual(lastResort);
+      expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, limitedBy: 'luck' } })).success).toBe(false);
+      expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, safeHours: -1 } })).success).toBe(false);
+    });
+
+    it('always says it: a last resort comes with its warning', () => {
+      const r = PlanSchema.safeParse(plan({ warnings: [] }));
+      expect(!r.success && r.error.issues[0]?.path).toEqual(['warnings']);
+    });
+
+    it('is a last resort only when a guarantee fails', () => {
+      const r = PlanSchema.safeParse(plan({ guarantees: examplePlan().guarantees }));
+      expect(!r.success && r.error.issues[0]?.path).toEqual(['lastResort']);
+    });
+  });
 });

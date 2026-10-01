@@ -66,7 +66,7 @@ export function localHour(ms: number, tz: string): number {
 
 /** Heat index above the base, in K; zero where the NOAA heat index is not defined (air below 26.7 °C). */
 export function heatIndexExcessC(tempC: Celsius, rhPct: Pct, baseC: number): number {
-  return Math.max(0, feelsLikeC({ tempC, rhPct, fanOn: false, fanEffectC: 0 }) - baseC);
+  return Math.max(0, feelsLikeC({ tempC, rhPct }) - baseC);
 }
 
 const inWindow = (hour: number, cfg: NightWindowConfig) =>

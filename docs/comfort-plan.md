@@ -24,9 +24,20 @@ Input: `goal` (`cool | heat | dry | auto`), plus optional `setpointC` and `roomI
    - it carries the ladder from its rung down, so later steps down need no new consent;
    - it is saved as `proposed` with a 10-minute expiry;
    - it carries the counterfactual: the same projection with no plan and with the naive "AC until the battery dies" plan.
-   If nothing is accepted, the guard's refusal goes back as a `guard_rejection` error with the nearest allowed value, and the refusal is logged.
+   If nothing is accepted, the planner's own candidates still give the safest plan, as long as it breaks no hard limit (storm reserve, inverter, battery power). It is the **last resort** (approved in #19):
+   - among those candidates, it keeps the safe room safe the longest (`safeUntil` in the guard: the battery runs out, or after the grace period the room leaves its temperature or humidity limits);
+   - it is proposed with `lastResort { safeUntil, safeHours, limitedBy }` and the `last_resort_plan` warning ("safe for about X hours, until …; then …");
+   - for now it is a proposal only: apply_plan still refuses a plan whose guarantees do not all hold, until the owner decides.
+
+   A refusal (`guard_rejection`, with the nearest allowed value, logged) remains when every candidate breaks a hard limit, and for a plan the model proposed.
 
 **Overrides.** With `setpointC` or `roomIds` the model proposes something concrete. The guard checks exactly that plan: no room is switched off to fit the inverter, and there is no night cooling or pacing added. A refusal tells the model why and what would be allowed (video scene 1: "every room at 22 °C" → `inverter_limit_exceeded`, nearest allowed 6000 W).
+
+**Off grid.** In a blackout only the EPS circuits are powered (approved in #19), in the simulator and in the projection alike (one core, plan §9.1):
+- the base load is the home profile's `epsBaseLoadW`, not the hour's whole-house base load. It is 150 W in the demo home: fridge, router, lights, an assumption to calibrate on the plant;
+- only the safe room's split and fans run.
+
+The storm safe hours read the same number. A profile without it falls back to `load.epsBaseLoadFallbackW` of the simulation parameters, and the server logs a warning at start-up.
 
 ## apply_plan (the only action)
 Input: `planId`.

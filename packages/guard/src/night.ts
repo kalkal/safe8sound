@@ -51,7 +51,13 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
     toMs: ctx.horizonMs,
     dischargeFloorPct: ctx.dischargeFloorPct,
   });
-  const proven = referenceProves(referencePoints, { gridAvailable: ctx.gridAvailable, window: plan.window, roomId, band: input.preferences.safety.humidity });
+  const proven = referenceProves(referencePoints, {
+    gridAvailable: ctx.gridAvailable,
+    window: plan.window,
+    roomId,
+    band: input.preferences.safety.humidity,
+    dries: referenceDries(input.profile, roomId),
+  });
   const reference = proven ? measure(referencePoints) : undefined;
   if (meets(reference)) return { nightRecovery: { ...base, status: 'unmet' }, warnings: [] };
 
@@ -88,14 +94,21 @@ export function nightMeets(m: Pick<NightMetrics, 'achievedHours' | 'heatIndexDeg
  */
 export function referenceProves(
   points: readonly ProjectionPoint[],
-  opts: { gridAvailable: boolean; window: { startMs: number; endMs: number }; roomId: string; band: { minPct: number; maxPct: number } },
+  opts: { gridAvailable: boolean; window: { startMs: number; endMs: number }; roomId: string; band: { minPct: number; maxPct: number }; dries: boolean },
 ): boolean {
   const sustainable = opts.gridAvailable || !points.some((p) => p.flows.unservedLoadW > UNSERVED_TOLERANCE_W);
   const inBand = points
     .filter((p) => p.ms >= opts.window.startMs && p.ms < opts.window.endMs)
     .flatMap((p) => p.rooms.filter((r) => r.id === opts.roomId))
-    .every((r) => r.humidityPct >= opts.band.minPct && r.humidityPct <= opts.band.maxPct);
+    // Under the minimum counts only when the reference dries the room: cooling cannot raise the humidity (#107).
+    .every((r) => (!opts.dries || r.humidityPct >= opts.band.minPct) && r.humidityPct <= opts.band.maxPct);
   return sustainable && inBand;
+}
+
+/** The reference dries only when the safe room's unit cannot cool. */
+export function referenceDries(profile: HomeProfile, safeRoomId: string): boolean {
+  const modes = profile.rooms.find((r) => r.id === safeRoomId)?.hvacUnits.flatMap((u) => u.modes) ?? [];
+  return !modes.includes('cool') && modes.includes('dry');
 }
 
 /** Safe room only, off until the night window, then cooling (or drying) below the threshold. */

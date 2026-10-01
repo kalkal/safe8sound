@@ -260,6 +260,7 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                   "unexpected_error",
                   "output_schema_violation",
                   "invalid_config",
+                  "missing_eps_load",
                 ],
                 "type": "string",
               },

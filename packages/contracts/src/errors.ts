@@ -72,6 +72,8 @@ export const ERROR_CATALOG = {
   unexpected_error: { category: 'internal' },
   output_schema_violation: { category: 'internal' },
   invalid_config: { category: 'internal' },
+  /** A storm calculation on a home profile without `epsBaseLoadW`: refused, never assumed (#107). */
+  missing_eps_load: { category: 'internal' },
 } as const satisfies Record<string, { category: ErrorCategory }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

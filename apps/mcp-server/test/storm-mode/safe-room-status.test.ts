@@ -1,4 +1,4 @@
-import { SafeRoomStatusSchema } from '@cold-reserve/contracts';
+import { HomeProfileSchema, SafeRoomStatusSchema, type HomeProfile } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { runStormDetector } from '../../src/modules/storm-mode/observe.js';
 import { safeRoomStatus, startStormMode } from '../../src/modules/storm-mode/tools.js';
@@ -27,6 +27,13 @@ describe('get_safe_room_status', () => {
     expect(out.value.stormPhase).toBeUndefined();
     expect(out.value.origin.scenario).toBe('storm-blackout');
     expect(out.value.safeHours).toBeCloseTo(expectedSafeHours({ snapshot: w.snapshot(), forecast: w.forecast(), profile: w.profile, preferences, config: stormConfig() }), 6);
+  });
+
+  it('on a home without its EPS load, refuses to count safe hours rather than assume one (#107)', async () => {
+    const bare = (p: HomeProfile) => HomeProfileSchema.parse(Object.fromEntries(Object.entries(p).filter(([k]) => k !== 'epsBaseLoadW')));
+    const w = world(4, { profile: bare });
+    const out = await safeRoomStatus(w.deps, w.ctx);
+    expect(!out.ok && out.error).toMatchObject({ code: 'missing_eps_load', category: 'internal' });
   });
 
   it('gives the time in the home time zone, with its offset', async () => {

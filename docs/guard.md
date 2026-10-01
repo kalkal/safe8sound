@@ -16,7 +16,7 @@
 | `storm_reserve` | On grid: every battery target and the projected SOC stay at or above the reserve floor. Off grid: always (the reserve is now the safe room's budget; only a measured grid loss unlocks it). | The floor, rounded up |
 | `inverter_limit` | The projected peak load stays within the inverter AC rating (on grid) or the EPS rating (off grid). | The rating |
 | `battery_power` | Off grid, the load PV does not cover stays within the battery's discharge rating, and the plan's SOC targets never need more than the charge or discharge rating. | The rating |
-| `safe_room_comfort` | After a grace period, the safe room's projected air temperature and relative humidity stay inside the season's thresholds from the preferences. Fans and feels-like temperature never count here. | The threshold |
+| `safe_room_comfort` | After a grace period, the safe room's projected air temperature and relative humidity stay inside the season's thresholds from the preferences. Fans and feels-like temperature never count here. Under the humidity minimum counts only where the plan dries the room: cooling and fans cannot raise the humidity, so air that is dry anyway gives the `dry_air` warning (drink water, a damp cloth), not a refusal (#107). | The threshold |
 | `pacing_on_track` | Off grid, the battery lasts until the next recharge; in any case, the projected SOC stays within a tolerance of the plan's trajectory. | 0 min short, or the highest target the projection can follow |
 
 A failing verdict becomes a `guard_rejection` error (`rejectionOf`), named after the first failing guarantee.
@@ -39,7 +39,7 @@ The guard also checks the safe room's night. This is a comfort-for-sleep measure
   - `met`: the plan's own projection reaches the hours within the budget;
   - `unmet`: it does not, but a reference strategy does. The reference cools the safe room only, and only during the window, a little below the threshold. The plan is rejected (`night_recovery_unmet`);
   - `infeasible`: no reference that keeps the room safe does it. The plan is **not** rejected. The result gives `bestAchievableHours` and the plan carries a `night_recovery_infeasible` warning, so voice and cards say it honestly.
-- **When the reference counts.** The reference proves the target reachable only if it respects what matters at night: off grid it must not run the battery out before the next recharge, and the room's humidity must stay inside its safety band. Hours bought by leaving the safe room without power before dawn, or at 85 % RH, are not "achievable".
+- **When the reference counts.** The reference proves the target reachable only if it respects what matters at night: off grid it must not run the battery out before the next recharge, and the room's humidity must stay inside its safety band (under the minimum only counts when the reference dries the room, #107). Hours bought by leaving the safe room without power before dawn, or at 85 % RH, are not "achievable".
 
 ## Configuration
 Defaults are in `packages/guard/config/guard.json`, validated by `GuardConfigSchema`. An invalid file is an `invalid_config` error with the field paths.

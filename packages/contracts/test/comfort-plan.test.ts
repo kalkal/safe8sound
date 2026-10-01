@@ -35,6 +35,10 @@ describe('comfort-plan tool I/O (approved in #19)', () => {
     expect(ApplyPlanOutputSchema.safeParse({ ...out, manualInstructions: [] }).success).toBe(true);
   });
 
+  it('a storm calculation on a home without its EPS load is refused, never assumed (#107)', () => {
+    expect(categoryOf('missing_eps_load')).toBe('internal');
+  });
+
   it('a simulated plan on the real home is forbidden', () => {
     expect(categoryOf('simulated_plan_on_real_home')).toBe('forbidden');
   });

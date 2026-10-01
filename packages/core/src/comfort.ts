@@ -5,7 +5,9 @@ import { celsius, type Celsius, type Pct } from '@cold-reserve/contracts';
 // Method: NOAA heat index (Rothfusz regression with its two adjustments), used only from 80 °F
 // (26.7 °C), where it is defined; below that the air temperature. The heat index is never taken
 // below the air temperature. A running fan lowers the result by a configured, conservative effect
-// (spike S6: 1.5 °C, CBE fans guidebook).
+// (spike S6: 1.5 °C, CBE fans guidebook), only below a configured air temperature: from 35 °C a fan
+// brings no benefit and can make things worse (UKHSA heat guidance; Lancet Planet Health 2024,
+// https://www.thelancet.com/journals/lanplh/article/PIIS2542-5196(24)00030-5/fulltext).
 
 const toF = (c: number) => c * 1.8 + 32;
 const toC = (f: number) => (f - 32) / 1.8;
@@ -26,8 +28,10 @@ function heatIndexF(t: number, rh: number): number {
   return hi;
 }
 
-export function feelsLikeC(input: { tempC: Celsius; rhPct: Pct; fanOn: boolean; fanEffectC: number }): Celsius {
+/** `fan`: present when a fan runs, with its effect and the air temperature from which it stops helping. */
+export function feelsLikeC(input: { tempC: Celsius; rhPct: Pct; fan?: { effectC: number; maxAirC: number } }): Celsius {
   const tF = toF(input.tempC);
   const still = tF < 80 ? input.tempC : Math.max(input.tempC, toC(heatIndexF(tF, input.rhPct)));
-  return celsius(still - (input.fanOn ? input.fanEffectC : 0));
+  const helps = input.fan !== undefined && input.tempC < input.fan.maxAirC;
+  return celsius(still - (helps ? (input.fan?.effectC ?? 0) : 0));
 }

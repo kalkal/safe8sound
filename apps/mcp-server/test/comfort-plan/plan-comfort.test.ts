@@ -1,6 +1,7 @@
-import { GUARANTEE_IDS, PlanIdSchema, PlanSchema, PreferencesSchema, celsius, err, pct, toolError, type Forecast } from '@cold-reserve/contracts';
+import { GUARANTEE_IDS, HomeProfileSchema, PlanIdSchema, PlanSchema, PreferencesSchema, celsius, err, pct, toolError, type Forecast } from '@cold-reserve/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { guardFrame, loadInputs, planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { REAL, preferences, world } from './support.js';
 
@@ -110,6 +111,16 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(evening.some((s) => s.hvacMode === 'dry')).toBe(true);
   });
 
+  it("on a dry afternoon under the person's humidity minimum, proposes cooling with a warning, never drying the room further", async () => {
+    // 35 % in the bedroom, a 42 % minimum: no plan can raise the humidity, so that is a warning (#107).
+    const prefs = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 42, maxPct: 60 } } });
+    const w = world('heatwave', 12, { preferences: prefs, snapshot: (s) => ({ ...s, rooms: s.rooms.map((x) => (x.id === 'bedroom-1' ? { ...x, humidityPct: pct(35) } : x)) }) });
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
+    expect(r.value.warnings?.some((x) => x.code === 'dry_air')).toBe(true);
+    expect(r.value.steps.filter((s) => s.roomId === 'bedroom-1')[0]?.hvacMode).toBe('cool');
+  });
+
   it('leaves a plan the model proposed as it is: no mode is changed for humidity', async () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(26), roomIds: ['bedroom-1'] }, w.ctx);
@@ -122,10 +133,9 @@ describe('plan_comfort (two-phase: propose)', () => {
         fc.integer({ min: 12, max: 20 }),
         fc.boolean(),
         fc.integer({ min: 40, max: 58 }),
-        // A minimum above 40 % cannot be held on a dry heatwave afternoon with only cool and dry (no
-        // humidifier): every plan is refused there, the case of the storm last resort. The maximum is the
-        // edge the planner's band must follow.
-        fc.integer({ min: 35, max: 40 }),
+        // A minimum above the dry afternoon's humidity cannot be held with only cool and dry (no humidifier):
+        // since #107 that is a warning, not a refusal. The maximum is the edge the planner's band must follow.
+        fc.integer({ min: 35, max: 45 }),
         fc.integer({ min: 50, max: 65 }),
         async (atH, elderly, rh, minPct, maxPct) => {
           const prefs = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct, maxPct } } });
@@ -157,6 +167,72 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(new Set(r.value.steps.map((s) => s.roomId))).toEqual(new Set(['bedroom-1']));
     expect(r.value.nightRecovery?.status).toBe('met');
   });
+});
+
+describe('last resort (approved in #19: proposal only)', () => {
+  const HARD = ['storm_reserve', 'inverter_limit', 'battery_power'];
+  const stormAt = (soc: number) => world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(soc) }) });
+
+  it('in a storm with a 35 % battery no plan holds until the recharge: proposes the safest one, with until when and why', async () => {
+    const w = stormAt(35);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
+    const p = PlanSchema.parse(r.value);
+    expect(p.lastResort).toBeDefined();
+    expect(p.guarantees.filter((g) => HARD.includes(g.id)).every((g) => g.ok)).toBe(true);
+    expect(p.guarantees.some((g) => !g.ok)).toBe(true);
+    expect(p.lastResort?.safeHours).toBeGreaterThan(0);
+    // The time as the person says it, in the home's zone (the guard's reasons use local time too).
+    expect(p.warnings?.find((x) => x.code === 'last_resort_plan')?.message).toMatch(
+      /^No plan keeps the Bedroom within its limits until the next recharge: safe for about [\d.]+ hours, until \d{1,2}:\d\d (AM|PM) \(2026-07-1[78]T\d\d:\d\d:\d\d\+02:00\); then /,
+    );
+    expect(p.lastResort?.safeUntil).toMatch(/\+02:00$/);
+    // A last resort names a real limit inside the horizon, never a battery that does not run out.
+    expect(Date.parse(p.lastResort?.safeUntil ?? '')).toBeLessThan(Date.parse(p.horizonAt));
+    const saved = await w.store.getPlan(p.id);
+    expect(saved.ok && saved.value.status).toBe('proposed');
+  });
+
+  it('the safe hours start now and end at the time given', async () => {
+    const w = stormAt(35);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const snap = await w.deps.homes(w.ctx.homeId)?.source.snapshot();
+    if (!snap?.ok) throw new Error('no snapshot');
+    const hours = (Date.parse(r.value.lastResort?.safeUntil ?? '') - Date.parse(snap.value.ts)) / 3_600_000;
+    expect(r.value.lastResort?.safeHours).toBeCloseTo(hours, 2);
+  });
+
+  it('off grid on a home without its EPS load, refuses to plan rather than assume one (#107)', async () => {
+    const w = stormAt(87.5);
+    const home = w.deps.homes(w.ctx.homeId);
+    if (home === undefined) throw new Error('no home');
+    const bare = HomeProfileSchema.parse(Object.fromEntries(Object.entries(home.profile).filter(([k]) => k !== 'epsBaseLoadW')));
+    const deps = { ...w.deps, homes: () => ({ ...home, profile: bare }) };
+    const r = await planComfort(deps, { goal: 'cool' }, w.ctx);
+    expect(!r.ok && r.error.code).toBe('missing_eps_load');
+  });
+
+  it('is not applied: apply_plan still refuses a plan whose guarantees do not all hold, until that is decided', async () => {
+    const w = stormAt(35);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const applied = await applyPlan(w.deps, { planId: r.value.id }, w.ctx);
+    expect(!applied.ok && applied.error.category).toBe('guard_rejection');
+  });
+
+  it('property: in a storm, whatever the battery, there is always a plan, or a refusal on a hard limit', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.integer({ min: 15, max: 100 }), async (soc) => {
+        const w = stormAt(soc);
+        const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+        if (r.ok) return;
+        expect(['storm_reserve_violated', 'inverter_limit_exceeded', 'battery_power_exceeded']).toContain(r.error.code);
+      }),
+      // Each case plans a whole storm night (about a second): fewer cases than the core properties.
+      { numRuns: runs(30) },
+    );
+  }, 300_000);
 });
 
 describe('the guard frame (season and night mode), shared by propose and apply', () => {

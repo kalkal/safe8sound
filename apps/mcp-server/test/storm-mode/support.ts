@@ -1,4 +1,4 @@
-import { PreferencesSchema, StormIdSchema, ok, type HomeId, type Preferences, type Snapshot } from '@cold-reserve/contracts';
+import { PreferencesSchema, StormIdSchema, ok, type HomeId, type HomeProfile, type Preferences, type Snapshot } from '@cold-reserve/contracts';
 import { fixedClock, type Notifier } from '@cold-reserve/core';
 import { createInAppNotifier } from '@cold-reserve/notifier-inapp';
 import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
@@ -38,11 +38,13 @@ export interface WorldOptions {
   readonly preferences?: Preferences;
   readonly notifier?: Notifier;
   readonly snapshot?: (s: Snapshot) => Snapshot;
+  /** Changes the demo home (the simulator and the module see the same profile). */
+  readonly profile?: (p: HomeProfile) => HomeProfile;
 }
 
 /** The storm-blackout scenario at hour `atH` (the grid is down from 3 to 18.5), with every dependency. */
 export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'storm-blackout') {
-  const profile = demoProfile();
+  const profile = over.profile ? over.profile(demoProfile()) : demoProfile();
   const scenario = builtInScenario(id);
   const startMs = Date.parse(scenario.startAt);
   let scenarioMs = startMs + atH * H;

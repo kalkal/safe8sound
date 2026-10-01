@@ -4,8 +4,9 @@ import type { ProjectionPoint } from '@cold-reserve/core';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { CONSTRAINTS } from '../src/constraints.js';
+import { dryAirWarning } from '../src/dry-air.js';
 import type { GuardContext } from '../src/context.js';
-import { H, MIN, T0, input } from './support.js';
+import { H, MIN, T0, input, plan, step } from './support.js';
 
 // Each constraint on a hand-built context: exact numbers, boundaries and reasons.
 
@@ -248,12 +249,36 @@ describe('safe_room_comfort', () => {
       nearestAllowed: 60,
       unit: '%',
     });
-    expect(check('safe_room_comfort', ctx({ points: [point(60, { rh: 39.4 })] }))).toMatchObject({
+    // Below the minimum is the plan's doing only when it dries the room (#107): see the next test.
+    const drying = input({ season: 'cooling', preferences: PreferencesSchema.parse(examplePreferences()), plan: plan([step({ mode: 'dry' })]) });
+    expect(check('safe_room_comfort', ctx({ input: drying, points: [point(60, { rh: 39.4 })] }))).toMatchObject({
       ok: false,
       reason: 'Humidity in the safe room would drop to 39 %, below 40 %.',
       limit: 40,
       unit: '%',
     });
+  });
+
+  it('a point is the state the previous step left: drying in the last dry step counts, even under a fan-only step', () => {
+    // Paced: dry for an hour, then only the fan. The point at 60 min is what the dry hour left (39 %).
+    const paced = input({
+      season: 'cooling',
+      preferences: PreferencesSchema.parse(examplePreferences()),
+      plan: plan([step({ mode: 'dry' }), step({ atMs: T0 + H, mode: 'fan_only' })]),
+    });
+    expect(check('safe_room_comfort', ctx({ input: paced, points: [point(55, { rh: 45 }), point(60, { rh: 39 })] }))).toMatchObject({ ok: false, limit: 40 });
+    // And air that a fan-only step left dry is the weather's doing.
+    expect(check('safe_room_comfort', ctx({ input: paced, points: [point(60, { rh: 45 }), point(65, { rh: 39 })] })).ok).toBe(true);
+    // The dry-air warning blames the weather only for the second case, never for what the dry hour left.
+    expect(dryAirWarning(ctx({ input: paced, points: [point(55, { rh: 45 }), point(60, { rh: 39 })] }))).toBeUndefined();
+    expect(dryAirWarning(ctx({ input: paced, points: [point(60, { rh: 45 }), point(65, { rh: 39 })] }))?.code).toBe('dry_air');
+  });
+
+  it('does not blame a plan that cools for air that is dry anyway: the plan cannot raise the humidity', () => {
+    // Cooling, not drying: a room under the minimum is the weather's doing (a warning, not a refusal).
+    expect(check('safe_room_comfort', ctx({ points: [point(60, { rh: 35 })] })).ok).toBe(true);
+    const fanOnly = input({ season: 'cooling', preferences: PreferencesSchema.parse(examplePreferences()), plan: plan([step({ mode: 'fan_only' })]) });
+    expect(check('safe_room_comfort', ctx({ input: fanOnly, points: [point(60, { rh: 35 })] })).ok).toBe(true);
   });
 
   it('fails safe when the safe room has no reading', () => {

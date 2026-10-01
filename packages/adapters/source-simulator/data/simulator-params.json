@@ -16,5 +16,5 @@
   },
   "pv": { "lossRatio": 0.14 },
   "load": { "noiseRatio": 0.05 },
-  "comfort": { "fanEffectC": 1.5 }
+  "comfort": { "fanEffectC": 1.5, "fanMaxAirC": 35 }
 }

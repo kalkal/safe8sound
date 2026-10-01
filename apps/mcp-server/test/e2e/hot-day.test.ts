@@ -106,19 +106,25 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
 });
 
 describe('storm (the grid is down at 15:00)', () => {
-  it('proposes a paced plan whose energy lasts until the recharge, where the naive one runs out', async () => {
+  it('on the EPS circuits alone, keeps the safe room at comfort until the recharge, cooler than the naive plan', async () => {
     await withServer({ MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '3' }, async (call) => {
       const r = await call(TOKEN, 'plan_comfort', { goal: 'cool' });
       expect(r.isError).toBeFalsy();
       const plan = PlanSchema.parse(r.structuredContent);
-      expect(plan.guarantees.find((g) => g.id === 'pacing_on_track')?.ok).toBe(true);
+      expect(plan.guarantees.every((g) => g.ok)).toBe(true);
+      expect(plan.guarantees.find((g) => g.id === 'pacing_on_track')?.reason).toMatch(/lasts until the next recharge/);
       expect(textOf(r)).toContain(`Storm reserve ${(plan.reserveWh / 1000).toFixed(1)} kWh.`);
       expect(textOf(r)).not.toContain('while the grid is up');
       expect(plan.guarantees.find((g) => g.id === 'storm_reserve')?.reason).toMatch(/grid is down/);
+      expect(plan.nightRecovery?.status).toBe('met');
       const c = plan.counterfactual;
-      // The naive plan (the scenario's own dry 27 °C) empties the battery: its peak comes late in the night.
-      expect(Date.parse(c?.scenarios.naive.peakAt ?? '')).toBeGreaterThan(Date.parse('2026-07-17T20:00:00Z'));
+      // Until 2026-10-01 the projection drew the whole house's base load from the battery in a blackout, so
+      // the naive plan (the scenario's own dry 27 °C) ran it empty before dawn and this plan had to be paced.
+      // Off grid only the EPS circuits are powered now (150 W besides the safe room's split): the naive plan
+      // lasts, but it holds the room at its 27 °C limit, while ours keeps it at 26 °C with no heat stress.
+      expect(c?.scenarios.naive.peakTempC).toBeGreaterThan(c?.scenarios.plan.peakTempC ?? Infinity);
       expect(c?.scenarios.naive.heatIndexDegreeHours).toBeGreaterThan(c?.scenarios.plan.heatIndexDegreeHours ?? Infinity);
+      expect(c?.scenarios.plan.heatIndexDegreeHours).toBe(0);
     });
   });
 });

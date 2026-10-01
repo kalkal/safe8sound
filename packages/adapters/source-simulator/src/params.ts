@@ -28,8 +28,11 @@ export const SimulatorParamsSchema = z.strictObject({
   }),
   pv: z.strictObject({ lossRatio: fraction }),
   load: z.strictObject({ noiseRatio: fraction }),
-  /** Feels-like effect of a running fan, used by the comfort levels only. */
-  comfort: z.strictObject({ fanEffectC: nonNegative }),
+  /**
+   * Feels-like effect of a running fan, used by the comfort levels only, and the air temperature from which
+   * a fan no longer helps (35 °C: UKHSA heat guidance; Lancet Planet Health 2024).
+   */
+  comfort: z.strictObject({ fanEffectC: nonNegative, fanMaxAirC: z.number().min(25).max(45) }),
 });
 export type SimulatorParams = z.infer<typeof SimulatorParamsSchema>;
 

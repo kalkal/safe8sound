@@ -1,6 +1,6 @@
 import type { GuaranteeId, GuaranteeResult } from '@cold-reserve/contracts';
 import { batteryCapacityWh, localHour } from '@cold-reserve/core';
-import { UNSERVED_TOLERANCE_W, type GuardContext } from './context.js';
+import { UNSERVED_TOLERANCE_W, driedInto, type GuardContext } from './context.js';
 
 // The five guarantees as Specification objects (plan §9.2): each reads the shared context and returns
 // its result; none can change the plan. Numbers in results are rounded for people, and the nearest
@@ -135,6 +135,9 @@ const safeRoomComfort: Constraint = {
     const after = ctx.points.filter((p) => p.ms >= fromMs);
     const considered = after.length > 0 ? after : ctx.points.slice(-1);
     const readings = considered.flatMap((p) => p.rooms.filter((r) => r.id === preferences.safeRoomId));
+    // Below the humidity minimum is the plan's doing only where it dries the room: cooling or a fan cannot raise
+    // the humidity, so air that is dry anyway is a warning (dryAirWarning), not a refusal (#107).
+    const dried = considered.filter((p) => driedInto(ctx)(p.ms)).flatMap((p) => p.rooms.filter((r) => r.id === preferences.safeRoomId));
     if (readings.length === 0) {
       return { id: 'safe_room_comfort', ok: false, reason: 'The safe room has no reading, so its safety cannot be checked.' };
     }
@@ -151,11 +154,12 @@ const safeRoomComfort: Constraint = {
     }
     const maxRh = Math.max(...rhs);
     const minRh = Math.min(...rhs);
+    const minDriedRh = Math.min(...dried.map((r) => r.humidityPct));
     if (maxRh > safety.humidity.maxPct + EPS) {
       return fail(`Humidity in the safe room would reach ${Math.round(maxRh).toString()} %, above ${safety.humidity.maxPct.toString()} %.`, r1(maxRh), safety.humidity.maxPct, '%');
     }
-    if (minRh < safety.humidity.minPct - EPS) {
-      return fail(`Humidity in the safe room would drop to ${Math.round(minRh).toString()} %, below ${safety.humidity.minPct.toString()} %.`, r1(minRh), safety.humidity.minPct, '%');
+    if (minDriedRh < safety.humidity.minPct - EPS) {
+      return fail(`Humidity in the safe room would drop to ${Math.round(minDriedRh).toString()} %, below ${safety.humidity.minPct.toString()} %.`, r1(minDriedRh), safety.humidity.minPct, '%');
     }
     const [measured, limit] = season === 'heating' ? [minT, safety.heating.minC] : [maxT, safety.cooling.maxC];
     return {

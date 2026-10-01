@@ -1,4 +1,4 @@
-import { watt, type Celsius, type HomeProfile, type HvacMode, type Minutes, type Pct, type Watt } from '@cold-reserve/contracts';
+import { err, ok, toolError, watt, type Celsius, type ErrorEnvelope, type HomeProfile, type HvacMode, type Minutes, type Pct, type Result, type Watt } from '@cold-reserve/contracts';
 import { acLimitW, dispatch, type Dispatch } from './energy.js';
 import { hvacResponse, type HvacModelParams, type HvacResponse } from './hvac.js';
 import { stepRoomMoisture } from './humidity.js';
@@ -84,13 +84,27 @@ export interface HomeStep {
   readonly flows: HomeFlows;
 }
 
+/**
+ * The load on the EPS circuits besides the HVAC: the home profile's `epsBaseLoadW`, the one number the
+ * simulator, the projection and the storm safe hours use off grid. Missing, it is an error, never assumed:
+ * the storm tools refuse with `missing_eps_load`.
+ */
+export function epsBaseLoadW(profile: HomeProfile): Result<number, ErrorEnvelope> {
+  return profile.epsBaseLoadW === undefined
+    ? err(toolError('missing_eps_load', 'The home profile does not say what its EPS circuits draw, so nothing is computed for a blackout.'))
+    : ok(profile.epsBaseLoadW);
+}
+
 export function stepHome(args: { state: HomeState; inputs: HomeInputs; profile: HomeProfile; params: SimParams; dt: Minutes; noise: number }): HomeStep {
   const { state, inputs, profile, params, dt } = args;
 
   const rooms = state.rooms.map((rs) => {
     const room = profile.rooms.find((r) => r.id === rs.id);
     if (room === undefined) throw new Error(`Room "${rs.id}" is not in the home profile`);
-    const input = inputs.rooms.find((r) => r.id === rs.id);
+    const asked = inputs.rooms.find((r) => r.id === rs.id);
+    // Off grid only the EPS circuits are powered: the safe room's unit and fans; the other rooms keep their
+    // people but nothing runs.
+    const input = asked === undefined || inputs.gridAvailable || room.isSafeRoom ? asked : { id: asked.id, occupants: asked.occupants, fanOn: false };
     const aperture = params.solarApertureM2.byRoom[rs.id] ?? params.solarApertureM2.default;
     const gainsW = watt(params.gains.perRoomBaseW + params.gains.perOccupantW * (input?.occupants.length ?? 0) + inputs.irradianceWm2 * aperture);
     const hvac: HvacResponse =
@@ -108,7 +122,11 @@ export function stepHome(args: { state: HomeState; inputs: HomeInputs; profile: 
 
   const hvacW = rooms.reduce((sum, r) => sum + r.hvac.electricW, 0);
   const fansW = rooms.reduce((sum, r) => sum + r.fansW, 0);
-  const baseW = inputs.baseLoadW * (1 + params.load.noiseRatio * (2 * args.noise - 1));
+  // Off grid the base load is what the EPS circuits draw, not the whole house. Without that number the whole
+  // house is drawn: the pessimistic bound, never an assumed figure (the storm tools refuse before using it).
+  const eps = epsBaseLoadW(profile);
+  const baseLoad = inputs.gridAvailable || !eps.ok ? inputs.baseLoadW : eps.value;
+  const baseW = baseLoad * (1 + params.load.noiseRatio * (2 * args.noise - 1));
   const loadW = watt(baseW + hvacW + fansW);
   const pvW = pvPowerW({ peakW: profile.pvPeakW, irradianceWm2: inputs.irradianceWm2, lossRatio: params.pv.lossRatio });
 

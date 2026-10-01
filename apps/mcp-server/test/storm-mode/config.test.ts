@@ -12,11 +12,14 @@ describe('storm-mode config', () => {
     ['capHours', { capHours: 0 }],
     ['stableGridMinutes', { stableGridMinutes: 1.5 }],
     ['minIntervalMinutes', { minIntervalMinutes: -1 }],
-    ['epsBaseLoadW', { epsBaseLoadW: 0 }],
     ['occupantGainW', { occupantGainW: 5000 }],
   ])('refuses a wrong %s and names the field', (field, change) => {
     const c = parseStormModeConfig({ ...raw, ...change });
     expect(!c.ok && c.error).toMatchObject({ code: 'invalid_config', details: { issues: [{ path: field }] } });
+  });
+
+  it("has no EPS load of its own: it is the home profile's (#19), the one number of the simulator, the guard and the safe hours", () => {
+    expect(parseStormModeConfig({ ...raw, epsBaseLoadW: 150 }).ok).toBe(false);
   });
 
   it('refuses unknown fields', () => {

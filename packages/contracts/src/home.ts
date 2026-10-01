@@ -78,6 +78,11 @@ export const HomeProfileSchema = z
       .min(1)
       .refine((rooms) => uniqueBy(rooms, (r) => r.id), { message: 'Room ids must be unique' }),
     epsCircuits: z.array(z.string().min(1).max(40)),
+    /**
+     * What the EPS circuits draw besides the HVAC (fridge, router, lights), in W: off grid only these and
+     * the safe room run. An assumption to calibrate on the plant (optional, added 2026-10-01, approved in #19).
+     */
+    epsBaseLoadW: z.number().min(0).max(5000).brand<'Watt'>().optional(),
     /** Rounded to one decimal (about 10 km): never the precise location. */
     location: z.strictObject({
       latRounded: z.number().min(-90).max(90).refine(roundedToOneDecimal, { message: 'Round to one decimal' }),

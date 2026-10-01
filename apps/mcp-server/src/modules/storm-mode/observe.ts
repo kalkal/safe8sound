@@ -16,7 +16,7 @@ import {
   type StormNotification,
   type StormSession,
 } from '@cold-reserve/contracts';
-import { holdPowerW, planNotifications, safeHours, stormReduce, type NotificationPlan, type StateStore, type StormContext, type StormEvent } from '@cold-reserve/core';
+import { epsBaseLoadW, holdPowerW, planNotifications, safeHours, stormReduce, type NotificationPlan, type StateStore, type StormContext, type StormEvent } from '@cold-reserve/core';
 import { LOCALES, stormMessage, type Locale, type StormMessageFields } from '@cold-reserve/i18n';
 import type { ToolContext } from '../../tool.js';
 import type { StormHome, StormModeDeps } from './deps.js';
@@ -80,7 +80,9 @@ function countSafeHours(deps: StormModeDeps, profile: HomeProfile, snapshot: Sna
   const unit = room.hvacUnits[0];
   const gainsW = reading.occupants.length * deps.config.occupantGainW;
   const hold = unit ? holdPowerW({ unit, thermal: room.thermal, outC, thresholdC: preferences.safety.cooling.maxC, gainsW }) : { holdW: 0 };
-  return ok(safeHours({ battery: profile.battery, socPct: snapshot.batterySocPct, holdW: hold.holdW, baseLoadW: deps.config.epsBaseLoadW, capHours: deps.config.capHours }));
+  const eps = epsBaseLoadW(profile);
+  if (!eps.ok) return eps;
+  return ok(safeHours({ battery: profile.battery, socPct: snapshot.batterySocPct, holdW: hold.holdW, baseLoadW: eps.value, capHours: deps.config.capHours }));
 }
 
 export function messageFields(o: Observed, session: StormSession | undefined): StormMessageFields {

@@ -1,6 +1,7 @@
 import type { GuaranteeResult, NightRecovery, Pct, PlanWarning } from '@cold-reserve/contracts';
 import { CONSTRAINTS } from './constraints.js';
 import { buildContext, type GuardInput } from './context.js';
+import { dryAirWarning } from './dry-air.js';
 import { evaluateNight } from './night.js';
 
 // "The LLM proposes, the guard decides" (plan §9.2): the guard projects the plan with the same physics
@@ -21,11 +22,12 @@ export function runGuard(input: GuardInput): GuardVerdict {
   const ctx = buildContext(input);
   const guarantees = CONSTRAINTS.map((c) => c.check(ctx));
   const night = evaluateNight(ctx);
+  const dryAir = dryAirWarning(ctx);
   return {
     ok: guarantees.every((g) => g.ok) && night.nightRecovery?.status !== 'unmet',
     guarantees,
     ...(night.nightRecovery === undefined ? {} : { nightRecovery: night.nightRecovery }),
-    warnings: night.warnings,
+    warnings: [...night.warnings, ...(dryAir === undefined ? [] : [dryAir])],
     reserveWh: ctx.reserveWh,
     reserveFloorSocPct: ctx.reserveFloorSocPct,
   };

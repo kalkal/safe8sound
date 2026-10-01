@@ -42,6 +42,13 @@ describe('HomeProfileSchema', () => {
     expect(HomeProfileSchema.safeParse(input).success).toBe(false);
   });
 
+  it('may carry the load on the EPS circuits besides the HVAC (optional, approved in #19)', () => {
+    expect(HomeProfileSchema.parse({ ...exampleHomeProfile(), epsBaseLoadW: 150 }).epsBaseLoadW).toBe(150);
+    const without = Object.fromEntries(Object.entries(exampleHomeProfile()).filter(([k]) => k !== 'epsBaseLoadW'));
+    expect(HomeProfileSchema.parse(without).epsBaseLoadW).toBeUndefined();
+    expect(HomeProfileSchema.safeParse({ ...exampleHomeProfile(), epsBaseLoadW: -1 }).success).toBe(false);
+  });
+
   it('rejects unknown fields such as serial numbers', () => {
     const input = { ...exampleHomeProfile(), serialNumber: 'X' };
     expect(HomeProfileSchema.safeParse(input).success).toBe(false);

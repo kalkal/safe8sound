@@ -1,4 +1,4 @@
-import { celsius } from '@cold-reserve/contracts';
+import { celsius, pct } from '@cold-reserve/contracts';
 import { nightWindowHours } from '@cold-reserve/guard';
 import { describe, expect, it } from 'vitest';
 import { applySummary, outlookSummary, planSummary } from '../../src/modules/comfort-plan/summaries.js';
@@ -85,6 +85,17 @@ describe('what the model reads', () => {
     expect(p.reserveFloorSocPct).toBeUndefined();
     expect(text).toContain(`Storm reserve ${one(p.reserveWh / 1000)} kWh.`);
     expect(text).not.toContain('while the grid is up');
+  });
+
+  it('plan_comfort: a last resort says until when the room is safe and why, and does not invite to apply it', async () => {
+    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(35) }) });
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const text = planSummary(r.value, NIGHT);
+    expect(r.value.lastResort).toBeDefined();
+    expect(text).toContain(r.value.warnings?.find((x) => x.code === 'last_resort_plan')?.message ?? 'missing');
+    expect(text).toMatch(/Last resort: the safest plan there is, but not every guarantee holds, so it cannot be applied\. Tell the person the safe room is safe until \d{1,2}:\d\d (AM|PM) \(2026-07-1[78]T[\d:]+\+02:00\)\./);
+    expect(text).not.toContain('call apply_plan');
   });
 
   it('plan_comfort: what the plan does in each room, and every step down the person pre-authorizes (plan §9.4)', async () => {

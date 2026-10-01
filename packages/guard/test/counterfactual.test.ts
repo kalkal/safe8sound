@@ -19,13 +19,15 @@ describe('counterfactualOf (feature queue item 2)', () => {
     expect(c?.scenarios.noPlan.hoursAtOrBelowThreshold).toBeLessThanOrEqual(c?.scenarios.plan.hoursAtOrBelowThreshold ?? 0);
   });
 
-  it('the naive plan runs the battery flat off grid, so its night ends hotter than a paced plan', () => {
-    // The daughter is in the living room: the naive plan cools it too and empties the battery early.
+  it('off grid the naive plan runs only what the EPS powers: the occupied living room gets nothing', () => {
+    // The daughter is in the living room, so the naive plan asks to cool it too. Off grid only the EPS
+    // circuits are powered (#19): the naive night is the same as cooling the safe room alone. Until
+    // 2026-10-01 the living room's split ran on the battery as well and emptied it early.
     const base = snapshot({ gridAvailable: false, socPct: 30 });
     const rooms = base.rooms.map((r) => (r.id === 'living' ? { ...r, occupants: ['daughter'] } : r));
-    const paced = input({ snapshot: { ...base, rooms }, plan: plan([step({ setpointC: 25, targetPct: 10 })]) });
-    const c = counterfactualOf(paced);
-    expect(c?.scenarios.naive.hoursAtOrBelowThreshold).toBeLessThan(c?.scenarios.plan.hoursAtOrBelowThreshold ?? 0);
+    const safeAlone = input({ snapshot: { ...base, rooms }, plan: plan([step({ setpointC: 25, targetPct: 10, fanOn: false })]) });
+    const c = counterfactualOf(safeAlone);
+    expect(c?.scenarios.naive).toEqual(c?.scenarios.plan);
   });
 
   it('rounds for people: temperatures to 0.1 °C, hours and degree-hours to 0.01', () => {

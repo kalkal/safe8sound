@@ -21,5 +21,6 @@ export function expectedSafeHours(input: { snapshot: Snapshot; forecast: Forecas
   const gainW = (Math.max(0, hour.tempOutC - preferences.safety.cooling.maxC) * 1000) / room.thermal.rKPerKw + reading.occupants.length * config.occupantGainW;
   const cop = unit.coolingKw / unit.inputKw.nominal;
   const holdW = gainW <= 0 ? 0 : Math.min(Math.max(gainW / cop, unit.inputKw.min * 1000), unit.inputKw.max * 1000);
-  return Math.min(energyWh / (holdW + config.epsBaseLoadW), config.capHours);
+  if (profile.epsBaseLoadW === undefined) throw new Error('the demo home declares its EPS load');
+  return Math.min(energyWh / (holdW + profile.epsBaseLoadW), config.capHours);
 }

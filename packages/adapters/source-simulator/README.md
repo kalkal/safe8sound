@@ -12,9 +12,9 @@ Judges, tests and E2E always run on it (plan §1 principle 3). The physics lives
 | Heat gains | base + per occupant + irradiance x effective solar aperture | `core/simulation.ts` |
 | Splits | cool/heat at the rated COP, capped at max input; dry = fixed fraction of nominal input and of rated cooling; fan only = fan power; units without a mode stay off | `core/hvac.ts` |
 | Room humidity | water balance of the room air in vapour pressure: air exchange toward the outdoor vapour pressure, gains from people and the household, removal by the splits from their datasheet capacity, never below the coil dew point; exact solution per step | `core/humidity.ts` |
-| Feels-like | NOAA heat index from 26.7 °C, never below the air; a fan lowers it by a configured effect. Comfort levels only, never the safety guarantee | `core/comfort.ts` |
+| Feels-like | NOAA heat index from 26.7 °C, never below the air; a fan lowers it by a configured effect, only below 35 °C of air (`comfort.fanMaxAirC`: from there a fan brings no benefit, UKHSA heat guidance and Lancet Planet Health 2024). Comfort levels only, never the safety guarantee | `core/comfort.ts` |
 | PV | peak x irradiance / 1000 W/m² x (1 - losses) | `core/pv.ts` |
-| Battery and flows | self-consumption; rated charge/discharge power; hardware floor to 100 %; sqrt(round trip) each way; inverter AC limit on grid, EPS limit off grid; off grid: no import/export, surplus curtailed, shortfall not served (HVAC then delivers only the served share) | `core/energy.ts` |
+| Battery and flows | self-consumption; rated charge/discharge power; hardware floor to 100 %; sqrt(round trip) each way; inverter AC limit on grid, EPS limit off grid; off grid: no import/export, surplus curtailed, shortfall not served (HVAC then delivers only the served share); off grid only the EPS circuits are powered: the profile's `epsBaseLoadW` (150 W in the demo home, fridge, router and lights; an assumption to calibrate) instead of the hour's whole-house base load, plus the safe room's split and fans (the other rooms get nothing). Fallback `load.epsBaseLoadFallbackW` when a profile has no `epsBaseLoadW` | `core/energy.ts`, `core/simulation.ts` |
 
 All quantities use the branded units of `packages/contracts` (`Watt`, `Celsius`, `Pct`, `Minutes`, ...).
 The 1R1C constants are in K/kW and kWh/K as in the contract.

@@ -55,6 +55,7 @@ export function exampleHomeProfile(): z.input<typeof HomeProfileSchema> {
       },
     ],
     epsCircuits: ['safe-room', 'router', 'fridge'],
+    epsBaseLoadW: 150,
     location: { latRounded: 41.9, lonRounded: 12.5, tz: 'Europe/Rome' },
   };
 }

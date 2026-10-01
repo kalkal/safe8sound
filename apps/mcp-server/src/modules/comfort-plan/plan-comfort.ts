@@ -11,14 +11,18 @@ import {
   type LevelStep,
   type Plan,
   type PlanComfortInput,
+  type PlanWarning,
+  type GuaranteeId,
   type PlanStep,
   type Preferences,
   type Result,
   type Snapshot,
 } from '@cold-reserve/contracts';
-import { acLimitW, buildLadder, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, seasonFor, withTargets, type HumidityMode } from '@cold-reserve/core';
-import { buildContext, counterfactualOf, currentControls, projectFrom, rejectionOf, reserveOf, runGuard, type CandidatePlan, type GuardInput, type GuardVerdict } from '@cold-reserve/guard';
+import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, seasonFor, withTargets, type HumidityMode } from '@cold-reserve/core';
+import { buildContext, counterfactualOf, currentControls, projectFrom, rejectionOf, reserveOf, runGuard, safeUntil, type CandidatePlan, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import type { ToolContext } from '../../tool.js';
+import { localIso } from '../storm-mode/observe.js';
+import { localTimeText } from '../storm-mode/summaries.js';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
 import { recordRejection } from './rejections.js';
 
@@ -71,6 +75,11 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   const loaded = await loadInputs(deps, ctx);
   if (!loaded.ok) return loaded;
   const { snapshot, forecast, profile, preferences } = loaded.value;
+  // Off grid the plan is projected on the EPS circuits: without their load nothing is assumed (#107).
+  if (!snapshot.gridAvailable) {
+    const eps = epsBaseLoadW(profile);
+    if (!eps.ok) return eps;
+  }
   const unknown = input.roomIds?.find((id) => !profile.rooms.some((r) => r.id === id));
   if (unknown !== undefined) {
     return err(toolError('unknown_room', `There is no room "${unknown}" in this home.`, { details: { field: 'roomIds', roomId: unknown } }));
@@ -91,20 +100,23 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     nightRecoveryMode,
   };
   const overridden = input.setpointC !== undefined || input.roomIds !== undefined;
+  // Every candidate tried, for the last resort.
+  const tried: Attempt[] = [];
+  const recorded = (a: Attempt): Attempt => (tried.push(a), a);
   const attempt = (index: number): Attempt | undefined => {
     const rung = ladder[index];
     if (rung === undefined) return undefined;
     // With night cooling first (the night-recovery target), then without it.
-    const withNight = overridden ? undefined : tryRung(deps, guardInput, ladder.slice(index), rung, false, undefined, undefined, true);
-    return withNight?.verdict.ok === true ? withNight : tryRung(deps, guardInput, ladder.slice(index), withOverrides(rung, input), overridden, input.setpointC);
+    const withNight = overridden ? undefined : recorded(tryRung(deps, guardInput, ladder.slice(index), rung, false, undefined, undefined, true));
+    return withNight?.verdict.ok === true ? withNight : recorded(tryRung(deps, guardInput, ladder.slice(index), withOverrides(rung, input), overridden, input.setpointC));
   };
-  // Last resort before refusing: the essential rung paced inside the hour, from the longest run down.
+  // Before the last resort: the essential rung paced inside the hour, from the longest run down.
   const cycled = (cycle: { onMinutes: number; periodMinutes: number }): Attempt | undefined => {
     const index = ladder.length - 1;
     const rung = ladder[index];
     if (rung === undefined) return undefined;
-    const withNight = tryRung(deps, guardInput, ladder.slice(index), rung, false, undefined, cycle, true);
-    return withNight.verdict.ok ? withNight : tryRung(deps, guardInput, ladder.slice(index), rung, false, undefined, cycle);
+    const withNight = recorded(tryRung(deps, guardInput, ladder.slice(index), rung, false, undefined, cycle, true));
+    return withNight.verdict.ok ? withNight : recorded(tryRung(deps, guardInput, ladder.slice(index), rung, false, undefined, cycle));
   };
 
   let chosen: Attempt | undefined;
@@ -119,6 +131,10 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     if (paced?.verdict.ok === true) chosen = paced;
   }
   const store = deps.storeFor(ctx.homeId);
+  // No plan holds every guarantee: the planner's own candidates still give the safest one, as long as it
+  // breaks no hard limit. A plan the model proposed is answered with the refusal.
+  const safest = chosen === undefined && !overridden ? lastResortOf(tried, deps, guardInput) : undefined;
+  if (chosen === undefined && safest !== undefined) chosen = safest.attempt;
   if (chosen === undefined) {
     const rejection = last === undefined ? undefined : rejectionOf(last.verdict);
     if (last !== undefined) {
@@ -151,7 +167,8 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     sourceOrigin: snapshot.origin,
     advisoryOnly: loaded.value.home.readOnly,
     ...(chosen.verdict.nightRecovery === undefined ? {} : { nightRecovery: chosen.verdict.nightRecovery }),
-    ...(chosen.verdict.warnings.length === 0 ? {} : { warnings: chosen.verdict.warnings }),
+    ...(warningsOf(chosen, safest).length === 0 ? {} : { warnings: warningsOf(chosen, safest) }),
+    ...(safest === undefined ? {} : { lastResort: safest.lastResort }),
     ...(counterfactual === undefined ? {} : { counterfactual }),
   };
   const parsed = PlanSchema.safeParse(draft);
@@ -159,6 +176,66 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   const saved = await store.savePlan(parsed.data);
   if (!saved.ok) return saved;
   return ok(parsed.data);
+}
+
+const HARD_LIMITS: readonly GuaranteeId[] = ['storm_reserve', 'inverter_limit', 'battery_power'];
+
+interface LastResort {
+  readonly attempt: Attempt;
+  readonly lastResort: NonNullable<Plan['lastResort']>;
+  readonly warning: PlanWarning;
+}
+
+/**
+ * The safest of the candidates when none holds every guarantee: among those that break no hard limit
+ * (storm reserve, inverter, battery power) but fail a guarantee, the one whose safe room stays safe the
+ * longest; the first, the most comfortable, on a tie. Undefined when every candidate breaks a hard limit.
+ */
+function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInput: GuardInput): LastResort | undefined {
+  const { preferences, snapshot, profile, season } = guardInput;
+  const nowMs = Date.parse(snapshot.ts);
+  const stepMs = deps.guard.projection.stepMinutes * 60_000;
+  let best: { attempt: Attempt; untilMs: number; limitedBy: SafeLimit } | undefined;
+  for (const a of tried) {
+    const guarantees = a.verdict.guarantees;
+    if (guarantees.every((g) => g.ok) || guarantees.some((g) => HARD_LIMITS.includes(g.id) && !g.ok)) continue;
+    const context = buildContext({ ...a.guardInput, plan: a.candidate });
+    const control = controlFromSteps(a.candidate.steps, currentControls(snapshot));
+    // A point is what the previous step left: the plan dried the room into it if that step was drying.
+    const driesAt = (ms: number) => control(ms - stepMs).find((c) => c.id === preferences.safeRoomId)?.hvac?.mode === 'dry';
+    const end = safeUntil(context.points, { nowMs, graceMinutes: deps.guard.safeRoom.graceMinutes, roomId: preferences.safeRoomId, season, safety: preferences.safety, driesAt });
+    // No breach inside the horizon: what fails is something else (the pace, the night), and "safe until"
+    // would name a limit that is not there. Such a candidate is not a last resort.
+    if (end === undefined) continue;
+    if (best === undefined || end.ms > best.untilMs) best = { attempt: a, untilMs: end.ms, limitedBy: end.limitedBy };
+  }
+  if (best === undefined) return undefined;
+  const { limitedBy } = best;
+  const safeHours = Math.round(((best.untilMs - nowMs) / 3_600_000) * 100) / 100;
+  // In the home's time zone, as the family message and the guard's reasons say it.
+  const safeUntilIso = localIso(best.untilMs, profile.location.tz);
+  const room = profile.rooms.find((r) => r.id === preferences.safeRoomId)?.name ?? preferences.safeRoomId;
+  const { cooling, heating, humidity } = preferences.safety;
+  const then =
+    limitedBy === 'battery'
+      ? 'the battery runs out'
+      : limitedBy === 'humidity'
+        ? `the humidity leaves its ${String(humidity.minPct)}-${String(humidity.maxPct)} % band`
+        : season === 'heating'
+          ? `the room drops below its ${String(heating.minC)} °C minimum`
+          : `the room goes above its ${String(cooling.maxC)} °C maximum`;
+  return {
+    attempt: best.attempt,
+    lastResort: { safeUntil: safeUntilIso, safeHours, limitedBy },
+    warning: {
+      code: 'last_resort_plan',
+      message: `No plan keeps the ${room} within its limits until the next recharge: safe for about ${String(safeHours)} hours, until ${localTimeText(safeUntilIso)}; then ${then}.`.slice(0, 300),
+    },
+  };
+}
+
+function warningsOf(chosen: Attempt, safest: LastResort | undefined): PlanWarning[] {
+  return [...chosen.verdict.warnings, ...(safest === undefined ? [] : [safest.warning])];
 }
 
 function withOverrides(rung: LevelStep, input: PlanComfortInput): LevelStep {

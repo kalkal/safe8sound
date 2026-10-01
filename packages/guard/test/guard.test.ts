@@ -1,8 +1,8 @@
-import { ForecastSchema, GUARANTEE_IDS, HomeProfileSchema, PreferencesSchema, NightRecoverySchema, type GuaranteeId } from '@cold-reserve/contracts';
+import { ForecastSchema, GUARANTEE_IDS, HomeProfileSchema, PreferencesSchema, NightRecoverySchema, pct, type GuaranteeId } from '@cold-reserve/contracts';
 import { exampleHomeProfile } from '@cold-reserve/contracts/fixtures';
 import { describe, expect, it } from 'vitest';
 import { CONSTRAINTS, rejectionOf, runGuard, type GuardVerdict } from '../src/index.js';
-import { H, T0, config, hotNight, input, iso, plan, preferences, snapshot, step } from './support.js';
+import { H, T0, config, hotNight, input, iso, plan, preferences, profile, snapshot, step } from './support.js';
 
 const g = (v: GuardVerdict, id: GuaranteeId) => {
   const found = v.guarantees.find((x) => x.id === id);
@@ -70,12 +70,23 @@ describe('storm_reserve', () => {
 });
 
 describe('inverter_limit', () => {
-  it('rejects three splits pulling down at once off grid (EPS 5 kW)', () => {
-    const r = g(runGuard(input({ snapshot: snapshot({ gridAvailable: false }), plan: plan(coolAll(18)) })), 'inverter_limit');
+  it('off grid measures against the EPS rating (5 kW), where only the safe room runs', () => {
+    // Off grid only the EPS circuits are powered (#19): the other rooms' splits get no power, so three
+    // splits pulling down at once draw what the safe room's alone does.
+    const all = g(runGuard(input({ snapshot: snapshot({ gridAvailable: false }), plan: plan(coolAll(18)) })), 'inverter_limit');
+    const safeOnly = g(runGuard(input({ snapshot: snapshot({ gridAvailable: false }), plan: plan(coolAll(18).slice(0, 1)) })), 'inverter_limit');
+    expect(all).toMatchObject({ ok: true, limit: 5000, unit: 'W' });
+    expect(all.measured).toBe(safeOnly.measured);
+  });
+
+  it('rejects a load over the EPS rating off grid, with the nearest allowed value', () => {
+    // A tighter EPS: 1 kW is less than the safe room's split pulling down at full power.
+    const tight = HomeProfileSchema.parse({ ...profile, eps: { ...profile.eps, continuousVa: 1000 } });
+    const r = g(runGuard(input({ profile: tight, snapshot: snapshot({ gridAvailable: false }), plan: plan(coolAll(18)) })), 'inverter_limit');
     expect(r.ok).toBe(false);
-    expect(r.limit).toBe(5000);
-    expect(r.measured).toBeGreaterThan(5000);
-    expect(r.nearestAllowed).toBe(5000);
+    expect(r.limit).toBe(1000);
+    expect(r.measured).toBeGreaterThan(1000);
+    expect(r.nearestAllowed).toBe(1000);
     expect(r.unit).toBe('W');
   });
 
@@ -141,6 +152,31 @@ describe('pacing_on_track', () => {
     const r = g(runGuard(input({ plan: plan([step({ targetPct: 99 })]) })), 'pacing_on_track');
     expect(r.ok).toBe(false);
     expect(r.unit).toBe('%');
+  });
+});
+
+describe('dry air (#107): the plan cannot raise the humidity', () => {
+  // A dry afternoon: the bedroom at 35 %, the person's minimum at 42 %.
+  const dryPrefs = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 42, maxPct: 60 } } });
+  const dryRoom = () => {
+    const s = snapshot();
+    return { ...s, rooms: s.rooms.map((r) => ({ ...r, humidityPct: pct(35) })) };
+  };
+
+  it('a cooling plan in air drier than the minimum is accepted, with a warning that says what helps', () => {
+    const v = runGuard(input({ preferences: dryPrefs, snapshot: dryRoom() }));
+    expect(v.guarantees.find((x) => x.id === 'safe_room_comfort')?.ok).toBe(true);
+    const w = v.warnings.find((x) => x.code === 'dry_air');
+    expect(w?.message).toMatch(/^The air in the Bedroom is dry \(down to \d+ %, under 42 %\) and cooling cannot raise it: drink water; a damp cloth or a bowl of water in the room helps\.$/);
+  });
+
+  it('a drying plan that takes the room under the minimum is refused', () => {
+    const v = runGuard(input({ preferences: dryPrefs, snapshot: dryRoom(), plan: plan([step({ mode: 'dry' })]) }));
+    expect(v.guarantees.find((x) => x.id === 'safe_room_comfort')?.ok).toBe(false);
+  });
+
+  it('no warning when the air stays within the band', () => {
+    expect(runGuard(input()).warnings.some((x) => x.code === 'dry_air')).toBe(false);
   });
 });
 

@@ -2,6 +2,7 @@ import {
   pct,
   type Forecast,
   type HomeProfile,
+  type HvacMode,
   type NightRecoveryMode,
   type Pct,
   type Plan,
@@ -121,6 +122,23 @@ export function buildContext(input: GuardInput): GuardContext {
     points: projectFrom(input, controlFromSteps(plan.steps, currentControls(snapshot)), { toMs: horizonMs, dischargeFloorPct }),
     targets: targetsOf(plan),
   };
+}
+
+/** The safe room's mode in force at an instant under the plan (before its first step: as the snapshot says). */
+export function safeRoomModeAt(ctx: GuardContext): (ms: number) => HvacMode | undefined {
+  const control = controlFromSteps(ctx.input.plan.steps, currentControls(ctx.input.snapshot));
+  const id = ctx.input.preferences.safeRoomId;
+  return (ms) => control(ms).find((c) => c.id === id)?.hvac?.mode;
+}
+
+/**
+ * Whether the plan dried the safe room into the state of a projection point. A point is the state at the start
+ * of its step, so it is what the previous step left: the mode one step earlier decides.
+ */
+export function driedInto(ctx: GuardContext): (pointMs: number) => boolean {
+  const modeAt = safeRoomModeAt(ctx);
+  const stepMs = ctx.input.config.projection.stepMinutes * MINUTE_MS;
+  return (pointMs) => modeAt(pointMs - stepMs) === 'dry';
 }
 
 /** The room settings the snapshot reports: what happens before a plan's first step. */

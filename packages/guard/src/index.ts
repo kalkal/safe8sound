@@ -8,3 +8,4 @@ export { buildContext, currentControls, projectFrom, reserveOf, type CandidatePl
 export { runGuard, type GuardVerdict } from './guard.js';
 export { evaluateNight, nightWindowHours } from './night.js';
 export { rejectionOf } from './rejection.js';
+export { safeUntil, type SafeLimit } from './safe-until.js';

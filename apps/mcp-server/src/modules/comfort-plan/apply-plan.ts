@@ -1,4 +1,5 @@
 import { err, isFullyLive, ok, toolError, type ApplyPlanInput, type ApplyPlanOutput, type ErrorEnvelope, type HomeProfile, type Plan, type Result } from '@cold-reserve/contracts';
+import { epsBaseLoadW } from '@cold-reserve/core';
 import { rejectionOf, runGuard } from '@cold-reserve/guard';
 import type { ToolContext } from '../../tool.js';
 import type { ComfortPlanDeps } from './deps.js';
@@ -31,6 +32,10 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
   const loaded = await loadInputs(deps, ctx);
   if (!loaded.ok) return loaded;
   const { snapshot, forecast, profile, preferences } = loaded.value;
+  if (!snapshot.gridAvailable) {
+    const eps = epsBaseLoadW(profile);
+    if (!eps.ok) return eps;
+  }
   const verdict = runGuard({
     plan: stored.value,
     snapshot,
