@@ -1,7 +1,7 @@
 import { PreferencesSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import { hotDayPlan } from '@cold-reserve/ui-cards';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TurnReplySchema, readCards } from '../src/agent/wire.js';
 
 const text = 'Tomorrow hits 36. Shall I apply the plan?';
@@ -40,5 +40,13 @@ describe('readCards: each tool result validated on its own by its contract', () 
   it('refuses manual instructions on an apply_plan result that is not advice (contract rule)', () => {
     const result = { plan: { ...hotDayPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [{ roomId: 'bedroom-1', text: 'Dry at 26 °C' }] };
     expect(valid([{ tool: 'apply_plan', result }])).toBe(false);
+  });
+});
+
+describe('a card that breaks its contract is logged with the turn id (audit L6)', () => {
+  it('logs output_schema_violation with the correlation id and the issue count', () => {
+    const log = vi.fn();
+    readCards([{ tool: 'delete_home', result: {} }], { correlationId: 'turn-9', log });
+    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'warn', code: 'output_schema_violation', correlationId: 'turn-9', details: { issues: expect.any(Number) as unknown } });
   });
 });

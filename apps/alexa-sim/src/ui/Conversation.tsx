@@ -75,7 +75,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone }: ConversationProp
         )}
         {/* Status and alert announce themselves; the answer needs a live region that exists before it appears. */}
         <div aria-live="polite">
-          {snapshot.matches('showingAnswer') && turn.data?.ok === true && <AnswerCard answer={turn.data.value} timeZone={timeZone} />}
+          {snapshot.matches('showingAnswer') && turn.data?.ok === true && turnId !== null && <AnswerCard answer={turn.data.value} timeZone={timeZone} turnId={turnId} />}
         </div>
         {snapshot.matches('failed') && error !== null && (
           <div className="failure" role="alert">

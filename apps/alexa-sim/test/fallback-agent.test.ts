@@ -1,5 +1,5 @@
 import { err, ok, toolError, type ErrorCode } from '@cold-reserve/contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Agent } from '../src/agent/agent.js';
 import { withScriptedFallback } from '../src/agent/fallback-agent.js';
 
@@ -32,5 +32,26 @@ describe('degraded mode: RemoteAgent down → scripted answer + notice (error-ha
     const withCard: Agent = { canCallTools: false, callTool: noTool, ask: () => Promise.resolve(ok({ text: 'Scripted.', cards: [{ tool: 'invalid' as const }] })) };
     const result = await withScriptedFallback(failing('agent_unavailable'), withCard).ask('q', ctx);
     expect(result).toEqual(ok({ text: 'Scripted.', degradedBy: 'agent_unavailable' }));
+  });
+});
+
+describe('degraded mode is logged with the turn correlation id (audit L6)', () => {
+  it('logs the failure it replaces', async () => {
+    const log = vi.fn();
+    await withScriptedFallback(failing('agent_unavailable'), scripted, log).ask('q', { correlationId: 'turn-7' });
+    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'warn', code: 'agent_unavailable', correlationId: 'turn-7', details: { degraded: true } });
+  });
+
+  it('logs a failure the script could not replace either', async () => {
+    const log = vi.fn();
+    await withScriptedFallback(failing('agent_timeout'), failing('invalid_config'), log).ask('q', { correlationId: 'turn-8' });
+    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'error', code: 'agent_timeout', correlationId: 'turn-8', details: { degraded: false, fallbackCode: 'invalid_config' } });
+  });
+
+  it('logs nothing for an answer or an error the user sees as it is', async () => {
+    const log = vi.fn();
+    await withScriptedFallback(scripted, scripted, log).ask('q', ctx);
+    await withScriptedFallback(failing('demo_quota_exceeded'), scripted, log).ask('q', ctx);
+    expect(log).not.toHaveBeenCalled();
   });
 });

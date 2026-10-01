@@ -10,16 +10,18 @@ import { parseConfig, type SimConfig } from './config.js';
 import { cardDocument } from './host/card-documents.js';
 import { CardHostProvider } from './host/card-host.js';
 import { Conversation } from './ui/Conversation.js';
+import { log, logUnhandled } from './log.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { t } from './ui/text.js';
 
+logUnhandled(window);
 const container = document.getElementById('root');
 if (container === null) throw new Error('Missing #root element');
 document.title = t('sim.title');
 
 const config = parseConfig(import.meta.env, window.location.search, import.meta.env.DEV);
 const agent = config.ok ? buildAgent(config.value) : config;
-if (!agent.ok) console.error('invalid simulator config', agent.error);
+if (!agent.ok) log({ level: 'error', code: agent.error.code, details: { step: 'config', ...(agent.error.details?.field !== undefined && { field: agent.error.details.field }) } });
 const queryClient = new QueryClient();
 
 // Dev-only card gallery (`?gallery&theme=light`): never part of a production build.

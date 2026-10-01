@@ -15,6 +15,7 @@ import {
 } from '@cold-reserve/contracts';
 import { z } from 'zod';
 import { t } from '../text.js';
+import { log } from './card-log.js';
 
 // The cards as MCP Apps resources (plan §9.3): one ui:// document per tool that shows a card, all built
 // from the same bundle. Pure code, unit tested; main.tsx wires it to the ext-apps App.
@@ -61,7 +62,7 @@ export function parseCardResult(kind: CardKind, result: ToolResultLike): CardSta
   }
   const parsed = CARD_KINDS[kind].schema.safeParse(result.structuredContent);
   if (!parsed.success) {
-    console.warn(JSON.stringify({ level: 'warn', component: 'ui-cards', code: 'output_schema_violation', card: kind, issues: parsed.error.issues.length }));
+    log({ level: 'warn', code: 'output_schema_violation', details: { card: kind, issues: parsed.error.issues.length } });
     return { kind: 'error', message: t('card.failed'), retryable: false };
   }
   return { kind, data: parsed.data } as CardState;
@@ -141,7 +142,7 @@ export function parseSaveResult(result: ToolResultLike): Result<PublicPreference
   }
   const parsed = SetPreferencesOutputSchema.safeParse(result.structuredContent);
   if (!parsed.success) {
-    console.warn(JSON.stringify({ level: 'warn', component: 'ui-cards', code: 'output_schema_violation', tool: 'set_preferences', issues: parsed.error.issues.length }));
+    log({ level: 'warn', code: 'output_schema_violation', details: { tool: 'set_preferences', issues: parsed.error.issues.length } });
     return err(t('card.failed'));
   }
   return ok(parsed.data.preferences);

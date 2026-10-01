@@ -1,13 +1,12 @@
-import { toolError } from '@cold-reserve/contracts';
 import { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge';
 import { CARD_KINDS, type CardKind } from '@cold-reserve/ui-cards';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { toolErrorResult } from '../agent/agent.js';
 import type { ToolCard } from '../agent/wire.js';
+import { log } from '../log.js';
 import { t } from '../ui/text.js';
 import { useCardHost } from './card-host.js';
 import { FrameTransport } from './frame-guard.js';
-import { readToolCall } from './tool-calls.js';
+import { answerCardCall } from './tool-calls.js';
 
 // One MCP Apps card (plan §9.3–9.4): a sandboxed srcdoc iframe without allow-same-origin, the host's
 // own CSP, every inbound message checked (FrameTransport), card tool calls checked (readToolCall) and
@@ -20,7 +19,8 @@ const INITIAL_HEIGHT_PX = 360;
 export const kindOf = (tool: ToolCard['tool']): CardKind =>
   (Object.keys(CARD_KINDS) as CardKind[]).find((kind) => CARD_KINDS[kind].tool === tool) ?? 'plan';
 
-export function CardFrame({ card }: { card: ToolCard }) {
+/** `turnId`: the turn that showed the card; its logs and its actions carry that correlation id. */
+export function CardFrame({ card, turnId }: { card: ToolCard; turnId: string }) {
   const { agent, documentFor, theme, timeZone } = useCardHost();
   const kind = kindOf(card.tool);
   const document = useMemo(() => documentFor(kind), [documentFor, kind]);
@@ -29,6 +29,7 @@ export function CardFrame({ card }: { card: ToolCard }) {
   const contextRef = useRef({ theme, timeZone });
   contextRef.current = { theme, timeZone };
   const [height, setHeight] = useState(INITIAL_HEIGHT_PX);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const iframe = frameRef.current;
@@ -40,41 +41,41 @@ export function CardFrame({ card }: { card: ToolCard }) {
       hostContext: { ...contextRef.current, displayMode: 'inline', availableDisplayModes: ['inline'] },
     });
     bridge.addEventListener('initialized', () => {
-      void bridge.sendToolResult({ content: [], structuredContent: card.result });
+      bridge.sendToolResult({ content: [], structuredContent: card.result }).catch((error: unknown) => {
+        log({ level: 'error', code: 'unexpected_error', correlationId: turnId, error, details: { step: 'send_tool_result', card: card.tool } });
+        setFailed(true);
+      });
     });
     bridge.addEventListener('sizechange', ({ height: h }) => {
       if (typeof h === 'number' && h > 0) setHeight(Math.ceil(h));
     });
-    bridge.oncalltool = async ({ name, arguments: args }) => {
-      const call = readToolCall({ name, arguments: args }, card);
-      if (!call.ok) return toolErrorResult(call.error);
-      try {
-        return await agent.callTool(call.value.name, call.value.args, { correlationId: crypto.randomUUID() });
-      } catch (reason) {
-        console.error(JSON.stringify({ level: 'error', component: 'alexa-sim', code: 'unexpected_error', tool: name, reason: String(reason) }));
-        return toolErrorResult(toolError('unexpected_error', 'Something went wrong: nothing was changed.'));
-      }
-    };
+    bridge.oncalltool = ({ name, arguments: args }) => answerCardCall({ name, arguments: args }, card, { agent, turnId, log });
     const transport = new FrameTransport(frame, window, (reason) => {
-      console.warn(JSON.stringify({ level: 'warn', component: 'alexa-sim', code: 'frame_message_rejected', reason }));
+      log({ level: 'warn', code: 'frame_message_rejected', correlationId: turnId, details: { reason, card: card.tool } });
     });
     bridgeRef.current = bridge;
     let closed = false;
-    void bridge.connect(transport).then(() => {
-      if (!closed) iframe.srcdoc = document.value;
-    });
+    bridge
+      .connect(transport)
+      .then(() => {
+        if (!closed) iframe.srcdoc = document.value;
+      })
+      .catch((error: unknown) => {
+        log({ level: 'error', code: 'unexpected_error', correlationId: turnId, error, details: { step: 'connect', card: card.tool } });
+        if (!closed) setFailed(true);
+      });
     return () => {
       closed = true;
       bridgeRef.current = null;
       void transport.close();
     };
-  }, [agent, card, document]);
+  }, [agent, card, document, turnId]);
 
   useEffect(() => {
     bridgeRef.current?.setHostContext({ theme, timeZone, displayMode: 'inline', availableDisplayModes: ['inline'] });
   }, [theme, timeZone]);
 
-  if (!document.ok) return <p role="alert">{t('surface.failed')}</p>;
+  if (!document.ok || failed) return <p role="alert">{t('surface.failed')}</p>;
   return (
     <iframe
       ref={frameRef}

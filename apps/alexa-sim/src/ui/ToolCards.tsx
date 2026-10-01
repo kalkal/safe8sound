@@ -6,7 +6,7 @@ import { t } from './text.js';
 // The cards of an answer, each in its own sandboxed ui:// frame (MCP Apps). Actions inside a card are
 // tool calls through the host; the page never renders card content itself.
 
-export function ToolCards({ cards }: { cards: readonly CardSlot[] }) {
+export function ToolCards({ cards, turnId }: { cards: readonly CardSlot[]; turnId: string }) {
   return (
     <div className="tool-cards">
       {cards.map((card, i) => (
@@ -16,7 +16,7 @@ export function ToolCards({ cards }: { cards: readonly CardSlot[] }) {
             // Broke its contract (already logged by readCards): a calm message instead of the card.
             <p role="alert">{t('surface.failed')}</p>
           ) : (
-            <CardFrame card={card} />
+            <CardFrame card={card} turnId={turnId} />
           )}
         </ErrorBoundary>
       ))}

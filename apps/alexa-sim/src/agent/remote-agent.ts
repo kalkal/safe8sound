@@ -37,7 +37,7 @@ export function createRemoteAgent(config: RemoteAgentConfig): Agent {
         if (timeout.aborted) return err(toolError('agent_timeout', `The assistant did not answer within ${String(config.timeoutMs)} ms.`));
         return err(toolError('agent_unavailable', 'The assistant could not be reached.'));
       }
-      return response.ok ? parseReply(body) : parseProblem(response.status, body);
+      return response.ok ? parseReply(body, context.correlationId) : parseProblem(response.status, body);
     },
   };
 }
@@ -50,11 +50,11 @@ function parseJson(body: string): unknown {
   }
 }
 
-function parseReply(body: string): Result<AgentAnswer, ErrorEnvelope> {
+function parseReply(body: string, correlationId: string): Result<AgentAnswer, ErrorEnvelope> {
   const parsed = TurnReplySchema.safeParse(parseJson(body));
   if (!parsed.success) return err(toolError('output_schema_violation', 'The assistant sent a reply in an unexpected format.'));
   const { text, status, cards } = parsed.data;
-  const slots = readCards(cards);
+  const slots = readCards(cards, { correlationId });
   return ok({ text, ...(status !== undefined && { status }), ...(slots !== undefined && { cards: slots }) });
 }
 

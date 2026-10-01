@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { t } from '../text.js';
 import { cardThemeFor } from '../theme.js';
 import { CardApp } from './CardApp.js';
+import { log, logUnhandled } from './card-log.js';
 import { isCardKind, isStormState, parseCardResult, parseSaveResult, safeTimeZone, type CardKind, type CardState } from './card-kinds.js';
 
 // Entry of the ui:// card bundle. The document names its card (data-card); the host sends the tool
@@ -61,8 +62,8 @@ function Card({ kind }: { kind: CardKind }) {
               if (saved.ok) setState((current) => (current.kind === 'preferences' ? { ...current, data: { ...current.data, preferences: saved.value } } : current));
             }
           })
-          .catch((reason: unknown) => {
-            console.warn(JSON.stringify({ level: 'warn', component: 'ui-cards', code: 'unexpected_error', tool: name, reason: String(reason) }));
+          .catch((error: unknown) => {
+            log({ level: 'warn', code: 'unexpected_error', error, details: { tool: name } });
             setState({ kind: 'error', message: t('card.failed'), retryable: true });
           });
       }}
@@ -70,6 +71,7 @@ function Card({ kind }: { kind: CardKind }) {
   );
 }
 
+logUnhandled(window);
 const root = document.getElementById('root');
 const kind = root?.dataset['card'];
 if (root && isCardKind(kind)) {

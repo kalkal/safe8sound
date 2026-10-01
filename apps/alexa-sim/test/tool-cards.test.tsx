@@ -17,7 +17,7 @@ const documentFor = (kind: CardKind): Result<string, 'no_head'> => ok(`<!doctype
 const show = (cards: CardSlot[]) =>
   render(
     <CardHostProvider value={{ agent, documentFor, theme: 'dark', timeZone: 'Europe/Rome' }}>
-      <ToolCards cards={cards} />
+      <ToolCards cards={cards} turnId="turn-1" />
     </CardHostProvider>,
   );
 
@@ -41,7 +41,7 @@ describe('ToolCards: each tool result in its own sandboxed ui:// frame', () => {
   it('never renders a card document without a head, so never without its CSP', () => {
     render(
       <CardHostProvider value={{ agent, documentFor: () => ({ ok: false, error: 'no_head' }), theme: 'dark', timeZone: 'Europe/Rome' }}>
-        <ToolCards cards={[{ tool: 'plan_comfort', result: hotDayPlan() }]} />
+        <ToolCards cards={[{ tool: 'plan_comfort', result: hotDayPlan() }]} turnId="turn-1" />
       </CardHostProvider>,
     );
     expect(screen.queryByTitle('Plan card')).toBeNull();

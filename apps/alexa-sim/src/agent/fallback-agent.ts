@@ -1,11 +1,12 @@
 import type { ErrorCategory } from '@cold-reserve/contracts';
+import { log as defaultLog, type Log } from '../log.js';
 import type { Agent } from './agent.js';
 
 // Degraded mode for "Bedrock / AgentCore down" (error-handling §5): scripted status answers + a clear notice.
 // Quota, permission and validation errors are not outages: they reach the user as they are.
 const DEGRADE_ON: ReadonlySet<ErrorCategory> = new Set(['dependency_unavailable', 'internal']);
 
-export function withScriptedFallback(primary: Agent, scripted: Agent): Agent {
+export function withScriptedFallback(primary: Agent, scripted: Agent, log: Log = defaultLog): Agent {
   return {
     canCallTools: primary.canCallTools,
     // Actions never fall back to the script: a scripted success would claim what did not happen.
@@ -14,10 +15,15 @@ export function withScriptedFallback(primary: Agent, scripted: Agent): Agent {
       const result = await primary.ask(question, context);
       if (result.ok || !DEGRADE_ON.has(result.error.category)) return result;
       const fallback = await scripted.ask(question, context);
-      if (!fallback.ok) return result;
+      const { code } = result.error;
+      if (!fallback.ok) {
+        log({ level: 'error', code, correlationId: context.correlationId, details: { degraded: false, fallbackCode: fallback.error.code } });
+        return result;
+      }
+      log({ level: 'warn', code, correlationId: context.correlationId, details: { degraded: true } });
       // The degraded mode never shows a card: a scripted plan or "applied" would claim what did not happen.
       const { text, status } = fallback.value;
-      return { ok: true, value: { text, ...(status !== undefined && { status }), degradedBy: result.error.code } };
+      return { ok: true, value: { text, ...(status !== undefined && { status }), degradedBy: code } };
     },
   };
 }

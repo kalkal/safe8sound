@@ -7,9 +7,11 @@ import { ToolCards } from './ToolCards.js';
 export interface AnswerCardProps {
   answer: AgentAnswer;
   timeZone: string;
+  /** The turn that produced the answer: the correlation id of its cards. */
+  turnId: string;
 }
 
-export function AnswerCard({ answer, timeZone }: AnswerCardProps) {
+export function AnswerCard({ answer, timeZone, turnId }: AnswerCardProps) {
   const { status } = answer;
   return (
     <article className="answer" data-testid="answer">
@@ -33,7 +35,7 @@ export function AnswerCard({ answer, timeZone }: AnswerCardProps) {
           </div>
         </dl>
       )}
-      {answer.cards !== undefined && <ToolCards cards={answer.cards} />}
+      {answer.cards !== undefined && <ToolCards cards={answer.cards} turnId={turnId} />}
     </article>
   );
 }

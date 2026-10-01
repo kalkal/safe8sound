@@ -1,4 +1,5 @@
 import { ToolCardSchema, type ToolCard } from '@cold-reserve/contracts';
+import { log as defaultLog, type Log } from '../log.js';
 
 // The turn protocol between alexa-sim and sim-api lives in @cold-reserve/contracts (#55):
 // one schema for both apps. Only the per-card reading, with its log line, stays here.
@@ -18,11 +19,11 @@ export {
 export type CardSlot = ToolCard | { tool: 'invalid' };
 
 /** One bad card never costs the answer or the other cards (error-handling §3). */
-export function readCards(cards: readonly unknown[] | undefined): CardSlot[] | undefined {
+export function readCards(cards: readonly unknown[] | undefined, { correlationId, log = defaultLog }: { correlationId?: string; log?: Log } = {}): CardSlot[] | undefined {
   return cards?.map((card) => {
     const parsed = ToolCardSchema.safeParse(card);
     if (parsed.success) return parsed.data;
-    console.warn(JSON.stringify({ level: 'warn', component: 'alexa-sim', code: 'output_schema_violation', issues: parsed.error.issues.length }));
+    log({ level: 'warn', code: 'output_schema_violation', ...(correlationId !== undefined && { correlationId }), details: { issues: parsed.error.issues.length } });
     return { tool: 'invalid' as const };
   });
 }

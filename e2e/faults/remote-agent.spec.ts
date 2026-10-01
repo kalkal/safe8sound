@@ -80,3 +80,28 @@ test('sim-api down + "Apply the plan" → an honest answer: nothing claimed as a
   await expect(page.getByText('Plan applied.')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Plan' })).toHaveCount(0);
 });
+
+test('sim-api answers 503 → the degraded mode leaves one JSON log line with the turn correlation id (audit L6)', async ({ page }) => {
+  let correlationId: string | undefined;
+  await page.route('**/sim-api/v1/turns', (route) => {
+    correlationId = route.request().headers()['x-correlation-id'];
+    return route.fulfill({ status: 503, body: 'Service Unavailable' });
+  });
+  const lines: unknown[] = [];
+  page.on('console', (message) => {
+    try {
+      const line: unknown = JSON.parse(message.text());
+      if (typeof line === 'object' && line !== null && (line as { component?: unknown }).component === 'alexa-sim') lines.push(line);
+    } catch {
+      // not one of our JSON lines (Vite, React dev messages)
+    }
+  });
+  await page.goto('/?agent=remote');
+  await ask(page);
+
+  await expect(page.getByRole('note')).toBeVisible();
+  expect(correlationId).toMatch(/^[0-9a-f-]{36}$/);
+  expect(lines).toEqual([
+    expect.objectContaining({ level: 'warn', code: 'agent_unavailable', category: 'dependency_unavailable', correlationId, details: { degraded: true } }),
+  ]);
+});
