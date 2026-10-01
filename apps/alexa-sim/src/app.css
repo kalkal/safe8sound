@@ -225,3 +225,78 @@
     justify-self: end;
   }
 }
+
+/* Surface C: the family member's phone, simulated (issue #24). Calm: no motion, new messages on top. */
+@layer surfaces {
+  .phone {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: var(--border-thin) solid var(--surface-card-line);
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+
+    & h2 {
+      margin: 0;
+      font-size: var(--font-size-body);
+      font-weight: var(--font-weight-medium);
+    }
+
+    & .muted {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+  }
+
+  .phone-list {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .phone-note {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border-inline-start: calc(var(--border-thin) * 4) solid var(--status-storm);
+    border-radius: var(--radius-card);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+
+    &[data-transition="power_back"] {
+      border-inline-start-color: var(--status-ok);
+    }
+
+    & h3,
+    & p {
+      margin: 0;
+    }
+
+    & h3 {
+      font-size: var(--font-size-body);
+      font-weight: var(--font-weight-bold);
+    }
+  }
+
+  .phone-meta {
+    color: var(--text-secondary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+  }
+}
+
+/* Calm by default: with reduced motion nothing on the page moves (plan §11.2 p.13). */
+@layer base {
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto;
+      transition-duration: 0ms;
+      animation-duration: 0ms;
+      animation-iteration-count: 1;
+    }
+  }
+}

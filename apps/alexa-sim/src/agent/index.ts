@@ -4,6 +4,7 @@ import type { Agent } from './agent.js';
 import { withScriptedFallback } from './fallback-agent.js';
 import { createRemoteAgent } from './remote-agent.js';
 import script from './script.v1.json' with { type: 'json' };
+import type { ScriptedPhone } from '../phone/phone-feed.js';
 import { createScriptedAgent } from './scripted-agent.js';
 
 export type { Agent, AgentAnswer } from './agent.js';
@@ -12,8 +13,8 @@ export type { Agent, AgentAnswer } from './agent.js';
  * ScriptedAgent by config; otherwise RemoteAgent with the scripted degraded mode behind it.
  * A broken script builds no agent at all: the remote one would have no degraded mode.
  */
-export function buildAgent(config: SimConfig, scriptSource: unknown = script): Result<Agent, ErrorEnvelope> {
-  const scripted = createScriptedAgent(scriptSource);
+export function buildAgent(config: SimConfig, scriptSource: unknown = script, phone?: ScriptedPhone): Result<Agent, ErrorEnvelope> {
+  const scripted = createScriptedAgent(scriptSource, phone === undefined ? {} : { phone });
   if (!scripted.ok || config.agent === 'scripted' || config.simApiUrl === undefined) return scripted;
   // Behind the remote agent the script answers status questions only (degraded mode, error-handling §5).
   const degraded = createScriptedAgent(scriptSource, { degraded: true });

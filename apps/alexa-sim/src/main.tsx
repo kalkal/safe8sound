@@ -11,6 +11,8 @@ import { cardDocument } from './host/card-documents.js';
 import { CardHostProvider } from './host/card-host.js';
 import { Conversation } from './ui/Conversation.js';
 import { log, logUnhandled } from './log.js';
+import { createScriptedPhone } from './phone/phone-feed.js';
+import { PhonePanel } from './phone/PhonePanel.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { t } from './ui/text.js';
 
@@ -20,7 +22,9 @@ if (container === null) throw new Error('Missing #root element');
 document.title = t('sim.title');
 
 const config = parseConfig(import.meta.env, window.location.search, import.meta.env.DEV);
-const agent = config.ok ? buildAgent(config.value) : config;
+// The family phone (surface C, #24): fed by the scripted scene. TODO(#24): a feed that polls GET /phone/inbox for the remote agent.
+const phone = createScriptedPhone();
+const agent = config.ok ? buildAgent(config.value, undefined, phone) : config;
 if (!agent.ok) log({ level: 'error', code: agent.error.code, details: { step: 'config', ...(agent.error.details?.field !== undefined && { field: agent.error.details.field }) } });
 const queryClient = new QueryClient();
 
@@ -55,6 +59,11 @@ function Simulator({ agent, config }: { agent: Agent; config: SimConfig }) {
           <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} />
         </QueryClientProvider>
       </CardHostProvider>
+      {config.agent === 'scripted' && (
+        <ErrorBoundary>
+          <PhonePanel feed={phone} timeZone={config.homeTimeZone} />
+        </ErrorBoundary>
+      )}
     </>
   );
 }

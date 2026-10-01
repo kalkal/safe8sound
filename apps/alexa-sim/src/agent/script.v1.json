@@ -69,6 +69,40 @@
           "fixture": "preferences"
         }
       ]
+    },
+    {
+      "id": "storm-start",
+      "patterns": ["power is out", "power s out", "power cut", "blackout", "storm is here"],
+      "text": "Power's out. I've switched to the safe room: the bedroom is at 26.8 degrees, comfortable at least until 6:40, and I've let your daughter know.",
+      "withStatus": false,
+      "cards": [
+        { "tool": "get_safe_room_status", "fixture": "safe-room-storm" },
+        { "tool": "plan_comfort", "fixture": "storm-plan" }
+      ],
+      "phone": [{ "fixture": "storm-started" }]
+    },
+    {
+      "id": "safe-room",
+      "patterns": ["how is grandpa", "how s grandpa", "safe room"],
+      "text": "Grandpa is in his bedroom at 26.8 degrees. The battery keeps it comfortable at least until 6:40.",
+      "withStatus": false,
+      "cards": [{ "tool": "get_safe_room_status", "fixture": "safe-room-storm" }]
+    },
+    {
+      "id": "storm-essential",
+      "patterns": ["switch to essential", "go to essential"],
+      "text": "I'm switching to Essential so the bedroom stays comfortable until sunrise. I've let your daughter know.",
+      "withStatus": false,
+      "cards": [{ "tool": "plan_comfort", "fixture": "storm-plan" }],
+      "phone": [{ "fixture": "essential" }]
+    },
+    {
+      "id": "power-back",
+      "patterns": ["power is back", "power back", "grid is back"],
+      "text": "Power is back and storm mode has ended. Your daughter knows.",
+      "withStatus": false,
+      "cards": [{ "tool": "get_safe_room_status", "fixture": "safe-room-calm" }],
+      "phone": [{ "fixture": "power-back" }]
     }
   ],
   "fallback": "In scripted mode I can only answer a few questions. Try asking: what's my battery level?",

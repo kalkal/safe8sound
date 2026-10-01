@@ -1,6 +1,6 @@
 import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
-import { hotDayPlan } from '@cold-reserve/ui-cards';
+import { hotDayPlan, safeRoomCalm, safeRoomInStorm, stormPlan } from '@cold-reserve/ui-cards';
 import { ToolCardSchema, type ToolCard } from './wire.js';
 
 // The tool results the script can show, by name: built from the contract fixtures, the same data the
@@ -26,6 +26,10 @@ export const SCRIPT_FIXTURES = {
         hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()),
       },
     }),
+  'safe-room-storm': () => card({ tool: 'get_safe_room_status', result: safeRoomInStorm() }),
+  'safe-room-calm': () => card({ tool: 'get_safe_room_status', result: { ...safeRoomCalm(), stormPhase: 'ended' } }),
+  /** The night in the storm: the pacing line with the reserve as the budget (plan §11.3, Q4 of #24). */
+  'storm-plan': () => card({ tool: 'plan_comfort', result: stormPlan() }),
 } as const satisfies Record<string, () => ToolCard>;
 
 export type ScriptFixture = keyof typeof SCRIPT_FIXTURES;

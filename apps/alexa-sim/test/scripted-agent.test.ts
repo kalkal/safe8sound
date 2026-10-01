@@ -1,6 +1,7 @@
 import { PlanSchema } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { createScriptedAgent } from '../src/agent/scripted-agent.js';
+import { createScriptedPhone } from '../src/phone/phone-feed.js';
 import script from '../src/agent/script.v1.json' with { type: 'json' };
 
 const ctx = { correlationId: 'c1' };
@@ -80,5 +81,46 @@ describe('ScriptedAgent', () => {
     expect(await created.value.ask('Apply the plan', ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
     expect(await created.value.ask('Keep Grandpa comfortable, it will be 36 degrees', ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
     expect(await created.value.ask("What's my battery level?", ctx)).toMatchObject({ ok: true, value: { status: script.status } });
+  });
+});
+
+describe('ScriptedAgent: the storm scene and the family phone (#24)', () => {
+  const withPhone = () => {
+    const phone = createScriptedPhone();
+    const created = createScriptedAgent(script, { phone });
+    if (!created.ok) throw new Error(created.error.message);
+    return { agent: created.value, phone };
+  };
+
+  it('shows the safe room and the night when the power goes out, and the daughter gets the alert', async () => {
+    const { agent: a, phone } = withPhone();
+    const reply = await a.ask("The power's out", ctx);
+    expect(reply.ok && reply.value.cards?.map((c) => c.tool)).toEqual(['get_safe_room_status', 'plan_comfort']);
+    expect(phone.messages().map((m) => m.transition)).toEqual(['storm_started']);
+  });
+
+  it('sends Essential and "power is back" as their own messages, never twice', async () => {
+    const { agent: a, phone } = withPhone();
+    await a.ask('The power is out', ctx);
+    await a.ask('Switch to essential', ctx);
+    await a.ask('Is the power back?', ctx);
+    await a.ask('Is the power back?', ctx);
+    expect(phone.messages().map((m) => m.transition)).toEqual(['power_back', 'essential_level', 'storm_started']);
+  });
+
+  it('a question about the safe room sends nothing to the family', async () => {
+    const { agent: a, phone } = withPhone();
+    const reply = await a.ask("How's grandpa?", ctx);
+    expect(reply.ok && reply.value.cards?.map((c) => c.tool)).toEqual(['get_safe_room_status']);
+    expect(phone.messages()).toEqual([]);
+  });
+
+  it('in the degraded mode never pretends a message was sent', async () => {
+    const phone = createScriptedPhone();
+    const created = createScriptedAgent(script, { degraded: true, phone });
+    if (!created.ok) throw new Error(created.error.message);
+    const reply = await created.value.ask('The power is out', ctx);
+    expect(reply.ok && reply.value.text).toBe(script.degradedFallback);
+    expect(phone.messages()).toEqual([]);
   });
 });

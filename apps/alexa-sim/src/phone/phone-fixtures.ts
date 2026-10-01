@@ -1,0 +1,33 @@
+import { InboxMessageSchema, type InboxMessage, type SendableTransition } from '@cold-reserve/contracts';
+import { stormMessage } from '@cold-reserve/i18n';
+
+// The family messages of the storm scene (Saturday night, storm-blackout), rendered by the real
+// i18n templates exactly as the server's notifier would, then parsed by the inbox contract.
+// "Sara" is the scene's fictional daughter.
+
+const ZONE = 'Europe/Rome';
+const NAME = 'Sara';
+const ms = (iso: string) => Date.parse(iso);
+
+export const PHONE_FIXTURES = {
+  'storm-started': { transition: 'storm_started', at: '2026-07-18T19:42:00+02:00', tempC: 26.8, safeUntil: '2026-07-19T06:40:00+02:00' },
+  essential: { transition: 'essential_level', at: '2026-07-18T21:10:00+02:00', tempC: 26.8, safeUntil: '2026-07-19T06:40:00+02:00' },
+  'power-back': { transition: 'power_back', at: '2026-07-19T05:52:00+02:00', tempC: 26.2, powerBackAt: '2026-07-19T05:48:00+02:00' },
+} as const satisfies Record<string, { transition: SendableTransition; at: string; tempC: number; safeUntil?: string; powerBackAt?: string }>;
+
+export type PhoneFixture = keyof typeof PHONE_FIXTURES;
+export const PHONE_FIXTURE_NAMES = Object.keys(PHONE_FIXTURES) as [PhoneFixture, ...PhoneFixture[]];
+
+export function phoneMessage(name: PhoneFixture): InboxMessage {
+  const f: { transition: SendableTransition; at: string; tempC: number; safeUntil?: string; powerBackAt?: string } = PHONE_FIXTURES[name];
+  const text = stormMessage('en-US', f.transition, NAME, {
+    roomName: 'Bedroom',
+    tempC: f.tempC,
+    atMs: ms(f.at),
+    timeZone: ZONE,
+    ...(f.safeUntil === undefined ? {} : { safeUntilMs: ms(f.safeUntil) }),
+    ...(f.powerBackAt === undefined ? {} : { powerBackAtMs: ms(f.powerBackAt) }),
+  });
+  if (!text.ok) throw new Error(`Phone fixture "${name}" misses ${text.error.missing.join(', ')}`);
+  return InboxMessageSchema.parse({ at: f.at, role: 'daughter', channel: 'in_app', transition: f.transition, text: text.value });
+}

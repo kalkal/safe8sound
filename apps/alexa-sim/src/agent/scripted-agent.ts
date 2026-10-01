@@ -1,11 +1,13 @@
 import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { z } from 'zod';
 import type { Agent, AgentAnswer } from './agent.js';
+import { PHONE_FIXTURE_NAMES, phoneMessage } from '../phone/phone-fixtures.js';
+import type { ScriptedPhone } from '../phone/phone-feed.js';
 import { SCRIPT_FIXTURES, SCRIPT_FIXTURE_NAMES } from './script-fixtures.js';
 import { refuseAction, scriptedToolCall } from './scripted-tools.js';
 import { StatusFactsSchema, type ToolName } from './wire.js';
 
-const TOOL_NAMES = ['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences'] as const satisfies readonly ToolName[];
+const TOOL_NAMES = ['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences', 'get_safe_room_status'] as const satisfies readonly ToolName[];
 
 // Deterministic answers from a versioned script file: no network, no LLM, no clock, no randomness.
 // Used in every test and in CI (cost rule), and as the degraded mode when the remote agent is down.
@@ -23,6 +25,8 @@ const ScriptSchema = z
           withStatus: z.boolean(),
           /** Tool results to show as cards, by fixture name (see script-fixtures.ts). */
           cards: z.array(z.strictObject({ tool: z.enum(TOOL_NAMES), fixture: z.enum(SCRIPT_FIXTURE_NAMES) })).max(4).optional(),
+          /** Family messages the scene sends with this answer, by fixture name (the phone, #24). */
+          phone: z.array(z.strictObject({ fixture: z.enum(PHONE_FIXTURE_NAMES) })).max(3).optional(),
         }),
       )
       .min(1),
@@ -50,9 +54,12 @@ const normalise = (text: string): string => ` ${text.toLowerCase().replace(/[^a-
 export interface ScriptedAgentOptions {
   /**
    * As the degraded mode behind the remote agent: status answers only. Entries that show a card (a plan,
-   * an applied plan, preferences) are never used, so a failure can never be reported as a success.
+   * an applied plan, preferences) or sends a family message are never used, so a failure can never be
+   * reported as a success.
    */
   degraded?: boolean;
+  /** The simulated family phone: the scene's messages arrive there. */
+  phone?: ScriptedPhone;
 }
 
 export function createScriptedAgent(source: unknown, options: ScriptedAgentOptions = {}): Result<Agent, ErrorEnvelope> {
@@ -63,7 +70,7 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
   }
   const script = parsed.data;
   const entries = script.entries
-    .filter((entry) => options.degraded !== true || entry.cards === undefined)
+    .filter((entry) => options.degraded !== true || (entry.cards === undefined && entry.phone === undefined))
     .map((entry) => ({ ...entry, patterns: entry.patterns.map(normalise) }));
   const fallback = options.degraded === true ? script.degradedFallback : script.fallback;
 
@@ -78,6 +85,7 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
       const answer: AgentAnswer =
         entry.withStatus && status !== undefined ? { text: entry.text.replaceAll('{soc}', String(status.batterySocPct)), status } : { text: entry.text };
       if (entry.cards !== undefined) answer.cards = entry.cards.map((card) => SCRIPT_FIXTURES[card.fixture]());
+      if (entry.phone !== undefined) options.phone?.deliver(entry.phone.map((m) => phoneMessage(m.fixture)));
       return Promise.resolve(ok(answer));
     },
   });

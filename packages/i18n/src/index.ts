@@ -120,6 +120,13 @@ const enUS = {
   'reason.soc_below_track': 'charge below plan',
   'reason.soc_above_track': 'charge above plan',
   'reason.storm': 'storm',
+  // The family phone in the simulator (surface C, issue #24).
+  'phone.title': "Your daughter's phone (simulated)",
+  'phone.empty': 'No messages from {product} yet.',
+  'phone.list': 'Notifications',
+  'phone.storm_started': 'Power outage (storm) at home',
+  'phone.essential_level': 'Switched to Essential',
+  'phone.power_back': 'Power is back at home',
   'prefs.title': 'Preferences',
   'prefs.comfort': 'Comfort setpoint',
   'prefs.cooler': 'Cooler',
