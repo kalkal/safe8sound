@@ -70,6 +70,8 @@ export const ERROR_CATALOG = {
   config_unavailable: { category: 'dependency_unavailable' },
   // rate_limited: wait retryAfterMs
   demo_quota_exceeded: { category: 'rate_limited' },
+  /** A second question for a home while one is still running (#101): retry after retryAfterMs. */
+  turn_in_progress: { category: 'rate_limited' },
   // internal: a bug, alert
   unexpected_error: { category: 'internal' },
   output_schema_violation: { category: 'internal' },

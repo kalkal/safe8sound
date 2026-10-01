@@ -5,8 +5,6 @@ import type { Clock } from '@cold-reserve/core';
 export interface QuotaStore {
   /** Counts one more under `key` if it is below `limit`; false when the cap is reached. */
   consume(key: string, limit: number, expiresAtMs: number): Promise<boolean>;
-  /** The current count under `key` (0 when absent). */
-  peek(key: string): Promise<number>;
 }
 
 /** Local store: keys carry their window (day or hour), so old windows are simply never read again. */
@@ -19,7 +17,6 @@ export function memoryQuotaStore(): QuotaStore {
       counts.set(key, n + 1);
       return Promise.resolve(true);
     },
-    peek: (key) => Promise.resolve(counts.get(key) ?? 0),
   };
 }
 
@@ -27,7 +24,8 @@ export interface QuotaLimits {
   readonly turnsPerCodePerDay: number;
   readonly turnsGlobalPerDay: number;
   readonly toolCallsPerCodePerDay: number;
-  readonly failedCodesPerIpPerHour: number;
+  /** Demo code attempts (right or wrong) per client IP per hour. */
+  readonly codeAttemptsPerIpPerHour: number;
 }
 
 export type Quota = ReturnType<typeof createQuota>;
@@ -57,15 +55,11 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
       const day = window(DAY_MS);
       return (await store.consume(`TOOLS#${codeId}#${day.id}`, limits.toolCallsPerCodePerDay, day.endMs)) ? ok(undefined) : over(day.retryAfterMs, DAILY);
     },
-    /** Records a wrong demo code from this IP; false once the hourly cap is reached. */
-    failedCode(ip: string): Promise<boolean> {
+    /** Counts one demo code attempt from this IP, atomically, before the code is looked at; false past the hourly cap. */
+    codeAttempt(ip: string): Promise<boolean> {
       const hour = window(HOUR_MS);
-      return store.consume(`FAIL#${ip}#${hour.id}`, limits.failedCodesPerIpPerHour, hour.endMs);
+      return store.consume(`ATTEMPT#${ip}#${hour.id}`, limits.codeAttemptsPerIpPerHour, hour.endMs);
     },
-    /** Whether this IP may still try a code: checked before looking at the code at all. */
-    async codeAttemptsLeft(ip: string): Promise<boolean> {
-      return (await store.peek(`FAIL#${ip}#${window(HOUR_MS).id}`)) < limits.failedCodesPerIpPerHour;
-    },
-    tooManyAttempts: (): Result<never, ErrorEnvelope> => over(window(HOUR_MS).retryAfterMs, 'Too many wrong demo codes. Try again in an hour.'),
+    tooManyAttempts: (): ErrorEnvelope => toolError('demo_quota_exceeded', 'Too many demo code attempts. Try again in an hour.', { retryAfterMs: window(HOUR_MS).retryAfterMs }),
   };
 }

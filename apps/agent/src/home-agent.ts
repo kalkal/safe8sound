@@ -24,33 +24,87 @@ export function createHomeAgent(deps: {
   now?: () => number;
 }): HomeAgent {
   const now = deps.now ?? Date.now;
-  let ready: Promise<{ agent: ColdReserveAgent; recorder: TurnRecorder }> | undefined;
+  interface Built {
+    agent: ColdReserveAgent;
+    recorder: TurnRecorder;
+    session: McpSession;
+  }
+  let ready: Promise<Built> | undefined;
 
   // Each agent has its own recorder: after a timeout a fresh pair is built, so a Strands run that is
   // still finishing writes into its own recorder, never into the next turn's cards.
-  const start = async () => {
+  const start = async (): Promise<Built> => {
     const recorder = createTurnRecorder();
-    const tools = await mcpToolset(await deps.connect(deps.home), recorder);
-    return { agent: createAgent({ config: deps.config, model: deps.model, tools, ...(deps.log ? { log: deps.log } : {}) }), recorder };
+    const session = await deps.connect(deps.home);
+    const tools = await mcpToolset(session, recorder);
+    return { agent: createAgent({ config: deps.config, model: deps.model, tools, ...(deps.log ? { log: deps.log } : {}) }), recorder, session };
   };
 
   const turn = async (question: string, correlationId: string, arrivedAt: number): Promise<Result<TurnReply, ErrorEnvelope>> => {
-    let built: { agent: ColdReserveAgent; recorder: TurnRecorder };
+    // Waited too long for the previous turn: answer now, and keep the agent (this turn never started).
+    const deadlineMs = deps.config.turnDeadlineMs - (now() - arrivedAt);
+    if (deadlineMs <= 0) {
+      const timeout = toolError('agent_timeout', 'The assistant took too long to answer. Try again in a moment.');
+      deps.log?.(logLine(timeout, 'TurnDeadline', { correlationId }));
+      return err(timeout);
+    }
+    let built: Built | 'timeout';
+    const starting = (ready ??= start());
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      built = await (ready ??= start());
+      // Opening the MCP session counts toward the deadline too (review of #121).
+      built = await Promise.race([
+        starting,
+        new Promise<'timeout'>((resolve) => {
+          timer = setTimeout(() => {
+            resolve('timeout');
+          }, deadlineMs);
+        }),
+      ]);
     } catch (e) {
       ready = undefined; // the next turn tries to connect again
       const failure = classifyFailure(e);
       if (failure.kind === 'bug') throw failure.error;
       deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId }));
       return err(failure.error);
+    } finally {
+      clearTimeout(timer);
     }
-    const { agent, recorder } = built;
+    if (built === 'timeout') {
+      // The next turn connects again; a session that opens late is closed, never used.
+      ready = undefined;
+      starting.then(
+        (late) => late.session.close?.(),
+        (e: unknown) => {
+          // Too late to be this turn's answer, but still worth a line.
+          deps.log?.(logLine(toolError('agent_unavailable', 'A late MCP session failed to open.'), e instanceof Error ? e.name : typeof e, { correlationId }));
+        },
+      ).catch((e: unknown) => {
+        deps.log?.(logLine(toolError('agent_unavailable', 'A late MCP session could not be closed.'), e instanceof Error ? e.name : typeof e, { correlationId }));
+      });
+      const timeout = toolError('agent_timeout', 'The assistant took too long to answer. Try again in a moment.');
+      deps.log?.(logLine(timeout, 'TurnDeadline', { correlationId }));
+      return err(timeout);
+    }
+    const { agent, recorder, session } = built;
+    // Waiting for the previous turn AND opening the session both count: the model gets only what is
+    // left (review of #139). Nothing started yet, so the agent and its session are kept.
+    const leftMs = deps.config.turnDeadlineMs - (now() - arrivedAt);
+    if (leftMs <= 0) {
+      const timeout = toolError('agent_timeout', 'The assistant took too long to answer. Try again in a moment.');
+      deps.log?.(logLine(timeout, 'TurnDeadline', { correlationId }));
+      return err(timeout);
+    }
     recorder.reset(correlationId);
-    // The time spent waiting for the previous turn counts toward this one's deadline.
-    const answer = await agent.ask(question, { correlationId, deadlineMs: deps.config.turnDeadlineMs - (now() - arrivedAt) });
+    const answer = await agent.ask(question, { correlationId, deadlineMs: leftMs });
     if (!answer.ok) {
-      if (answer.error.code === 'agent_timeout') ready = undefined; // the cancelled run may still be finishing
+      if (answer.error.code === 'agent_timeout') {
+        // The cancelled run may still be finishing: the next turn gets a fresh agent and session.
+        ready = undefined;
+        void session.close?.().catch((e: unknown) => {
+          deps.log?.(logLine(toolError('agent_unavailable', 'A timed-out MCP session could not be closed.'), e instanceof Error ? e.name : typeof e, { correlationId }));
+        });
+      }
       return answer;
     }
     const cards = recorder.cards();
@@ -65,7 +119,7 @@ export function createHomeAgent(deps: {
   return {
     ask(question, correlationId) {
       if (inFlight >= MAX_TURNS_PER_HOME) {
-        const busy = toolError('demo_quota_exceeded', 'Wait for the answer to the previous question, then ask again.', { retryAfterMs: deps.config.turnDeadlineMs });
+        const busy = toolError('turn_in_progress', 'Wait for the answer to the previous question, then ask again.', { retryAfterMs: deps.config.turnDeadlineMs });
         deps.log?.(logLine(busy, 'TurnQueueFull', { correlationId }));
         return Promise.resolve(err(busy));
       }

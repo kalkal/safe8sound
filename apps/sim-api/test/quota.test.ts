@@ -2,7 +2,7 @@ import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import { createQuota, memoryQuotaStore, type QuotaLimits } from '../src/quota.js';
 
-const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, failedCodesPerIpPerHour: 2 };
+const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, codeAttemptsPerIpPerHour: 2 };
 // 2026-10-01 23:59:00 UTC: one minute to the daily reset.
 const NOW = Date.UTC(2026, 9, 1, 23, 59, 0);
 
@@ -38,12 +38,17 @@ describe('daily caps, checked before calling the agent (plan §13.2.4), reset at
     expect((await quota(NOW + 2 * 60_000, store).turn('judges')).ok).toBe(true);
   });
 
-  it('caps failed demo codes per IP per hour', async () => {
+  it('caps demo code attempts per IP per hour, counted atomically before the code is looked at (review of #110)', async () => {
     const q = quota();
-    expect(await q.failedCode('203.0.113.7')).toBe(true);
-    expect(await q.failedCode('203.0.113.7')).toBe(true);
-    expect(await q.failedCode('203.0.113.7')).toBe(false);
-    expect(await q.failedCode('198.51.100.1')).toBe(true);
-    expect(await q.codeAttemptsLeft('203.0.113.7')).toBe(false);
+    expect(await q.codeAttempt('203.0.113.7')).toBe(true);
+    expect(await q.codeAttempt('203.0.113.7')).toBe(true);
+    expect(await q.codeAttempt('203.0.113.7')).toBe(false);
+    expect(await q.codeAttempt('198.51.100.1')).toBe(true);
+  });
+
+  it('lets no more than the cap through when attempts arrive at the same time', async () => {
+    const q = quota();
+    const results = await Promise.all(Array.from({ length: 6 }, () => q.codeAttempt('203.0.113.7')));
+    expect(results.filter(Boolean)).toHaveLength(2);
   });
 });

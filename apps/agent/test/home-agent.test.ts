@@ -150,8 +150,8 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
     const first = agent.ask('Battery?', 'turn-a');
     const second = agent.ask('Battery?', 'turn-b');
     const third = await agent.ask('Battery?', 'turn-c');
-    expect(third).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', category: 'rate_limited', retryAfterMs: CONFIG.turnDeadlineMs } });
-    expect(logs).toMatchObject([{ code: 'demo_quota_exceeded', correlationId: 'turn-c' }]);
+    expect(third).toMatchObject({ ok: false, error: { code: 'turn_in_progress', category: 'rate_limited', retryAfterMs: CONFIG.turnDeadlineMs } });
+    expect(logs).toMatchObject([{ code: 'turn_in_progress', correlationId: 'turn-c' }]);
     release();
     expect((await first).ok && (await second).ok).toBe(true);
   });
@@ -173,13 +173,26 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
         return base.callTool(name, args, signal, correlationId);
       },
     };
-    const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(s), now: () => now });
+    let connects = 0;
+    const agent = createHomeAgent({
+      config: CONFIG,
+      home: HOME,
+      model: new FakeModel(policy),
+      connect: () => {
+        connects++;
+        return Promise.resolve(s);
+      },
+      now: () => now,
+    });
     const first = agent.ask('Battery?', 'turn-a');
     const second = agent.ask('Battery?', 'turn-b');
     release();
     expect(await first).toMatchObject({ ok: true });
     expect(await second).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
     expect(base.correlationIds).toEqual(['turn-a']);
+    // The second turn never started, so the agent (and its history) is kept for the next one.
+    expect(await agent.ask('Battery?', 'turn-c')).toMatchObject({ ok: true });
+    expect(connects).toBe(1);
   });
 
   it('starts a fresh agent after a timeout, so a late tool result never lands in the next turn', async () => {
@@ -189,11 +202,17 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
       release = resolve;
     });
     let opened = 0;
+    const closed: number[] = [];
     const connect = () => {
       const base = session();
-      const first = ++opened === 1;
+      const id = ++opened;
+      const first = id === 1;
       return Promise.resolve<McpSession>({
         listTools: () => base.listTools(),
+        close: () => {
+          closed.push(id);
+          return Promise.resolve();
+        },
         // The first session's plan_comfort ignores the cancel signal and answers late.
         callTool: async (name, args, signal, correlationId) => {
           if (first) await late;
@@ -207,8 +226,71 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
     release();
     const reply = await next;
     expect(opened).toBe(2);
+    expect(closed).toEqual([1]); // the timed-out session is closed, the new one stays open
     expect(reply).toMatchObject({ ok: true, value: { text: 'Battery at 45%.' } });
     expect(reply.ok && reply.value.cards).toBeUndefined();
   });
 });
 
+
+describe('createHomeAgent: the first turn opens the MCP session within the deadline (review of #121)', () => {
+  it('answers agent_timeout when connecting hangs, closes the late session, and tries again on the next turn', async () => {
+    const quick = { ...CONFIG, turnDeadlineMs: 50 };
+    let attempts = 0;
+    let lateClosed = false;
+    let resolveLate: (s: McpSession) => void = () => undefined;
+    const connect = () => {
+      attempts++;
+      if (attempts === 1) {
+        return new Promise<McpSession>((resolve) => {
+          resolveLate = resolve;
+        });
+      }
+      return Promise.resolve(session());
+    };
+    const agent = createHomeAgent({ config: quick, home: HOME, model: new FakeModel(policy), connect });
+    const started = Date.now();
+    expect(await agent.ask('Battery?', 'turn-a')).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
+    expect(Date.now() - started).toBeLessThan(1000);
+    const base = session();
+    resolveLate({
+      listTools: () => base.listTools(),
+      callTool: (...args) => base.callTool(...args),
+      close: () => {
+        lateClosed = true;
+        return Promise.resolve();
+      },
+    });
+    expect(await agent.ask('Battery?', 'turn-b')).toMatchObject({ ok: true, value: { text: 'Battery at 45%.' } });
+    expect(attempts).toBe(2);
+    expect(lateClosed).toBe(true);
+  });
+});
+
+describe('createHomeAgent: connecting and answering share one deadline (review of #139)', () => {
+  it('gives the model only what is left after a slow connect, so the reply never comes after the deadline', async () => {
+    const config = { ...CONFIG, turnDeadlineMs: 400 };
+    const pause = (ms: number) =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+      });
+    const base = session();
+    const slow: McpSession = {
+      listTools: () => base.listTools(),
+      callTool: async (name, args, signal, correlationId) => {
+        await pause(300); // the tool alone fits in a fresh deadline, not in what is left of it
+        return base.callTool(name, args, signal, correlationId);
+      },
+    };
+    const connect = async () => {
+      await pause(240); // 0.6 × the deadline
+      return slow;
+    };
+    const agent = createHomeAgent({ config, home: HOME, model: new FakeModel(policy), connect });
+    const started = Date.now();
+    const reply = await agent.ask('Battery?', 'turn-a');
+    const elapsed = Date.now() - started;
+    expect(reply).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
+    expect(elapsed).toBeLessThan(config.turnDeadlineMs + 120);
+  });
+});

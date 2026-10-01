@@ -224,6 +224,13 @@ describe('readParameter (SSM through the Parameters and Secrets Lambda extension
     expect(await readParameter('/p', { fetchFn: answer(400), sessionToken: 'tok', timeoutMs: 1000 })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
+  it('treats the extension\'s "not ready" 400 as transient: config_unavailable with retryAfterMs (review of #134)', async () => {
+    const notReady = () => Promise.resolve(new Response('not ready to serve traffic, please wait', { status: 400 }));
+    const result = await readParameter('/p', { fetchFn: notReady, sessionToken: 'tok', timeoutMs: 1000 });
+    expect(result).toMatchObject({ ok: false, error: { code: 'config_unavailable', category: 'dependency_unavailable', retryAfterMs: 1000 } });
+    expect(JSON.stringify(result)).not.toContain('please wait');
+  });
+
   it('fails with invalid_config on a non-200 answer, without the value', async () => {
     const fetchFn = () => Promise.resolve(new Response('denied', { status: 403 }));
     const result = await readParameter('/p', { fetchFn, sessionToken: 'tok', timeoutMs: 1000 });

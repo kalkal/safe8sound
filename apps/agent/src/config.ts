@@ -91,6 +91,16 @@ export function loadInvokeToken(env: Readonly<Record<string, string | undefined>
   return loadToken(env, 'AGENT_INVOKE_TOKEN');
 }
 
+/** AGENT_MAX_SESSIONS: sandbox homes kept in memory (LRU), 1-1000, default 50. */
+export function loadMaxSessions(env: Readonly<Record<string, string | undefined>>): Result<number, ErrorEnvelope> {
+  const raw = env['AGENT_MAX_SESSIONS'];
+  if (raw === undefined) return ok(50);
+  const value = Number(raw.trim());
+  return raw.trim() !== '' && Number.isInteger(value) && value >= 1 && value <= 1000
+    ? ok(value)
+    : err(toolError('invalid_config', 'AGENT_MAX_SESSIONS must be a whole number from 1 to 1000.'));
+}
+
 function loadToken(env: Readonly<Record<string, string | undefined>>, name: string): Result<McpToken, ErrorEnvelope> {
   const raw = env[name]?.trim();
   if (!raw) return err(toolError('invalid_config', `${name} is not set.`));

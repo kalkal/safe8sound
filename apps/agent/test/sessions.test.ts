@@ -1,7 +1,7 @@
 import './no-network.js';
 import { HomeIdSchema, ok, type HomeId } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { loadInvokeToken } from '../src/config.js';
+import { loadInvokeToken, loadMaxSessions } from '../src/config.js';
 import type { HomeAgent } from '../src/invocations.js';
 import { homeAgents } from '../src/sessions.js';
 
@@ -37,5 +37,16 @@ describe('loadInvokeToken: the token sim-api uses to invoke the agent, separate 
 
   it.each([{}, { AGENT_INVOKE_TOKEN: 'short' }])('fails with invalid_config on %j', (env) => {
     expect(loadInvokeToken(env)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+});
+
+describe('loadMaxSessions: how many sandbox homes stay in memory (review of #121)', () => {
+  it('reads AGENT_MAX_SESSIONS, 50 by default', () => {
+    expect(loadMaxSessions({})).toEqual({ ok: true, value: 50 });
+    expect(loadMaxSessions({ AGENT_MAX_SESSIONS: '10' })).toEqual({ ok: true, value: 10 });
+  });
+
+  it.each(['abc', '0', '-3', '1.5', '100000', ''])('fails with invalid_config on %j (NaN would mean no limit)', (value) => {
+    expect(loadMaxSessions({ AGENT_MAX_SESSIONS: value })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 });

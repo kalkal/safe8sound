@@ -1,16 +1,24 @@
 import { err, ok, toolError } from '@cold-reserve/contracts';
+import { jsonLineSink, loggerTo } from '@cold-reserve/core';
 import { createApp } from './app.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules, createDynamoStoreFactory } from './compose.js';
-import { createLambdaHandler, installProcessHooks, storeErrorLogger } from './lambda.js';
+import { createLambdaHandler, installProcessHooks, storeErrorLogger, toLogEntry, type LambdaLogEntry } from './lambda.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 import { readParameter } from './ssm.js';
 import { stormModeWiring } from './storm-mode-config.js';
 
 // Lambda entry: the client tokens come from SSM (SecureString) named by MCP_CLIENTS_PARAMETER;
 // state lives in the single DynamoDB table named by STATE_TABLE_NAME.
-const log = (entry: object) => {
-  console.error(JSON.stringify(entry));
+// One sink for every line: one JSON object per line on stdout, so the InternalErrors metric filter
+// finds `category` at the top level (reviews of #134 and #139).
+const logger = loggerTo(
+  jsonLineSink((text) => {
+    process.stdout.write(text);
+  }),
+);
+const log = (entry: LambdaLogEntry) => {
+  logger.log(toLogEntry(entry));
 };
 
 installProcessHooks(process, {
@@ -49,7 +57,7 @@ export const handler = createLambdaHandler(
     // the tools without their ui:// cards. TODO(#104): ship the card bundle with the MCP Lambda.
     const app = createApp(
       { ...process.env, MCP_CLIENTS: clients.value },
-      { wallClock, logger: { log }, modules: modules.value, comfortPlan: comfortPlan.value, stormMode: stormMode.value },
+      { wallClock, logger, modules: modules.value, comfortPlan: comfortPlan.value, stormMode: stormMode.value },
     );
     return app.ok ? ok(app.value.handler) : app;
   },

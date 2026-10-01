@@ -33,7 +33,7 @@ export interface CardToolPort {
 }
 
 /** One line of the error log: never the demo code or the token. */
-export interface LogLine {
+export interface ErrorLine {
   ts: string;
   level: 'warn' | 'error';
   component: 'sim-api';
@@ -45,6 +45,20 @@ export interface LogLine {
   errorName?: string;
   causeName?: string;
 }
+
+/** One line per successful turn or card action (review of #110): never the question or the answer. */
+export interface InfoLine {
+  ts: string;
+  level: 'info';
+  component: 'sim-api';
+  event: 'turn_answered' | 'card_action_done';
+  correlationId: string;
+  codeId: string;
+  durationMs: number;
+  tool?: string;
+}
+
+export type LogLine = ErrorLine | InfoLine;
 
 export interface SimApiDeps {
   readonly agent: TurnAgentPort;
@@ -73,6 +87,11 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
     const origin = req.headers.get('origin');
     /** Set only for an allowlisted Origin: CORS headers go back to that origin alone. */
     const allowedOrigin = origin !== null && origins.has(origin) ? origin : undefined;
+    const startedMs = deps.clock.now();
+    const info = (line: Pick<InfoLine, 'event' | 'codeId' | 'tool'>) => {
+      const now = deps.clock.now();
+      deps.logger.log({ ts: new Date(now).toISOString(), level: 'info', component: 'sim-api', correlationId, durationMs: now - startedMs, ...line });
+    };
     const fail = (error: ErrorEnvelope, status?: HttpErrorStatus, headers: Record<string, string> = {}, codeId?: string) => {
       if (LOGGED.has(error.category)) {
         deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: error.category === 'internal' ? 'error' : 'warn', component: 'sim-api', code: error.code, category: error.category, correlationId, ...(codeId === undefined ? {} : { codeId }) });
@@ -115,15 +134,11 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       if (path === '/v1/session') {
         const request = SessionRequestSchema.safeParse(body);
         if (!request.success) return fail(toolError('invalid_input', 'Send {"code": "<demo code>"}.'));
-        if (!(await quota.codeAttemptsLeft(meta.clientIp))) {
-          const limited = quota.tooManyAttempts();
-          if (!limited.ok) return fail(limited.error);
-        }
+        // One atomic count per attempt BEFORE the code is compared (review of #110): concurrent wrong
+        // codes cannot slip past the cap between a check and a later count.
+        if (!(await quota.codeAttempt(meta.clientIp))) return fail(quota.tooManyAttempts());
         const codeId = config.demoCodes.get(createHash('sha256').update(request.data.code).digest('hex'));
-        if (codeId === undefined) {
-          await quota.failedCode(meta.clientIp);
-          return fail(toolError('invalid_demo_code', 'That demo code is not valid.'));
-        }
+        if (codeId === undefined) return fail(toolError('invalid_demo_code', 'That demo code is not valid.'));
         const iat = Math.floor(deps.clock.now() / 1000);
         const claims: DemoClaims = { sub: codeId, home: SandboxHomeIdSchema.parse(`demo#${deps.randomHex()}`), iat, exp: iat + config.tokenTtlS, jti: randomUUID() };
         const reply: SessionReply = { token: signToken(claims, signingKey), expiresAt: new Date(claims.exp * 1000).toISOString() };
@@ -143,7 +158,9 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         const allowed = await quota.turn(codeId);
         if (!allowed.ok) return fail(allowed.error, undefined, {}, codeId);
         const reply = await deps.agent.ask({ home, question: request.data.question, correlationId });
-        return reply.ok ? respond(200, reply.value) : fail(reply.error, undefined, {}, codeId);
+        if (!reply.ok) return fail(reply.error, undefined, {}, codeId);
+        info({ event: 'turn_answered', codeId });
+        return respond(200, reply.value);
       }
 
       const request = ToolCallRequestSchema.safeParse(body);
@@ -151,7 +168,9 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       const allowed = await quota.toolCall(codeId);
       if (!allowed.ok) return fail(allowed.error, undefined, {}, codeId);
       const reply = await deps.tools.call({ home, request: request.data, correlationId });
-      return reply.ok ? respond(200, reply.value) : fail(reply.error, undefined, {}, codeId);
+      if (!reply.ok) return fail(reply.error, undefined, {}, codeId);
+      info({ event: 'card_action_done', codeId, tool: request.data.name });
+      return respond(200, reply.value);
     };
 
     try {

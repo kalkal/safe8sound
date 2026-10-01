@@ -7,9 +7,13 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "start": "node --import tsx src/local.ts"
+  },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",
     "@cold-reserve/core": "workspace:*",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@modelcontextprotocol/sdk": "1.30.1"
   }
 }

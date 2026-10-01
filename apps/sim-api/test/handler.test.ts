@@ -17,7 +17,7 @@ function config(over: Record<string, string> = {}): SimApiConfig {
     SIM_TOKEN_KEYS: `k1:${KEY.toString('base64url')}`,
     SIM_ALLOWED_ORIGINS: ORIGIN,
     SIM_LIMIT_TURNS_PER_CODE: '2',
-    SIM_LIMIT_FAILED_CODES_PER_IP_HOUR: '2',
+    SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR: '3',
     ...over,
   });
   if (!result.ok) throw new Error(result.error.message);
@@ -98,7 +98,18 @@ describe('POST /v1/session: a demo code for a 1-hour token', () => {
     const first = await problem(await send('/v1/session', wrong), 401, 'invalid_demo_code');
     expect(first.detail).not.toMatch(/judges/);
     await problem(await send('/v1/session', wrong), 401, 'invalid_demo_code');
+    await problem(await send('/v1/session', wrong), 401, 'invalid_demo_code');
     await problem(await send('/v1/session', { body: { code: CODE } }), 429, 'demo_quota_exceeded');
+  });
+});
+
+describe('POST /v1/session: concurrent attempts (review of #110)', () => {
+  it('never lets more wrong codes through than the cap, even sent at the same time', async () => {
+    const { send } = setup();
+    const replies = await Promise.all(Array.from({ length: 8 }, () => send('/v1/session', { body: { code: 'not-the-demo-code-at-all' } })));
+    const statuses = replies.map((r) => r.status).sort();
+    expect(statuses.filter((s) => s === 401)).toHaveLength(3);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(5);
   });
 });
 
@@ -110,6 +121,18 @@ describe('POST /v1/turns: the agent behind the token', () => {
     expect(await res.json()).toEqual({ text: 'Your battery is at 45%.' });
     expect(asked).toEqual([{ home: 'demo#01aaaaaaaaaaaaaa', question: "What's my battery level?", correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60' }]);
     expect(res.headers.get('x-correlation-id')).toBe('0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60');
+  });
+
+  it('logs one info line per answered turn and per card action, with the correlation id (review of #110)', async () => {
+    const { send, session, logs } = setup();
+    const token = await session();
+    await send('/v1/turns', { token, body: { question: 'Hi' }, headers: { 'x-correlation-id': '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60' } });
+    await send('/v1/tools/call', { token, body: { name: 'apply_plan', arguments: { planId: 'plan-0001' } } });
+    expect(logs).toMatchObject([
+      { level: 'info', component: 'sim-api', event: 'turn_answered', correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60', codeId: 'judges', durationMs: 0 },
+      { level: 'info', component: 'sim-api', event: 'card_action_done', codeId: 'judges', tool: 'apply_plan' },
+    ]);
+    expect(JSON.stringify(logs)).not.toContain('Hi');
   });
 
   it('keeps each visitor in their own sandbox: a token never reaches another home', async () => {
@@ -281,7 +304,6 @@ describe('last resort (review of #110): a throw never escapes the handler', () =
   it('keeps the cause chain by name: a wrapped store error logs both names', async () => {
     const failing: QuotaStore = {
       consume: () => Promise.reject(new Error('quota store down', { cause: Object.assign(new Error('x'), { name: 'ProvisionedThroughputExceededException' }) })),
-      peek: () => Promise.resolve(0),
     };
     const { send, logs } = setup({}, undefined, { quota: failing });
     const token = signToken({ sub: 'judges', home: 'demo#01aaaaaaaaaaaaaa' as HomeId, iat: NOW / 1000, exp: NOW / 1000 + 3600, jti: 'j' }, { kid: 'k1', material: KEY });
@@ -290,7 +312,7 @@ describe('last resort (review of #110): a throw never escapes the handler', () =
   });
 
   it('maps a throwing quota store on /v1/session to 500 too', async () => {
-    const throwing: QuotaStore = { consume: () => Promise.reject(new RangeError('x')), peek: () => Promise.reject(new RangeError('x')) };
+    const throwing: QuotaStore = { consume: () => Promise.reject(new RangeError('x')) };
     const { send } = setup({}, undefined, { quota: throwing });
     await problem(await send('/v1/session', { body: { code: CODE } }), 500, 'unexpected_error');
   });

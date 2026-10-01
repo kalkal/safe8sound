@@ -33,7 +33,7 @@ const NumbersSchema = z.object({
   turnsPerCodePerDay: int(1, 10_000),
   turnsGlobalPerDay: int(1, 100_000),
   toolCallsPerCodePerDay: int(1, 10_000),
-  failedCodesPerIpPerHour: int(1, 1000),
+  codeAttemptsPerIpPerHour: int(1, 1000),
   maxBodyBytes: int(256, 1_048_576),
 });
 
@@ -79,7 +79,7 @@ export function loadSimApiConfig(env: Readonly<Record<string, string | undefined
     turnsPerCodePerDay: env['SIM_LIMIT_TURNS_PER_CODE'] ?? '20',
     turnsGlobalPerDay: env['SIM_LIMIT_TURNS_GLOBAL'] ?? '30',
     toolCallsPerCodePerDay: env['SIM_LIMIT_TOOL_CALLS_PER_CODE'] ?? '20',
-    failedCodesPerIpPerHour: env['SIM_LIMIT_FAILED_CODES_PER_IP_HOUR'] ?? '10',
+    codeAttemptsPerIpPerHour: env['SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR'] ?? '10',
     maxBodyBytes: env['SIM_MAX_BODY_BYTES'] ?? '16384',
   });
   if (!numbers.success) return invalid(`A SIM_* number is not valid: ${numbers.error.issues.map((i) => i.path.join('.')).join(', ')}.`);

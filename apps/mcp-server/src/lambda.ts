@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { CORRELATION_ID_HEADER, PROBLEM_JSON_CONTENT_TYPE, categoryOf, correlationIdFrom, toProblemDetails, toolError, type ErrorCategory, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { CORRELATION_ID_HEADER, PROBLEM_JSON_CONTENT_TYPE, categoryOf, correlationIdFrom, toProblemDetails, toolError, type ErrorCategory, type ErrorEnvelope, type LogEntry, type Result } from '@cold-reserve/contracts';
+import { jsonLineSink, loggerTo } from '@cold-reserve/core';
 import type { StoreErrorEvent } from '@cold-reserve/store-dynamodb';
 import type { McpHandler } from './handler.js';
 
@@ -41,8 +42,37 @@ export interface LambdaLogEntry {
 const levelOf = (category: ErrorCategory): LambdaLogEntry['level'] => (category === 'internal' ? 'error' : 'warn');
 const nameOf = (e: unknown): string => (e instanceof Error ? e.name : typeof e);
 
+/**
+ * A Lambda line in the shared LogEntry shape of L1 (#111): the store fields go under `details`, the code is
+ * the message when we have none, and a line without a request (process hooks) says `none`.
+ */
+export function toLogEntry(e: LambdaLogEntry): LogEntry {
+  const details = {
+    ...(e.operation === undefined ? {} : { operation: e.operation }),
+    ...(e.httpStatus === undefined ? {} : { httpStatus: e.httpStatus }),
+    ...(e.requestId === undefined ? {} : { requestId: e.requestId }),
+  };
+  return {
+    ts: e.ts,
+    level: e.level,
+    component: e.component,
+    message: e.message ?? e.code,
+    correlationId: e.correlationId ?? 'none',
+    code: e.code,
+    category: e.category,
+    ...(e.errorName === undefined ? {} : { errorName: e.errorName }),
+    ...(Object.keys(details).length === 0 ? {} : { details }),
+  };
+}
+
+// The one sink of the Lambda: a JSON line on stdout (reviews of #134 and #139).
+const stdoutLogger = loggerTo(
+  jsonLineSink((text) => {
+    process.stdout.write(text);
+  }),
+);
 const defaultLog = (entry: LambdaLogEntry) => {
-  console.error(JSON.stringify(entry));
+  stdoutLogger.log(toLogEntry(entry));
 };
 
 function toRequest(event: FunctionUrlEvent): Request {

@@ -258,6 +258,7 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                   "store_unavailable",
                   "config_unavailable",
                   "demo_quota_exceeded",
+                  "turn_in_progress",
                   "unexpected_error",
                   "output_schema_violation",
                   "invalid_config",

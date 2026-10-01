@@ -159,6 +159,10 @@ describe('mcp stack: the MCP server Lambda', () => {
     });
   });
 
+  it('logs in JSON format, so our JSON lines on stdout reach CloudWatch as they are (review of #134)', () => {
+    tpl('cold-reserve-dev-mcp').hasResourceProperties('AWS::Lambda::Function', { LoggingConfig: Match.objectLike({ LogFormat: 'JSON' }) });
+  });
+
   it('counts log lines of category "internal" and alarms on the first one (#112)', () => {
     const t = tpl('cold-reserve-dev-mcp');
     t.hasResourceProperties('AWS::Logs::MetricFilter', {

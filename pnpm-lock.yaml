@@ -373,6 +373,9 @@ importers:
       '@cold-reserve/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@modelcontextprotocol/sdk':
+        specifier: 1.30.1
+        version: 1.30.1(supports-color@10.2.2)(zod@4.6.5)
       zod:
         specifier: 4.6.5
         version: 4.6.5

@@ -25,6 +25,8 @@ export interface McpSession {
   listTools(): Promise<McpToolInfo[]>;
   /** `correlationId` is the user turn's id: sent as x-correlation-id with the request. */
   callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal, correlationId?: string): Promise<McpCallResult>;
+  /** Ends the session (the real client); a fake may omit it. */
+  close?(): Promise<void>;
 }
 
 /** The tools whose results the simulator shows as cards (TurnReply.cards). */
@@ -103,7 +105,7 @@ export function withCorrelationHeader(fetchFn: (url: string | URL, init?: Reques
 }
 
 /** A real MCP session over Streamable HTTP to config.mcpUrl. */
-export async function connectMcp(config: Pick<AgentConfig, 'mcpUrl'>, token: McpToken, home: HomeId | undefined): Promise<McpSession & { close(): Promise<void> }> {
+export async function connectMcp(config: Pick<AgentConfig, 'mcpUrl'>, token: McpToken, home: HomeId | undefined): Promise<McpSession> {
   const client = new Client({ name: 'cold-reserve-agent', version: '0.0.0' });
   let current: string | undefined;
   const transport = new StreamableHTTPClientTransport(new URL(config.mcpUrl), {

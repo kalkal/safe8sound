@@ -20,7 +20,7 @@ Every error carries a stable machine code (`snake_case`), a category and a short
 | `unauthorized` / `forbidden` | `missing_token`, `wrong_client`, `origin_not_allowed`, `demo_disabled` | configuration | no |
 | `conflict` | `plan_already_applied` (idempotent success, not a failure) | nobody: return the original outcome | n/a |
 | `dependency_unavailable` | `home_data_stale`, `split_cloud_unreachable`, `forecast_unavailable`, `bedrock_throttled`, `polly_unavailable`, `config_unavailable` (SSM at startup) | transient | yes, with backoff, then degrade |
-| `rate_limited` | `demo_quota_exceeded` | wait | after `retryAfter` |
+| `rate_limited` | `demo_quota_exceeded`, `turn_in_progress` (one question at a time per home) | wait | after `retryAfter` |
 | `internal` | `unexpected_error` | us (bug) | no; alert |
 
 ## 3. Per layer

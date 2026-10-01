@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { ArnFormat, CfnOutput, Duration, RemovalPolicy, Stack, Validations, type StackProps } from 'aws-cdk-lib';
 import { ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
-import { Architecture, FunctionUrlAuthType, ParamsAndSecretsLayerVersion, ParamsAndSecretsVersions, Runtime } from 'aws-cdk-lib/aws-lambda';
+import { Architecture, FunctionUrlAuthType, LoggingFormat, ParamsAndSecretsLayerVersion, ParamsAndSecretsVersions, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { FilterPattern, LogGroup, MetricFilter, type CfnLogGroup } from 'aws-cdk-lib/aws-logs';
 import type { Construct } from 'constructs';
@@ -57,6 +57,8 @@ export class McpStack extends Stack {
       depsLockFilePath: join(ROOT, 'pnpm-lock.yaml'),
       runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,
+      // JSON format: our JSON lines on stdout reach CloudWatch unchanged (review of #134).
+      loggingFormat: LoggingFormat.JSON,
       memorySize: mcp.memoryMb,
       timeout: Duration.seconds(mcp.timeoutSeconds),
       role,
