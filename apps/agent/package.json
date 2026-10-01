@@ -8,7 +8,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "evals": "node --import tsx scripts/evals.ts"
+    "evals": "node --import tsx scripts/evals.ts",
+    "start": "node --import tsx src/local.ts"
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",

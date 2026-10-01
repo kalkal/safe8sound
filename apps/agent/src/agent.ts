@@ -2,6 +2,7 @@ import { AfterToolCallEvent, Agent, BeforeInvocationEvent, BeforeToolCallEvent, 
 import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import type { AgentConfig } from './config.js';
 import { classifyFailure } from './failure.js';
+import { logLine, type AgentLogEntry } from './log.js';
 import { buildSystemPrompt } from './prompts.js';
 
 export interface AgentTurn {
@@ -13,17 +14,11 @@ export interface AgentTurn {
   readonly toolResults: readonly string[];
 }
 
-/** One line for the error log: the code and the error type only, never the message (it may hold internals). */
-export interface AgentLogEntry {
-  readonly code: ErrorEnvelope['code'];
-  readonly errorName: string;
-  /** HTTP status when the MCP server answered with one (401, 503, ...). */
-  readonly httpStatus?: number;
-}
+export type { AgentLogEntry } from './log.js';
 
 export interface ColdReserveAgent {
   /** Expected failures (model or MCP server unreachable) come back as values. */
-  ask(question: string): Promise<Result<AgentTurn, ErrorEnvelope>>;
+  ask(question: string, opts?: { correlationId?: string }): Promise<Result<AgentTurn, ErrorEnvelope>>;
   historyLength(): number;
 }
 
@@ -64,7 +59,8 @@ export function createAgent(deps: { config: AgentConfig; model: Model; tools: To
   });
 
   return {
-    async ask(question) {
+    async ask(question, opts = {}) {
+      const { correlationId } = opts;
       const deadline = new AbortController();
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timedOut = new Promise<'timeout'>((resolve) => {
@@ -81,14 +77,15 @@ export function createAgent(deps: { config: AgentConfig; model: Model; tools: To
         // The model or the MCP server failed: the caller degrades (scripted answer, plan §9.2).
         const failure = classifyFailure(e);
         if (failure.kind === 'bug') throw failure.error;
-        deps.log?.({ code: failure.error.code, errorName: e instanceof Error ? e.name : typeof e, ...(failure.httpStatus === undefined ? {} : { httpStatus: failure.httpStatus }) });
+        deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId, httpStatus: failure.httpStatus }));
         return err(failure.error);
       } finally {
         clearTimeout(timer);
       }
       if (result === 'timeout' || result.stopReason === 'cancelled') {
-        deps.log?.({ code: 'agent_timeout', errorName: 'TurnDeadline' });
-        return err(toolError('agent_timeout', "The assistant took too long to answer. Try again in a moment."));
+        const timeout = toolError('agent_timeout', 'The assistant took too long to answer. Try again in a moment.');
+        deps.log?.(logLine(timeout, 'TurnDeadline', { correlationId }));
+        return err(timeout);
       }
       const text = result.lastMessage.content.map((b) => (b.type === 'textBlock' ? b.text : '')).join('');
       return ok({ text, stopReason: result.stopReason, toolCalls: [...ran], toolResults: [...results] });

@@ -102,6 +102,25 @@ describe('createAgent on the Strands loop with the fake model', () => {
     expect(JSON.stringify(turn)).not.toContain('/secret/path');
   });
 
+  it('logs a failed turn in the shared shape, with the correlation id of the turn', async () => {
+    const logs: unknown[] = [];
+    const model = new FakeModel(() => {
+      throw new ModelError('down');
+    });
+    await createAgent({ config: CONFIG, model, tools: [], log: (e) => logs.push(e) }).ask('Hi', { correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60' });
+    expect(logs).toEqual([
+      {
+        ts: expect.any(String) as unknown,
+        level: 'warn',
+        component: 'agent',
+        code: 'agent_unavailable',
+        category: 'dependency_unavailable',
+        correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60',
+        errorName: 'ModelError',
+      },
+    ]);
+  });
+
   it('rethrows a bug (TypeError) instead of hiding it as a failed turn', async () => {
     const model = new FakeModel(() => {
       throw new TypeError('policy is not a function');

@@ -83,8 +83,17 @@ export class McpToken {
 
 /** AGENT_MCP_TOKEN from the environment (locally .env; on AgentCore a secret, after S2). */
 export function loadMcpToken(env: Readonly<Record<string, string | undefined>>): Result<McpToken, ErrorEnvelope> {
-  const raw = env['AGENT_MCP_TOKEN']?.trim();
-  if (!raw) return err(toolError('invalid_config', 'AGENT_MCP_TOKEN is not set.'));
-  if (raw.length < MIN_TOKEN_LENGTH) return err(toolError('invalid_config', `AGENT_MCP_TOKEN is shorter than ${String(MIN_TOKEN_LENGTH)} characters.`));
+  return loadToken(env, 'AGENT_MCP_TOKEN');
+}
+
+/** AGENT_INVOKE_TOKEN: what sim-api presents to invoke the agent, separate from the MCP token (#101). */
+export function loadInvokeToken(env: Readonly<Record<string, string | undefined>>): Result<McpToken, ErrorEnvelope> {
+  return loadToken(env, 'AGENT_INVOKE_TOKEN');
+}
+
+function loadToken(env: Readonly<Record<string, string | undefined>>, name: string): Result<McpToken, ErrorEnvelope> {
+  const raw = env[name]?.trim();
+  if (!raw) return err(toolError('invalid_config', `${name} is not set.`));
+  if (raw.length < MIN_TOKEN_LENGTH) return err(toolError('invalid_config', `${name} is shorter than ${String(MIN_TOKEN_LENGTH)} characters.`));
   return ok(new McpToken(raw));
 }
