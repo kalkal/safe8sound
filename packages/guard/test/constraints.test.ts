@@ -274,6 +274,20 @@ describe('safe_room_comfort', () => {
     expect(dryAirWarning(ctx({ input: paced, points: [point(60, { rh: 45 }), point(65, { rh: 39 })] }))?.code).toBe('dry_air');
   });
 
+  it('dry air: only after the grace period, only the safe room, strictly under the minimum, and the lowest value', () => {
+    const warn = (points: ProjectionPoint[]) => dryAirWarning(ctx({ points }));
+    expect(warn([point(55, { rh: 35 })])).toBeUndefined();
+    expect(warn([point(60, { rh: 35 })])?.code).toBe('dry_air');
+    expect(warn([point(60, { rh: 35, room: 'living' })])).toBeUndefined();
+    expect(warn([point(60, { rh: 40 })])).toBeUndefined();
+    expect(warn([point(60, { rh: 38 }), point(65, { rh: 35 })])?.message).toContain('down to 35 %, under 40 %');
+  });
+
+  it('dry air names the safe room the person chose', () => {
+    const living = input({ season: 'cooling', preferences: PreferencesSchema.parse({ ...examplePreferences(), safeRoomId: 'living', roomPriority: ['living', 'bedroom-1', 'study'] }) });
+    expect(dryAirWarning(ctx({ input: living, points: [point(60, { rh: 35, room: 'living' })] }))?.message).toMatch(/^The air in the Living room is dry/);
+  });
+
   it('does not blame a plan that cools for air that is dry anyway: the plan cannot raise the humidity', () => {
     // Cooling, not drying: a room under the minimum is the weather's doing (a warning, not a refusal).
     expect(check('safe_room_comfort', ctx({ points: [point(60, { rh: 35 })] })).ok).toBe(true);

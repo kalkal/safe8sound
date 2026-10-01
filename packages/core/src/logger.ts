@@ -17,9 +17,10 @@ export function causeFields(cause: unknown, opts: { withStack: boolean }): { err
   if (!(cause instanceof Error)) return { errorName: cause === null ? 'null' : typeof cause };
   const errorName = (cause.name || cause.constructor.name || 'Error').slice(0, 80);
   if (!opts.withStack || cause.stack === undefined) return { errorName };
-  // The stack starts with "Name: message", and the message may span lines: keep only the frames, under the name.
-  const frames = cause.stack.indexOf('\n    at ');
-  const stack = frames < 0 ? errorName : `${errorName}${cause.stack.slice(frames)}`;
+  // V8 writes the header as "Name: message" (or "Name" when the message is empty), and the message may hold
+  // anything, frames included: strip exactly that header, and keep nothing when it is not there.
+  const header = cause.message === '' ? cause.name : `${cause.name}: ${cause.message}`;
+  const stack = cause.stack.startsWith(header) ? `${errorName}${cause.stack.slice(header.length)}` : errorName;
   return { errorName, stack: stack.slice(0, STACK_MAX) };
 }
 

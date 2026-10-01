@@ -12,7 +12,10 @@ import {
   type Result,
   type Snapshot,
 } from '@cold-reserve/contracts';
-import { resolveOrigin, type Clock, type HomeDataSource } from '@cold-reserve/core';
+import { causeFields, resolveOrigin, type Clock, type HomeDataSource } from '@cold-reserve/core';
+
+/** What kind of thing was thrown: the name, never the message (the shared rule of the logger). */
+const nameOf = (cause: unknown): string => causeFields(cause, { withStack: false }).errorName;
 
 // Strategy + Decorator (plan §1 principle 3, §9.2): the real home first, the simulator when the
 // real data is older than `maxStaleness` or missing, and the switch is always declared:
@@ -27,8 +30,12 @@ export type SourceEvent =
       readonly lastLiveAt?: string;
       /** Why the primary was not used. */
       readonly reason: ErrorCode;
+      /** The name of what the primary threw, when it threw (never its text, #113). */
+      readonly errorName?: string;
     }
-  | { readonly type: 'HOME_REACHABLE'; readonly at: string };
+  | { readonly type: 'HOME_REACHABLE'; readonly at: string }
+  /** The simulator itself failed for a reason a retry cannot fix: a bug or a configuration gap (#113). */
+  | { readonly type: 'FALLBACK_FAILED'; readonly at: string; readonly code: ErrorCode; readonly errorName?: string };
 
 export interface FallbackSourceOptions {
   readonly primary: HomeDataSource;
@@ -44,12 +51,13 @@ export interface FallbackSourceOptions {
 const DEFAULT_MAX_STALENESS = minutes(15);
 const DEFAULT_PRIMARY_TIMEOUT_MS = 2_000;
 
-type PrimaryOutcome = { readonly ok: true; readonly snapshot: Snapshot } | { readonly ok: false; readonly reason: ErrorCode };
+type PrimaryOutcome = { readonly ok: true; readonly snapshot: Snapshot } | { readonly ok: false; readonly reason: ErrorCode; readonly errorName?: string };
 
 export class FallbackSource implements HomeDataSource {
   readonly #opts: FallbackSourceOptions;
   #lastLiveAt: string | undefined;
   #link: HomeLink | undefined;
+  #fallbackErrorName: string | undefined;
 
   constructor(opts: FallbackSourceOptions) {
     this.#opts = opts;
@@ -74,11 +82,18 @@ export class FallbackSource implements HomeDataSource {
     const reason: ErrorCode = primary.ok ? 'home_data_stale' : primary.reason;
     const lastLiveAt = this.#lastLiveAt;
     if (this.#link === undefined || this.#link === 'ok') {
-      this.#emit({ type: 'HOME_UNREACHABLE', at, homeLink: link, ...(lastLiveAt === undefined ? {} : { lastLiveAt }), reason });
+      const errorName = primary.ok ? undefined : primary.errorName;
+      this.#emit({ type: 'HOME_UNREACHABLE', at, homeLink: link, ...(lastLiveAt === undefined ? {} : { lastLiveAt }), reason, ...(errorName === undefined ? {} : { errorName }) });
     }
     this.#link = link;
 
     const fallback = await this.#readFallback();
+    // A simulator that fails for a reason a retry cannot fix (a bug, a missing EPS load) is not stale home data:
+    // its own error goes back, not retryable, and the event names it.
+    if (!fallback.ok && !fallback.error.retryable) {
+      this.#emit({ type: 'FALLBACK_FAILED', at, code: fallback.error.code, ...(this.#fallbackErrorName === undefined ? {} : { errorName: this.#fallbackErrorName }) });
+      return fallback;
+    }
     if (!fallback.ok) {
       const ageSeconds = lastLiveAt === undefined ? undefined : Math.max(0, Math.round((nowMs - epochMs(lastLiveAt)) / 1000));
       return err(
@@ -108,8 +123,8 @@ export class FallbackSource implements HomeDataSource {
     });
     const read = this.#opts.primary.snapshot().then(
       (r): PrimaryOutcome => (r.ok ? { ok: true, snapshot: r.value } : { ok: false, reason: r.error.code }),
-      // A throwing source is a bug: handled here by the fallback and reported through the event.
-      (): PrimaryOutcome => ({ ok: false, reason: 'unexpected_error' }),
+      // A throwing source is a bug: handled here by the fallback and reported through the event, by name.
+      (cause: unknown): PrimaryOutcome => ({ ok: false, reason: 'unexpected_error', errorName: nameOf(cause) }),
     );
     try {
       return await Promise.race([read, timeout]);
@@ -119,9 +134,11 @@ export class FallbackSource implements HomeDataSource {
   }
 
   async #readFallback(): Promise<Result<Snapshot, ErrorEnvelope>> {
+    this.#fallbackErrorName = undefined;
     try {
       return await this.#opts.fallback.snapshot();
-    } catch {
+    } catch (cause) {
+      this.#fallbackErrorName = nameOf(cause);
       return err(toolError('unexpected_error', 'The simulator failed.'));
     }
   }

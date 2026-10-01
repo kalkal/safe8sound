@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { GROUPS, groupConfig, mutationScore, selectGroups } from '../src/mutation.mjs';
 
 const report = (statuses: string[]) => ({ files: { 'a.ts': { mutants: statuses.map((status, i) => ({ id: String(i), status })) } } });
@@ -27,6 +27,21 @@ describe('groups', () => {
       expect(g.tests.length).toBeGreaterThan(0);
     }
     expect(new Set(GROUPS.map((g) => g.name)).size).toBe(GROUPS.length);
+  });
+
+  it('run a source against its own test file whenever there is one (guard-night once missed night.test.ts)', () => {
+    for (const g of GROUPS) {
+      for (const source of g.mutate) {
+        const own = source.replace('/src/', '/test/').replace(/\.ts$/, '.test.ts');
+        if (existsSync(own)) expect(g.tests, `${g.name}: ${source}`).toContain(own);
+      }
+    }
+  });
+
+  it('measure every guard source', () => {
+    const measured = new Set(GROUPS.flatMap((g) => g.mutate));
+    const guard = readdirSync('packages/guard/src').filter((f) => f.endsWith('.ts') && f !== 'index.ts').map((f) => `packages/guard/src/${f}`);
+    expect(guard.filter((f) => !measured.has(f))).toEqual([]);
   });
 
   it('build a command-runner config that runs the group tests with the Stryker Vitest config', () => {

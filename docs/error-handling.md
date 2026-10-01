@@ -88,6 +88,8 @@ A small CLI (`pnpm errors [--since 24h] [--code ...]`) reads the database log fo
 - The correlation id has one definition: `CORRELATION_ID_HEADER` and `CorrelationIdSchema` (a UUID). `correlationIdFrom(header, fresh)` keeps a well-formed id and makes a fresh one otherwise.
 - A store opened with `storeFor(homeId, { correlationId })` reports its failures with that id (`StoreErrorEvent.correlationId`).
 
+**The home's data source (#113).** `FallbackSource` switches to the simulator when the home's data is stale or lost, and says so in the log: a warning on the switch, with the reason, its category and the name of what was thrown (never its text); an info line when the home answers again. A simulator that fails for a reason a retry cannot fix (a bug, a missing EPS load) is an error with its own code, not a retryable `home_data_stale`.
+
 **Reading what is stored (R7).** Inputs stay strict. Stored items are read with `readStored`, which drops the fields this version does not know at any depth, and with `isReadableSchemaVersion`, which accepts every version up to the current one. So an additive field never breaks an older reader, and a newer version is still refused.
 
 ## 7. Tests (unit first, then code, then E2E)

@@ -1,9 +1,10 @@
-import { HomeStatusSchema, ErrorEnvelopeSchema, err, toolError } from '@cold-reserve/contracts';
+import { HomeStatusSchema, ErrorEnvelopeSchema, LogEntrySchema, err, toolError } from '@cold-reserve/contracts';
 import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
-import { createApp, type AppOptions } from '../src/app.js';
+import type { SourceEvent } from '@cold-reserve/source-fallback';
+import { createApp, logSourceEvent, type AppOptions } from '../src/app.js';
 import type { LogEntry } from '../src/handler.js';
-import { HOME_TOKEN, TOKEN, callTool, post, toolResult, toolsList } from './helpers.js';
+import { HOME_TOKEN, TOKEN, callTool, homeId, post, toolResult, toolsList } from './helpers.js';
 
 const WALL = Date.UTC(2026, 8, 29, 7, 0, 0);
 const SANDBOX_TOKEN = 's'.repeat(32);
@@ -63,6 +64,35 @@ describe('get_home_status on the real home (FallbackSource, no live data yet)', 
     const status = HomeStatusSchema.parse((await toolResult(res)).structuredContent);
     expect(status).toMatchObject({ homeId: 'home', homeLink: 'lost', controlAvailability: 'manual_only' });
     expect([status.origin.energy, status.origin.rooms, status.origin.weather]).toEqual(['simulated', 'simulated', 'simulated']);
+  });
+
+  it('logs the switch to the simulator once, in the shared log line (#113)', async () => {
+    const { handler, logs } = app();
+    await post(handler, callTool('get_home_status', {}), { authorization: `Bearer ${HOME_TOKEN}` });
+    await post(handler, callTool('get_home_status', {}), { authorization: `Bearer ${HOME_TOKEN}` });
+    const switches = logs.filter((l) => l.details?.['event'] === 'HOME_UNREACHABLE');
+    expect(switches).toHaveLength(1);
+    expect(LogEntrySchema.parse(switches[0])).toMatchObject({ level: 'warn', component: 'mcp-server', homeId: 'home', details: { homeLink: 'lost' } });
+  });
+});
+
+describe('logSourceEvent (#113)', () => {
+  const at = '2026-07-15T12:00:00.000Z';
+  const lines = (event: SourceEvent) => {
+    const logs: LogEntry[] = [];
+    logSourceEvent({ log: (e) => logs.push(e) }, homeId('home'))(event);
+    return logs.map((l) => LogEntrySchema.parse(l));
+  };
+
+  it('a lost home is a warning with the reason, its category, and the name of what was thrown', () => {
+    expect(lines({ type: 'HOME_UNREACHABLE', at, homeLink: 'lost', reason: 'unexpected_error', errorName: 'TypeError' })[0]).toMatchObject({
+      ts: at, level: 'warn', code: 'unexpected_error', category: 'internal', errorName: 'TypeError', homeId: 'home',
+    });
+  });
+
+  it('a simulator failure is an error; the way back is an info line', () => {
+    expect(lines({ type: 'FALLBACK_FAILED', at, code: 'missing_eps_load' })[0]).toMatchObject({ level: 'error', code: 'missing_eps_load', category: 'internal' });
+    expect(lines({ type: 'HOME_REACHABLE', at })[0]).toMatchObject({ level: 'info' });
   });
 });
 

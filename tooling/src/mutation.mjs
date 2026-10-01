@@ -36,7 +36,16 @@ export const GROUPS = [
     mutate: ['packages/guard/src/context.ts', 'packages/guard/src/guard.ts'],
     tests: ['packages/guard/test/context.test.ts', 'packages/guard/test/guard.test.ts', 'packages/guard/test/scenarios.test.ts'],
   },
-  { name: 'guard-night', mutate: ['packages/guard/src/night.ts'], tests: ['packages/guard/test/guard.test.ts', 'packages/guard/test/guard.property.test.ts'] },
+  {
+    name: 'guard-night',
+    mutate: ['packages/guard/src/night.ts'],
+    tests: ['packages/guard/test/night.test.ts', 'packages/guard/test/guard.test.ts', 'packages/guard/test/guard.property.test.ts'],
+  },
+  {
+    name: 'guard-safe-until',
+    mutate: ['packages/guard/src/safe-until.ts', 'packages/guard/src/dry-air.ts'],
+    tests: ['packages/guard/test/safe-until.test.ts', 'packages/guard/test/constraints.test.ts', 'packages/guard/test/guard.test.ts'],
+  },
 ];
 
 /** @type {Readonly<Record<string, Counted>>} */

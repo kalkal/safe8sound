@@ -1,6 +1,6 @@
-import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
+import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, err, ok, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
 import { epsBaseLoadW, scenarioClock, utcDayStart, type Clock, type HomeDataSource } from '@cold-reserve/core';
-import { FallbackSource } from '@cold-reserve/source-fallback';
+import { FallbackSource, type SourceEvent } from '@cold-reserve/source-fallback';
 import { SCENARIO_IDS, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
 import { withCardResources, type CardDocuments } from './cards.js';
 import { loadConfig, type ServerConfig } from './config.js';
@@ -102,6 +102,38 @@ export function warnMissingEpsLoad(profiles: readonly HomeProfile[], logger: Log
   }
 }
 
+/**
+ * The real home's data source switching to the simulator and back, in the shared log (#113). Not tied to one
+ * request (the source is read by many), so the correlation id names the link.
+ */
+export function logSourceEvent(logger: Logger, homeId: HomeId): (event: SourceEvent) => void {
+  return (event) => {
+    const base = { ts: event.at, component: 'mcp-server', correlationId: 'home-link', homeId, details: { event: event.type } } as const;
+    if (event.type === 'HOME_REACHABLE') {
+      logger.log({ ...base, level: 'info', message: 'The home answers again: live data is back.' });
+    } else if (event.type === 'HOME_UNREACHABLE') {
+      logger.log({
+        ...base,
+        level: 'warn',
+        code: event.reason,
+        category: categoryOf(event.reason),
+        message: `The home's data is ${event.homeLink}: the simulator stands in, and every reply says so.`,
+        ...(event.errorName === undefined ? {} : { errorName: event.errorName }),
+        details: { event: event.type, homeLink: event.homeLink, ...(event.lastLiveAt === undefined ? {} : { lastLiveAt: event.lastLiveAt }) },
+      });
+    } else {
+      logger.log({
+        ...base,
+        level: 'error',
+        code: event.code,
+        category: categoryOf(event.code),
+        message: 'The simulator standing in for the home failed: no home data until it is fixed.',
+        ...(event.errorName === undefined ? {} : { errorName: event.errorName }),
+      });
+    }
+  };
+}
+
 export function createApp(env: Readonly<Record<string, string | undefined>>, opts: AppOptions): Result<App, ErrorEnvelope> {
   const config = loadConfig(env);
   if (!config.ok) return config;
@@ -135,7 +167,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   warnMissingEpsLoad([demo, home], opts.logger);
   const homes = new Map<HomeId, HomeEntry>([
     [DEMO, { source: demoSim, profile: demo, readOnly: false, levelSince }],
-    [HOME, { source: new FallbackSource({ primary: noLiveHome, fallback: homeSim, clock }), profile: home, readOnly: true, levelSince }],
+    [HOME, { source: new FallbackSource({ primary: noLiveHome, fallback: homeSim, clock, onEvent: logSourceEvent(opts.logger, HOME) }), profile: home, readOnly: true, levelSince }],
   ]);
   // TODO(#15): the cached Open-Meteo forecast; until then every home plans on the scenario weather.
   const forecasts = new Map<HomeId, () => ReturnType<SimulatorSource['forecast']>>([

@@ -123,7 +123,15 @@ describe('FallbackSource', () => {
     const { fb, events } = setup({ primary });
     const s = await value(fb);
     expect(s.homeLink).toBe('lost');
-    expect(events[0]).toMatchObject({ type: 'HOME_UNREACHABLE', homeLink: 'lost', reason: 'unexpected_error' });
+    expect(events[0]).toMatchObject({ type: 'HOME_UNREACHABLE', homeLink: 'lost', reason: 'unexpected_error', errorName: 'Error' });
+  });
+
+  it('keeps the name of what the primary threw, never its text (#113)', async () => {
+    const primary = sourceOf(() => Promise.reject(new TypeError('cannot read secret-token of undefined')));
+    const { fb, events } = setup({ primary });
+    await value(fb);
+    expect(events[0]).toMatchObject({ errorName: 'TypeError' });
+    expect(JSON.stringify(events)).not.toContain('secret-token');
   });
 
   it('times out a primary that hangs and falls back', async () => {
@@ -166,22 +174,38 @@ describe('FallbackSource', () => {
     expect(s.origin).toEqual({ energy: 'simulated', rooms: 'simulated', weather: 'simulated' });
   });
 
-  it('returns home_data_stale (retryable) when both sources fail', async () => {
+  it('returns home_data_stale (retryable) when both sources are down for a reason a retry can fix', async () => {
     const primary = sourceOf(() => Promise.resolve(ok(liveSnapshot(T0 - 40 * MIN))));
-    const fallback = sourceOf(() => Promise.resolve(err(toolError('unexpected_error', 'Simulator failed.'))));
+    const fallback = sourceOf(() => Promise.resolve(err(toolError('store_unavailable', 'The fallback store did not answer.'))));
     const r = await setup({ primary, fallback }).fb.snapshot();
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toMatchObject({ code: 'home_data_stale', category: 'dependency_unavailable', retryable: true, details: { ageSeconds: 40 * 60 } });
   });
 
-  it('returns home_data_stale without an age when the home was never reached and the fallback fails', async () => {
+  it('returns home_data_stale without an age when the home was never reached', async () => {
     const primary = sourceOf(() => Promise.resolve(err(toolError('home_not_found', 'Unknown home.'))));
-    const fallback = sourceOf(() => Promise.reject(new Error('boom')));
+    const fallback = sourceOf(() => Promise.resolve(err(toolError('store_unavailable', 'Down.'))));
     const r = await setup({ primary, fallback }).fb.snapshot();
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error.code).toBe('home_data_stale');
     expect(r.error.details).toBeUndefined();
+  });
+
+  it('a simulator bug is a bug, not stale data: its own error, not retryable, reported with its cause (#113)', async () => {
+    const primary = sourceOf(() => Promise.resolve(err(toolError('home_not_found', 'Unknown home.'))));
+    const broken = sourceOf(() => Promise.resolve(err(toolError('missing_eps_load', 'No EPS load.'))));
+    const a = setup({ primary, fallback: broken });
+    const r = await a.fb.snapshot();
+    expect(!r.ok && r.error).toMatchObject({ code: 'missing_eps_load', retryable: false });
+    expect(a.events.find((e) => e.type === 'FALLBACK_FAILED')).toMatchObject({ code: 'missing_eps_load' });
+
+    const throwing = sourceOf(() => Promise.reject(new RangeError('step out of range')));
+    const b = setup({ primary, fallback: throwing });
+    const t = await b.fb.snapshot();
+    expect(!t.ok && t.error).toMatchObject({ code: 'unexpected_error', retryable: false });
+    expect(b.events.find((e) => e.type === 'FALLBACK_FAILED')).toMatchObject({ code: 'unexpected_error', errorName: 'RangeError' });
+    expect(JSON.stringify(b.events)).not.toContain('out of range');
   });
 });

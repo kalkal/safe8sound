@@ -32,6 +32,19 @@ describe('causeFields', () => {
     expect(line.stack?.length).toBeLessThanOrEqual(4000);
   });
 
+  it('a message that itself looks like a stack frame never reaches the stack', () => {
+    const e = new Error('nope\n    at secret (token=abc)');
+    const s = causeFields(e, { withStack: true }).stack ?? '';
+    expect(s).not.toContain('secret');
+    expect(s).not.toContain('token');
+  });
+
+  it('with no recognisable header, keeps only the name: never a guess that could hold the message', () => {
+    const e = new Error('hidden');
+    e.stack = 'something else entirely: hidden\n    at f (a.js:1:1)';
+    expect(causeFields(e, { withStack: true }).stack).toBe('Error');
+  });
+
   it('a multi-line message never reaches the stack either', () => {
     const e = new Error('line one\nsecret line two');
     const s = causeFields(e, { withStack: true }).stack ?? '';

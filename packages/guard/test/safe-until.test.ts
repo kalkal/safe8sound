@@ -60,4 +60,38 @@ describe('safeUntil', () => {
   it('when the room ends on two limits at once, the battery is named first', () => {
     expect(safeUntil(shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? 28 : 26, rh: 50 }), T0 + 2 * H), opts)).toEqual({ ms: T0 + 2 * H, limitedBy: 'battery' });
   });
+
+  describe('at its edges (mutation survivors of #128)', () => {
+    it('load unserved up to the dispatch tolerance is not a flat battery', () => {
+      const points = shaped(fine).map((p, i) => (i === 10 ? { ...p, flows: { ...p.flows, unservedLoadW: watt(1) } } : p));
+      expect(safeUntil(points, opts)).toBeUndefined();
+    });
+
+    it('looks at the safe room only', () => {
+      const other = base.map((p) => ({ ...p, rooms: p.rooms.map((r) => ({ ...r, tempC: celsius(r.id === 'bedroom-1' ? 26 : 30), humidityPct: pct(r.id === 'bedroom-1' ? 50 : 90) })) }));
+      expect(safeUntil(other, opts)).toBeUndefined();
+      expect(safeUntil(other, { ...opts, roomId: 'attic' })).toBeUndefined();
+    });
+
+    it('the temperature limits are exact, and each applies only in its season', () => {
+      const at = (t: number) => shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? t : 26, rh: 50 }));
+      expect(safeUntil(at(27 + 1e-9), opts)).toBeUndefined();
+      expect(safeUntil(at(27 + 2e-9), opts)?.limitedBy).toBe('temperature');
+      expect(safeUntil(at(17), opts)).toBeUndefined();
+      const heating = { ...opts, season: 'heating' as const };
+      expect(safeUntil(at(18 - 1e-9), heating)).toBeUndefined();
+      expect(safeUntil(at(18 - 2e-9), heating)?.limitedBy).toBe('temperature');
+      expect(safeUntil(at(18 - 5e-10), { ...opts, season: 'neutral' })).toBeUndefined();
+    });
+
+    it('the humidity limits are exact, and the minimum counts only where the plan dries', () => {
+      const at = (rh: number) => shaped((ms) => ({ tempC: 26, rh: ms >= T0 + 2 * H ? rh : 50 }));
+      const drying = { ...opts, driesAt: () => true };
+      expect(safeUntil(at(60 + 1e-9), opts)).toBeUndefined();
+      expect(safeUntil(at(60 + 2e-9), opts)?.limitedBy).toBe('humidity');
+      expect(safeUntil(at(40 - 1e-9), drying)).toBeUndefined();
+      expect(safeUntil(at(40 - 5e-10), drying)).toBeUndefined();
+      expect(safeUntil(at(40 - 2e-9), drying)?.limitedBy).toBe('humidity');
+    });
+  });
 });
