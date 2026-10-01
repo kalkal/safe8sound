@@ -18,7 +18,8 @@ export type { AgentLogEntry } from './log.js';
 
 export interface ColdReserveAgent {
   /** Expected failures (model or MCP server unreachable) come back as values. */
-  ask(question: string, opts?: { correlationId?: string }): Promise<Result<AgentTurn, ErrorEnvelope>>;
+  /** `deadlineMs` (default `turnDeadlineMs`) is what is left of the turn budget, e.g. after waiting in a queue. */
+  ask(question: string, opts?: { correlationId?: string; deadlineMs?: number }): Promise<Result<AgentTurn, ErrorEnvelope>>;
   historyLength(): number;
 }
 
@@ -61,13 +62,19 @@ export function createAgent(deps: { config: AgentConfig; model: Model; tools: To
   return {
     async ask(question, opts = {}) {
       const { correlationId } = opts;
+      const budgetMs = opts.deadlineMs ?? config.turnDeadlineMs;
+      if (budgetMs <= 0) {
+        const timeout = toolError('agent_timeout', 'The assistant took too long to answer. Try again in a moment.');
+        deps.log?.(logLine(timeout, 'TurnDeadline', { correlationId }));
+        return err(timeout);
+      }
       const deadline = new AbortController();
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timedOut = new Promise<'timeout'>((resolve) => {
         timer = setTimeout(() => {
           deadline.abort();
           resolve('timeout');
-        }, config.turnDeadlineMs);
+        }, budgetMs);
       });
       let result;
       try {

@@ -141,7 +141,7 @@ describe('mcp stack: the MCP server Lambda', () => {
 
   it('alarms on any error and on p95 duration over 500 ms in 2 of 3 periods (one cold start does not fire it)', () => {
     const t = tpl('cold-reserve-dev-mcp');
-    t.resourceCountIs('AWS::CloudWatch::Alarm', 2);
+    t.resourceCountIs('AWS::CloudWatch::Alarm', 3);
     t.hasResourceProperties('AWS::CloudWatch::Alarm', {
       MetricName: 'Errors',
       Namespace: 'AWS/Lambda',
@@ -156,6 +156,22 @@ describe('mcp stack: the MCP server Lambda', () => {
       EvaluationPeriods: 3,
       DatapointsToAlarm: 2,
       ComparisonOperator: 'GreaterThanThreshold',
+    });
+  });
+
+  it('counts log lines of category "internal" and alarms on the first one (#112)', () => {
+    const t = tpl('cold-reserve-dev-mcp');
+    t.hasResourceProperties('AWS::Logs::MetricFilter', {
+      FilterPattern: '{ $.category = "internal" }',
+      MetricTransformations: [Match.objectLike({ MetricNamespace: 'ColdReserve/dev', MetricName: 'InternalErrors', MetricValue: '1' })],
+    });
+    t.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'InternalErrors',
+      Namespace: 'ColdReserve/dev',
+      Statistic: 'Sum',
+      Threshold: 0,
+      ComparisonOperator: 'GreaterThanThreshold',
+      TreatMissingData: 'notBreaching',
     });
   });
 });
@@ -174,6 +190,11 @@ describe('loadInfraConfig for the mcp and state settings', () => {
 
   it('reads them from the CDK context', () => {
     expect(loadInfraConfig(context())).toEqual({ ok: true, value: config });
+  });
+
+  it('accepts a fixed ISO instant as the scenario anchor (a recording session)', () => {
+    const mcp = { ...config.mcp, scenarioAnchor: '2026-10-20T08:00:00+02:00' };
+    expect(loadInfraConfig(context({ 'cold-reserve:mcp': mcp }))).toEqual({ ok: true, value: { ...config, mcp } });
   });
 
   it.each([

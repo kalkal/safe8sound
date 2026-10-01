@@ -56,14 +56,27 @@ function number(env: Readonly<Record<string, string | undefined>>, key: string, 
  * built by a factory, no DI framework). Homes: `demo` is the seeded simulator; `home` is the real
  * home behind FallbackSource, read-only, with the simulator as its declared fallback.
  */
+/** The UTC offset written in an ISO instant (`+02:00`, `-05:30`, `Z`), in milliseconds. */
+function utcOffsetMs(iso: string): number {
+  const m = /([+-])(\d{2}):(\d{2})$/.exec(iso);
+  if (!m) return 0;
+  const ms = (Number(m[2]) * 60 + Number(m[3])) * 60_000;
+  return m[1] === '-' ? -ms : ms;
+}
+
 /**
  * Which wall-clock instant is the start of the scenario (R1, 2026-10-01 architecture check):
- * `start` (default) = when this server starts, fine for one local process; `daily` = the start of
- * the UTC day, the same in every Lambda container; or a fixed ISO instant.
+ * `start` (default) = when this server starts, fine for one local process; `daily` = midnight in the
+ * scenario's own UTC offset (its `startAt`, e.g. +02:00), so the scenario clock reads the same hour as
+ * the home and every Lambda container agrees; or a fixed ISO instant. With a fixed instant (or a speed
+ * above 1) the simulator stops at the end of the scenario.
  */
-function scenarioAnchor(raw: string | undefined, startedAtMs: number): Result<number | ((wallMs: number) => number), ErrorEnvelope> {
+function scenarioAnchor(raw: string | undefined, startedAtMs: number, scenarioStartAt: string): Result<number | ((wallMs: number) => number), ErrorEnvelope> {
   if (raw === undefined || raw === 'start') return ok(startedAtMs);
-  if (raw === 'daily') return ok(utcDayStart);
+  if (raw === 'daily') {
+    const offsetMs = utcOffsetMs(scenarioStartAt);
+    return ok((wallMs) => utcDayStart(wallMs + offsetMs) - offsetMs);
+  }
   const instant = IsoDateTimeSchema.safeParse(raw);
   return instant.success ? ok(Date.parse(instant.data)) : err(toolError('invalid_config', 'MCP_SCENARIO_ANCHOR must be start, daily or an ISO instant.'));
 }
@@ -108,7 +121,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
 
   const scenario = builtInScenario(scenarioId as ScenarioId);
   const scenarioStartMs = Date.parse(scenario.startAt) + startH.value * HOUR_MS;
-  const anchor = scenarioAnchor(env['MCP_SCENARIO_ANCHOR'], opts.wallClock.now());
+  const anchor = scenarioAnchor(env['MCP_SCENARIO_ANCHOR'], opts.wallClock.now(), scenario.startAt);
   if (!anchor.ok) return anchor;
   const clock = scenarioClock({ wall: opts.wallClock, anchorMs: anchor.value, scenarioStartMs, speed: speed.value });
   const params = defaultSimParams();

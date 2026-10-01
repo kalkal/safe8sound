@@ -1,7 +1,7 @@
 import { celsius } from '@cold-reserve/contracts';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { describe, expect, it } from 'vitest';
-import { composeModules, createDynamoStoreFactory, defaultDynamoClient, type DynamoClientSettings } from '../src/compose.js';
+import { composeModules, createDynamoStoreFactory, defaultDynamoClient, profileFor, type DynamoClientSettings } from '../src/compose.js';
 import { loadPreferencesConfig, preferencesConfigFile } from '../src/preferences-config.js';
 import { homeId } from './helpers.js';
 
@@ -19,7 +19,13 @@ describe('composeModules (shared by the local and the Lambda entry)', () => {
     const [prefs] = result.value;
     expect(prefs?.id).toBe('preferences');
     expect(prefs?.enabledFor?.(homeId('demo'))).toBe(true);
-    expect(prefs?.enabledFor?.(homeId('demo#k3v9x2p7q1'))).toBe(true);
+    expect(prefs?.enabledFor?.(homeId('demo#0123456789abcdef'))).toBe(true);
+  });
+
+  it('knows a profile only for demo and real sandbox ids, not for anything that merely starts with demo#', () => {
+    expect(profileFor(homeId('demo'))).toBeDefined();
+    expect(profileFor(homeId('demo#0123456789abcdef'))).toBeDefined();
+    for (const id of ['demo#x', 'demo#0123456789abcdef0', 'home']) expect(profileFor(homeId(id)), id).toBeUndefined();
   });
 
   it('keeps preferences off for the real home until its profile exists (no guessed rooms)', () => {

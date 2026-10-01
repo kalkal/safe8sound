@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { AgentConfig } from '../src/config.js';
 import { FakeModel, type FakePolicy } from '../src/fake-model.js';
 import { createHomeAgent } from '../src/home-agent.js';
+import type { AgentLogEntry } from '../src/log.js';
 import type { McpSession } from '../src/mcp-tools.js';
 
 const CONFIG: AgentConfig = {
@@ -121,17 +122,93 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
     expect(base.correlationIds).toEqual(['turn-a', 'turn-b']);
   });
 
-  it('a failed turn does not block the next one', async () => {
-    const base = session();
-    let calls = 0;
-    const s: McpSession = {
-      listTools: () => base.listTools(),
-      callTool: (name, args, signal, correlationId) => (++calls === 1 ? Promise.reject(new RangeError('bug in the first turn')) : base.callTool(name, args, signal, correlationId)),
-    };
-    const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(s) });
-    const first = agent.ask("What's my battery level?", 'turn-a').catch(() => 'threw');
+  it('a turn that throws (a bug) does not block the next one', async () => {
+    let attempts = 0;
+    const connect = () => (++attempts === 1 ? Promise.reject(new RangeError('bug while connecting')) : Promise.resolve(session()));
+    const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect });
+    const first = agent.ask("What's my battery level?", 'turn-a');
     const second = agent.ask("What's my battery level?", 'turn-b');
-    await first;
+    await expect(first).rejects.toThrow(RangeError);
     expect(await second).toMatchObject({ ok: true, value: { text: 'Battery at 45%.' } });
   });
+
+  it('keeps at most one question waiting per home: a third one is rate limited, the others still answer', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const base = session();
+    const s: McpSession = {
+      listTools: () => base.listTools(),
+      callTool: async (name, args, signal, correlationId) => {
+        await gate;
+        return base.callTool(name, args, signal, correlationId);
+      },
+    };
+    const logs: AgentLogEntry[] = [];
+    const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(s), log: (e) => logs.push(e) });
+    const first = agent.ask('Battery?', 'turn-a');
+    const second = agent.ask('Battery?', 'turn-b');
+    const third = await agent.ask('Battery?', 'turn-c');
+    expect(third).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', category: 'rate_limited', retryAfterMs: CONFIG.turnDeadlineMs } });
+    expect(logs).toMatchObject([{ code: 'demo_quota_exceeded', correlationId: 'turn-c' }]);
+    release();
+    expect((await first).ok && (await second).ok).toBe(true);
+  });
+
+  it('counts the time spent waiting toward the deadline of the waiting question', async () => {
+    let now = 0;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const base = session();
+    const s: McpSession = {
+      listTools: () => base.listTools(),
+      callTool: async (name, args, signal, correlationId) => {
+        if (correlationId === 'turn-a') {
+          await gate;
+          now += CONFIG.turnDeadlineMs; // the first turn used the whole budget of the second one
+        }
+        return base.callTool(name, args, signal, correlationId);
+      },
+    };
+    const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(s), now: () => now });
+    const first = agent.ask('Battery?', 'turn-a');
+    const second = agent.ask('Battery?', 'turn-b');
+    release();
+    expect(await first).toMatchObject({ ok: true });
+    expect(await second).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
+    expect(base.correlationIds).toEqual(['turn-a']);
+  });
+
+  it('starts a fresh agent after a timeout, so a late tool result never lands in the next turn', async () => {
+    const quick = { ...CONFIG, turnDeadlineMs: 50 };
+    let release: () => void = () => undefined;
+    const late = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let opened = 0;
+    const connect = () => {
+      const base = session();
+      const first = ++opened === 1;
+      return Promise.resolve<McpSession>({
+        listTools: () => base.listTools(),
+        // The first session's plan_comfort ignores the cancel signal and answers late.
+        callTool: async (name, args, signal, correlationId) => {
+          if (first) await late;
+          return base.callTool(name, args, signal, correlationId);
+        },
+      });
+    };
+    const agent = createHomeAgent({ config: quick, home: HOME, model: new FakeModel(policy), connect });
+    expect(await agent.ask('Make a plan', 'turn-a')).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
+    const next = agent.ask("What's my battery level?", 'turn-b');
+    release();
+    const reply = await next;
+    expect(opened).toBe(2);
+    expect(reply).toMatchObject({ ok: true, value: { text: 'Battery at 45%.' } });
+    expect(reply.ok && reply.value.cards).toBeUndefined();
+  });
 });
+

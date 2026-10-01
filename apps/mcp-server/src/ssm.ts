@@ -20,13 +20,15 @@ export async function readParameter(name: string, opts: ReadParameterOptions): P
   }, opts.timeoutMs);
   try {
     const res = await opts.fetchFn(url, { headers: { 'x-aws-parameters-secrets-token': opts.sessionToken }, signal: controller.signal });
+    // 5xx is the extension or SSM failing (transient); 4xx is our setup (name, permissions).
+    if (res.status >= 500) return err(toolError('config_unavailable', `Parameter ${name} could not be read (HTTP ${String(res.status)}).`));
     if (!res.ok) return err(toolError('invalid_config', `Parameter ${name} could not be read (HTTP ${String(res.status)}).`));
     const body = (await res.json()) as { Parameter?: { Value?: unknown } };
     const value = body.Parameter?.Value;
     return typeof value === 'string' ? ok(value) : err(toolError('invalid_config', `Parameter ${name} has no string value.`));
   } catch (e) {
     const reason = controller.signal.aborted ? `timed out after ${String(opts.timeoutMs)} ms` : e instanceof Error ? e.name : 'failed';
-    return err(toolError('invalid_config', `Parameter ${name} could not be read (${reason}).`));
+    return err(toolError('config_unavailable', `Parameter ${name} could not be read (${reason}).`));
   } finally {
     clearTimeout(timer);
   }

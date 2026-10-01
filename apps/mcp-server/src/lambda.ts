@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { PROBLEM_JSON_CONTENT_TYPE, toProblemDetails, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { PROBLEM_JSON_CONTENT_TYPE, categoryOf, toProblemDetails, toolError, type ErrorCategory, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import type { McpHandler } from './handler.js';
 
 /** The subset of the Lambda Function URL event (payload 2.0) the adapter reads. */
@@ -19,6 +19,32 @@ export interface FunctionUrlResult {
   isBase64Encoded: false;
 }
 
+/**
+ * One line of the error log, in the shape of docs/error-handling.md §6.1 until L1 brings the shared
+ * logger. `message` is ours (configuration failures); a caught error only gives its name.
+ */
+export interface LambdaLogEntry {
+  readonly ts: string;
+  readonly level: 'warn' | 'error';
+  readonly component: 'mcp-server' | 'store-dynamodb';
+  readonly code: ErrorEnvelope['code'];
+  readonly category: ErrorCategory;
+  readonly correlationId?: string;
+  readonly errorName?: string;
+  readonly message?: string;
+  readonly operation?: string;
+  readonly httpStatus?: number;
+  readonly requestId?: string;
+}
+
+const levelOf = (category: ErrorCategory): LambdaLogEntry['level'] => (category === 'internal' ? 'error' : 'warn');
+const nameOf = (e: unknown): string => (e instanceof Error ? e.name : typeof e);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const defaultLog = (entry: LambdaLogEntry) => {
+  console.error(JSON.stringify(entry));
+};
+
 function toRequest(event: FunctionUrlEvent): Request {
   const query = event.rawQueryString ? `?${event.rawQueryString}` : '';
   const headers = new Headers();
@@ -32,24 +58,92 @@ async function toResult(res: Response): Promise<FunctionUrlResult> {
   return { statusCode: res.status, headers: Object.fromEntries(res.headers), body: await res.text(), isBase64Encoded: false };
 }
 
-function configFailure(error: ErrorEnvelope): FunctionUrlResult {
-  const correlationId = randomUUID();
-  // The detail stays in the log; the caller only learns that the server is misconfigured.
-  console.error(JSON.stringify({ ts: new Date().toISOString(), level: 'error', component: 'mcp-server', code: error.code, category: error.category, message: error.message, correlationId }));
-  const body = toProblemDetails(toolError('invalid_config', 'The server is not configured correctly.'), { instance: `urn:uuid:${correlationId}` });
+function problem(error: ErrorEnvelope, correlationId: string): FunctionUrlResult {
+  const body = toProblemDetails(error, { instance: `urn:uuid:${correlationId}` });
   return { statusCode: body.status, headers: { 'content-type': PROBLEM_JSON_CONTENT_TYPE, 'x-correlation-id': correlationId }, body: JSON.stringify(body), isBase64Encoded: false };
 }
 
-/** Lambda entry around the same Web-standard handler as the local Node entry. Built once per container. */
-export function createLambdaHandler(load: () => Promise<Result<McpHandler, ErrorEnvelope>>): (event: FunctionUrlEvent) => Promise<FunctionUrlResult> {
+/** What the caller learns about a startup failure: transient ones keep their code (503, retry); the rest is a generic 500. */
+function publicStartupError(error: ErrorEnvelope): ErrorEnvelope {
+  return error.category === 'dependency_unavailable'
+    ? toolError(error.code, 'A service the server needs is not reachable. Try again in a moment.')
+    : toolError('invalid_config', 'The server is not configured correctly.');
+}
+
+/**
+ * Lambda entry around the same Web-standard handler as the local Node entry. The app is built once per
+ * container; a failed or rejected build is not kept, so the next request tries again. Nothing escapes as
+ * a raw 502: every failure is an RFC 9457 answer with a log line carrying the correlation id.
+ */
+export function createLambdaHandler(
+  load: () => Promise<Result<McpHandler, ErrorEnvelope>>,
+  deps: { readonly log?: (entry: LambdaLogEntry) => void } = {},
+): (event: FunctionUrlEvent) => Promise<FunctionUrlResult> {
+  const log = deps.log ?? defaultLog;
   let ready: Promise<Result<McpHandler, ErrorEnvelope>> | undefined;
+
+  const unexpected = (e: unknown, correlationId: string) => {
+    log({ ts: new Date().toISOString(), level: 'error', component: 'mcp-server', code: 'unexpected_error', category: 'internal', correlationId, errorName: nameOf(e) });
+    return problem(toolError('unexpected_error', 'Something went wrong on our side.'), correlationId);
+  };
+
   return async (event) => {
-    ready ??= load();
-    const app = await ready;
+    const presented = event.headers['x-correlation-id'];
+    const correlationId = presented !== undefined && UUID.test(presented) ? presented : randomUUID();
+
+    let app: Result<McpHandler, ErrorEnvelope>;
+    try {
+      ready ??= load();
+      app = await ready;
+    } catch (e) {
+      ready = undefined; // a rejected build is not cached: the next request retries
+      return unexpected(e, correlationId);
+    }
     if (!app.ok) {
       ready = undefined; // a later request retries the configuration
-      return configFailure(app.error);
+      const error = app.error;
+      // The detail stays in the log; the caller only learns whether to retry.
+      log({ ts: new Date().toISOString(), level: levelOf(error.category), component: 'mcp-server', code: error.code, category: error.category, correlationId, message: error.message });
+      return problem(publicStartupError(error), correlationId);
     }
-    return toResult(await app.value(toRequest(event)));
+
+    try {
+      return await toResult(await app.value(toRequest(event)));
+    } catch (e) {
+      return unexpected(e, correlationId);
+    }
+  };
+}
+
+/** Last-resort process hooks: an unhandled rejection is logged; an uncaught exception is logged and the container exits. */
+export function installProcessHooks(
+  proc: { on(name: 'unhandledRejection' | 'uncaughtException', fn: (value: unknown) => void): unknown },
+  deps: { readonly log?: (entry: LambdaLogEntry) => void; readonly exit: (code: number) => void },
+): void {
+  const log = deps.log ?? defaultLog;
+  const line = (e: unknown): LambdaLogEntry => ({ ts: new Date().toISOString(), level: 'error', component: 'mcp-server', code: 'unexpected_error', category: 'internal', errorName: nameOf(e) });
+  proc.on('unhandledRejection', (reason) => {
+    log(line(reason));
+  });
+  proc.on('uncaughtException', (error) => {
+    log(line(error));
+    deps.exit(1); // the state may be broken: the runtime starts a clean container
+  });
+}
+
+/** The DynamoDB store's error event as a log line: the SDK error name, HTTP status and request id, never the cause text. */
+export function storeErrorLine(event: { readonly code: 'store_unavailable' | 'unexpected_error'; readonly operation: string; readonly cause: unknown }): LambdaLogEntry {
+  const category = categoryOf(event.code);
+  const metadata = (event.cause as { $metadata?: { httpStatusCode?: unknown; requestId?: unknown } } | null | undefined)?.$metadata;
+  return {
+    ts: new Date().toISOString(),
+    level: levelOf(category),
+    component: 'store-dynamodb',
+    code: event.code,
+    category,
+    operation: event.operation,
+    errorName: nameOf(event.cause),
+    ...(typeof metadata?.httpStatusCode === 'number' ? { httpStatus: metadata.httpStatusCode } : {}),
+    ...(typeof metadata?.requestId === 'string' ? { requestId: metadata.requestId } : {}),
   };
 }

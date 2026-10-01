@@ -29,6 +29,15 @@ describe('scenario anchor (MCP_SCENARIO_ANCHOR)', () => {
     expect(sb.batterySocPct).toBe(sa.batterySocPct);
   });
 
+  it('daily: the scenario day starts at local midnight of the scenario (its +02:00), not at UTC midnight', async () => {
+    // heatwave starts at 2026-07-16T00:00:00+02:00; at 12:00 in Rome the scenario shows 12:00 too.
+    const a = instance({ MCP_SCENARIO_ANCHOR: 'daily' }, at('2026-10-01T10:00:00Z'));
+    expect((await a.status()).ts).toBe(new Date(at('2026-07-16T12:00:00+02:00')).toISOString());
+    // 01:00 in Rome is still the scenario day that began at Rome midnight (23:00 UTC the day before).
+    a.wall.set(at('2026-09-30T23:00:00Z'));
+    expect((await a.status()).ts).toBe(new Date(at('2026-07-16T01:00:00+02:00')).toISOString());
+  });
+
   it('a fixed instant: the scenario starts at that wall time, whatever the container start', async () => {
     const a = instance({ MCP_SCENARIO_ANCHOR: '2026-10-01T10:00:00Z', MCP_SCENARIO_START_H: '14' }, at('2026-10-01T12:00:00Z'));
     const scenarioStart = Date.parse((await instance({ MCP_SCENARIO_START_H: '14' }, at('2026-10-01T12:00:00Z')).status()).ts);

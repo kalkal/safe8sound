@@ -5,7 +5,7 @@ import { ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Architecture, FunctionUrlAuthType, ParamsAndSecretsLayerVersion, ParamsAndSecretsVersions, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
-import { LogGroup, type CfnLogGroup } from 'aws-cdk-lib/aws-logs';
+import { FilterPattern, LogGroup, MetricFilter, type CfnLogGroup } from 'aws-cdk-lib/aws-logs';
 import type { Construct } from 'constructs';
 import type { McpConfig, StageName, StateConfig } from './config.js';
 
@@ -104,6 +104,23 @@ export class McpStack extends Stack {
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
       treatMissingData: TreatMissingData.NOT_BREACHING,
     });
+    // Handled errors never fail the invocation, so Errors misses them: count our own log lines of
+    // category "internal" (a bug or a broken config, docs/error-handling.md) and alarm on the first one.
+    new MetricFilter(this, 'InternalErrorsFilter', {
+      logGroup,
+      filterPattern: FilterPattern.stringValue('$.category', '=', 'internal'),
+      metricNamespace: `ColdReserve/${stage}`,
+      metricName: 'InternalErrors',
+      metricValue: '1',
+    })
+      .metric({ period: Duration.minutes(5), statistic: 'Sum' })
+      .createAlarm(this, 'InternalErrors', {
+        alarmDescription: 'The MCP server logged an error of category "internal" (a bug or a broken configuration).',
+        threshold: 0,
+        evaluationPeriods: 1,
+        comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
+        treatMissingData: TreatMissingData.NOT_BREACHING,
+      });
 
     // cdk-nag 3 findings are acknowledged through CDK Validations, each with its reason.
     const logGroupId = this.getLogicalId(logGroup.node.defaultChild as CfnLogGroup);

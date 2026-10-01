@@ -1,6 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { err, ok, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
+import { SandboxHomeIdSchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
 import { seededRng, type Clock, type StateStoreFactory } from '@cold-reserve/core';
 import { demoProfile } from '@cold-reserve/source-simulator';
 import { createDocumentTableClient, documentSender, dynamoStateStoreFactory, type StoreErrorEvent } from '@cold-reserve/store-dynamodb';
@@ -16,7 +16,7 @@ import type { CapabilityModule } from './registry.js';
  * The real home (`home`) has no profile until F2, so modules that need rooms stay off for it.
  */
 export function profileFor(homeId: HomeId): HomeProfile | undefined {
-  return homeId === 'demo' || homeId.startsWith('demo#') ? demoProfile() : undefined;
+  return homeId === 'demo' || SandboxHomeIdSchema.safeParse(homeId).success ? demoProfile() : undefined;
 }
 
 export interface ComposeOptions {

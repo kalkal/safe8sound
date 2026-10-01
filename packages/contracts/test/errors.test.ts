@@ -48,6 +48,8 @@ describe('error catalog (docs/error-handling.md §2)', () => {
   it('maps codes to the categories of the taxonomy', () => {
     expect(categoryOf('invalid_setpoint')).toBe('validation');
     expect(categoryOf('storm_reserve_violated')).toBe('guard_rejection');
+    // SSM timeout or 5xx at startup: transient, retried (#112).
+    expect(categoryOf('config_unavailable')).toBe('dependency_unavailable');
     expect(categoryOf('battery_power_exceeded')).toBe('guard_rejection');
     expect(categoryOf('home_not_found')).toBe('not_found');
     expect(categoryOf('missing_token')).toBe('unauthorized');

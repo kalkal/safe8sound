@@ -66,6 +66,8 @@ export const ERROR_CATALOG = {
   agent_unavailable: { category: 'dependency_unavailable' },
   polly_unavailable: { category: 'dependency_unavailable' },
   store_unavailable: { category: 'dependency_unavailable' },
+  /** The configuration store (SSM) timed out or failed at startup: retried on the next request (#112). */
+  config_unavailable: { category: 'dependency_unavailable' },
   // rate_limited: wait retryAfterMs
   demo_quota_exceeded: { category: 'rate_limited' },
   // internal: a bug, alert

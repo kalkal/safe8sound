@@ -256,6 +256,7 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                   "agent_unavailable",
                   "polly_unavailable",
                   "store_unavailable",
+                  "config_unavailable",
                   "demo_quota_exceeded",
                   "unexpected_error",
                   "output_schema_violation",

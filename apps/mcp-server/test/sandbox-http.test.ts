@@ -85,5 +85,6 @@ describe('x-cold-reserve-home: sandbox homes for the demo#* grant only', () => {
       { level: 'warn', code: 'demo_quota_exceeded', category: 'rate_limited', clientId: 'agent-sandbox' },
     ]);
     expect(logs.every((l) => typeof l.correlationId === 'string')).toBe(true);
+    expect(JSON.stringify(logs)).not.toContain('demo#');
   });
 });

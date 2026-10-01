@@ -29,8 +29,10 @@ export const McpConfigSchema = z.strictObject({
   allowedOrigins: z.array(z.url()),
   scenario: z.string().regex(/^[a-z0-9][a-z0-9-]{0,47}$/),
   /**
-   * Where scenario time starts (R1): `daily` = the start of the UTC day, or a fixed ISO instant. Never
-   * the container start (the server default for local runs): two warm Lambdas would disagree.
+   * Where scenario time starts (R1): `daily` = midnight in the scenario's own offset (it replays every
+   * day), or a fixed ISO instant. Never the container start (the server default for local runs): two
+   * warm Lambdas would disagree. With a fixed instant the simulator stops at the end of the scenario
+   * (24-36 h later), so use it only for a recording session.
    */
   scenarioAnchor: z.union([z.literal('daily'), z.iso.datetime({ offset: true })]),
 });
