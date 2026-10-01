@@ -1,5 +1,8 @@
-import { HomeIdSchema } from '@cold-reserve/contracts';
+import { FamilyContactSchema, HomeIdSchema } from '@cold-reserve/contracts';
 import { fixedClock } from '@cold-reserve/core';
+import { stormMessage } from '@cold-reserve/i18n';
+import { dynamoStateStoreFactory } from '@cold-reserve/store-dynamodb';
+import { createFakeTable } from '@cold-reserve/store-dynamodb/testing';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
@@ -18,10 +21,27 @@ function wiring() {
 }
 
 describe('storm-mode wiring', () => {
-  it('loads the shipped config and starts with an empty phone', () => {
+  it('loads the shipped config and starts with an empty phone', async () => {
     const w = wiring();
     expect(w.config.capHours).toBe(24);
-    expect(w.inbox(HomeIdSchema.parse('demo'))).toEqual([]);
+    expect(await w.inbox(HomeIdSchema.parse('demo'))).toEqual({ ok: true, value: [] });
+  });
+
+  it('keeps the phone in the StateStore: a later invocation on the same table reads what an earlier one sent', async () => {
+    const p = loadPreferencesConfig(preferencesConfigFile());
+    if (!p.ok) throw new Error(p.error.message);
+    const table = createFakeTable();
+    const storeFor = () => dynamoStateStoreFactory({ table, clock, rng: { next: Math.random } });
+    const first = stormModeWiring({ storeFor: storeFor(), preferences: p.value, clock });
+    const later = stormModeWiring({ storeFor: storeFor(), preferences: p.value, clock });
+    if (!first.ok || !later.ok) throw new Error('wiring failed');
+    const demo = HomeIdSchema.parse('demo');
+    const contact = FamilyContactSchema.parse({ role: 'daughter', name: 'Example Contact', channel: 'in_app', handle: 'phone-1' });
+    const text = stormMessage('en-US', 'power_back', contact.name, { roomName: 'Bedroom', tempC: 26, atMs: clock.now(), powerBackAtMs: clock.now(), timeZone: 'Europe/Rome' });
+    if (!text.ok) throw new Error('template');
+    expect(await first.value.notifier.send({ homeId: demo, contact, transition: 'power_back', text: text.value, at: new Date(clock.now()).toISOString() })).toEqual({ ok: true, value: undefined });
+    const listed = await later.value.inbox(demo);
+    expect(listed.ok && listed.value.map((m) => `${m.transition}:${m.role}`)).toEqual(['power_back:daughter']);
   });
 
   it('storm ids are fresh and valid', () => {

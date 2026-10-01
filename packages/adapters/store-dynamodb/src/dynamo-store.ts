@@ -1,6 +1,7 @@
 import {
   ConfigChangeSchema,
   GuaranteeIdSchema,
+  InboxMessageSchema,
   IsoDateTimeSchema,
   PlanIdSchema,
   PlanSchema,
@@ -13,6 +14,7 @@ import {
   type ConfigChange,
   type ErrorEnvelope,
   type HomeId,
+  type NewInboxMessage,
   type Plan,
   type PlanId,
   type Preferences,
@@ -195,6 +197,27 @@ class DynamoStateStore implements StateStore {
       // If it has expired, every older one has too.
       const [latest] = await this.#table.query(this.#pk, 'STORM#', { newestFirst: true, limit: 1 });
       return latest && this.#isLive(latest) ? parse(StormSessionSchema, latest) : undefined;
+    });
+  }
+
+  saveInboxMessage(message: NewInboxMessage) {
+    return this.#run('saveInboxMessage', async () => {
+      const parsed = InboxMessageSchema.safeParse(message);
+      if (!parsed.success) {
+        fail(toolError('invalid_input', 'A family message breaks its contract.', { details: { field: parsed.error.issues[0]?.path.join('.') ?? 'message' } }));
+      }
+      // SK = INBOX#<at in UTC>#<suffix>: newest first is the reverse key order; two messages at once are both kept.
+      const sk = `INBOX#${new Date(message.at).toISOString()}#${this.#suffix()}`;
+      await this.#table.put(this.#item(sk, message, epochMs(message.at) + this.#ttl.inboxDays * DAY_MS));
+    });
+  }
+
+  listInbox(limit: number) {
+    return this.#run('listInbox', async () => {
+      if (limit <= 0) return [];
+      // Expired messages are the oldest ones, so the live ones are a prefix of the newest-first page.
+      const newest = await this.#table.query(this.#pk, 'INBOX#', { newestFirst: true, limit });
+      return newest.filter((item) => this.#isLive(item)).map((item) => parse(InboxMessageSchema, item));
     });
   }
 

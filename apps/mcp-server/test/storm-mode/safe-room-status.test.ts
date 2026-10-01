@@ -43,7 +43,7 @@ describe('get_safe_room_status', () => {
     expect(out.ok && out.value.stormPhase).toBeUndefined();
     const saved = await w.store.getLatestStormSession();
     expect(saved.ok && saved.value).toBeUndefined();
-    expect(w.inbox()).toEqual([]);
+    expect((await w.inbox())).toEqual([]);
   });
 
   it('reports the stored storm: Essential for the storm while it is active', async () => {
@@ -54,7 +54,7 @@ describe('get_safe_room_status', () => {
     expect(out.ok && out.value).toMatchObject({ stormPhase: 'active', level: 'essential', levelReason: 'storm' });
     const after = await w.store.getLatestStormSession();
     expect(after).toEqual(before);
-    expect(w.inbox()).toHaveLength(1);
+    expect((await w.inbox())).toHaveLength(1);
   });
 
   it('with no reading from the safe room the status is not guessed', async () => {
@@ -70,14 +70,14 @@ describe('the storm detector (tick)', () => {
     const out = await runStormDetector(w.deps, w.ctx);
     expect(out.ok && out.value.session?.phase).toBe('active');
     await runStormDetector(w.deps, w.ctx);
-    expect(w.inbox().map((m) => m.transition)).toEqual(['storm_started']);
+    expect((await w.inbox()).map((m) => m.transition)).toEqual(['storm_started']);
   });
 
   it('without that permission a grid loss starts nothing', async () => {
     const w = world(4, { preferences: { ...preferences, autoStormOnGridLoss: false } });
     const out = await runStormDetector(w.deps, w.ctx);
     expect(out.ok && out.value.session).toBeUndefined();
-    expect(w.inbox()).toEqual([]);
+    expect((await w.inbox())).toEqual([]);
   });
 
   it('power back: the storm ends after the stable-grid window, with the "power is back" message', async () => {
@@ -90,10 +90,10 @@ describe('the storm detector (tick)', () => {
     await runStormDetector(w.deps, w.ctx);
     const ended = await safeRoomStatus(w.deps, w.ctx);
     expect(ended.ok && ended.value).toMatchObject({ stormPhase: 'ended', level: 'comfort' });
-    const [latest] = w.inbox();
+    const [latest] = (await w.inbox());
     expect(latest?.transition).toBe('power_back');
     expect(latest?.text).toContain('power came back at home');
-    expect(w.inbox()).toHaveLength(2);
+    expect((await w.inbox())).toHaveLength(2);
     const session = await w.store.getLatestStormSession();
     expect(session.ok && session.value?.notifications.map((n) => n.transition)).toEqual(['storm_started', 'power_back']);
   });
@@ -113,6 +113,6 @@ describe('the storm detector (tick)', () => {
     w.clock.set(w.clock.now() + 6 * MIN);
     const out = await runStormDetector(w.deps, w.ctx);
     expect(out.ok && out.value.session?.phase).toBe('active');
-    expect(w.inbox()).toHaveLength(1);
+    expect((await w.inbox())).toHaveLength(1);
   });
 });

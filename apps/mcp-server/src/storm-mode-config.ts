@@ -6,9 +6,9 @@ import file from '../config/storm-mode.json' with { type: 'json' };
 import { parseStormModeConfig, type StormModeConfig } from './modules/storm-mode/index.js';
 import { defaultPreferencesFor, type PreferencesConfig } from './preferences-config.js';
 
-// Wiring of the storm-mode module for the local entry: config/storm-mode.json, the preferences (saved
-// or default), fresh storm ids and the simulated in-app phone. The phone keeps its inbox in memory, so
-// the Lambda entry waits for the persistent inbox (F8c) before it registers the module.
+// Wiring of the storm-mode module shared by the local and the Lambda entries: config/storm-mode.json,
+// the preferences (saved or default), fresh storm ids and the simulated in-app phone, whose inbox lives
+// in the same StateStore (#24), so any process can read it.
 
 export interface StormModeWiring {
   readonly storeFor: StateStoreFactory;
@@ -27,7 +27,7 @@ const newStormId = (): StormId => StormIdSchema.parse(`storm_${randomBytes(15).t
 export function stormModeWiring(opts: { storeFor: StateStoreFactory; preferences: PreferencesConfig; clock: Clock }): Result<StormModeWiring, ErrorEnvelope> {
   const config = parseStormModeConfig(structuredClone(file));
   if (!config.ok) return config;
-  const phone = createInAppNotifier({ ...config.value.inApp, clock: opts.clock });
+  const phone = createInAppNotifier({ storeFor: opts.storeFor, maxPerHome: config.value.inApp.maxPerHome });
   if (!phone.ok) return phone;
   return ok({
     storeFor: opts.storeFor,

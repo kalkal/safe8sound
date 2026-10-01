@@ -22,7 +22,7 @@ describe('notify_family', () => {
     expect(NotifyFamilyOutputSchema.parse(out.value)).toMatchObject({ sent: [{ role: 'daughter', channel: 'in_app' }], skipped: [] });
     expect(out.value.preview).toMatch(/ for daughter: /);
     expect(JSON.stringify(out.value)).not.toMatch(/Giulia|phone-daughter/);
-    const [latest] = w.inbox();
+    const [latest] = (await w.inbox());
     expect(latest).toMatchObject({ role: 'daughter', transition: 'essential_level' });
     expect(latest?.text).toMatch(/ for Giulia Example: /);
   });
@@ -41,7 +41,7 @@ describe('notify_family', () => {
     const w = await activeStorm();
     const out = await notifyFamily(w.deps, { transition: 'storm_started' }, w.ctx);
     expect(out.ok && out.value).toMatchObject({ sent: [], skipped: [{ role: 'daughter', reason: 'rate_limited' }] });
-    expect(w.inbox()).toHaveLength(1);
+    expect((await w.inbox())).toHaveLength(1);
     w.clock.set(w.clock.now() + (stormConfig().minIntervalMinutes + 1) * 60_000);
     const later = await notifyFamily(w.deps, { transition: 'storm_started' }, w.ctx);
     expect(later.ok && later.value.sent).toEqual([{ role: 'daughter', channel: 'in_app' }]);
@@ -57,7 +57,7 @@ describe('notify_family', () => {
     const w = await activeStorm();
     const out = await notifyFamily(w.deps, { transition: 'essential_level', roles: ['neighbor'] }, w.ctx);
     expect(!out.ok && out.error).toMatchObject({ code: 'recipient_not_registered', category: 'validation', details: { field: 'roles' } });
-    expect(w.inbox()).toHaveLength(1);
+    expect((await w.inbox())).toHaveLength(1);
   });
 
   it('refuses when the home has no contact at all', async () => {
@@ -74,7 +74,7 @@ describe('notify_family', () => {
     const w = world(atH);
     const out = await notifyFamily(w.deps, { transition }, w.ctx);
     expect(!out.ok && out.error).toMatchObject({ code: 'invalid_input', details: { field: 'transition' } });
-    expect(w.inbox()).toEqual([]);
+    expect((await w.inbox())).toEqual([]);
   });
 
   it('a failed delivery is an error, recorded as not delivered, and may be retried', async () => {
@@ -88,7 +88,7 @@ describe('notify_family', () => {
     down = false;
     const retry = await notifyFamily(w.deps, { transition: 'essential_level' }, w.ctx);
     expect(retry.ok && retry.value.sent).toHaveLength(1);
-    expect(phone.inbox().map((m) => m.transition)).toEqual(['essential_level']);
+    expect((await phone.inbox()).map((m) => m.transition)).toEqual(['essential_level']);
   });
 
   it('property: whatever roles the model asks for, only registered contacts get a message, and no name reaches the model', async () => {
@@ -97,10 +97,10 @@ describe('notify_family', () => {
       fc.asyncProperty(fc.uniqueArray(fc.oneof(role, fc.constant('daughter'), fc.constant('son')), { minLength: 1, maxLength: 3 }), async (roles) => {
         const contacts = [...preferences.familyContacts, { role: 'son', name: 'Marco Example', channel: 'in_app' as const, handle: 'phone-son-1' }];
         const w = await activeStorm({ preferences: { ...preferences, familyContacts: contacts } });
-        const before = w.inbox().length;
+        const before = (await w.inbox()).length;
         const out = await notifyFamily(w.deps, { transition: 'essential_level', roles }, w.ctx);
         const registered = new Set(contacts.map((c) => c.role));
-        const delivered = w.inbox().slice(0, w.inbox().length - before);
+        const delivered = (await w.inbox()).slice(0, (await w.inbox()).length - before);
         expect(delivered.every((m) => registered.has(m.role) && roles.includes(m.role))).toBe(true);
         expect(delivered).toHaveLength(roles.filter((r) => registered.has(r)).length);
         const seen = JSON.stringify(out.ok ? out.value : out.error);

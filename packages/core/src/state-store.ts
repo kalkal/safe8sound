@@ -3,6 +3,8 @@ import type {
   ErrorEnvelope,
   GuaranteeId,
   HomeId,
+  InboxMessage,
+  NewInboxMessage,
   Plan,
   PlanId,
   Preferences,
@@ -35,9 +37,11 @@ export interface StateStoreTtl {
   readonly configChangeDays: number;
   readonly guardRejectionDays: number;
   readonly stormSessionDays: number;
+  /** The family phone's messages (#24): short-lived, they matter during one storm. */
+  readonly inboxDays: number;
 }
 
-export const DEFAULT_STATE_STORE_TTL: StateStoreTtl = { planDays: 30, configChangeDays: 90, guardRejectionDays: 90, stormSessionDays: 90 };
+export const DEFAULT_STATE_STORE_TTL: StateStoreTtl = { planDays: 30, configChangeDays: 90, guardRejectionDays: 90, stormSessionDays: 90, inboxDays: 2 };
 
 export interface StateStore {
   readonly homeId: HomeId;
@@ -62,6 +66,10 @@ export interface StateStore {
   saveStormSession(session: StormSession): Promise<Result<void, ErrorEnvelope>>;
   /** The most recently started storm session still retained, if any. */
   getLatestStormSession(): Promise<Result<StormSession | undefined, ErrorEnvelope>>;
+  /** Keeps a delivered family message for the phone (#24); validated against InboxMessageSchema. */
+  saveInboxMessage(message: NewInboxMessage): Promise<Result<void, ErrorEnvelope>>;
+  /** The family messages still retained, newest first, at most `limit`. */
+  listInbox(limit: number): Promise<Result<InboxMessage[], ErrorEnvelope>>;
 }
 
 export type StateStoreFactory = (homeId: HomeId) => StateStore;

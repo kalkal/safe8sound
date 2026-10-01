@@ -16,7 +16,7 @@ describe('start_storm_mode', () => {
       reason: 'grid_still_up',
       session: { phase: 'prepare', trigger: 'user', safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], notifications: [] },
     });
-    expect(w.inbox()).toEqual([]);
+    expect((await w.inbox())).toEqual([]);
   });
 
   it('"prepare" with the grid up says it was requested', async () => {
@@ -31,7 +31,7 @@ describe('start_storm_mode', () => {
     if (!out.ok) throw new Error(out.error.message);
     expect(StartStormModeOutputSchema.parse(out.value)).toMatchObject({ effectiveMode: 'active', reserveUnlocked: true, reason: 'grid_lost', session: { phase: 'active', trigger: 'grid_loss' } });
     expect(out.value.session.notifications).toEqual([{ at: new Date(w.clock.now()).toISOString(), transition: 'storm_started', contactRole: 'daughter', channel: 'in_app', delivered: true }]);
-    const [message] = w.inbox();
+    const [message] = (await w.inbox());
     expect(message).toMatchObject({ role: 'daughter', transition: 'storm_started' });
     expect(message?.text).toMatch(/^.+ alert for Giulia Example: a storm cut the power at home\. Bedroom is at \d+\.\d °C/);
   });
@@ -41,7 +41,7 @@ describe('start_storm_mode', () => {
     const first = await startStormMode(w.deps, { mode: 'active' }, w.ctx);
     const again = await startStormMode(w.deps, { mode: 'active' }, w.ctx);
     expect(again.ok && first.ok && again.value.session).toEqual(first.ok && first.value.session);
-    expect(w.inbox()).toHaveLength(1);
+    expect((await w.inbox())).toHaveLength(1);
   });
 
   it('quotes the safe hours of the #23 formula, until when, and keeps them as hoursAtEssential', async () => {
@@ -61,7 +61,7 @@ describe('start_storm_mode', () => {
     await startStormMode(w.deps, { mode: 'prepare' }, w.ctx); // the grid is back: the window starts
     w.advanceTo(19 + (stormConfig().stableGridMinutes + 1) / 60);
     const out = await startStormMode(w.deps, { mode: 'prepare' }, w.ctx);
-    expect(w.inbox().map((m) => m.transition)).toEqual(['power_back', 'storm_started']);
+    expect((await w.inbox()).map((m) => m.transition)).toEqual(['power_back', 'storm_started']);
     // The request itself then opens a new preparation, as asked.
     expect(out.ok && out.value).toMatchObject({ effectiveMode: 'prepare', reason: 'requested', session: { phase: 'prepare', notifications: [] } });
   });

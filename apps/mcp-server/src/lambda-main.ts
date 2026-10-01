@@ -5,6 +5,7 @@ import { composeModules, createDynamoStoreFactory } from './compose.js';
 import { createLambdaHandler } from './lambda.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 import { readParameter } from './ssm.js';
+import { stormModeWiring } from './storm-mode-config.js';
 
 // Lambda entry: the client tokens come from SSM (SecureString) named by MCP_CLIENTS_PARAMETER;
 // state lives in the single DynamoDB table named by STATE_TABLE_NAME.
@@ -34,8 +35,15 @@ export const handler = createLambdaHandler(async () => {
   const comfortPlan = comfortPlanWiring({ storeFor: storeFor.value, preferences: preferences.value, clock: wallClock });
   if (!comfortPlan.ok) return comfortPlan;
 
+  // The family phone's inbox lives in the same table (#24); its HTTP route is not served here.
+  const stormMode = stormModeWiring({ storeFor: storeFor.value, preferences: preferences.value, clock: wallClock });
+  if (!stormMode.ok) return stormMode;
+
   // No cardDocuments yet: the built card bundle is not shipped with the function, so the Lambda serves
   // the tools without their ui:// cards. TODO(#104): ship the card bundle with the MCP Lambda.
-  const app = createApp({ ...process.env, MCP_CLIENTS: clients.value }, { wallClock, logger: { log }, modules: modules.value, comfortPlan: comfortPlan.value });
+  const app = createApp(
+    { ...process.env, MCP_CLIENTS: clients.value },
+    { wallClock, logger: { log }, modules: modules.value, comfortPlan: comfortPlan.value, stormMode: stormMode.value },
+  );
   return app.ok ? ok(app.value.handler) : app;
 });

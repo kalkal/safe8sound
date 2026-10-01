@@ -49,7 +49,7 @@ export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'st
   const clock = settableClock(WALL_START);
   const sim = () => new SimulatorSource({ profile, scenario, params: defaultSimParams(), clock: fixedClock(scenarioMs) });
   const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock });
-  const phone = createInAppNotifier({ maxPerHome: 20, ttlHours: 48, clock });
+  const phone = createInAppNotifier({ storeFor, maxPerHome: 20 });
   if (!phone.ok) throw new Error(phone.error.message);
   let n = 0;
   const snapshotOf = (h: HomeId): Snapshot => {
@@ -74,5 +74,9 @@ export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'st
     clock.set(clock.now() + (startMs + h * H - scenarioMs));
     scenarioMs = startMs + h * H;
   };
-  return { deps, ctx, store: storeFor(DEMO), clock, profile, inbox: () => phone.value.inbox(DEMO), advanceTo, snapshot: () => snapshotOf(DEMO), forecast: () => sim().forecast() };
+  return { deps, ctx, store: storeFor(DEMO), clock, profile, inbox: async () => {
+      const listed = await phone.value.inbox(DEMO);
+      if (!listed.ok) throw new Error(listed.error.message);
+      return listed.value;
+    }, advanceTo, snapshot: () => snapshotOf(DEMO), forecast: () => sim().forecast() };
 }

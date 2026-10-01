@@ -1,4 +1,4 @@
-import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { INBOX_MAX_MESSAGES, err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { z } from 'zod';
 
 // Storm-mode settings: config, never constants in code. Defaults in config/storm-mode.json.
@@ -13,7 +13,7 @@ export const StormModeConfigSchema = z.strictObject({
   minIntervalMinutes: positiveInt(24 * 60),
   epsBaseLoadW: z.number().positive().max(5000),
   occupantGainW: z.number().nonnegative().max(300),
-  inApp: z.strictObject({ maxPerHome: positiveInt(500), ttlHours: positiveInt(24 * 7) }),
+  inApp: z.strictObject({ maxPerHome: positiveInt(INBOX_MAX_MESSAGES) }),
 });
 export type StormModeConfig = z.infer<typeof StormModeConfigSchema>;
 

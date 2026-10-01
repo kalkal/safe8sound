@@ -93,6 +93,8 @@ describe('preferences module (MCP tools)', () => {
         listGuardRejections: () => base.listGuardRejections(),
         saveStormSession: (s) => base.saveStormSession(s),
         getLatestStormSession: () => base.getLatestStormSession(),
+        saveInboxMessage: (m) => base.saveInboxMessage(m),
+        listInbox: (n) => base.listInbox(n),
       };
     };
     const set = await call(deps({ storeFor }), 'set_preferences', { language: 'it-IT', confirmed: true });
@@ -147,6 +149,8 @@ describe('preferences module (MCP tools)', () => {
       listGuardRejections: () => Promise.reject(new Error('not used')),
       saveStormSession: () => Promise.reject(new Error('not used')),
       getLatestStormSession: () => Promise.reject(new Error('not used')),
+      saveInboxMessage: () => Promise.reject(new Error('not used')),
+      listInbox: () => Promise.reject(new Error('not used')),
     };
     expect(await call(deps({ storeFor: () => failing }), 'get_preferences', {})).toMatchObject({
       isError: true,

@@ -1,4 +1,5 @@
 import {
+  InboxMessageSchema,
   IsoDateTimeSchema,
   epochMs,
   err,
@@ -7,6 +8,8 @@ import {
   type ConfigChange,
   type ErrorEnvelope,
   type HomeId,
+  type InboxMessage,
+  type NewInboxMessage,
   type Plan,
   type PlanId,
   type Preferences,
@@ -24,7 +27,8 @@ import {
 } from '@cold-reserve/core';
 
 // In-memory StateStore. It mirrors the DynamoDB single-table keys (plan §3.2) so both adapters
-// behave the same: PK = HOME#<homeId>, SK = PREFS | PLAN#<id> | EVENT#<ts>#<n> | GUARD#<ts>#<n>.
+// behave the same: PK = HOME#<homeId>, SK = PREFS | PLAN#<id> | EVENT#<ts>#<n> | GUARD#<ts>#<n> |
+// STORM#<startedAt>#<id> | INBOX#<at>#<n>.
 // Expired items are invisible on read, like DynamoDB TTL items that are not yet deleted.
 
 interface Item {
@@ -150,6 +154,27 @@ class MemoryStateStore implements StateStore {
   getLatestStormSession(): Promise<Result<StormSession | undefined, ErrorEnvelope>> {
     const [latest] = this.#query<StormSession>('STORM#').sort((a, b) => epochMs(b.startedAt) - epochMs(a.startedAt));
     return Promise.resolve(ok(latest));
+  }
+
+  saveInboxMessage(message: NewInboxMessage): Promise<Result<void, ErrorEnvelope>> {
+    const parsed = InboxMessageSchema.safeParse(message);
+    if (!parsed.success) {
+      const field = parsed.error.issues[0]?.path.join('.') ?? 'message';
+      return Promise.resolve(err(toolError('invalid_input', 'A family message breaks its contract.', { details: { field } })));
+    }
+    // Same key as store-dynamodb: the time in UTC, then a sequence, so two messages at once are both kept.
+    const sk = `INBOX#${new Date(message.at).toISOString()}#${String(this.#next()).padStart(12, '0')}`;
+    this.#put(sk, { value: parsed.data, expiresAtMs: epochMs(message.at) + this.#ttl.inboxDays * DAY_MS });
+    return Promise.resolve(ok(undefined));
+  }
+
+  listInbox(limit: number): Promise<Result<InboxMessage[], ErrorEnvelope>> {
+    const newest = [...this.#partition()]
+      .filter(([sk, item]) => sk.startsWith('INBOX#') && this.#live(item))
+      .sort(([a], [b]) => (a < b ? 1 : -1))
+      .slice(0, Math.max(0, limit))
+      .map(([, item]) => structuredClone(item.value) as InboxMessage);
+    return Promise.resolve(ok(newest));
   }
 
   #partition(): Map<string, Item> {

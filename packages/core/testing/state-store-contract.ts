@@ -1,11 +1,14 @@
 import {
   ConfigChangeSchema,
   HomeIdSchema,
+  InboxMessageSchema,
   PlanIdSchema,
   PlanSchema,
   PreferencesSchema,
   StormSessionSchema,
   type HomeId,
+  type NewInboxMessage,
+  type StormMessageText,
   type Plan,
   type StormSession,
 } from '@cold-reserve/contracts';
@@ -188,6 +191,57 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
         expect(await store.getLatestStormSession()).toEqual({ ok: true, value: undefined });
       });
     });
+    describe('family inbox (the phone, #24)', () => {
+      // Test-only stand-in for a rendered template (the store suite runs without @cold-reserve/i18n).
+      // eslint-disable-next-line no-restricted-syntax -- the stores are tested without the templates
+      const rendered = (text: string) => text as unknown as StormMessageText;
+      const message = (t: { at: (offsetMs: number) => string }, offsetMs: number, text: string): NewInboxMessage => ({
+        ...InboxMessageSchema.parse({ at: t.at(offsetMs), role: 'daughter', channel: 'in_app', transition: 'storm_started', text }),
+        text: rendered(text),
+      });
+
+      it('lists the messages newest first, up to the limit, and keeps two sent at the same time', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        expect(await store.listInbox(10)).toEqual({ ok: true, value: [] });
+        const sent = [message(t, 0, 'first'), message(t, MINUTE_MS, 'second'), message(t, MINUTE_MS, 'second again'), message(t, 2 * MINUTE_MS, 'third')];
+        for (const m of sent) expect((await store.saveInboxMessage(m)).ok).toBe(true);
+        const all = await store.listInbox(10);
+        const texts = all.ok ? all.value.map((m) => m.text) : [];
+        expect(texts[0]).toBe('third');
+        expect(texts.slice(1, 3).sort()).toEqual(['second', 'second again']);
+        expect(texts[3]).toBe('first');
+        const two = await store.listInbox(2);
+        expect(two.ok && two.value.map((m) => m.text)[0]).toBe('third');
+        expect(two.ok && two.value).toHaveLength(2);
+      });
+
+      it('refuses a message that breaks its contract, and writes nothing', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        expect(await store.saveInboxMessage({ ...message(t, 0, 'ok'), at: 'yesterday' })).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+        expect(await store.saveInboxMessage({ ...message(t, 0, 'ok'), text: rendered('') })).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+        expect(await store.listInbox(10)).toEqual({ ok: true, value: [] });
+      });
+
+      it('never shows one home the messages of another', async () => {
+        const t = setup();
+        await t.harness.factory(t.homeA).saveInboxMessage(message(t, 0, 'for home A'));
+        expect(await t.harness.factory(t.homeB).listInbox(10)).toEqual({ ok: true, value: [] });
+      });
+
+      it('keeps a message readable until its retention (TTL) ends', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        await store.saveInboxMessage(message(t, 0, 'short-lived'));
+        const end = t.start + DEFAULT_STATE_STORE_TTL.inboxDays * DAY_MS;
+        t.harness.setNow(end - 1);
+        expect((await store.listInbox(10)).ok && (await store.listInbox(10))).toMatchObject({ value: [{ text: 'short-lived' }] });
+        t.harness.setNow(end);
+        expect(await store.listInbox(10)).toEqual({ ok: true, value: [] });
+      });
+    });
+
     describe('home scoping', () => {
       it('never shows one home the data of another', async () => {
         const t = setup();

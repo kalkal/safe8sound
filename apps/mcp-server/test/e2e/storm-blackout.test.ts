@@ -48,7 +48,11 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
     await client.connect(transport as unknown as Transport);
     await client.listTools();
     const call = (name: string, args: Record<string, unknown> = {}) => client.callTool({ name, arguments: args });
-    const inbox = () => stormMode.value.inbox(DEMO);
+    const inbox = async () => {
+      const listed = await stormMode.value.inbox(DEMO);
+      if (!listed.ok) throw new Error(listed.error.message);
+      return listed.value;
+    };
     const t0 = wall.now();
     const atHour = (h: number) => {
       wall.set(t0 + (h - startH) * H);
@@ -59,7 +63,7 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       const injected = await call('start_storm_mode', { mode: 'active' });
       expect(StartStormModeOutputSchema.parse(injected.structuredContent)).toMatchObject({ effectiveMode: 'prepare', reserveUnlocked: false, reason: 'grid_still_up' });
       expect(textOf(injected)).toContain('the storm reserve stays locked');
-      expect(inbox()).toEqual([]);
+      expect(await inbox()).toEqual([]);
 
       expect(JSON.stringify(injected)).not.toMatch(/Giulia|phone-/);
 
@@ -68,12 +72,12 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       atHour(3.5);
       const quiet = await call('get_safe_room_status');
       expect(SafeRoomStatusSchema.parse(quiet.structuredContent)).toMatchObject({ stormPhase: 'prepare', level: 'comfort' });
-      expect(inbox()).toEqual([]);
+      expect(await inbox()).toEqual([]);
       const started = await call('start_storm_mode', { mode: 'prepare' });
       const start = StartStormModeOutputSchema.parse(started.structuredContent);
       expect(start).toMatchObject({ effectiveMode: 'active', reserveUnlocked: true, reason: 'grid_lost' });
       expect(JSON.stringify(started)).not.toMatch(/Giulia|phone-/);
-      expect(inbox()[0]?.text).toContain(`keeps it safe until ${clock(Date.parse(start.safeUntil))}.`);
+      expect((await inbox())[0]?.text).toContain(`keeps it safe until ${clock(Date.parse(start.safeUntil))}.`);
       const status = await call('get_safe_room_status');
       expect(JSON.stringify(status)).not.toMatch(/Giulia|phone-/);
       const s = SafeRoomStatusSchema.parse(status.structuredContent);
@@ -83,8 +87,8 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       const expected = expectedSafeHours({ snapshot: sim.snapshotAt(Date.parse(scenario.startAt) + 3.5 * H), forecast: sim.forecast(), profile: demoProfile(), preferences, config: stormMode.value.config });
       expect(Math.abs(s.safeHours - expected) / expected).toBeLessThanOrEqual(0.05);
       expect(textOf(status)).toContain(`Safe for about ${s.safeHours.toFixed(1)} hours`);
-      expect(inbox().map((m) => `${m.transition}:${m.role}`)).toEqual(['storm_started:daughter']);
-      expect(inbox()[0]?.text).toContain('Bedroom is at');
+      expect((await inbox()).map((m) => `${m.transition}:${m.role}`)).toEqual(['storm_started:daughter']);
+      expect((await inbox())[0]?.text).toContain('Bedroom is at');
 
       // 3. The model tells the family the house went to Essential: roles only in what it reads.
       const told = await call('notify_family', { transition: 'essential_level' });
@@ -102,8 +106,8 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       expect(StartStormModeOutputSchema.parse(back.structuredContent).effectiveMode).toBe('active'); // not yet stable
       atHour(18.6 + 11 / 60);
       await call('start_storm_mode', { mode: 'prepare' });
-      expect(inbox().map((m) => m.transition)).toEqual(['power_back', 'essential_level', 'storm_started']);
-      expect(inbox()[0]?.text).toContain(`power came back at home at ${clock(gridBackMs)}.`);
+      expect((await inbox()).map((m) => m.transition)).toEqual(['power_back', 'essential_level', 'storm_started']);
+      expect((await inbox())[0]?.text).toContain(`power came back at home at ${clock(gridBackMs)}.`);
     } finally {
       await client.close();
       await server.close();

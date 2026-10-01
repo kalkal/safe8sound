@@ -5,7 +5,7 @@ import { parseStormModeConfig } from '../../src/modules/storm-mode/config.js';
 describe('storm-mode config', () => {
   it('parses the default file', () => {
     const c = parseStormModeConfig(raw);
-    expect(c.ok && c.value).toMatchObject({ capHours: 24, stableGridMinutes: 10, minIntervalMinutes: 60, inApp: { maxPerHome: 50, ttlHours: 48 } });
+    expect(c.ok && c.value).toMatchObject({ capHours: 24, stableGridMinutes: 10, minIntervalMinutes: 60, inApp: { maxPerHome: 50 } });
   });
 
   it.each([
