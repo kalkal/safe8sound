@@ -12,7 +12,7 @@ import {
   renderCardHtml,
   safeTimeZone,
 } from '../src/app/card-kinds.js';
-import { hotDayPlan, stormPlan } from '../src/fixtures.js';
+import { hotDayPlan, stormPlan, safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -25,6 +25,7 @@ describe('CARD_KINDS: one ui:// resource per tool that shows a card', () => {
       applied: ['apply_plan', 'ui://cold-reserve/applied-plan'],
       reserve: ['get_reserve_outlook', 'ui://cold-reserve/reserve-outlook'],
       preferences: ['get_preferences', 'ui://cold-reserve/preferences'],
+      storm: ['get_safe_room_status', 'ui://cold-reserve/safe-room'],
     });
   });
 });
@@ -111,6 +112,17 @@ describe('isStormState: the card switches to the storm theme only with the grid 
     expect(isStormState({ kind: 'reserve', data: { ...outlook, gridAvailable: false } })).toBe(true);
     expect(isStormState({ kind: 'reserve', data: { ...outlook, gridAvailable: true } })).toBe(false);
     expect(isStormState({ kind: 'reserve', data: outlook })).toBe(false);
+  });
+
+  it('is true for the safe room only while the storm is active', () => {
+    expect(isStormState({ kind: 'storm', data: safeRoomInStorm() })).toBe(true);
+    expect(isStormState({ kind: 'storm', data: safeRoomCalm() })).toBe(false);
+    expect(isStormState({ kind: 'storm', data: { ...safeRoomInStorm(), stormPhase: 'prepare' } })).toBe(false);
+  });
+
+  it('parses the safe-room status for the storm card', () => {
+    expect(parseCardResult('storm', { content: [], structuredContent: safeRoomInStorm() })).toMatchObject({ kind: 'storm', data: { safeRoomId: 'bedroom-1' } });
+    expect(parseCardResult('storm', { content: [], structuredContent: { safeRoomId: 'bedroom-1' } })).toMatchObject({ kind: 'error' });
   });
 });
 

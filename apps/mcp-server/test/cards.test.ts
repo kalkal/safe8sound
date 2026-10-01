@@ -24,6 +24,7 @@ const tool = (name: string) =>
 
 const comfort: CapabilityModule = { id: 'comfort-plan', tools: [tool('plan_comfort'), tool('apply_plan'), tool('get_reserve_outlook')] };
 const preferences: CapabilityModule = { id: 'preferences', tools: [tool('get_preferences'), tool('set_preferences')] };
+const storm: CapabilityModule = { id: 'storm-mode', tools: [tool('start_storm_mode'), tool('get_safe_room_status'), tool('notify_family')] };
 const documents: CardDocuments = { read: (kind) => ok(`<!doctype html><html><head></head><body data-card="${kind}"></body></html>`) };
 
 describe('withCardResources', () => {
@@ -38,6 +39,12 @@ describe('withCardResources', () => {
     expect(prefs?.tools.map((t) => t.ui?.resourceUri)).toEqual(['ui://cold-reserve/preferences', undefined]);
     expect(prefs?.resources?.map((r) => r.uri)).toEqual(['ui://cold-reserve/preferences']);
     expect(probe).toBe(probeModule);
+  });
+
+  it('gives the storm-mode module the safe-room card on get_safe_room_status only (#24)', () => {
+    const [linked] = withCardResources([storm], documents);
+    expect(linked?.tools.map((t) => t.ui?.resourceUri)).toEqual([undefined, 'ui://cold-reserve/safe-room', undefined]);
+    expect(linked?.resources?.map((r) => r.uri)).toEqual(['ui://cold-reserve/safe-room']);
   });
 
   it('reads the card document only when asked', () => {

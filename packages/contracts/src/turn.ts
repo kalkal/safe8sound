@@ -5,6 +5,7 @@ import { DataOriginSchema } from './origin.js';
 import { PlanSchema } from './plan.js';
 import { GetPreferencesOutputSchema, SetPreferencesInputSchema } from './preferences-view.js';
 import { ReserveOutlookSchema } from './reserve-outlook.js';
+import { SafeRoomStatusSchema } from './storm.js';
 import { PctSchema } from './units.js';
 
 // The wire between alexa-sim and sim-api (#55, #101). The browser only ever holds the demo token:
@@ -37,6 +38,8 @@ export const ToolCardSchema = z.discriminatedUnion('tool', [
   z.strictObject({ tool: z.literal('apply_plan'), result: ApplyPlanOutputSchema }),
   z.strictObject({ tool: z.literal('get_reserve_outlook'), result: ReserveOutlookSchema }),
   z.strictObject({ tool: z.literal('get_preferences'), result: GetPreferencesOutputSchema }),
+  /** The storm card (safe room), additive, approved in #24 (Q2). */
+  z.strictObject({ tool: z.literal('get_safe_room_status'), result: SafeRoomStatusSchema }),
 ]);
 export type ToolCard = z.infer<typeof ToolCardSchema>;
 export type CardToolName = ToolCard['tool'];

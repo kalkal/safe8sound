@@ -7,7 +7,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto(`/?gallery&theme=${theme}`);
     await expect(page.getByText(`Guard · plan ${'P'.repeat(64)}`)).toBeVisible();
-    for (const title of ['Plan', 'Guard check', 'Cold reserve', 'Preferences']) {
+    for (const title of ['Plan', 'Guard check', 'Cold reserve', 'Preferences', 'Safe room · Bedroom 1']) {
       await expect(page.getByRole('heading', { name: title, exact: true }).first()).toBeVisible();
     }
     await expect(page.locator('html')).toHaveAttribute('data-card-theme', `pawnio-${theme}`);

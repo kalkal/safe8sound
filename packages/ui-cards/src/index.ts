@@ -20,6 +20,7 @@ export { GuardReceipt } from './GuardReceipt.js';
 export { IceCubesCard, cubeFills } from './IceCubesCard.js';
 export { PlanCard, type PlanCardProps } from './PlanCard.js';
 export { PreferencesCard, type PreferencesCardProps } from './PreferencesCard.js';
-export { advisoryPlan, hotDayPlan, rejectedPlan, stormPlan } from './fixtures.js';
+export { SafeRoomCard } from './SafeRoomCard.js';
+export { advisoryPlan, hotDayPlan, rejectedPlan, safeRoomCalm, safeRoomInStorm, stormPlan } from './fixtures.js';
 export { homeClock, levelSpans, pacingGeometry } from './plan-model.js';
 export { cardThemeFor, type CardTheme } from './theme.js';

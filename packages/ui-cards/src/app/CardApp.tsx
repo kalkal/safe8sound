@@ -3,6 +3,7 @@ import { GuardReceipt } from '../GuardReceipt.js';
 import { IceCubesCard } from '../IceCubesCard.js';
 import { PlanCard } from '../PlanCard.js';
 import { PreferencesCard } from '../PreferencesCard.js';
+import { SafeRoomCard } from '../SafeRoomCard.js';
 import { t } from '../text.js';
 import { CardErrorBoundary } from './CardErrorBoundary.js';
 import type { CardState } from './card-kinds.js';
@@ -66,6 +67,8 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
       return <AppliedPlan result={state.data} timeZone={timeZone} />;
     case 'reserve':
       return <IceCubesCard outlook={state.data} />;
+    case 'storm':
+      return <SafeRoomCard status={state.data} />;
     case 'preferences':
       return (
         <>

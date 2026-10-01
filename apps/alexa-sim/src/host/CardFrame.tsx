@@ -16,13 +16,21 @@ import { answerCardCall } from './tool-calls.js';
 const HOST_INFO = { name: 'cold-reserve-alexa-sim', version: '0.1.0' };
 const INITIAL_HEIGHT_PX = 360;
 
-export const kindOf = (tool: ToolCard['tool']): CardKind =>
-  (Object.keys(CARD_KINDS) as CardKind[]).find((kind) => CARD_KINDS[kind].tool === tool) ?? 'plan';
+/** The card kind that shows a tool's result; a tool without a card has none (never another card's kind). */
+export const kindOf = (tool: string): CardKind | undefined => (Object.keys(CARD_KINDS) as CardKind[]).find((kind) => CARD_KINDS[kind].tool === tool);
 
 /** `turnId`: the turn that showed the card; its logs and its actions carry that correlation id. */
 export function CardFrame({ card, turnId }: { card: ToolCard; turnId: string }) {
-  const { agent, documentFor, theme, timeZone } = useCardHost();
   const kind = kindOf(card.tool);
+  if (kind === undefined) {
+    log({ level: 'warn', code: 'unknown_card', correlationId: turnId, details: { card: card.tool } });
+    return <p role="alert">{t('card.failed')}</p>;
+  }
+  return <KnownCardFrame card={card} kind={kind} turnId={turnId} />;
+}
+
+function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind; turnId: string }) {
+  const { agent, documentFor, theme, timeZone } = useCardHost();
   const document = useMemo(() => documentFor(kind), [documentFor, kind]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<AppBridge | null>(null);

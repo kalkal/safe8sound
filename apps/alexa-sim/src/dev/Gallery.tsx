@@ -1,7 +1,20 @@
 import '@cold-reserve/ui-cards/cards.css';
 import { HomeProfileSchema, PlanSchema, PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
 import { exampleHomeProfile, examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
-import { GuardReceipt, IceCubesCard, PlanCard, PreferencesCard, advisoryPlan, cardThemeFor, hotDayPlan, rejectedPlan, stormPlan } from '@cold-reserve/ui-cards';
+import {
+  GuardReceipt,
+  IceCubesCard,
+  PlanCard,
+  PreferencesCard,
+  SafeRoomCard,
+  advisoryPlan,
+  cardThemeFor,
+  hotDayPlan,
+  rejectedPlan,
+  safeRoomCalm,
+  safeRoomInStorm,
+  stormPlan,
+} from '@cold-reserve/ui-cards';
 
 // Dev-only style lab (plan §11.1bis point 8): every card on contract fixtures, in the theme the host
 // would pass (`?gallery&theme=light|dark`). Used for visual checks and the per-theme screenshots.
@@ -32,6 +45,8 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       />
       <PlanCard plan={advisoryPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <PlanCard plan={stormPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
+      <SafeRoomCard status={safeRoomInStorm()} />
+      <SafeRoomCard status={{ ...safeRoomCalm(), homeLink: 'stale' }} />
     </div>
   );
 }

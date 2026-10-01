@@ -13,7 +13,7 @@ export function cubeFills(hours: number): number[] {
 }
 
 /** What the row of cubes shows, in words: derived from the same fills that are drawn. */
-function cubesLabel(hours: number): string {
+export function cubesLabel(hours: number): string {
   const fills = cubeFills(hours);
   const full = fills.filter((f) => f === 1).length;
   const part = fills.some((f) => f > 0 && f < 1);

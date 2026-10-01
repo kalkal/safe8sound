@@ -74,11 +74,11 @@ describe('MCP Inspector CLI against the local entry', () => {
     expect(status.origin).toMatchObject({ energy: 'simulated', rooms: 'simulated', weather: 'simulated' });
   });
 
-  it('shows the four cards as ui:// MCP Apps resources (#92)', { timeout: TIMEOUT }, async () => {
+  it('shows the five cards as ui:// MCP Apps resources (#92, #24)', { timeout: TIMEOUT }, async () => {
     const run = await inspect(['--method', 'resources/list']);
     expect(run.status, run.stderr).toBe(0);
     expect(run.result?.resources?.map((r) => [r.uri, r.mimeType])).toEqual(
-      ['plan-card', 'applied-plan', 'reserve-outlook', 'preferences'].map((card) => [`ui://cold-reserve/${card}`, 'text/html;profile=mcp-app']),
+      ['plan-card', 'applied-plan', 'reserve-outlook', 'safe-room', 'preferences'].map((card) => [`ui://cold-reserve/${card}`, 'text/html;profile=mcp-app']),
     );
   });
 
@@ -93,7 +93,7 @@ describe('MCP Inspector CLI against the local entry', () => {
     expect(document?.text).toContain('<div id="root" data-card="plan"></div>');
   });
 
-  it('links plan_comfort, apply_plan, get_reserve_outlook and get_preferences to their cards', { timeout: TIMEOUT }, async () => {
+  it('links the five card tools to their cards: plan_comfort, apply_plan, get_reserve_outlook, get_safe_room_status and get_preferences', { timeout: TIMEOUT }, async () => {
     const run = await inspect(['--method', 'tools/list']);
     expect(run.status, run.stderr).toBe(0);
     const linked = Object.fromEntries((run.result?.tools ?? []).filter((t) => t._meta).map((t) => [t.name, t._meta?.ui?.resourceUri]));
@@ -101,6 +101,7 @@ describe('MCP Inspector CLI against the local entry', () => {
       plan_comfort: 'ui://cold-reserve/plan-card',
       apply_plan: 'ui://cold-reserve/applied-plan',
       get_reserve_outlook: 'ui://cold-reserve/reserve-outlook',
+      get_safe_room_status: 'ui://cold-reserve/safe-room',
       get_preferences: 'ui://cold-reserve/preferences',
     });
   });

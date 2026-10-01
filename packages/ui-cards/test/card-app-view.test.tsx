@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CardApp } from '../src/app/CardApp.js';
 import type { CardState } from '../src/app/card-kinds.js';
-import { advisoryPlan, hotDayPlan } from '../src/fixtures.js';
+import { advisoryPlan, hotDayPlan, safeRoomInStorm } from '../src/fixtures.js';
 
 afterEach(cleanup);
 
@@ -34,6 +34,12 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(screen.getByRole('status').textContent).toBe('Plan applied.');
     expect(screen.getByRole('list', { name: 'Do this by hand' }).textContent).toBe('Bedroom: dry at 26.5 °C');
     expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();
+  });
+
+  it('shows the safe room for the storm card', () => {
+    show({ kind: 'storm', data: safeRoomInStorm() });
+    expect(screen.getByRole('region', { name: 'Safe room · Bedroom 1' })).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('Storm mode');
   });
 
   it('shows the ice cubes', () => {

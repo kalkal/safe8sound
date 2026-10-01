@@ -1,4 +1,4 @@
-import { PlanSchema, type Plan } from '@cold-reserve/contracts';
+import { PlanSchema, SafeRoomStatusSchema, type Plan, type SafeRoomStatus } from '@cold-reserve/contracts';
 import { examplePlan } from '@cold-reserve/contracts/fixtures';
 
 // Card fixtures, built only from the contract fixtures and parsed by the contract schemas.
@@ -72,4 +72,28 @@ export function advisoryPlan(): Plan {
   };
   plan.warnings = [{ code: 'night_recovery_infeasible', message: 'The bedroom stays at or below 24 °C for 4 of the 6 hours needed tonight.' }];
   return PlanSchema.parse(plan);
+}
+
+/** The safe room during the storm-blackout scene: grandpa in bedroom 1, Essential, grid down. */
+export function safeRoomInStorm(): SafeRoomStatus {
+  return SafeRoomStatusSchema.parse({
+    safeRoomId: 'bedroom-1',
+    tempC: 26.8,
+    humidityPct: 55,
+    occupantRoles: ['grandpa'],
+    level: 'essential',
+    levelReason: 'storm',
+    safeHours: 10.4,
+    safeUntil: '2026-07-18T06:40:00+02:00',
+    stormPhase: 'active',
+    origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated', scenario: 'storm-blackout' },
+    homeLink: 'ok',
+  });
+}
+
+/** The same room on an ordinary evening: no storm, the person's chosen comfort. */
+export function safeRoomCalm(): SafeRoomStatus {
+  const status: Partial<SafeRoomStatus> = { ...safeRoomInStorm(), level: 'comfort', levelReason: 'user_choice' };
+  delete status.stormPhase;
+  return SafeRoomStatusSchema.parse(status);
 }

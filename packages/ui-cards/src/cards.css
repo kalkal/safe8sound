@@ -96,6 +96,8 @@
     font-size: clamp(var(--font-size-hero-min), 14cqi, var(--font-size-hero-max));
     font-weight: var(--font-weight-bold);
     line-height: 1;
+    /* A narrow phone with a wider fallback font never scrolls sideways (CI has no Roboto). */
+    overflow-wrap: anywhere;
   }
 
   .plan-hero {
@@ -334,6 +336,38 @@
     }
   }
 
+  /* Safe room (storm screen): storm mode said in words and an icon, never by colour alone (plan §11.2 p.13). */
+  .storm-banner,
+  .advice,
+  .info-strip {
+    margin: 0;
+    padding: var(--space-3);
+    border-inline-start: calc(var(--border-thin) * 4) solid var(--status-storm);
+    border-radius: var(--radius-cube);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+  }
+
+  .storm-banner {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    font-weight: var(--font-weight-bold);
+  }
+
+  .info-strip {
+    border-inline-start-color: var(--status-neutral);
+  }
+
+  .facts {
+    display: grid;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    color: var(--text-primary);
+    list-style: none;
+  }
+
   /* Ice cubes: one per hour at the current level; the last one fills to the part of the hour left. */
   .cubes {
     display: flex;
@@ -438,3 +472,4 @@
     cursor: not-allowed;
   }
 }
+
