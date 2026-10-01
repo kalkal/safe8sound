@@ -23,13 +23,14 @@ let simApi: string;
 function start(app: string, env: Record<string, string>): Promise<string> {
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/local.ts'], { cwd: join(APPS, app), env: { ...process.env, PORT: '0', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
   children.push(child);
-  child.stderr.resume();
+  child.stderr.on('data', (d: Buffer) => process.stderr.write(`[${app}] ${String(d)}`));
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`${app} did not start within 40 s`));
     }, 40_000);
     child.stdout.on('data', (d: Buffer) => {
-      const found = /listening on (\S+)"/.exec(String(d));
+      // The URL ends at the closing quote of the JSON message, wherever the message sits in the line.
+      const found = /listening on ([^"\s]+)"/.exec(String(d));
       if (found?.[1]) {
         clearTimeout(timer);
         resolve(found[1]);

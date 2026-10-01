@@ -32,14 +32,21 @@ const InvocationSchema = z.strictObject({
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest();
 
+/**
+ * Who authenticates the caller. `token`: the local entry checks AGENT_INVOKE_TOKEN itself. `platform`: on
+ * AgentCore the runtime is reached only through InvokeAgentRuntime, which IAM (SigV4) has already
+ * authenticated (decided in #17): the request carries no bearer, and none is asked for.
+ */
+export type InvocationAuth = { readonly kind: 'token'; readonly invokeToken: string } | { readonly kind: 'platform' };
+
 export function createInvocationHandler(deps: {
-  invokeToken: string;
+  auth: InvocationAuth;
   maxBodyBytes: number;
   agentFor: (home: HomeId) => HomeAgent;
   /** Refusals only: turn failures are logged by the agent itself. */
   log?: (entry: AgentLogEntry) => void;
 }): (req: Request) => Promise<Response> {
-  const expected = sha256(deps.invokeToken);
+  const expected = deps.auth.kind === 'token' ? sha256(deps.auth.invokeToken) : undefined;
   const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
     new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
   const fail = (error: ErrorEnvelope, correlationId: string, status?: HttpErrorStatus) => {
@@ -60,9 +67,11 @@ export function createInvocationHandler(deps: {
     if (path !== '/invocations') return refuse(toolError('route_not_found', 'Unknown endpoint.'), correlationId, 404);
     if (req.method !== 'POST') return refuse(toolError('method_not_allowed', 'POST only.'), correlationId, 405);
 
-    const bearer = /^Bearer (\S+)$/.exec(req.headers.get('authorization') ?? '')?.[1];
-    if (bearer === undefined) return refuse(toolError('missing_token', 'An invoke token is required.'), correlationId);
-    if (!timingSafeEqual(sha256(bearer), expected)) return refuse(toolError('wrong_client', 'This caller may not invoke the agent.'), correlationId);
+    if (expected !== undefined) {
+      const bearer = /^Bearer (\S+)$/.exec(req.headers.get('authorization') ?? '')?.[1];
+      if (bearer === undefined) return refuse(toolError('missing_token', 'An invoke token is required.'), correlationId);
+      if (!timingSafeEqual(sha256(bearer), expected)) return refuse(toolError('wrong_client', 'This caller may not invoke the agent.'), correlationId);
+    }
 
     const declared = Number(req.headers.get('content-length') ?? 0);
     const text = declared > deps.maxBodyBytes ? '' : await req.text();

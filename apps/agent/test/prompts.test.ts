@@ -58,3 +58,13 @@ describe('few-shot dialogues (plan §4: hot day, storm, "how is Grandpa doing?")
     for (const call of dialogue.toolCalls) expect(PLAN_TOOLS).toContain(call.name);
   });
 });
+
+describe('the system prompt inside the code (G1a: it must survive the CJS bundle for AgentCore)', () => {
+  it('comes from a generated module that matches prompts/system.v1.md (run `pnpm --filter @cold-reserve/agent prompts`)', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const source = (await readFile(new URL('../prompts/system.v1.md', import.meta.url), 'utf8')).trim();
+    const { SYSTEM_PROMPTS } = await import('../src/prompts.generated.js');
+    expect(SYSTEM_PROMPTS.v1).toBe(source);
+    expect(SYSTEM_PROMPT_TEMPLATE).toBe(source);
+  });
+});

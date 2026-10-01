@@ -1,7 +1,7 @@
 import './no-network.js';
 import { ProblemDetailsSchema, TurnReplySchema, err, ok, toolError, type HomeId } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { createInvocationHandler, type HomeAgent } from '../src/invocations.js';
+import { createInvocationHandler, type HomeAgent, type InvocationAuth } from '../src/invocations.js';
 import type { AgentLogEntry } from '../src/log.js';
 
 const TOKEN = 'i'.repeat(48);
@@ -10,12 +10,12 @@ const ID = '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60';
 
 const REPLY = TurnReplySchema.parse({ text: 'Your battery is at 45%.', status: { batterySocPct: 45, origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' }, ts: '2026-07-15T12:00:00.000Z' } });
 
-function setup(answer: HomeAgent['ask'] = () => Promise.resolve(ok(REPLY))) {
+function setup(answer: HomeAgent['ask'] = () => Promise.resolve(ok(REPLY)), auth: InvocationAuth = { kind: 'token', invokeToken: TOKEN }) {
   const homes: HomeId[] = [];
   const logs: AgentLogEntry[] = [];
   const handler = createInvocationHandler({
     log: (entry) => logs.push(entry),
-    invokeToken: TOKEN,
+    auth,
     maxBodyBytes: 4096,
     agentFor: (home) => {
       homes.push(home);
@@ -103,7 +103,25 @@ describe('agent invocation entry (AgentCore runtime shape: POST /invocations, GE
     await post({ prompt: 'Hi', home: 'demo#0123456789abcdef' }, 'x'.repeat(48), '/invocations', { 'x-correlation-id': ID });
     expect(logs).toMatchObject([{ level: 'warn', component: 'agent', code: 'wrong_client', category: 'unauthorized', correlationId: ID, errorName: 'InvocationRefused' }]);
     expect(logs).toHaveLength(1);
-    expect(Object.keys(logs[0] ?? {}).sort()).toEqual(['category', 'code', 'component', 'correlationId', 'errorName', 'level', 'ts']);
+    expect(Object.keys(logs[0] ?? {}).sort()).toEqual(['category', 'code', 'component', 'correlationId', 'errorName', 'level', 'message', 'ts']);
+    // The message is the code (#143): never the refusal text.
+    expect(logs[0]?.message).toBe('wrong_client');
     expect(JSON.stringify(logs)).not.toContain('may not invoke');
+  });
+});
+
+describe('AgentCore runtime entry: the platform authenticates the caller (G1a, IAM/SigV4 decided in #17)', () => {
+  it('serves an invocation without any bearer token', async () => {
+    const { post, homes } = setup(undefined, { kind: 'platform' });
+    const res = await post({ prompt: 'Hi', home: 'demo#0123456789abcdef' }, null);
+    expect(res.status).toBe(200);
+    expect(homes).toEqual(['demo#0123456789abcdef']);
+  });
+
+  it('still serves sandbox homes only, and still caps the body', async () => {
+    const { post, homes } = setup(undefined, { kind: 'platform' });
+    await problem(await post({ prompt: 'Hi', home: 'home' }, null), 400, 'invalid_input');
+    await problem(await post({ prompt: 'x'.repeat(5000), home: 'demo#0123456789abcdef' }, null), 413, 'payload_too_large');
+    expect(homes).toEqual([]);
   });
 });

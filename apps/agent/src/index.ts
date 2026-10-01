@@ -11,7 +11,7 @@ export { EVAL_SUITE, EvalSuiteSchema, type EvalCase, type EvalSuite } from './ev
 export { runEvals, type CaseResult, type EvalReport } from './evals/harness.js';
 export { scoreCase, type CaseScore } from './evals/metrics.js';
 export { createHomeAgent } from './home-agent.js';
-export { createInvocationHandler, type HomeAgent } from './invocations.js';
+export { createInvocationHandler, type HomeAgent, type InvocationAuth } from './invocations.js';
 export { connectMcp, createTurnRecorder, mcpRequestHeaders, mcpToolset, withCorrelationHeader, type McpSession, type TurnRecorder } from './mcp-tools.js';
 export { logLine } from './log.js';
 export { homeAgents } from './sessions.js';

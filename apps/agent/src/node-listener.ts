@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http';
+import { logLine, type AgentLogEntry } from './log.js';
 import { PROBLEM_JSON_CONTENT_TYPE, toProblemDetails, toolError, type ErrorEnvelope, type HttpErrorStatus } from '@cold-reserve/contracts';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -8,7 +9,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * The local agent entry on Node's http server (review of #121): the body is capped while it is read,
  * and a throw becomes an RFC 9457 500 with the correlation id and one log line (error name only).
  */
-export function nodeListener(handle: (req: Request) => Promise<Response>, opts: { maxBodyBytes: number; log: (line: object) => void }): RequestListener {
+export function nodeListener(handle: (req: Request) => Promise<Response>, opts: { maxBodyBytes: number; log: (entry: AgentLogEntry) => void }): RequestListener {
   return (req, res) => {
     const presented = req.headers['x-correlation-id'];
     const correlationId = typeof presented === 'string' && UUID.test(presented) ? presented : randomUUID();
@@ -30,8 +31,9 @@ export function nodeListener(handle: (req: Request) => Promise<Response>, opts: 
       const response = await handle(new Request(new URL(req.url ?? '/', 'http://127.0.0.1'), { method, headers, ...(method === 'GET' || method === 'HEAD' ? {} : { body }) }));
       await writeResponse(res, response);
     })().catch((error: unknown) => {
-      opts.log({ ts: new Date().toISOString(), level: 'error', component: 'agent', code: 'unexpected_error', category: 'internal', correlationId, errorName: error instanceof Error ? error.name : typeof error });
-      problem(toolError('unexpected_error', 'Something went wrong on our side.'));
+      const failure = toolError('unexpected_error', 'Something went wrong on our side.');
+      opts.log(logLine(failure, error instanceof Error ? error.name : typeof error, { correlationId }));
+      problem(failure);
     });
   };
 }

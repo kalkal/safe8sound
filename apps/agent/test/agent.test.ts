@@ -113,6 +113,7 @@ describe('createAgent on the Strands loop with the fake model', () => {
         ts: expect.any(String) as unknown,
         level: 'warn',
         component: 'agent',
+        message: 'agent_unavailable',
         code: 'agent_unavailable',
         category: 'dependency_unavailable',
         correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60',

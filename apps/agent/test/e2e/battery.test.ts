@@ -123,7 +123,7 @@ describe("\"What's my battery level?\" through the agent and the local MCP serve
     const agent = createAgent({ config: config(url), model: new FakeModel(batteryPolicy), tools: tools(url, 'x'.repeat(48)), log: (e) => logs.push(e) });
     const turn = await agent.ask("What's my battery level?");
     expect(turn).toMatchObject({ ok: false, error: { code: 'invalid_config', retryable: false } });
-    expect(logs).toMatchObject([{ level: 'error', component: 'agent', code: 'invalid_config', category: 'internal', errorName: 'Error', httpStatus: 401 }]);
+    expect(logs).toMatchObject([{ level: 'error', component: 'agent', code: 'invalid_config', category: 'internal', errorName: 'Error', details: { httpStatus: 401 } }]);
   }, 60_000);
 
   it('returns agent_unavailable (retryable) when the MCP server is down', async () => {
