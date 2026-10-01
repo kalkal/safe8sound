@@ -9,7 +9,7 @@ Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server
 > - **The storm is a scenario.** No real blackout is involved; the family messages go to a simulated in-app phone: an inbox kept in the home's state store for two days ([notifier-inapp](packages/adapters/notifier-inapp/src/index.ts), [state-store.ts:44](packages/core/src/state-store.ts:44)), not to real phones.
 > - **The real home is read-only.** The `home` id is served by the simulator until the home bridge exists ([app.ts:43](apps/mcp-server/src/app.ts:43), issue #15), and on it a plan is advice with manual steps, never a command ([docs/comfort-plan.md](docs/comfort-plan.md)).
 > - **The model is fake until AWS.** Locally and in CI the agent runs on a scripted fake model; Bedrock (Nova 2 Lite) is wired in config but not called yet ([config.ts:24](apps/agent/src/config.ts:24)).
-> - **Not done yet:** the sim-api HTTP entry (#101), real voice (#25), the storm screen and family phone screen (#24), the card bundle on Lambda (#104), the database error log, and the deploy. See [What is not done yet](#what-is-not-done-yet).
+> - **Not done yet:** the deploy (sim-api and the agent run locally only), the rest of voice (#25), the phone reading its real inbox and manual control (#24), the card bundle on Lambda (#104), and the database error log. See [What is not done yet](#what-is-not-done-yet).
 
 ## What it does today
 
@@ -54,8 +54,9 @@ Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server
 - **Guarantees:** the storm reserve is never spent while the grid is up: "active" with the grid up is only a preparation ([start-storm-mode.test.ts:10](apps/mcp-server/test/storm-mode/start-storm-mode.test.ts:10)). `notify_family` sends only fixed texts to saved contacts; the model cannot write the text or name a recipient, and nobody is told twice ([notify-family.test.ts](apps/mcp-server/test/storm-mode/notify-family.test.ts), with a property test at line 94).
 - **Off grid, only the EPS load.** The storm physics draws only the home's EPS load (`epsBaseLoadW` in the home profile). A profile without it refuses to plan (`missing_eps_load`) rather than assume a value ([plan-comfort.test.ts:206](apps/mcp-server/test/comfort-plan/plan-comfort.test.ts:206), [eps-load.test.ts](apps/mcp-server/test/eps-load.test.ts)).
 - **Last resort.** When no plan keeps every guarantee in a storm with a low battery, `plan_comfort` adds a last-resort warning: how long the safe room stays safe and until what local time. It is advice only: it does not invite to apply, and `apply_plan` still refuses it ([summaries.test.ts:90](apps/mcp-server/test/comfort-plan/summaries.test.ts:90), [safe-until.ts](packages/guard/src/safe-until.ts)).
-- **Simulated:** the blackout (scenario `storm-blackout`) and the phone. Each delivered message is saved in the home's state store (`INBOX#` items, kept two days). The family phone reads it through a GET route with a phone-only token, on the local entry only ([phone-inbox.ts](apps/mcp-server/src/phone-inbox.ts), [phone-inbox.test.ts](apps/mcp-server/test/phone-inbox.test.ts)); the phone screen comes with #24; the inbox is never exposed through an MCP tool, because the text carries the contact's name. Storm mode is wired on the Lambda entry too ([lambda-main.ts:39](apps/mcp-server/src/lambda-main.ts:39)).
-- **Proof:** [e2e/storm-blackout.test.ts](apps/mcp-server/test/e2e/storm-blackout.test.ts) runs the whole flow through MCP, with safe hours within 5 % of the formula.
+- **Simulated:** the blackout (scenario `storm-blackout`) and the phone. Each delivered message is saved in the home's state store (`INBOX#` items, kept two days). The family phone reads it through a GET route with a phone-only token, on the local entry only ([phone-inbox.ts](apps/mcp-server/src/phone-inbox.ts), [phone-inbox.test.ts](apps/mcp-server/test/phone-inbox.test.ts)); the inbox is never exposed through an MCP tool, because the text carries the contact's name. Storm mode is wired on the Lambda entry too ([lambda-main.ts:53](apps/mcp-server/src/lambda-main.ts:53)).
+- **Phone panel.** The simulator shows a family phone panel, titled as simulated, fed by the scripted scene; it does not read the GET route yet (#24) ([PhonePanel.tsx](apps/alexa-sim/src/phone/PhonePanel.tsx)).
+- **Proof:** [e2e/storm-blackout.test.ts](apps/mcp-server/test/e2e/storm-blackout.test.ts) runs the whole flow through MCP, with safe hours within 5 % of the formula; demo scene 3 in the browser: storm starts, the safe-room card and the phone message appear, the spoken numbers match the cards ([scene-03-storm.spec.ts](e2e/demo-script/scene-03-storm.spec.ts)).
 
 ### Cards (MCP Apps, `ui://`)
 - Five cards from one self-contained bundle ([card-kinds.ts](packages/ui-cards/src/app/card-kinds.ts)): `ui://cold-reserve/plan-card` (plan_comfort), `applied-plan` (apply_plan), `reserve-outlook` (get_reserve_outlook), `preferences` (get_preferences), `safe-room` (get_safe_room_status). Light and dark themes from the host; they fit a 375 px phone ([gallery.spec.ts](e2e/cards/gallery.spec.ts)). Screenshots: [docs/screenshots](docs/screenshots).
@@ -64,7 +65,8 @@ Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server
 ### Web simulator
 - `apps/alexa-sim`: a conversation screen like an Alexa+ device with a display. It runs offline on a **scripted agent** (a fixed script, [script.v1.json](apps/alexa-sim/src/agent/script.v1.json)) or on a **remote agent** behind the sim-api. If the remote agent fails or times out, it falls back to the script, still marked SIMULATED, and never claims an action happened ([fallback-agent.ts](apps/alexa-sim/src/agent/fallback-agent.ts), [faults/remote-agent.spec.ts](e2e/faults/remote-agent.spec.ts)).
 - Browser and card log lines are structured JSON with the turn's correlation id when the simulator knows it (lines from inside a card have none yet), error names only, never messages or stacks ([log.ts](apps/alexa-sim/src/log.ts), [log.test.ts](apps/alexa-sim/test/log.test.ts)).
-- Voice: not yet (#25). Today you type.
+- **Voice.** You can ask aloud and hear the answer, with the browser's own speech recognition and voices ([speech.ts](apps/alexa-sim/src/voice/speech.ts)). Listening is never allowed while thinking or speaking. A blocked microphone, an unsupported language, a voice that never starts or no voices at all each give one notice, and typing keeps working; the spoken words never reach the logs ([voice-machine.test.ts:223](apps/alexa-sim/test/voice-machine.test.ts:223), [voice-round-trip.spec.ts](e2e/voice/voice-round-trip.spec.ts), [no-voices.spec.ts](e2e/voice/no-voices.spec.ts)). Polly and the rest of #25 are not done.
+- **Demo code gate.** In remote mode the simulator asks for the demo code once and trades it with sim-api for a short-lived token kept only in memory; the field is cleared and the code is never logged ([DemoCodeGate.tsx](apps/alexa-sim/src/ui/DemoCodeGate.tsx), [demo-code.spec.ts](e2e/faults/demo-code.spec.ts)).
 
 ### The agent
 - `apps/agent`: a Strands agent with the MCP server as its only tool source ([mcp-tools.ts](apps/agent/src/mcp-tools.ts)). Its HTTP entry has the AgentCore runtime shape (`POST /invocations`, `GET /ping`), on the loopback with the fake model only ([invocations.ts](apps/agent/src/invocations.ts)). Each sandbox home has its own agent and history and runs one turn at a time; a failed turn does not block the next ([home-agent.test.ts](apps/agent/test/home-agent.test.ts)). Versioned system prompt ([system.v1.md](apps/agent/prompts/system.v1.md)): no invented numbers, say when data is simulated, plan before acting, act only after confirmation, people by role.
@@ -75,13 +77,16 @@ Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server
 - `apps/sim-api` sits between the simulator and the agent ([handler.ts](apps/sim-api/src/handler.ts)): `/v1/session` trades a demo code for a one-hour token bound to a fresh sandbox home; `/v1/turns` runs one agent turn; `/v1/tools/call` forwards a card action, and only card actions.
 - **Guarantees:** demo codes are kept only as SHA-256 hashes; tokens are short-lived HS256 with a pinned algorithm and their signatures are checked in constant time, and the home comes from the token, never from the body; daily caps per code and overall are checked before the agent is called; a kill switch turns the demo off; exact-origin CORS; errors as Problem Details; the code and the token never reach the logs ([handler.test.ts](apps/sim-api/test/handler.test.ts), [token.test.ts](apps/sim-api/test/token.test.ts), [quota.test.ts](apps/sim-api/test/quota.test.ts)).
 - **Sandbox homes.** Each visitor gets a `demo#…` home with its own simulator and its own state; one visitor's preferences and plans are invisible to another ([sandbox-modules.test.ts:68](apps/mcp-server/test/e2e/sandbox-modules.test.ts:68)).
-- **Not yet:** the HTTP entry and the deploy (#101, #112). The handler is tested, but the simulator cannot reach it yet.
+- **Runs locally** on the loopback ([local.ts](apps/sim-api/src/local.ts)): demo-code attempts per IP are counted before the code is compared, and the client IP comes from the socket only. A test runs the real local chain (simulator client → sim-api → agent with the fake model → MCP server): a battery answer, a plan applied through sim-api, and refusals for no code, a wrong code, an expired token, the daily cap and a foreign origin ([remote-mode.test.ts:80](apps/alexa-sim/test/e2e/remote-mode.test.ts:80)).
+- **Not yet:** the deploy; there is no CDK stack for sim-api or the agent yet.
 
 ### Logs and errors
 - Expected errors are values with shared codes ([errors.ts](packages/contracts/src/errors.ts), [docs/error-handling.md](docs/error-handling.md)). Tool failures come back as `isError: true` with a structured envelope ([handler.ts:77](apps/mcp-server/src/handler.ts:77)); HTTP failures as RFC 9457 Problem Details.
 - The MCP server writes JSON log lines and records each handled error once with its correlation id; a thrown exception never leaks internals ([tools.test.ts:52](apps/mcp-server/test/tools.test.ts:52)).
+- **Shared log format.** A strict log entry schema ([log.ts](packages/contracts/src/log.ts): warn and error need a code with its category) and a logger port with an injectable sink ([logger.ts](packages/core/src/logger.ts)): one JSON object per line, causes by error name plus stack frames on the server only, and a failing sink never breaks the caller. So far only the MCP server uses them ([lambda.ts](apps/mcp-server/src/lambda.ts), [lambda-main.ts](apps/mcp-server/src/lambda-main.ts)); the agent, sim-api and the browser still have their own JSON loggers.
 - sim-api and the agent log refusals and internal errors with the correlation id, by error name only.
-- Planned: one shared logger for all apps, browser logs sent to sim-api (#125), and the error log in the database (docs/error-handling.md §6.1).
+- **On Lambda** the MCP server no longer stays broken after a failed start: the next request rebuilds it, and every path answers a Problem Details with the correlation id. CDK adds an `InternalErrors` metric filter and alarm ([mcp-stack.ts:111](infra/src/mcp-stack.ts:111)).
+- Planned: the agent, sim-api and the browser on the shared logger, browser logs sent to sim-api (#125), and the error log in the database (docs/error-handling.md §6.1).
 
 ### Agent Skill
 - [skills/home-energy/SKILL.md](skills/home-energy/SKILL.md) tells any agent how to use the nine MCP tools: which tool when, numbers only from tool results, an explicit yes before `apply_plan` and `set_preferences`, family by role with fixed texts, honest failures, and three test prompts.
@@ -99,9 +104,9 @@ flowchart LR
   M --> P["Adapters<br/>simulator · real home (read-only) · DynamoDB · family phone"]
   P --> W[("AWS<br/>Lambda · DynamoDB · Bedrock · Polly")]
 ```
-- **Correlation id.** The simulator creates one per turn and sends it as `x-correlation-id` ([remote-agent.ts:30](apps/alexa-sim/src/agent/remote-agent.ts:30)). sim-api and the agent pass it on to every MCP request of the turn ([home-agent.test.ts:69](apps/agent/test/home-agent.test.ts:69)). The MCP server accepts it (or creates one), echoes it in the response and writes it in every error log ([handler.ts:247](apps/mcp-server/src/handler.ts:247)). Each hop is tested; the whole chain runs once sim-api has its HTTP entry and its agent adapter (#101).
+- **Correlation id.** The simulator creates one per turn and sends it as `x-correlation-id` ([remote-agent.ts:44](apps/alexa-sim/src/agent/remote-agent.ts:44)). sim-api and the agent pass it on to every MCP request of the turn ([home-agent.test.ts:69](apps/agent/test/home-agent.test.ts:69)). The MCP server accepts it (or creates one), echoes it in the response and writes it in every error log ([handler.ts:247](apps/mcp-server/src/handler.ts:247)). Each hop is tested on its own. The real local chain runs end to end ([remote-mode.test.ts](apps/alexa-sim/test/e2e/remote-mode.test.ts)), but that test does not check the correlation id across the hops yet.
 - **Boundaries.** `contracts` is a leaf; `core` and `guard` are pure; adapters plug in behind ports; apps never import each other (enforced by `pnpm depcruise`).
-- **Cloud.** `infra/` synthesises the MCP server as a Lambda with a Function URL and a DynamoDB table; synth and cdk-nag only, nothing is deployed yet.
+- **Cloud.** `infra/` synthesises the MCP server as a Lambda with a Function URL and a DynamoDB table; plus the `InternalErrors` alarm; synth and cdk-nag only, nothing is deployed yet. sim-api and the agent have no stack yet.
 
 ## Alexa-ready
 The Alexa+ MCP toolkit is for selected US partners only, so we follow its published requirements and prove them with tests.
@@ -124,7 +129,7 @@ The Alexa+ MCP toolkit is for selected US partners only, so we follow its publis
 **Auth, next step.** Today each client has its own bearer token. For Alexa+ we will add OAuth 2.1 with PKCE S256: Amazon Cognito (pre-registered app client, `resource` bound to the token `aud`) as the authorization server, and the MCP server validating the audience. Cognito publishes OpenID Connect discovery without `code_challenge_methods_supported`, while Alexa+ expects RFC 8414 metadata at `/.well-known/oauth-authorization-server`, so we will serve that document ourselves, next to the Protected Resource Metadata. Sources: [Alexa+ MCP toolkit quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html), [Cognito authorization endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/authorization-endpoint.html), [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization).
 
 ## What is not done yet
-Sim-api HTTP entry and deploy (#101, #112), real voice (#25), storm screen and family phone screen in the simulator (#24), Agent Skill run with a real MCP client (#131), browser logs sent to sim-api (#125), card bundle on Lambda (#104), real home data (#15), weather forecast from Open-Meteo (#15), shared logger and database error log, OAuth 2.1, deploy to AWS.
+Deploy of sim-api and the agent, the rest of voice with Polly (#25), the phone reading its real inbox and manual control (#24), Agent Skill run with a real MCP client (#131), browser logs sent to sim-api (#125), card bundle on Lambda (#104), real home data (#15), weather forecast from Open-Meteo (#15), the agent, sim-api and the browser on the shared logger, database error log, OAuth 2.1, deploy to AWS.
 
 ## Run locally
 Requires Node 22 and pnpm 12 (`corepack enable`). Copy `.env.example` to `.env`.
@@ -138,7 +143,8 @@ pnpm synth            # cdk synth + cdk-nag, no AWS account needed
 pnpm tokens           # rebuild design tokens after editing tokens.json
 pnpm --filter @cold-reserve/mcp-server start   # MCP server on 127.0.0.1:3316 (needs MCP_CLIENTS)
 pnpm --filter @cold-reserve/agent start        # agent on the loopback, fake model only (needs AGENT_MCP_TOKEN, AGENT_INVOKE_TOKEN)
-pnpm --filter @cold-reserve/alexa-sim dev      # simulator on 127.0.0.1:5318, scripted agent
+pnpm --filter @cold-reserve/sim-api start      # sim-api on 127.0.0.1:3341 (needs SIM_DEMO_CODES, SIM_TOKEN_KEYS, AGENT_INVOKE_TOKEN and SIM_MCP_TOKEN, 32+ characters)
+pnpm --filter @cold-reserve/alexa-sim dev      # simulator on 127.0.0.1:5318: scripted agent, or VITE_AGENT=remote with VITE_SIM_API_URL
 ```
 Mutation testing: see [docs/mutation-testing.md](docs/mutation-testing.md).
 
@@ -159,7 +165,7 @@ infra/            AWS CDK app (dev and demo stages, cdk-nag), synth only
 tooling/          repo scripts: secret scan, heavy lock, hook install
 spikes/           throwaway spike code, outside the workspace
 ```
-`ingest-api`, `jobs` and `home-bridge` are skeletons for now; `sim-api` has its handler but no HTTP entry yet. `skills/home-energy/` holds the Agent Skill.
+`ingest-api`, `jobs` and `home-bridge` are skeletons for now; `sim-api` and the agent run locally, not deployed yet. `skills/home-energy/` holds the Agent Skill.
 
 ## Status
 | Milestone | Due |
