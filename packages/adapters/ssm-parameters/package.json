@@ -2,7 +2,7 @@
   "name": "@cold-reserve/ssm-parameters",
   "private": true,
   "version": "0.0.0",
-  "description": "SSM parameters through the AWS Parameters and Secrets Lambda Extension (no SDK), shared by the Lambdas.",
+  "description": "One SSM SecureString reader with two transports: the Lambda extension and the AWS SDK (given by the caller).",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

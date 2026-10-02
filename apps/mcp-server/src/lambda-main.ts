@@ -1,6 +1,6 @@
 import { err, ok, toolError } from '@cold-reserve/contracts';
 import { jsonLineSink, loggerTo } from '@cold-reserve/core';
-import { readParameter } from '@cold-reserve/ssm-parameters';
+import { extensionReader } from '@cold-reserve/ssm-parameters';
 import { createApp } from './app.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules, createDynamoStoreFactory } from './compose.js';
@@ -33,7 +33,7 @@ export const handler = createLambdaHandler(
     const parameter = process.env['MCP_CLIENTS_PARAMETER'];
     const sessionToken = process.env['AWS_SESSION_TOKEN'];
     if (!parameter || !sessionToken) return err(toolError('invalid_config', 'MCP_CLIENTS_PARAMETER or AWS_SESSION_TOKEN is not set.'));
-    const clients = await readParameter(parameter, { fetchFn: fetch, sessionToken, timeoutMs: Number(process.env['SSM_TIMEOUT_MS'] ?? 2000) });
+    const clients = await extensionReader({ fetchFn: fetch, sessionToken, timeoutMs: Number(process.env['SSM_TIMEOUT_MS'] ?? 2000) })(parameter);
     if (!clients.ok) return clients;
 
     const wallClock = { now: Date.now };

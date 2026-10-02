@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { Clock } from '@cold-reserve/core';
+import type { ParameterReader } from '@cold-reserve/ssm-parameters';
 import { dynamoSettingsFrom, type DynamoClientSettings } from '@cold-reserve/store-dynamodb';
 import { err, ok, toolError, type ErrorEnvelope, type LogEntry, type Result } from '@cold-reserve/contracts';
 import { z } from 'zod';
@@ -21,7 +22,7 @@ const SettingsSchema = z.object({
 
 export interface SimApiLambdaDeps {
   /** Reads one SecureString (the Parameters and Secrets extension on Lambda). */
-  readonly read: (name: string) => Promise<Result<string, ErrorEnvelope>>;
+  readonly read: ParameterReader;
   readonly agentCore: AgentCoreClientLike;
   /** The caps on the shared table: one atomic counter per key (decided in #17). */
   readonly quotaFor: (table: { tableName: string; client: DynamoClientSettings }) => QuotaStore;

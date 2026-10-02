@@ -1,9 +1,10 @@
 import type { AddressInfo } from 'node:net';
-import { SSMClient } from '@aws-sdk/client-ssm';
+import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { jsonLineSink, loggerTo } from '@cold-reserve/core';
+import { cachedOnSuccess, sdkReader } from '@cold-reserve/ssm-parameters';
 import { buildAgentCoreServer } from './agentcore.js';
 import { logLine, type AgentLogEntry } from './log.js';
-import { cachedOnSuccess, readMcpTokenFromSsm } from './ssm-token.js';
+import { readMcpToken } from './ssm-token.js';
 
 // The process AgentCore starts (G1a): bundled to one CommonJS app.js by scripts/bundle.ts. Every line is
 // the shared LogEntry of L1, one JSON line on stdout (#143). A broken config stops the process before it
@@ -24,7 +25,11 @@ const ssmTimeoutMs = Number(process.env['AGENT_SSM_TIMEOUT_MS'] ?? 2000);
 const mcpToken =
   parameter === undefined || parameter === ''
     ? undefined
-    : cachedOnSuccess(() => readMcpTokenFromSsm(parameter, { client: new SSMClient({}), timeoutMs: Number.isFinite(ssmTimeoutMs) && ssmTimeoutMs > 0 ? ssmTimeoutMs : 2000 }));
+    : (() => {
+        const client = new SSMClient({});
+        const read = sdkReader({ getParameter: (input, options) => client.send(new GetParameterCommand(input), options), timeoutMs: Number.isFinite(ssmTimeoutMs) && ssmTimeoutMs > 0 ? ssmTimeoutMs : 2000 });
+        return cachedOnSuccess(() => readMcpToken(read, parameter));
+      })();
 
 const built = buildAgentCoreServer(process.env, { log, ...(mcpToken === undefined ? {} : { mcpToken }) });
 if (!built.ok) {
