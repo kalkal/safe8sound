@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ApplyPlanInputSchema, ApplyPlanOutputSchema } from './comfort-plan.js';
 import { IsoDateTimeSchema } from './common.js';
+import { ErrorCategorySchema, ErrorCodeSchema, categoryOf } from './errors.js';
 import { DataOriginSchema } from './origin.js';
 import { PlanSchema } from './plan.js';
 import { GetPreferencesOutputSchema, SetPreferencesInputSchema } from './preferences-view.js';
@@ -52,6 +53,23 @@ export const TurnReplySchema = z.strictObject({
   cards: z.array(z.unknown()).max(4).optional(),
 });
 export type TurnReply = z.infer<typeof TurnReplySchema>;
+
+/**
+ * An expected turn failure, as the agent answers it on AgentCore (#17, G1c, approved in #17): HTTP 200
+ * with this envelope, because AgentCore turns any 4xx/5xx of the container into a 424 for the caller and
+ * the code would be lost. The code and its category, the wait time and the turn id; never free text.
+ * sim-api turns it back into Problem Details with the same category.
+ */
+export const TurnFailureSchema = z
+  .strictObject({
+    failed: z.literal(true),
+    code: ErrorCodeSchema,
+    category: ErrorCategorySchema,
+    retryAfterMs: z.number().int().nonnegative().optional(),
+    correlationId: z.string().min(1).max(128),
+  })
+  .refine((f) => categoryOf(f.code) === f.category, { message: 'The category is the one the catalogue gives the code', path: ['category'] });
+export type TurnFailure = z.infer<typeof TurnFailureSchema>;
 
 /** POST /v1/tools/call: a card action, already bound to its card by the host. Only these two exist. */
 export const ToolCallRequestSchema = z.discriminatedUnion('name', [

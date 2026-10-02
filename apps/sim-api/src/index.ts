@@ -5,5 +5,6 @@ export { loadSimApiConfig, type SimApiConfig } from './config.js';
 export { createSimApiHandler, type CardToolPort, type LogLine, type SimApiDeps, type SimApiHandler, type TurnAgentPort } from './handler.js';
 export { createQuota, memoryQuotaStore, type Quota, type QuotaLimits, type QuotaStore } from './quota.js';
 export { signToken, verifyToken, type DemoClaims, type TokenKey } from './token.js';
-export { httpTurnAgent } from './adapters/agent-http.js';
+export { fromAgentFailure, httpTurnAgent } from './adapters/agent-http.js';
+export { agentCoreTurnAgent, type AgentCoreClientLike } from './adapters/agentcore.js';
 export { mcpCardTools, streamableMcpCaller, type McpCaller } from './adapters/mcp-cards.js';

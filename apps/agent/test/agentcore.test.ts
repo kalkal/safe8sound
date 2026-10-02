@@ -1,7 +1,7 @@
 import './no-network.js';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { ProblemDetailsSchema, err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { TurnFailureSchema, err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildAgentCoreServer } from '../src/agentcore.js';
 import { McpToken } from '../src/config.js';
@@ -45,9 +45,11 @@ describe('buildAgentCoreServer', () => {
     const base = await listen(ENV);
     // No MCP server listens here: the turn fails as agent_unavailable, never as missing_token.
     const res = await fetch(`${base}/invocations`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'Hi', home: 'demo#0123456789abcdef' }) });
-    const problem = ProblemDetailsSchema.parse(await res.json());
-    expect(problem.code).not.toBe('missing_token');
-    expect(problem.code).toBe('agent_unavailable');
+    // Expected failures are a 200 envelope on AgentCore (approved in #17): its code reaches sim-api.
+    expect(res.status).toBe(200);
+    const failure = TurnFailureSchema.parse(await res.json());
+    expect(failure.code).not.toBe('missing_token');
+    expect(failure).toMatchObject({ code: 'agent_unavailable', category: 'dependency_unavailable' });
   });
 
   it('refuses a broken config at startup, before listening', () => {
@@ -55,7 +57,7 @@ describe('buildAgentCoreServer', () => {
     expect(buildAgentCoreServer({ ...ENV, AGENT_MAX_SESSIONS: 'abc' }, { log: () => undefined })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
-  it('reads the MCP token on demand: SSM down is a 503 config_unavailable, /ping stays healthy, the next call tries again', async () => {
+  it('reads the MCP token on demand: SSM down is a config_unavailable envelope, /ping stays healthy, the next call tries again', async () => {
     let calls = 0;
     const provider = () => {
       calls++;
@@ -65,10 +67,10 @@ describe('buildAgentCoreServer', () => {
     const base = await listen(withoutToken, provider);
     const invoke = () => fetch(`${base}/invocations`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'Hi', home: 'demo#0123456789abcdef' }) });
     const first = await invoke();
-    expect(first.status).toBe(503);
-    expect(ProblemDetailsSchema.parse(await first.json()).code).toBe('config_unavailable');
+    expect(first.status).toBe(200);
+    expect(TurnFailureSchema.parse(await first.json())).toMatchObject({ code: 'config_unavailable', category: 'dependency_unavailable' });
     expect((await fetch(`${base}/ping`)).status).toBe(200);
-    expect(ProblemDetailsSchema.parse(await (await invoke()).json()).code).toBe('agent_unavailable');
+    expect(TurnFailureSchema.parse(await (await invoke()).json()).code).toBe('agent_unavailable');
     expect(calls).toBe(2);
   });
 });

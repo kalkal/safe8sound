@@ -1,5 +1,5 @@
 import './no-network.js';
-import { ProblemDetailsSchema, TurnReplySchema, err, ok, toolError, type HomeId } from '@cold-reserve/contracts';
+import { TurnFailureSchema, ProblemDetailsSchema, TurnReplySchema, err, ok, toolError, type HomeId } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { createInvocationHandler, type HomeAgent, type InvocationAuth } from '../src/invocations.js';
 import type { AgentLogEntry } from '../src/log.js';
@@ -10,12 +10,13 @@ const ID = '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60';
 
 const REPLY = TurnReplySchema.parse({ text: 'Your battery is at 45%.', status: { batterySocPct: 45, origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' }, ts: '2026-07-15T12:00:00.000Z' } });
 
-function setup(answer: HomeAgent['ask'] = () => Promise.resolve(ok(REPLY)), auth: InvocationAuth = { kind: 'token', invokeToken: TOKEN }) {
+function setup(answer: HomeAgent['ask'] = () => Promise.resolve(ok(REPLY)), auth: InvocationAuth = { kind: 'token', invokeToken: TOKEN }, failuresAs: 'problem' | 'envelope' = 'problem') {
   const homes: HomeId[] = [];
   const logs: AgentLogEntry[] = [];
   const handler = createInvocationHandler({
     log: (entry) => logs.push(entry),
     auth,
+    failuresAs,
     maxBodyBytes: 4096,
     agentFor: (home) => {
       homes.push(home);
@@ -123,5 +124,26 @@ describe('AgentCore runtime entry: the platform authenticates the caller (G1a, I
     await problem(await post({ prompt: 'Hi', home: 'home' }, null), 400, 'invalid_input');
     await problem(await post({ prompt: 'x'.repeat(5000), home: 'demo#0123456789abcdef' }, null), 413, 'payload_too_large');
     expect(homes).toEqual([]);
+  });
+});
+
+describe('failures as a 200 envelope on AgentCore (G1c, approved in #17): AgentCore turns 4xx/5xx into a 424', () => {
+  it('answers an agent failure as 200 + TurnFailure with the code, category, wait time and turn id', async () => {
+    const { post } = setup(() => Promise.resolve(err(toolError('turn_in_progress', 'Wait.', { retryAfterMs: 7000 }))), { kind: 'platform' }, 'envelope');
+    const res = await post({ prompt: 'Hi', home: 'demo#0123456789abcdef', correlationId: ID }, null);
+    expect(res.status).toBe(200);
+    expect(TurnFailureSchema.parse(await res.json())).toEqual({ failed: true, code: 'turn_in_progress', category: 'rate_limited', retryAfterMs: 7000, correlationId: ID });
+  });
+
+  it('answers a refused invocation the same way, so its code reaches sim-api', async () => {
+    const { post } = setup(undefined, { kind: 'platform' }, 'envelope');
+    const res = await post({ prompt: 'Hi', home: 'home' }, null, '/invocations', { 'x-correlation-id': ID });
+    expect(res.status).toBe(200);
+    expect(TurnFailureSchema.parse(await res.json())).toMatchObject({ code: 'invalid_input', category: 'validation', correlationId: ID });
+  });
+
+  it('keeps Problem Details on the local entry', async () => {
+    const { post } = setup(() => Promise.resolve(err(toolError('agent_timeout', 'Too slow.'))));
+    await problem(await post({ prompt: 'Hi', home: 'demo#0123456789abcdef' }), 503, 'agent_timeout');
   });
 });

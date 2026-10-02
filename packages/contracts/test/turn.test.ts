@@ -6,6 +6,7 @@ import {
   StatusFactsSchema,
   ToolCallReplySchema,
   ToolCallRequestSchema,
+  TurnFailureSchema,
   TurnReplySchema,
   TurnRequestSchema,
   categoryOf,
@@ -71,5 +72,24 @@ describe('sandbox homes (#101)', () => {
     expect(categoryOf('home_not_allowed')).toBe('forbidden');
     const problem = toProblemDetails(toolError('home_not_allowed', 'This client may not reach that home.'), { instance: 'urn:uuid:00000000-0000-4000-8000-000000000000' });
     expect(ProblemDetailsSchema.parse(problem)).toMatchObject({ status: 403, code: 'home_not_allowed' });
+  });
+});
+
+describe('TurnFailureSchema: an expected turn failure from the agent on AgentCore (#17, G1c, approved in #17)', () => {
+  const ID = '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60';
+
+  it('carries the code, its category, the wait time and the turn id, nothing else', () => {
+    expect(TurnFailureSchema.parse({ failed: true, code: 'agent_timeout', category: 'dependency_unavailable', retryAfterMs: 2000, correlationId: ID })).toMatchObject({ code: 'agent_timeout' });
+    expect(TurnFailureSchema.safeParse({ failed: true, code: 'agent_timeout', category: 'dependency_unavailable', correlationId: ID, message: 'free text' }).success).toBe(false);
+  });
+
+  it('refuses a category that is not the catalogue one, and an unknown code', () => {
+    expect(TurnFailureSchema.safeParse({ failed: true, code: 'agent_timeout', category: 'internal', correlationId: ID }).success).toBe(false);
+    expect(TurnFailureSchema.safeParse({ failed: true, code: 'made_up', category: 'internal', correlationId: ID }).success).toBe(false);
+  });
+
+  it('never matches a TurnReply, so the two answers cannot be confused', () => {
+    expect(TurnFailureSchema.safeParse({ text: 'Your battery is at 45%.' }).success).toBe(false);
+    expect(TurnReplySchema.safeParse({ failed: true, code: 'agent_timeout', category: 'dependency_unavailable', correlationId: ID }).success).toBe(false);
   });
 });

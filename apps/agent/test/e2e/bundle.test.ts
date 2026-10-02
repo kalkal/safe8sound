@@ -2,7 +2,7 @@ import '../no-network.js';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ProblemDetailsSchema } from '@cold-reserve/contracts';
+import { TurnFailureSchema } from '@cold-reserve/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // G1a: the one-file CommonJS bundle AgentCore runs. Built here with scripts/bundle.ts, started with plain
@@ -49,9 +49,9 @@ describe('the AgentCore bundle (dist/agentcore/app.js, CommonJS)', () => {
     expect(await res.json()).toEqual({ status: 'Healthy' });
   });
 
-  it('takes an invocation without a bearer and runs the turn (here the MCP server is down: 503)', async () => {
+  it('takes an invocation without a bearer and runs the turn (here the MCP server is down: a 200 failure envelope)', async () => {
     const res = await fetch(`${base}/invocations`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'Hi', home: 'demo#0123456789abcdef' }) });
-    expect(res.status).toBe(503);
-    expect(ProblemDetailsSchema.parse(await res.json()).code).toBe('agent_unavailable');
+    expect(res.status).toBe(200);
+    expect(TurnFailureSchema.parse(await res.json())).toMatchObject({ code: 'agent_unavailable', category: 'dependency_unavailable' });
   });
 });

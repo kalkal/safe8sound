@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
-import { PROBLEM_JSON_CONTENT_TYPE, ok, toProblemDetails, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { loadAgentConfig, loadMaxSessions, loadMcpToken, type McpToken } from './config.js';
 import { referencePolicy } from './evals/fake-world.js';
 import { FakeModel } from './fake-model.js';
 import { createHomeAgent } from './home-agent.js';
-import { createInvocationHandler } from './invocations.js';
+import { createInvocationHandler, turnFailure } from './invocations.js';
 import { logLine, type AgentLogEntry } from './log.js';
 import { connectMcp } from './mcp-tools.js';
 import { createModel } from './model.js';
@@ -19,7 +19,7 @@ import { homeAgents } from './sessions.js';
  * is valid; the caller starts the server on the port the platform gives (8080).
  *
  * The MCP token comes from AGENT_MCP_TOKEN, or from `mcpToken` (the SSM SecureString on AgentCore), read
- * when the first invocation needs it: if SSM does not answer, that invocation is a 503 config_unavailable,
+ * when the first invocation needs it: if SSM does not answer, that invocation is a config_unavailable failure envelope,
  * /ping stays healthy, and the next invocation tries again (decided in #17).
  */
 export function buildAgentCoreServer(
@@ -50,7 +50,7 @@ export function buildAgentCoreServer(
         log: deps.log,
       }),
   });
-  const handle = createInvocationHandler({ auth: { kind: 'platform' }, maxBodyBytes: 8192, agentFor: agents, log: deps.log });
+  const handle = createInvocationHandler({ auth: { kind: 'platform' }, failuresAs: 'envelope', maxBodyBytes: 8192, agentFor: agents, log: deps.log });
 
   const withToken = async (req: Request): Promise<Response> => {
     if (token === undefined && readToken !== undefined && new URL(req.url).pathname === '/invocations') {
@@ -58,8 +58,8 @@ export function buildAgentCoreServer(
       if (!read.ok) {
         const correlationId = randomUUID();
         deps.log(logLine(read.error, 'McpTokenUnavailable', { correlationId }));
-        const body = toProblemDetails(read.error, { instance: `urn:uuid:${correlationId}` });
-        return new Response(JSON.stringify(body), { status: body.status, headers: { 'content-type': PROBLEM_JSON_CONTENT_TYPE } });
+        // An expected failure: a 200 envelope, like every turn failure on AgentCore (approved in #17).
+        return new Response(JSON.stringify(turnFailure(read.error, correlationId)), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       token = read.value;
     }

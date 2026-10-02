@@ -33,7 +33,17 @@ How the agent (`apps/agent`) runs on Amazon Bedrock AgentCore Runtime, and who m
 
 ## Errors seen by the caller
 
-When the container answers a 4xx or 5xx, AgentCore returns **424 `RuntimeClientError`** to the caller. Our Problem Details may therefore not reach sim-api as they are. sim-api's AgentCore adapter (G1c) handles that.
+When the container answers a 4xx or 5xx, AgentCore returns **424 `RuntimeClientError`** to the caller, without the container's body. So (approved in #17, G1c):
+
+- **Expected failures are a 200 `TurnFailure`** (`packages/contracts`, `turn.ts`): `{failed: true, code, category, retryAfterMs?, correlationId}`, never free text. On the AgentCore entry this covers turn failures, refused invocations, and the MCP token not readable yet. The local entry keeps Problem Details.
+- **Only an unexpected throw is a real 5xx** (the Node adapter's last resort), which the caller sees as a 424.
+- **sim-api's AgentCore adapter** (`apps/sim-api/src/adapters/agentcore.ts`) calls `InvokeAgentRuntime` with the SDK, signed by sim-api's role, with one runtime session per sandbox home (a hash of the home). It turns:
+  - a `TurnFailure` back into the same error, with a fixed message (`fromAgentFailure`, shared with the HTTP adapter). An agent refusal of sim-api itself becomes `unexpected_error`, logged with the agent's code;
+  - a 424 and the other transient AWS errors into `agent_unavailable` (dependency_unavailable);
+  - access, validation and not-found errors into `unexpected_error`.
+
+  Every failure is logged with its error name and HTTP status, never the SDK text.
+- **End to end without AWS**: `apps/sim-api/test/e2e/agentcore.test.ts` runs the real SDK client against a local stand-in for AgentCore, in front of the real agent and MCP server.
 
 ## Sources
 

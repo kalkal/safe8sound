@@ -1,4 +1,4 @@
-import { ProblemDetailsSchema, TurnReplySchema, categoryOf, err, isRetryableCategory, ok, toolError, type ErrorCategory, type ErrorEnvelope, type Result, type TurnReply } from '@cold-reserve/contracts';
+import { ProblemDetailsSchema, TurnReplySchema, categoryOf, err, isRetryableCategory, ok, toolError, type ErrorCategory, type ErrorCode, type ErrorEnvelope, type Result, type TurnReply } from '@cold-reserve/contracts';
 import type { ErrorLine, TurnAgentPort } from '../handler.js';
 
 /**
@@ -49,17 +49,25 @@ export function httpTurnAgent(opts: {
       const problem = ProblemDetailsSchema.safeParse(body);
       if (!problem.success) return err(toolError('agent_unavailable', `The assistant failed (HTTP ${String(response.status)}).`));
       const { code, retryAfterMs } = problem.data;
-      const category = categoryOf(code);
-      // The agent refused sim-api itself (token, invocation shape, route): a bug or a broken setup, never
-      // the visitor's fault. It must not ask for the demo code again (review of #139): internal, logged.
-      if (!PASSED_ON.has(category)) {
-        opts.log?.({ ts: new Date().toISOString(), level: 'error', component: 'sim-api', message: code, correlationId, code, category, errorName: 'AgentRefused' });
-        return err(toolError('unexpected_error', SAFE_MESSAGE.internal));
-      }
-      // The code passes on; the text never does (it could carry internals): a fixed message per category.
-      return err(toolError(code, SAFE_MESSAGE[category], retryAfterMs !== undefined && isRetryableCategory(categoryOf(code)) ? { retryAfterMs } : {}));
+      return err(fromAgentFailure({ code, retryAfterMs, correlationId }, opts.log));
     },
   };
+}
+
+/**
+ * An agent failure as the browser may see it (both adapters, HTTP and AgentCore). The agent refused
+ * sim-api itself (token, invocation shape, route): a bug or a broken setup, never the visitor's fault, so
+ * it must not ask for the demo code again (review of #139): internal, logged with the agent's code. The
+ * code passes on otherwise; the text never does (it could carry internals): a fixed message per category.
+ */
+export function fromAgentFailure(failure: { code: ErrorCode; retryAfterMs?: number | undefined; correlationId: string }, log?: (line: ErrorLine) => void): ErrorEnvelope {
+  const { code, retryAfterMs, correlationId } = failure;
+  const category = categoryOf(code);
+  if (!PASSED_ON.has(category)) {
+    log?.({ ts: new Date().toISOString(), level: 'error', component: 'sim-api', message: code, correlationId, code, category, errorName: 'AgentRefused' });
+    return toolError('unexpected_error', SAFE_MESSAGE.internal);
+  }
+  return toolError(code, SAFE_MESSAGE[category], retryAfterMs !== undefined && isRetryableCategory(category) ? { retryAfterMs } : {});
 }
 
 /** Agent failures the browser may see as they are: transient ones, and our own internal ones. */

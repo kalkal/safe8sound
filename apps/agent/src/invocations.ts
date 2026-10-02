@@ -10,6 +10,7 @@ import {
   type HomeId,
   type HttpErrorStatus,
   type Result,
+  type TurnFailure,
   type TurnReply,
 } from '@cold-reserve/contracts';
 import { z } from 'zod';
@@ -45,11 +46,18 @@ export function createInvocationHandler(deps: {
   agentFor: (home: HomeId) => HomeAgent;
   /** Refusals only: turn failures are logged by the agent itself. */
   log?: (entry: AgentLogEntry) => void;
+  /**
+   * `problem` (default, the local entry): RFC 9457 Problem Details. `envelope` (AgentCore): HTTP 200 with a
+   * TurnFailure, because AgentCore turns any 4xx/5xx of the container into a 424 and the code would be lost
+   * (approved in #17). Unexpected throws stay real 5xx (the Node adapter's last resort).
+   */
+  failuresAs?: 'problem' | 'envelope';
 }): (req: Request) => Promise<Response> {
   const expected = deps.auth.kind === 'token' ? sha256(deps.auth.invokeToken) : undefined;
   const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
     new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
   const fail = (error: ErrorEnvelope, correlationId: string, status?: HttpErrorStatus) => {
+    if (deps.failuresAs === 'envelope') return json(200, turnFailure(error, correlationId));
     const body = toProblemDetails(error, { instance: `urn:uuid:${correlationId}`, ...(status === undefined ? {} : { status }) });
     return json(body.status, body, { 'content-type': PROBLEM_JSON_CONTENT_TYPE });
   };
@@ -88,5 +96,16 @@ export function createInvocationHandler(deps: {
     const turnId = invocation.data.correlationId ?? correlationId;
     const reply = await deps.agentFor(invocation.data.home).ask(invocation.data.prompt, turnId);
     return reply.ok ? json(200, reply.value) : fail(reply.error, turnId);
+  };
+}
+
+/** The AgentCore form of an expected failure: the code and its category, the wait time and the turn id. */
+export function turnFailure(error: ErrorEnvelope, correlationId: string): TurnFailure {
+  return {
+    failed: true,
+    code: error.code,
+    category: error.category,
+    ...(error.retryAfterMs === undefined ? {} : { retryAfterMs: error.retryAfterMs }),
+    correlationId,
   };
 }
