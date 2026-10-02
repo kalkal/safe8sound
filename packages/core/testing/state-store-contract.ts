@@ -14,7 +14,7 @@ import {
 } from '@cold-reserve/contracts';
 import { examplePlan, examplePreferences } from '@cold-reserve/contracts/fixtures';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STATE_STORE_TTL, type StateStoreFactory } from '../src/state-store.js';
+import { DEFAULT_STATE_STORE_TTL, type LastResortConfirmation, type StateStoreFactory } from '../src/state-store.js';
 
 // Shared contract suite (plan §10.1): every StateStore adapter must pass it unchanged.
 // It is re-runnable against a persistent backend (the dev table, later in the main pipeline):
@@ -311,6 +311,89 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
         expect((await store.getPlan(t.plan.id)).ok).toBe(true);
         t.harness.setNow(end);
         expect(await store.getPlan(t.plan.id)).toMatchObject({ ok: false, error: { code: 'plan_not_found' } });
+      });
+    });
+
+    describe('last-resort confirmations (#160)', () => {
+      const HASH_A = 'a'.repeat(64);
+      const HASH_B = 'b'.repeat(64);
+      const PLAN_HASH = 'c'.repeat(64);
+      const confirmation = (t: ReturnType<typeof setup>, over: Partial<LastResortConfirmation> = {}): LastResortConfirmation => ({
+        planId: t.plan.id,
+        tokenHash: HASH_A,
+        planHash: PLAN_HASH,
+        expiresAt: t.at(5 * MINUTE_MS),
+        ...over,
+      });
+
+      it('consumes a saved confirmation once, from any store instance, and returns it', async () => {
+        const t = setup();
+        expect((await t.harness.factory(t.homeA).saveLastResortConfirmation(confirmation(t))).ok).toBe(true);
+        expect(await t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A)).toEqual({ ok: true, value: confirmation(t) });
+        expect(await t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A)).toMatchObject({
+          ok: false,
+          error: { code: 'last_resort_token_invalid', category: 'validation' },
+        });
+      });
+
+      it('refuses a wrong token and keeps the right one usable', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        await store.saveLastResortConfirmation(confirmation(t));
+        expect(await store.consumeLastResortConfirmation(t.plan.id, HASH_B)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        expect((await store.consumeLastResortConfirmation(t.plan.id, HASH_A)).ok).toBe(true);
+      });
+
+      it('a new confirmation of the same plan replaces the earlier one', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        await store.saveLastResortConfirmation(confirmation(t));
+        await store.saveLastResortConfirmation(confirmation(t, { tokenHash: HASH_B }));
+        expect(await store.consumeLastResortConfirmation(t.plan.id, HASH_A)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        expect((await store.consumeLastResortConfirmation(t.plan.id, HASH_B)).ok).toBe(true);
+      });
+
+      it('works until the last millisecond before it expires', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        await store.saveLastResortConfirmation(confirmation(t));
+        t.harness.setNow(t.start + 5 * MINUTE_MS);
+        expect(await store.consumeLastResortConfirmation(t.plan.id, HASH_A)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        t.harness.setNow(t.start + 5 * MINUTE_MS - 1);
+        expect((await store.consumeLastResortConfirmation(t.plan.id, HASH_A)).ok).toBe(true);
+      });
+
+      it('lets exactly one of two concurrent uses win (conditional write)', async () => {
+        const t = setup();
+        await t.harness.factory(t.homeA).saveLastResortConfirmation(confirmation(t));
+        const results = await Promise.all([
+          t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A),
+          t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A),
+        ]);
+        expect(results.filter((r) => r.ok)).toHaveLength(1);
+      });
+
+      it('never lets one home use the confirmation of another, and knows no confirmation for an unknown plan', async () => {
+        const t = setup();
+        await t.harness.factory(t.homeA).saveLastResortConfirmation(confirmation(t));
+        expect(await t.harness.factory(t.homeB).consumeLastResortConfirmation(t.plan.id, HASH_A)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        const unknown = PlanIdSchema.parse('plan_unknown00');
+        expect(await t.harness.factory(t.homeA).consumeLastResortConfirmation(unknown, HASH_A)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        expect((await t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A)).ok).toBe(true);
+      });
+
+      it('refuses a malformed confirmation and saves nothing', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        expect(await store.saveLastResortConfirmation(confirmation(t, { tokenHash: 'lr_plain-token' }))).toMatchObject({
+          ok: false,
+          error: { code: 'invalid_input', details: { field: 'tokenHash' } },
+        });
+        expect(await store.saveLastResortConfirmation(confirmation(t, { expiresAt: 'soon' }))).toMatchObject({
+          ok: false,
+          error: { code: 'invalid_input', details: { field: 'expiresAt' } },
+        });
+        expect(await store.consumeLastResortConfirmation(t.plan.id, 'lr_plain-token')).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
       });
     });
 

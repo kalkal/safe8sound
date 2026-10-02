@@ -24,7 +24,10 @@ import {
 import {
   DEFAULT_STATE_STORE_TTL,
   type Clock,
+  invalidLastResortToken,
+  lastResortConfirmationProblem,
   type GuardRejection,
+  type LastResortConfirmation,
   type PlanApplication,
   type StateStore,
   type StateStoreFactory,
@@ -33,7 +36,7 @@ import {
 
 // In-memory StateStore. It mirrors the DynamoDB single-table keys (plan §3.2) so both adapters
 // behave the same: PK = HOME#<homeId>, SK = PREFS | PLAN#<id> | EVENT#<ts>#<n> | GUARD#<ts>#<n> |
-// STORM#<startedAt>#<id> | INBOX#<at>#<n>.
+// STORM#<startedAt>#<id> | INBOX#<at>#<n> | CONFIRM#<planId>.
 // Expired items are invisible on read, like DynamoDB TTL items that are not yet deleted.
 
 interface Item {
@@ -130,6 +133,25 @@ class MemoryStateStore implements StateStore {
     const stored = this.#partition().get(sk);
     this.#put(sk, { value: applied, ...(stored?.expiresAtMs === undefined ? {} : { expiresAtMs: stored.expiresAtMs }) });
     return Promise.resolve(ok({ plan: structuredClone(applied), alreadyApplied: false }));
+  }
+
+  saveLastResortConfirmation(confirmation: LastResortConfirmation): Promise<Result<void, ErrorEnvelope>> {
+    const problem = lastResortConfirmationProblem(confirmation);
+    if (problem !== undefined) return Promise.resolve(err(problem));
+    // One per plan, like store-dynamodb: a new confirmation replaces the earlier one.
+    this.#put(`CONFIRM#${confirmation.planId}`, { value: { confirmation, used: false }, expiresAtMs: epochMs(confirmation.expiresAt) });
+    return Promise.resolve(ok(undefined));
+  }
+
+  consumeLastResortConfirmation(planId: PlanId, tokenHash: string): Promise<Result<LastResortConfirmation, ErrorEnvelope>> {
+    // Synchronous from read to write: the in-memory equivalent of a conditional update.
+    const sk = `CONFIRM#${planId}`;
+    const item = this.#partition().get(sk);
+    if (!this.#live(item)) return Promise.resolve(err(invalidLastResortToken()));
+    const stored = item.value as { confirmation: LastResortConfirmation; used: boolean };
+    if (stored.used || stored.confirmation.tokenHash !== tokenHash) return Promise.resolve(err(invalidLastResortToken()));
+    this.#put(sk, { ...item, value: { ...stored, used: true } });
+    return Promise.resolve(ok(structuredClone(stored.confirmation)));
   }
 
   recordGuardRejection(rejection: GuardRejection): Promise<Result<void, ErrorEnvelope>> {

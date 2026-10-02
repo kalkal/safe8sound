@@ -1,15 +1,18 @@
-import type {
-  ConfigChange,
-  ErrorEnvelope,
-  GuaranteeId,
-  HomeId,
-  InboxMessage,
-  NewInboxMessage,
-  Plan,
-  PlanId,
-  Preferences,
-  Result,
-  StormSession,
+import {
+  IsoDateTimeSchema,
+  PlanIdSchema,
+  toolError,
+  type ConfigChange,
+  type ErrorEnvelope,
+  type GuaranteeId,
+  type HomeId,
+  type InboxMessage,
+  type NewInboxMessage,
+  type Plan,
+  type PlanId,
+  type Preferences,
+  type Result,
+  type StormSession,
 } from '@cold-reserve/contracts';
 
 // StateStore port (plan §9.1, §14.1): preferences, plans, the config-change log and the guard
@@ -30,6 +33,40 @@ export interface PlanApplication {
   /** True when the plan had already been applied: the original outcome is returned (idempotent). */
   readonly alreadyApplied: boolean;
 }
+
+/**
+ * The first step of a last-resort apply (#160): the second yes must bring back the token. Only its SHA-256
+ * is stored, never the token, with the hash of the plan it was issued for.
+ */
+export interface LastResortConfirmation {
+  readonly planId: PlanId;
+  /** SHA-256 of the token, 64 lowercase hex characters. */
+  readonly tokenHash: string;
+  /** SHA-256 of the plan the person heard, 64 lowercase hex characters. */
+  readonly planHash: string;
+  /** ISO 8601; the token works until the millisecond before. */
+  readonly expiresAt: string;
+}
+
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/** What is wrong with a confirmation before it is stored, if anything: the same check in every adapter. */
+export function lastResortConfirmationProblem(c: LastResortConfirmation): ErrorEnvelope | undefined {
+  const field = !SHA256_HEX.test(c.tokenHash)
+    ? 'tokenHash'
+    : !SHA256_HEX.test(c.planHash)
+      ? 'planHash'
+      : !IsoDateTimeSchema.safeParse(c.expiresAt).success
+        ? 'expiresAt'
+        : !PlanIdSchema.safeParse(c.planId).success
+          ? 'planId'
+          : undefined;
+  return field === undefined ? undefined : toolError('invalid_input', 'A last-resort confirmation breaks its contract.', { details: { field } });
+}
+
+/** The one answer to a token that cannot be used: never says whether it was wrong, expired, used or unknown. */
+export const invalidLastResortToken = (): ErrorEnvelope =>
+  toolError('last_resort_token_invalid', 'This confirmation is not valid any more: ask for the plan again and confirm it twice.');
 
 /** Retention of what the store writes, in days (plan §3.2); from config. */
 export interface StateStoreTtl {
@@ -59,6 +96,13 @@ export interface StateStore {
    * the stored outcome with `alreadyApplied: true`.
    */
   applyPlan(planId: PlanId): Promise<Result<PlanApplication, ErrorEnvelope>>;
+  /** Stores the confirmation of a last-resort plan; it replaces an earlier one of the same plan. */
+  saveLastResortConfirmation(confirmation: LastResortConfirmation): Promise<Result<void, ErrorEnvelope>>;
+  /**
+   * Uses the confirmation once (conditional write): a wrong, expired, used or unknown token is
+   * `last_resort_token_invalid`, never which of them.
+   */
+  consumeLastResortConfirmation(planId: PlanId, tokenHash: string): Promise<Result<LastResortConfirmation, ErrorEnvelope>>;
   recordGuardRejection(rejection: GuardRejection): Promise<Result<void, ErrorEnvelope>>;
   /** Rejections still retained, newest first. */
   listGuardRejections(): Promise<Result<GuardRejection[], ErrorEnvelope>>;

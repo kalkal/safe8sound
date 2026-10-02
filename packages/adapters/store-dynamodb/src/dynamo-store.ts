@@ -25,8 +25,11 @@ import {
 } from '@cold-reserve/contracts';
 import {
   DEFAULT_STATE_STORE_TTL,
+  invalidLastResortToken,
+  lastResortConfirmationProblem,
   type Clock,
   type GuardRejection,
+  type LastResortConfirmation,
   type Rng,
   type PlanApplication,
   type StateStore,
@@ -38,7 +41,7 @@ import { z } from 'zod';
 import type { TableClient, TableItem } from './table.js';
 
 // StateStore on the single table (plan §3.2): PK = HOME#<homeId>; SK = PREFS | PLAN#<id> |
-// EVENT#<ts>#<n> | GUARD#<ts>#<n>. Every item carries schemaVersion; logs and plans carry the
+// EVENT#<ts>#<n> | GUARD#<ts>#<n> | CONFIRM#<planId>. Every item carries schemaVersion; logs and plans carry the
 // DynamoDB TTL attribute `ttl` (epoch seconds). TTL deletion is lazy, so reads skip expired items.
 
 const SCHEMA_VERSION = 1;
@@ -50,6 +53,13 @@ const GuardRejectionSchema = z.strictObject({
   at: IsoDateTimeSchema,
   failed: z.array(GuaranteeIdSchema).min(1),
   planId: PlanIdSchema.optional(),
+});
+
+const ConfirmationSchema = z.strictObject({
+  planId: PlanIdSchema,
+  tokenHash: z.string().regex(/^[0-9a-f]{64}$/),
+  planHash: z.string().regex(/^[0-9a-f]{64}$/),
+  expiresAt: IsoDateTimeSchema,
 });
 
 export interface DynamoStateStoreOptions {
@@ -164,6 +174,32 @@ class DynamoStateStore implements StateStore {
       // Lost the race or the plan changed meanwhile: report what is stored now.
       const current = (await this.#readPlan(planId)) ?? fail(notFound(planId));
       return current.status === 'applied' ? { plan: current, alreadyApplied: true } : fail(expired(planId));
+    });
+  }
+
+  saveLastResortConfirmation(confirmation: LastResortConfirmation) {
+    return this.#run('saveLastResortConfirmation', async () => {
+      const problem = lastResortConfirmationProblem(confirmation);
+      if (problem !== undefined) fail(problem);
+      const expiresAtMs = epochMs(confirmation.expiresAt);
+      // One per plan: a new confirmation replaces the earlier one. The conditions of the use read these top-level attributes.
+      await this.#table.put({ ...this.#item(`CONFIRM#${confirmation.planId}`, confirmation, expiresAtMs), tokenHash: confirmation.tokenHash, used: 0, expiresAtMs });
+    });
+  }
+
+  consumeLastResortConfirmation(planId: PlanId, tokenHash: string) {
+    return this.#run('consumeLastResortConfirmation', async () => {
+      const sk = `CONFIRM#${planId}`;
+      const item = await this.#table.get(this.#pk, sk);
+      if (item === undefined || !this.#isLive(item)) return fail(invalidLastResortToken());
+      const confirmation = parse(ConfirmationSchema, item);
+      // Once, before it expires, with this token: the conditional write decides between concurrent uses.
+      const outcome = await this.#table.update(this.#pk, sk, { used: 1 }, [
+        { attr: 'tokenHash', op: '=', value: tokenHash },
+        { attr: 'used', op: '=', value: 0 },
+        { attr: 'expiresAtMs', op: '>', value: this.#clock.now() },
+      ]);
+      return outcome === 'ok' ? confirmation : fail(invalidLastResortToken());
     });
   }
 
