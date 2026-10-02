@@ -118,7 +118,8 @@ The Alexa+ MCP toolkit is for selected US partners only, so we follow its publis
 |---|---|---|
 | MCP spec 2025-11-25 | done | [sdk-client.test.ts:35](apps/mcp-server/test/e2e/sdk-client.test.ts:35), [http.test.ts:106](apps/mcp-server/test/http.test.ts:106) |
 | Streamable HTTP, stateless, no legacy SSE transport | done | POST only, no session id ([handler.ts:185](apps/mcp-server/src/handler.ts:185)); GET, DELETE, PUT → 405 ([http.test.ts:32](apps/mcp-server/test/http.test.ts:32)); a notification → 202 with no body ([http.test.ts:131](apps/mcp-server/test/http.test.ts:131)) |
-| `MCP-Protocol-Version` header | done, strict by choice | missing or unsupported → 400 ([http.test.ts:114](apps/mcp-server/test/http.test.ts:114), [:119](apps/mcp-server/test/http.test.ts:119)); the [spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) lets a server assume 2025-03-26 instead |
+| `MCP-Protocol-Version` header | done, strict by choice | missing or unsupported → 400 ([http.test.ts:114](apps/mcp-server/test/http.test.ts:114), [:119](apps/mcp-server/test/http.test.ts:119)); required on every request after initialize (the [spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) lets a server assume 2025-03-26 when it is missing): stricter on purpose, so a client on an old revision fails loudly instead of being misread |
+| Official MCP conformance suite | passes initialize, ping, tools/list, resources/list and the Origin check; expected failures listed with their reason | `pnpm conformance` runs `@modelcontextprotocol/conformance` 0.1.16 against the local server, through a small proxy that adds the bearer (so the Host check is not exercised); not in CI. Baseline: [conformance-baseline.yml](tooling/conformance-baseline.yml) (the suite's own test tools and resources, capabilities the server does not declare, no session id by design) |
 | `outputSchema` and `structuredContent` on every tool | done | [tools.test.ts:14](apps/mcp-server/test/tools.test.ts:14), [tool.ts:56](apps/mcp-server/src/tool.ts:56) |
 | Valid schemas for MCP Inspector (`--strict`) | done | [inspector.test.ts:64](apps/mcp-server/test/e2e/inspector.test.ts:64) |
 | Tool annotations (read-only, destructive) | done | each module's `annotations` |
@@ -144,10 +145,12 @@ pnpm lint && pnpm lint:css && pnpm depcruise
 pnpm test             # or: pnpm test packages/contracts
 pnpm e2e              # Playwright: demo scenes, cards, fault injection
 pnpm synth            # cdk synth + cdk-nag, no AWS account needed
+pnpm conformance      # official MCP conformance suite against the local server
 pnpm tokens           # rebuild design tokens after editing tokens.json
 pnpm --filter @cold-reserve/mcp-server start   # MCP server on 127.0.0.1:3316 (needs MCP_CLIENTS)
 pnpm --filter @cold-reserve/agent start        # agent on the loopback, fake model only (needs AGENT_MCP_TOKEN, AGENT_INVOKE_TOKEN)
 pnpm --filter @cold-reserve/sim-api start      # sim-api on 127.0.0.1:3341 (needs SIM_DEMO_CODES, SIM_TOKEN_KEYS, AGENT_INVOKE_TOKEN and SIM_MCP_TOKEN, 32+ characters)
+pnpm --filter @cold-reserve/ui-cards build:card # build the card bundle first (not automatic yet)
 pnpm --filter @cold-reserve/alexa-sim dev      # simulator on 127.0.0.1:5318: scripted agent, or VITE_AGENT=remote with VITE_SIM_API_URL
 ```
 Mutation testing: see [docs/mutation-testing.md](docs/mutation-testing.md).
