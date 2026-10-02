@@ -1,4 +1,5 @@
 import { ProblemDetailsSchema } from '@cold-reserve/contracts';
+import { request } from 'node:http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startNodeServer, type RunningServer } from '../src/node-server.js';
 
@@ -36,5 +37,20 @@ describe('startNodeServer (local entry adapter)', () => {
     expect(JSON.stringify(body)).not.toContain('/secret/path');
     expect(errors).toHaveBeenCalledOnce();
     errors.mockRestore();
+  });
+
+  it('builds the request URL from the path and query only: an absolute request target cannot name another host (#149)', async () => {
+    let seen = '';
+    server = await startNodeServer((req) => ((seen = req.url), Promise.resolve(new Response('ok'))), { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: 100 });
+    const { port } = new URL(server.url);
+    await new Promise<void>((resolve, reject) => {
+      const r = request({ host: '127.0.0.1', port: Number(port), method: 'GET', path: 'http://evil.example/mcp?x=1', headers: { host: 'evil.example' } }, (res) => {
+        res.resume();
+        res.on('end', resolve);
+      });
+      r.on('error', reject);
+      r.end();
+    });
+    expect(seen).toBe(`http://127.0.0.1:${port}/mcp?x=1`);
   });
 });

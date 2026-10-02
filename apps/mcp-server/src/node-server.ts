@@ -51,6 +51,16 @@ function readBody(req: IncomingMessage, maxBytes: number): Promise<Buffer | 'too
  * Local adapter: node:http <-> Web Request/Response around the same handler as the Lambda entry.
  * Path, method, Origin and token checks live in the handler, so both entries behave alike.
  */
+/**
+ * The request URL on the local entry: this server's own host and port, plus the path and query of the request.
+ * An absolute request target (`GET http://evil.example/... HTTP/1.1`) or a Host header never names another host.
+ */
+function localUrl(target: string | undefined, host: string, server: { address(): unknown }): URL {
+  const { port } = server.address() as AddressInfo;
+  const parsed = new URL(target ?? '/', 'http://placeholder');
+  return new URL(`${parsed.pathname}${parsed.search}`, `http://${host}:${String(port)}`);
+}
+
 export function startNodeServer(handle: McpHandler, options: NodeServerOptions): Promise<RunningServer> {
   const server = createServer((req, res) => {
     void (async () => {
@@ -66,9 +76,7 @@ export function startNodeServer(handle: McpHandler, options: NodeServerOptions):
         if (typeof value === 'string') headers.set(key, value);
         else if (Array.isArray(value)) headers.set(key, value.join(', '));
       }
-      const response = await handle(
-        new Request(new URL(req.url ?? '/', `http://${options.host}`), { method, headers, ...(body === undefined ? {} : { body }) }),
-      );
+      const response = await handle(new Request(localUrl(req.url, options.host, server), { method, headers, ...(body === undefined ? {} : { body }) }));
       res.writeHead(response.status, Object.fromEntries(response.headers));
       res.end(Buffer.from(await response.arrayBuffer()));
     })().catch((error: unknown) => {

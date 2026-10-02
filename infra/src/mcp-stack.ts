@@ -74,6 +74,9 @@ export class McpStack extends Stack {
         MCP_ALLOWED_ORIGINS: mcp.allowedOrigins.join(','),
         MCP_SCENARIO: mcp.scenario,
         MCP_SCENARIO_ANCHOR: mcp.scenarioAnchor,
+        // #149: the Function URL cannot go into its own Lambda's env (a circular dependency), so the server takes
+        // its canonical URL from each request: the Function URL domain AWS puts in the event.
+        MCP_RESOURCE_URL: 'auto',
         STATE_TABLE_NAME: table.tableName,
         STATE_STORE_CONNECT_TIMEOUT_MS: String(state.connectTimeoutMs),
         STATE_STORE_REQUEST_TIMEOUT_MS: String(state.requestTimeoutMs),

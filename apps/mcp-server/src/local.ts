@@ -2,6 +2,7 @@ import type { ErrorEnvelope, Result } from '@cold-reserve/contracts';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { createApp } from './app.js';
 import { cardDocumentsFromFiles, workspaceCardFiles } from './cards.js';
+import { forLocalEntry } from './config.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules } from './compose.js';
 import { startNodeServer } from './node-server.js';
@@ -30,6 +31,8 @@ const comfortPlan = orExit(comfortPlanWiring({ storeFor, preferences, clock: wal
 const stormMode = orExit(stormModeWiring({ storeFor, preferences, clock: wallClock }));
 const cardDocuments = cardDocumentsFromFiles(workspaceCardFiles());
 const app = orExit(createApp(process.env, { wallClock, logger: { log }, modules, comfortPlan, stormMode, cardDocuments }));
+// MCP_RESOURCE_URL=auto is for Lambda only (#149): locally the canonical URL has no trustworthy source.
+orExit(forLocalEntry(app.config));
 
 // The family phone's inbox (#24): only here and in the dev stage, never on the demo Lambda.
 const phone = createPhoneInboxHandler(app.config, { inbox: stormMode.inbox, logger: { log } });

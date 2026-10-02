@@ -136,6 +136,20 @@ export function logSourceEvent(logger: Logger, homeId: HomeId): (event: SourceEv
   };
 }
 
+/** The Protected Resource Metadata mode at start-up (#149): auto, fixed or off, never the URL itself. */
+function logMetadataMode(config: ServerConfig, logger: Logger): void {
+  const pr = config.protectedResource;
+  const mode = pr === undefined ? 'off' : pr.resource === 'auto' ? 'auto' : 'fixed';
+  logger.log({
+    ts: new Date().toISOString(),
+    level: 'info',
+    component: 'mcp-server',
+    message: `Protected resource metadata: ${mode}.`,
+    correlationId: 'startup',
+    details: { event: 'protected_resource_metadata', mode, authorizationServers: pr?.authorizationServers.length ?? 0 },
+  });
+}
+
 export function createApp(env: Readonly<Record<string, string | undefined>>, opts: AppOptions): Result<App, ErrorEnvelope> {
   const config = loadConfig(env);
   if (!config.ok) return config;
@@ -167,6 +181,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const demoSim = simulator(demo);
   const homeSim = simulator(home);
   warnMissingEpsLoad([demo, home], opts.logger);
+  logMetadataMode(config.value, opts.logger);
   const homes = new Map<HomeId, HomeEntry>([
     [DEMO, { source: demoSim, profile: demo, readOnly: false, levelSince }],
     [HOME, { source: new FallbackSource({ primary: noLiveHome, fallback: homeSim, clock, onEvent: logSourceEvent(opts.logger, HOME) }), profile: home, readOnly: true, levelSince }],

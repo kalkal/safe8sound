@@ -108,6 +108,9 @@ describe('mcp stack: the MCP server Lambda', () => {
           MCP_SCENARIO: 'clear-day',
           // R1: every container anchors the scenario on the UTC day, never on its own start.
           MCP_SCENARIO_ANCHOR: 'daily',
+          // #149: the Function URL cannot go into its own Lambda's env (a circular dependency in CloudFormation),
+          // so the server takes its canonical URL from each request.
+          MCP_RESOURCE_URL: 'auto',
         }),
       },
     });

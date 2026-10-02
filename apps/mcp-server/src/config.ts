@@ -27,7 +27,9 @@ export interface ServerConfig {
   readonly metricsNamespace: string;
   /**
    * OAuth 2.0 Protected Resource Metadata (RFC 9728, G4 step 1, #149): served only when the canonical URL is
-   * configured; `authorizationServers` empty until an authorization server exists.
+   * configured; `authorizationServers` empty until an authorization server exists. `auto` takes the canonical
+   * URL from each request (`resource: 'auto'`; on Lambda, the Function URL domain AWS puts in the event), because the Function URL
+   * cannot go into its own Lambda's environment.
    */
   readonly protectedResource?: { readonly resource: string; readonly authorizationServers: readonly string[] };
 }
@@ -81,10 +83,17 @@ const isSecureOrLocal = (url: URL): boolean => url.protocol === 'https:' || (url
 function protectedResourceOf(env: Readonly<Record<string, string | undefined>>, path: string): Result<ServerConfig['protectedResource'], ErrorEnvelope> {
   const raw = env['MCP_RESOURCE_URL']?.trim();
   if (raw === undefined || raw === '') return ok(undefined);
+  const servers = authorizationServersOf(env);
+  if (!servers.ok) return servers;
+  if (raw === 'auto') return ok({ resource: 'auto', authorizationServers: servers.value });
   const url = isUrl(raw);
   if (url === undefined || !isSecureOrLocal(url) || url.pathname !== path) {
     return invalid(`MCP_RESOURCE_URL must be the server's https URL ending with ${path} (http only on the local machine).`);
   }
+  return ok({ resource: url.href, authorizationServers: servers.value });
+}
+
+function authorizationServersOf(env: Readonly<Record<string, string | undefined>>): Result<string[], ErrorEnvelope> {
   const servers = (env['MCP_AUTHORIZATION_SERVERS'] ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -92,7 +101,17 @@ function protectedResourceOf(env: Readonly<Record<string, string | undefined>>, 
   if (servers.some((s) => { const u = isUrl(s); return u === undefined || !isSecureOrLocal(u); })) {
     return invalid('MCP_AUTHORIZATION_SERVERS must be a comma-separated list of https URLs.');
   }
-  return ok({ resource: url.href, authorizationServers: servers });
+  return ok(servers);
+}
+
+/**
+ * The local Node entry refuses `MCP_RESOURCE_URL=auto` (#149): only Lambda has a trustworthy source for the
+ * canonical URL (the Function URL domain AWS puts in the event). Locally, set the URL itself.
+ */
+export function forLocalEntry(config: ServerConfig): Result<ServerConfig, ErrorEnvelope> {
+  return config.protectedResource?.resource === 'auto'
+    ? invalid('MCP_RESOURCE_URL=auto is for Lambda only (the Function URL domain comes from AWS); on the local entry set the URL itself, e.g. http://127.0.0.1:3316/mcp.')
+    : ok(config);
 }
 
 export function loadConfig(env: Readonly<Record<string, string | undefined>>): Result<ServerConfig, ErrorEnvelope> {
