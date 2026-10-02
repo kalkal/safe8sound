@@ -19,10 +19,11 @@ import {
   type Snapshot,
 } from '@cold-reserve/contracts';
 import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, seasonFor, withTargets, type HumidityMode } from '@cold-reserve/core';
-import { buildContext, counterfactualOf, currentControls, projectFrom, rejectionOf, reserveOf, runGuard, safeUntil, type CandidatePlan, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
+import { buildContext, counterfactualOf, currentControls, nightCoolingLimit, projectFrom, rejectionOf, reserveOf, runGuard, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import type { ToolContext } from '../../tool.js';
 import { localIso, localTimeText } from '../../time.js';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
+import { lastResortActions, lastResortWindow } from './last-resort.js';
 import { recordRejection } from './rejections.js';
 
 // plan_comfort, the first of the two phases (plan §9.2): read-only on the home, it proposes a plan and
@@ -206,7 +207,10 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
   const { preferences, snapshot, profile, season } = guardInput;
   const nowMs = Date.parse(snapshot.ts);
   const stepMs = deps.guard.projection.stepMinutes * 60_000;
-  let best: { attempt: Attempt; untilMs: number; limitedBy: SafeLimit } | undefined;
+  // At night the health threshold of the night-recovery mode wins over a higher safety maximum (#160).
+  const coolingMaxAt = nightCoolingLimit({ maxC: preferences.safety.cooling.maxC, tz: profile.location.tz, night: deps.guard.nightRecovery, mode: guardInput.nightRecoveryMode });
+  const limitAt = (ms: number) => (season === 'heating' ? preferences.safety.heating.minC : coolingMaxAt(ms));
+  let best: { attempt: Attempt; untilMs: number; limitedBy: SafeLimit; points: GuardContext['points'] } | undefined;
   for (const a of tried) {
     const guarantees = a.verdict.guarantees;
     if (guarantees.every((g) => g.ok) || guarantees.some((g) => HARD_LIMITS.includes(g.id) && !g.ok)) continue;
@@ -214,11 +218,11 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
     const control = controlFromSteps(a.candidate.steps, currentControls(snapshot));
     // A point is what the previous step left: the plan dried the room into it if that step was drying.
     const driesAt = (ms: number) => control(ms - stepMs).find((c) => c.id === preferences.safeRoomId)?.hvac?.mode === 'dry';
-    const end = safeUntil(context.points, { nowMs, graceMinutes: deps.guard.safeRoom.graceMinutes, roomId: preferences.safeRoomId, season, safety: preferences.safety, driesAt });
+    const end = safeUntil(context.points, { nowMs, graceMinutes: deps.guard.safeRoom.graceMinutes, roomId: preferences.safeRoomId, season, safety: preferences.safety, driesAt, coolingMaxAt });
     // No breach inside the horizon: what fails is something else (the pace, the night), and "safe until"
     // would name a limit that is not there. Such a candidate is not a last resort.
     if (end === undefined) continue;
-    if (best === undefined || end.ms > best.untilMs) best = { attempt: a, untilMs: end.ms, limitedBy: end.limitedBy };
+    if (best === undefined || end.ms > best.untilMs) best = { attempt: a, untilMs: end.ms, limitedBy: end.limitedBy, points: context.points };
   }
   if (best === undefined) return undefined;
   const { limitedBy } = best;
@@ -227,6 +231,7 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
   const safeUntilIso = localIso(best.untilMs, profile.location.tz);
   const room = profile.rooms.find((r) => r.id === preferences.safeRoomId)?.name ?? preferences.safeRoomId;
   const { cooling, heating, humidity } = preferences.safety;
+  const limitThen = coolingMaxAt(best.untilMs);
   const then =
     limitedBy === 'battery'
       ? 'the battery runs out'
@@ -234,10 +239,21 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
         ? `the humidity leaves its ${String(humidity.minPct)}-${String(humidity.maxPct)} % band`
         : season === 'heating'
           ? `the room drops below its ${String(heating.minC)} °C minimum`
-          : `the room goes above its ${String(cooling.maxC)} °C maximum`;
+          : limitThen < cooling.maxC
+            ? `the room goes above ${String(limitThen)} °C, the night limit`
+            : `the room goes above its ${String(cooling.maxC)} °C maximum`;
+  // The honest window (#160): the limit kept until safeUntil, then how far the room goes and by when; the
+  // summary says it (the warning keeps its 300 characters for the reason).
+  const window = lastResortWindow(best.points, { nowMs, untilMs: best.untilMs, roomId: preferences.safeRoomId, season, limitAt, claimsUntil: limitedBy !== 'battery' });
   return {
     attempt: best.attempt,
-    lastResort: { safeUntil: safeUntilIso, safeHours, limitedBy },
+    lastResort: {
+      safeUntil: safeUntilIso,
+      safeHours,
+      limitedBy,
+      ...(window === undefined ? {} : { comfortLimitC: celsius(window.comfortLimitC), worstC: celsius(window.worstC), worstAt: localIso(window.worstAtMs, profile.location.tz) }),
+      actions: lastResortActions(season),
+    },
     warning: {
       code: 'last_resort_plan',
       message: `No plan keeps the ${room} within its limits until the next recharge: safe for about ${String(safeHours)} hours, until ${localTimeText(safeUntilIso)}; then ${then}.`.slice(0, 300),

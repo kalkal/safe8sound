@@ -116,6 +116,12 @@ describe('PlanSchema', () => {
         expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, ...window, worstAt: lastResort.safeUntil } })).success).toBe(true);
       });
 
+      it('a window goes past the limit, on either side (cooling or heating)', () => {
+        const r = PlanSchema.safeParse(plan({ lastResort: { ...lastResort, ...window, worstC: 26 } }));
+        expect(!r.success && r.error.issues[0]?.path).toEqual(['lastResort', 'worstC']);
+        expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, ...window, comfortLimitC: 18, worstC: 16.9 } })).success).toBe(true);
+      });
+
       it('gives the window whole or not at all', () => {
         expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, worstC: 29 } })).success).toBe(false);
         expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, comfortLimitC: 26, worstC: 29 } })).success).toBe(false);

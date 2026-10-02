@@ -1,5 +1,5 @@
-import type { Season } from '@cold-reserve/contracts';
-import type { ProjectionPoint } from '@cold-reserve/core';
+import type { NightRecoveryMode, Season } from '@cold-reserve/contracts';
+import { inNightWindow, type NightWindowHours, type ProjectionPoint } from '@cold-reserve/core';
 import { UNSERVED_TOLERANCE_W } from './context.js';
 
 // Until when the safe room stays safe along a projection: the first point where the battery leaves load
@@ -21,6 +21,8 @@ export function safeUntil(
     safety: { cooling: { maxC: number }; heating: { minC: number }; humidity: { minPct: number; maxPct: number } };
     /** Whether the plan dries the safe room at an instant: only then is air under the minimum its doing (#107). */
     driesAt?: (ms: number) => boolean;
+    /** The cooling maximum in force at an instant (the night threshold lowers it, #160); `cooling.maxC` otherwise. */
+    coolingMaxAt?: (ms: number) => number;
   },
 ): { ms: number; limitedBy: SafeLimit } | undefined {
   const fromMs = opts.nowMs + opts.graceMinutes * MINUTE_MS;
@@ -30,11 +32,26 @@ export function safeUntil(
     if (p.ms < fromMs) continue;
     const room = p.rooms.find((r) => r.id === opts.roomId);
     if (room === undefined) continue;
-    const tooHot = opts.season !== 'heating' && room.tempC > cooling.maxC + EPS;
+    const tooHot = opts.season !== 'heating' && room.tempC > (opts.coolingMaxAt?.(p.ms) ?? cooling.maxC) + EPS;
     const tooCold = opts.season !== 'cooling' && room.tempC < heating.minC - EPS;
     if (tooHot || tooCold) return { ms: p.ms, limitedBy: 'temperature' };
     const tooDry = room.humidityPct < humidity.minPct - EPS && (opts.driesAt?.(p.ms) ?? false);
     if (room.humidityPct > humidity.maxPct + EPS || tooDry) return { ms: p.ms, limitedBy: 'humidity' };
   }
   return undefined;
+}
+
+/**
+ * The cooling maximum of the safe room at an instant (#160): during the night window the night-recovery
+ * threshold of the mode (26 °C, 24 °C with an elderly person) when it is lower than the safety maximum. The
+ * health threshold at night cannot be overridden by a higher preference.
+ */
+export function nightCoolingLimit(opts: {
+  maxC: number;
+  tz: string;
+  night: NightWindowHours & { thresholdC: Readonly<Record<NightRecoveryMode, number>> };
+  mode: NightRecoveryMode;
+}): (ms: number) => number {
+  const nightC = Math.min(opts.maxC, opts.night.thresholdC[opts.mode]);
+  return (ms) => (inNightWindow(ms, opts.tz, opts.night) ? nightC : opts.maxC);
 }

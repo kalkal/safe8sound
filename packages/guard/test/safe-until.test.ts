@@ -2,7 +2,7 @@ import { celsius, pct, watt } from '@cold-reserve/contracts';
 import type { ProjectionPoint } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import { projectFrom } from '../src/context.js';
-import { safeUntil } from '../src/safe-until.js';
+import { nightCoolingLimit, safeUntil } from '../src/safe-until.js';
 import { H, MIN, T0, input } from './support.js';
 
 // Until when the safe room stays safe along a projection: the battery serves the load, and after the grace
@@ -59,6 +59,29 @@ describe('safeUntil', () => {
 
   it('when the room ends on two limits at once, the battery is named first', () => {
     expect(safeUntil(shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? 28 : 26, rh: 50 }), T0 + 2 * H), opts)).toEqual({ ms: T0 + 2 * H, limitedBy: 'battery' });
+  });
+
+  describe('with the night threshold (#160: the health limit at night cannot be overridden)', () => {
+    const night = { windowStartHour: 22, windowEndHour: 7, thresholdC: { standard: 26, elderly: 24 } };
+    const tz = 'Europe/Rome';
+
+    it('the cooling limit is the lower of the safety maximum and the night threshold, at night only', () => {
+      const at = (iso: string) => Date.parse(iso);
+      const limit = nightCoolingLimit({ maxC: 27, tz, night, mode: 'standard' });
+      expect(limit(at('2026-07-17T21:59:00+02:00'))).toBe(27);
+      expect(limit(at('2026-07-17T22:00:00+02:00'))).toBe(26);
+      expect(limit(at('2026-07-18T06:59:00+02:00'))).toBe(26);
+      expect(limit(at('2026-07-18T07:00:00+02:00'))).toBe(27);
+      expect(nightCoolingLimit({ maxC: 27, tz, night, mode: 'elderly' })(at('2026-07-18T01:00:00+02:00'))).toBe(24);
+      expect(nightCoolingLimit({ maxC: 30, tz, night, mode: 'standard' })(at('2026-07-18T01:00:00+02:00'))).toBe(26);
+      expect(nightCoolingLimit({ maxC: 25, tz, night, mode: 'standard' })(at('2026-07-18T01:00:00+02:00'))).toBe(25);
+    });
+
+    it('safeUntil ends where the room crosses the limit in force at that point', () => {
+      const lower = (ms: number) => (ms >= T0 + 3 * H ? 26 : 27);
+      expect(safeUntil(shaped(() => ({ tempC: 26.5, rh: 50 })), { ...opts, coolingMaxAt: lower })).toEqual({ ms: T0 + 3 * H, limitedBy: 'temperature' });
+      expect(safeUntil(shaped(() => ({ tempC: 26, rh: 50 })), { ...opts, coolingMaxAt: lower })).toBeUndefined();
+    });
   });
 
   describe('at its edges (mutation survivors of #128)', () => {

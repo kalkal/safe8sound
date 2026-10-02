@@ -99,8 +99,10 @@ export const PlanSchema = z
         /** What ends the safe hours: the battery runs out, or the room leaves its temperature or humidity limits. */
         limitedBy: z.enum(['battery', 'temperature', 'humidity']),
         /**
-         * The honest window, whole or not at all (optional, added 2026-10-02, approved in #160): the room stays
-         * within `comfortLimitC` until `safeUntil`, then reaches `worstC` by `worstAt`.
+         * The honest window, whole or not at all (optional, added 2026-10-02, approved in #160): `comfortLimitC`
+         * is the limit in force at `safeUntil` (at night the night-recovery threshold when lower), and the room is
+         * past it at `worstC` by `worstAt`. When the temperature or the humidity ends the safe hours, the room also
+         * stays inside that limit from now until `safeUntil`.
          */
         comfortLimitC: CelsiusSchema.optional(),
         worstC: CelsiusSchema.optional(),
@@ -112,6 +114,10 @@ export const PlanSchema = z
         const window = [lr.comfortLimitC, lr.worstC, lr.worstAt];
         if (window.some((v) => v !== undefined) && window.some((v) => v === undefined)) {
           ctx.addIssue({ code: 'custom', path: ['worstAt'], message: 'The window is given whole: comfortLimitC, worstC and worstAt together' });
+        }
+        // Past the limit: above it when cooling, below it when heating (the plan carries no season, so either side).
+        if (lr.worstC !== undefined && lr.worstC === lr.comfortLimitC) {
+          ctx.addIssue({ code: 'custom', path: ['worstC'], message: 'A window is given only when the room goes past its limit' });
         }
         if (lr.worstAt !== undefined && epochMs(lr.worstAt) < epochMs(lr.safeUntil)) {
           ctx.addIssue({ code: 'custom', path: ['worstAt'], message: 'The worst point comes at or after the end of the safe hours' });

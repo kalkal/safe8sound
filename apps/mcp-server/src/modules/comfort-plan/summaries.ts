@@ -59,7 +59,19 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
         `with this plan at ${lineText(plan)}.`,
     );
   }
-  // A last resort cannot be applied (whether it may be is not decided yet): say until when, do not offer it.
+  // The honest window of a last resort (#160), every number of it.
+  const lr = p.lastResort;
+  if (lr?.comfortLimitC !== undefined && lr.worstC !== undefined && lr.worstAt !== undefined) {
+    // The room has gone past the limit (contract): below it is the heating season.
+    const heating = lr.worstC < lr.comfortLimitC;
+    const reaches = `${heating ? 'down' : 'up'} to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}`;
+    parts.push(
+      lr.limitedBy === 'battery'
+        ? `The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room then goes ${reaches}, past its ${String(lr.comfortLimitC)} °C limit.`
+        : `The safe room stays ${heating ? 'above' : 'under'} ${String(lr.comfortLimitC)} °C until ${localTimeText(lr.safeUntil)}, then ${reaches}.`,
+    );
+  }
+  // A last resort cannot be applied yet (the two-step confirmation comes next, #160): say until when, do not offer it.
   parts.push(
     p.lastResort === undefined
       ? `Say it to the person and ask to confirm; then call apply_plan with planId ${p.id}.`

@@ -1,10 +1,12 @@
-import { celsius, pct } from '@cold-reserve/contracts';
+import { celsius, pct, type Plan } from '@cold-reserve/contracts';
+import { examplePlan } from '@cold-reserve/contracts/fixtures';
 import { nightWindowHours } from '@cold-reserve/guard';
 import { describe, expect, it } from 'vitest';
 import { applySummary, outlookSummary, planSummary } from '../../src/modules/comfort-plan/summaries.js';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { reserveOutlook } from '../../src/modules/comfort-plan/reserve-outlook.js';
+import { localTimeText } from '../../src/time.js';
 import { REAL, guardConfig, world } from './support.js';
 
 // The agent (Strands) reads only the text content of a tool result, not structuredContent (F7): every
@@ -96,6 +98,31 @@ describe('what the model reads', () => {
     expect(text).toContain(r.value.warnings?.find((x) => x.code === 'last_resort_plan')?.message ?? 'missing');
     expect(text).toMatch(/Last resort: the safest plan there is, but not every guarantee holds, so it cannot be applied\. Tell the person the safe room is safe until \d{1,2}:\d\d (AM|PM) \(2026-07-1[78]T[\d:]+\+02:00\)\./);
     expect(text).not.toContain('call apply_plan');
+  });
+
+  it('plan_comfort: when the battery ends it, says until when the battery lasts and how far the room then goes, every number (#160)', async () => {
+    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(30), rooms: x.rooms.map((r) => ({ ...r, occupants: r.occupants.length > 0 ? ['daughter', 'son'] : [] })) }) });
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const lr = r.value.lastResort;
+    if (lr?.worstAt === undefined || lr.worstC === undefined || lr.comfortLimitC === undefined) throw new Error('no window');
+    expect(lr.limitedBy).toBe('battery');
+    expect(planSummary(r.value, NIGHT)).toContain(
+      `The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room then goes up to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}, past its ${String(lr.comfortLimitC)} °C limit.`,
+    );
+  });
+
+  it('when the temperature ends it, says the limit kept and how far the room then goes; heating says above and down to; no window, nothing more', () => {
+    const lastResort = { safeUntil: '2026-01-18T03:00:00+01:00', safeHours: 5, limitedBy: 'temperature' as const };
+    const plan = (lr: object) => ({ ...examplePlan(), lastResort: lr }) as Plan;
+    const cooling = { ...lastResort, safeUntil: '2026-07-18T02:40:00+02:00', comfortLimitC: 26, worstC: 29, worstAt: '2026-07-18T07:00:00+02:00' };
+    expect(planSummary(plan(cooling), NIGHT)).toContain(
+      `The safe room stays under 26 °C until ${localTimeText(cooling.safeUntil)}, then up to 29 °C by ${localTimeText(cooling.worstAt)}.`,
+    );
+    expect(planSummary(plan({ ...lastResort, comfortLimitC: 18, worstC: 16.9, worstAt: '2026-01-18T07:00:00+01:00' }), NIGHT)).toContain(
+      `The safe room stays above 18 °C until ${localTimeText(lastResort.safeUntil)}, then down to 16.9 °C by ${localTimeText('2026-01-18T07:00:00+01:00')}.`,
+    );
+    expect(planSummary(plan(lastResort), NIGHT)).not.toContain('The safe room stays');
   });
 
   it('plan_comfort: what the plan does in each room, and every step down the person pre-authorizes (plan §9.4)', async () => {

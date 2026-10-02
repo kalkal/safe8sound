@@ -10,6 +10,9 @@ import type { ProjectionPoint } from './projection.js';
 //   (https://bigladdersoftware.com/epx/docs/24-1/engineering-reference/resilience-metrics.html).
 // These are comfort-for-sleep metrics; nothing here claims a medical outcome.
 
+/** The hours of the night window, on the home's wall clock. */
+export type NightWindowHours = Pick<NightWindowConfig, 'windowStartHour' | 'windowEndHour'>;
+
 export interface NightWindowConfig {
   readonly windowStartHour: number;
   readonly windowEndHour: number;
@@ -69,10 +72,15 @@ export function heatIndexExcessC(tempC: Celsius, rhPct: Pct, baseC: number): num
   return Math.max(0, feelsLikeC({ tempC, rhPct }) - baseC);
 }
 
-const inWindow = (hour: number, cfg: NightWindowConfig) =>
+const inWindow = (hour: number, cfg: NightWindowHours) =>
   cfg.windowStartHour > cfg.windowEndHour
     ? hour >= cfg.windowStartHour || hour < cfg.windowEndHour
     : hour >= cfg.windowStartHour && hour < cfg.windowEndHour;
+
+/** Whether an instant falls in the night window, on the home's wall clock. */
+export function inNightWindow(ms: number, tz: string, config: NightWindowHours): boolean {
+  return inWindow(localHour(ms, tz), config);
+}
 
 /** The next night-window stretch in [fromMs, toMs), found on a 5-minute grid; undefined if there is none. */
 export function nextNightWindow(fromMs: number, toMs: number, tz: string, config: NightWindowConfig): { startMs: number; endMs: number } | undefined {

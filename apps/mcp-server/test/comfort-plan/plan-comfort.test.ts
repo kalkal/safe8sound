@@ -1,4 +1,4 @@
-import { GUARANTEE_IDS, HomeProfileSchema, PlanIdSchema, PlanSchema, PreferencesSchema, celsius, err, pct, toolError, type Forecast } from '@cold-reserve/contracts';
+import { GUARANTEE_IDS, HomeProfileSchema, LAST_RESORT_ACTIONS, PlanIdSchema, PlanSchema, PreferencesSchema, celsius, err, pct, toolError, type Forecast } from '@cold-reserve/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
@@ -88,13 +88,13 @@ describe('plan_comfort (two-phase: propose)', () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     expect(r.ok && r.value.nightRecovery?.mode).toBe('elderly');
-    const young = world('heatwave', 14, { snapshot: (s) => ({ ...s, rooms: s.rooms.map((x) => ({ ...x, occupants: [] })) }) });
+    const young = world('heatwave', 14, { snapshot: (s) => ({ ...s, rooms: s.rooms.map((x) => ({ ...x, occupants: x.occupants.length > 0 ? ['daughter', 'son'] : [] })) }) });
     const r2 = await planComfort(young.deps, { goal: 'cool' }, young.ctx);
     expect(r2.ok && r2.value.nightRecovery?.mode).toBe('standard');
   });
 
   it('on a humid heatwave night without an elderly person, alternates dry and cool to keep the humidity in band', async () => {
-    const w = world('heatwave', 14, { snapshot: (s) => ({ ...s, rooms: s.rooms.map((x) => ({ ...x, occupants: [] })) }) });
+    const w = world('heatwave', 14, { snapshot: (s) => ({ ...s, rooms: s.rooms.map((x) => ({ ...x, occupants: x.occupants.length > 0 ? ['daughter', 'son'] : [] })) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     expect(r.value.guarantees.find((g) => g.id === 'safe_room_comfort')?.ok).toBe(true);
@@ -203,6 +203,44 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(r.value.lastResort?.safeHours).toBeCloseTo(hours, 2);
   });
 
+  describe('the night limit wins over a higher safety maximum (#160, d-limiti-preferenze)', () => {
+    // Two adults in the safe room, no elderly person: the standard 26 °C night threshold.
+    const noElderly = (soc: number, prefs = preferences) =>
+      world('storm-blackout', 3, { preferences: prefs, snapshot: (s) => ({ ...s, batterySocPct: pct(soc), rooms: s.rooms.map((x) => ({ ...x, occupants: x.occupants.length > 0 ? ['daughter', 'son'] : [] })) }) });
+    const lastResortOf = async (w: ReturnType<typeof world>) => {
+      const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+      if (!r.ok) throw new Error(r.error.message);
+      const lr = r.value.lastResort;
+      if (lr === undefined) throw new Error('no last resort');
+      return { plan: r.value, lr, warning: r.value.warnings?.find((x) => x.code === 'last_resort_plan')?.message ?? '' };
+    };
+
+    it('at 30 % the battery ends the safe hours at night: the window names the 26 °C night limit, and the zero-energy actions', async () => {
+      const { lr } = await lastResortOf(noElderly(30));
+      expect(lr.limitedBy).toBe('battery');
+      expect(lr.comfortLimitC).toBe(26);
+      expect(lr.worstC).toBeGreaterThan(26);
+      expect(lr.worstAt).toMatch(/\+02:00$/);
+      expect(Date.parse(lr.worstAt ?? '')).toBeGreaterThanOrEqual(Date.parse(lr.safeUntil));
+      expect(lr.actions).toEqual([...LAST_RESORT_ACTIONS]);
+    });
+
+    it('a safety maximum of 30 °C still says 26 °C at night', async () => {
+      const hot = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, cooling: { maxC: 30 } } });
+      const { lr } = await lastResortOf(noElderly(30, hot));
+      expect(lr.comfortLimitC).toBe(26);
+    });
+
+    it('with an elderly person the 24 °C night limit ends the safe hours when the night starts, and nothing claims the room was under it', async () => {
+      const { lr, warning } = await lastResortOf(stormAt(30));
+      expect(lr.limitedBy).toBe('temperature');
+      expect(lr.safeUntil).toBe('2026-07-17T22:00:00+02:00');
+      expect(warning).toMatch(/then the room goes above 24 °C, the night limit\.$/);
+      // The room is above 24 °C before 22:00 (its day limit is 27 °C): "stays under 24 °C until 10 PM" would be false.
+      expect(lr.comfortLimitC).toBeUndefined();
+    });
+  });
+
   it('off grid on a home without its EPS load, refuses to plan rather than assume one (#107)', async () => {
     const w = stormAt(87.5);
     const home = w.deps.homes(w.ctx.homeId);
@@ -255,7 +293,7 @@ describe('the guard frame (season and night mode), shared by propose and apply',
 
   it('uses the elderly night mode when an elderly person is in the safe room right now', async () => {
     expect((await frameIn(world('heatwave', 14), 'cool')).nightRecoveryMode).toBe('elderly');
-    const empty = world('heatwave', 14, { snapshot: (s) => ({ ...s, rooms: s.rooms.map((x) => ({ ...x, occupants: [] })) }) });
+    const empty = world('heatwave', 14, { snapshot: (s) => ({ ...s, rooms: s.rooms.map((x) => ({ ...x, occupants: x.occupants.length > 0 ? ['daughter', 'son'] : [] })) }) });
     expect((await frameIn(empty, 'cool')).nightRecoveryMode).toBe('standard');
   });
 });
