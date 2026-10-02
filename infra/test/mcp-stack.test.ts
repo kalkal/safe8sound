@@ -187,6 +187,7 @@ describe('loadInfraConfig for the mcp and state settings', () => {
       'cold-reserve:stages': config.stages,
       'cold-reserve:mcp': config.mcp,
       'cold-reserve:state': config.state,
+      'cold-reserve:agent': config.agent,
       ...overrides,
     };
     return (key: string) => values[key];

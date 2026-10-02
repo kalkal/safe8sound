@@ -25,6 +25,9 @@ export interface McpStackProps extends StackProps {
  * Parameters and Secrets extension, least-privilege IAM, 14-day logs, alarms on errors and p95.
  */
 export class McpStack extends Stack {
+  /** The Function URL (ends with `/`): the agent reaches the server at `<url>mcp`. */
+  readonly functionUrl: string;
+
   constructor(scope: Construct, id: string, props: McpStackProps) {
     super(scope, id, props);
     const { stage, mcp, state, table } = props;
@@ -89,6 +92,7 @@ export class McpStack extends Stack {
 
     const url = fn.addFunctionUrl({ authType: FunctionUrlAuthType.NONE });
     new CfnOutput(this, 'McpUrl', { value: url.url });
+    this.functionUrl = url.url;
 
     fn.metricErrors({ period: Duration.minutes(5), statistic: 'Sum' }).createAlarm(this, 'Errors', {
       alarmDescription: 'The MCP server Lambda failed at least once in 5 minutes.',

@@ -2,6 +2,7 @@ import { CfnWaitConditionHandle, Stack, Stage, Validations, type App, type Stack
 import { AwsSolutionsChecks } from 'cdk-nag';
 import type { Construct } from 'constructs';
 import type { InfraConfig, StageName } from './config.js';
+import { AgentStack } from './agent-stack.js';
 import { DataStack } from './data-stack.js';
 import { McpStack } from './mcp-stack.js';
 
@@ -26,7 +27,8 @@ export class ColdReserveStage extends Stage {
     });
     new FoundationStack(this, 'foundation', common('foundation'));
     const data = new DataStack(this, 'data', { ...common('data'), retain: stageName === 'demo' });
-    new McpStack(this, 'mcp', { ...common('mcp'), stage: stageName, mcp: config.mcp, state: config.state, table: data.table });
+    const mcp = new McpStack(this, 'mcp', { ...common('mcp'), stage: stageName, mcp: config.mcp, state: config.state, table: data.table });
+    new AgentStack(this, 'agent', { ...common('agent'), stage: stageName, agent: config.agent, mcpFunctionUrl: mcp.functionUrl });
   }
 }
 

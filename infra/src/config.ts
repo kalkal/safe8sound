@@ -46,12 +46,26 @@ export const StateConfigSchema = z.strictObject({
 });
 export type StateConfig = z.infer<typeof StateConfigSchema>;
 
+/** The agent on AgentCore Runtime (#17, G1b). Model ids and names only: never a token value. */
+export const AgentConfigSchema = z.strictObject({
+  /** The inference profile the agent calls (Nova 2 Lite: `us.amazon.nova-2-lite-v1:0` in us-east-1). */
+  modelId: z.string().regex(/^(us|eu|apac|global)\.[a-z0-9-]+\.[a-z0-9.-]+:\d+$/),
+  /** The model behind the profile, for the IAM policy (the profile routes to it in several regions). */
+  foundationModelId: z.string().regex(/^[a-z0-9-]+\.[a-z0-9.-]+:\d+$/),
+  /** SSM SecureString with the agent's MCP token, under `/<project>/{stage}/agent/`. */
+  mcpTokenParameter: z.string().regex(/^\/[a-z0-9-]+\/\{stage\}\/agent\/[A-Za-z0-9_.-]+$/),
+  /** Idle sessions end after this many seconds (plan §13.2.4: 120; the AgentCore default is 900). */
+  idleRuntimeSessionTimeoutSeconds: z.number().int().min(60).max(28_800),
+});
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;
+
 export const InfraConfigSchema = z.strictObject({
   /** AWS region, e.g. us-east-1. Never hard-coded in stacks. */
   region: z.string().regex(/^[a-z]{2}(-[a-z]+)+-\d$/),
   stages: z.array(StageNameSchema).min(1),
   mcp: McpConfigSchema,
   state: StateConfigSchema,
+  agent: AgentConfigSchema,
 });
 export type InfraConfig = z.infer<typeof InfraConfigSchema>;
 
@@ -62,10 +76,11 @@ export function loadInfraConfig(context: (key: string) => unknown): Result<Infra
     stages: context('cold-reserve:stages'),
     mcp: context('cold-reserve:mcp'),
     state: context('cold-reserve:state'),
+    agent: context('cold-reserve:agent'),
   });
   if (parsed.success) return ok(parsed.data);
   return err(
-    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp or :state.', {
+    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp, :state or :agent.', {
       details: { issues: parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message.slice(0, 200) })) },
     }),
   );
