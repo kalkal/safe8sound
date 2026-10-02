@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import type { LogEntry } from '@cold-reserve/contracts';
+import { jsonLineSink, loggerTo } from '@cold-reserve/core';
 import { z } from 'zod';
 import { httpTurnAgent } from './adapters/agent-http.js';
 import { mcpCardTools, streamableMcpCaller } from './adapters/mcp-cards.js';
@@ -11,11 +13,18 @@ import { memoryQuotaStore } from './quota.js';
 
 // Local sim-api entry (#101): the loopback only, an in-memory quota store, the local agent entry and
 // MCP server behind it. The browser only ever gets the demo token; the other tokens stay here.
-const log = (line: object) => {
-  console.error(JSON.stringify({ ts: new Date().toISOString(), component: 'sim-api', ...line }));
+// Every line is the shared LogEntry of L1, one JSON line on stdout (#143).
+const logger = loggerTo(
+  jsonLineSink((text) => {
+    process.stdout.write(text);
+  }),
+);
+const log = (entry: LogEntry) => {
+  logger.log(entry);
 };
-const fail = (message: string): never => {
-  log({ level: 'error', code: 'invalid_config', message });
+const fail = (reason: string): never => {
+  // Our own reason (which setting is wrong), never a value: it goes under details.
+  log({ ts: new Date().toISOString(), level: 'error', component: 'sim-api', message: 'invalid_config', correlationId: 'none', code: 'invalid_config', category: 'internal', details: { reason } });
   process.exit(1);
 };
 
@@ -54,7 +63,7 @@ const handler = createSimApiHandler(config.value, {
 const server = createServer(nodeListener(handler, { maxBodyBytes: config.value.maxBodyBytes, log }));
 server.listen(Number(process.env['PORT'] ?? 3341), '127.0.0.1', () => {
   const { port } = server.address() as AddressInfo;
-  console.log(JSON.stringify({ level: 'info', component: 'sim-api', message: `listening on http://127.0.0.1:${String(port)}` }));
+  log({ ts: new Date().toISOString(), level: 'info', component: 'sim-api', message: `listening on http://127.0.0.1:${String(port)}`, correlationId: 'none' });
 });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {

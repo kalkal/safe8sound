@@ -53,7 +53,7 @@ export function httpTurnAgent(opts: {
       // The agent refused sim-api itself (token, invocation shape, route): a bug or a broken setup, never
       // the visitor's fault. It must not ask for the demo code again (review of #139): internal, logged.
       if (!PASSED_ON.has(category)) {
-        opts.log?.({ ts: new Date().toISOString(), level: 'error', component: 'sim-api', code, category, correlationId, errorName: 'AgentRefused' });
+        opts.log?.({ ts: new Date().toISOString(), level: 'error', component: 'sim-api', message: code, correlationId, code, category, errorName: 'AgentRefused' });
         return err(toolError('unexpected_error', SAFE_MESSAGE.internal));
       }
       // The code passes on; the text never does (it could carry internals): a fixed message per category.

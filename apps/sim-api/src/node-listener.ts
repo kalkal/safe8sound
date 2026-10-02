@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http';
-import { PROBLEM_JSON_CONTENT_TYPE, toProblemDetails, toolError, type ErrorEnvelope, type HttpErrorStatus } from '@cold-reserve/contracts';
+import { PROBLEM_JSON_CONTENT_TYPE, toProblemDetails, toolError, type ErrorEnvelope, type LogEntry, type HttpErrorStatus } from '@cold-reserve/contracts';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -10,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * adapter takes `requestContext.http.sourceIp` instead); the body is capped while it is read; a throw
  * becomes an RFC 9457 500 with the correlation id and one log line (error name only).
  */
-export function nodeListener(handle: (req: Request, meta: { clientIp: string }) => Promise<Response>, opts: { maxBodyBytes: number; log: (line: object) => void }): RequestListener {
+export function nodeListener(handle: (req: Request, meta: { clientIp: string }) => Promise<Response>, opts: { maxBodyBytes: number; log: (entry: LogEntry) => void }): RequestListener {
   return (req, res) => {
     const presented = req.headers['x-correlation-id'];
     const correlationId = typeof presented === 'string' && UUID.test(presented) ? presented : randomUUID();
@@ -35,7 +35,7 @@ export function nodeListener(handle: (req: Request, meta: { clientIp: string }) 
       });
       await writeResponse(res, response);
     })().catch((error: unknown) => {
-      opts.log({ ts: new Date().toISOString(), level: 'error', component: 'sim-api', code: 'unexpected_error', category: 'internal', correlationId, errorName: error instanceof Error ? error.name : typeof error });
+      opts.log({ ts: new Date().toISOString(), level: 'error', component: 'sim-api', message: 'unexpected_error', correlationId, code: 'unexpected_error', category: 'internal', errorName: error instanceof Error ? error.name : typeof error });
       problem(toolError('unexpected_error', 'Something went wrong on our side.'));
     });
   };

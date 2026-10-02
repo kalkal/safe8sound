@@ -9,6 +9,7 @@ import {
   type ErrorCategory,
   type ErrorEnvelope,
   type HomeId,
+  type LogEntry,
   type HttpErrorStatus,
   type Result,
   type SessionReply,
@@ -32,33 +33,14 @@ export interface CardToolPort {
   call(input: { home: HomeId; request: ToolCallRequest; correlationId: string }): Promise<Result<ToolCallReply, ErrorEnvelope>>;
 }
 
-/** One line of the error log: never the demo code or the token. */
-export interface ErrorLine {
-  ts: string;
-  level: 'warn' | 'error';
-  component: 'sim-api';
-  code: ErrorEnvelope['code'];
-  category: ErrorCategory;
-  correlationId: string;
-  codeId?: string;
-  /** Last resort only: the error type and its cause's type, never their messages. */
-  errorName?: string;
-  causeName?: string;
-}
-
-/** One line per successful turn or card action (review of #110): never the question or the answer. */
-export interface InfoLine {
-  ts: string;
-  level: 'info';
-  component: 'sim-api';
-  event: 'turn_answered' | 'card_action_done';
-  correlationId: string;
-  codeId: string;
-  durationMs: number;
-  tool?: string;
-}
-
-export type LogLine = ErrorLine | InfoLine;
+/**
+ * One log line: the shared LogEntry of L1 (#111, moved here in #143). Never the demo code, the token, the
+ * question or the answer: the code is the message, and the demo code id, durations and tool names go under
+ * details.
+ */
+export type LogLine = LogEntry;
+/** The line of a refused or failed request (kept as a name for the adapters). */
+export type ErrorLine = LogEntry;
 
 export interface SimApiDeps {
   readonly agent: TurnAgentPort;
@@ -67,7 +49,7 @@ export interface SimApiDeps {
   readonly clock: Clock;
   /** 16 random hex characters for a visitor's sandbox home. */
   readonly randomHex: () => string;
-  readonly logger: { log(line: LogLine): void };
+  readonly logger: { log(line: LogEntry): void };
 }
 
 export type SimApiHandler = (req: Request, meta: { clientIp: string }) => Promise<Response>;
@@ -88,13 +70,23 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
     /** Set only for an allowlisted Origin: CORS headers go back to that origin alone. */
     const allowedOrigin = origin !== null && origins.has(origin) ? origin : undefined;
     const startedMs = deps.clock.now();
-    const info = (line: Pick<InfoLine, 'event' | 'codeId' | 'tool'>) => {
+    const info = (line: { event: 'turn_answered' | 'card_action_done'; codeId: string; tool?: string }) => {
       const now = deps.clock.now();
-      deps.logger.log({ ts: new Date(now).toISOString(), level: 'info', component: 'sim-api', correlationId, durationMs: now - startedMs, ...line });
+      const { event, ...details } = line;
+      deps.logger.log({ ts: new Date(now).toISOString(), level: 'info', component: 'sim-api', message: event, correlationId, details: { ...details, durationMs: now - startedMs } });
     };
     const fail = (error: ErrorEnvelope, status?: HttpErrorStatus, headers: Record<string, string> = {}, codeId?: string) => {
       if (LOGGED.has(error.category)) {
-        deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: error.category === 'internal' ? 'error' : 'warn', component: 'sim-api', code: error.code, category: error.category, correlationId, ...(codeId === undefined ? {} : { codeId }) });
+        deps.logger.log({
+          ts: new Date(deps.clock.now()).toISOString(),
+          level: error.category === 'internal' ? 'error' : 'warn',
+          component: 'sim-api',
+          message: error.code,
+          correlationId,
+          code: error.code,
+          category: error.category,
+          ...(codeId === undefined ? {} : { details: { codeId } }),
+        });
       }
       const body = toProblemDetails(error, { instance: `urn:uuid:${correlationId}`, ...(status === undefined ? {} : { status }) });
       return respond(body.status, body, { 'content-type': PROBLEM_JSON_CONTENT_TYPE, ...headers });
@@ -181,12 +173,14 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         ts: new Date(deps.clock.now()).toISOString(),
         level: 'error',
         component: 'sim-api',
+        message: 'unexpected_error',
+        correlationId,
         code: 'unexpected_error',
         category: 'internal',
-        correlationId,
-        ...(codeIdOfRequest === undefined ? {} : { codeId: codeIdOfRequest }),
         errorName: nameOf(e),
-        ...(cause === undefined ? {} : { causeName: nameOf(cause) }),
+        ...(codeIdOfRequest === undefined && cause === undefined
+          ? {}
+          : { details: { ...(codeIdOfRequest === undefined ? {} : { codeId: codeIdOfRequest }), ...(cause === undefined ? {} : { causeName: nameOf(cause) }) } }),
       });
       const body = toProblemDetails(toolError('unexpected_error', 'Something went wrong on our side. Try again in a moment.'), { instance: `urn:uuid:${correlationId}` });
       return respond(body.status, body, { 'content-type': PROBLEM_JSON_CONTENT_TYPE });

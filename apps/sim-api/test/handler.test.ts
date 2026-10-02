@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
-import { ProblemDetailsSchema, SessionReplySchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result, type ToolCallReply, type TurnReply } from '@cold-reserve/contracts';
+import { LogEntrySchema, ProblemDetailsSchema, SessionReplySchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result, type ToolCallReply, type TurnReply } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { loadSimApiConfig, type SimApiConfig } from '../src/config.js';
-import { createSimApiHandler, type LogLine, type TurnAgentPort } from '../src/handler.js';
+import { createSimApiHandler, type TurnAgentPort } from '../src/handler.js';
+import type { LogEntry } from '@cold-reserve/contracts';
 import { memoryQuotaStore, type QuotaStore } from '../src/quota.js';
 import { signToken, verifyToken } from '../src/token.js';
 
@@ -34,7 +35,7 @@ interface Faults {
 function setup(over: Record<string, string> = {}, agentReply?: Result<TurnReply, ErrorEnvelope>, faults: Faults = {}) {
   const asked: { home: HomeId; question: string; correlationId: string }[] = [];
   const called: { home: HomeId; name: string }[] = [];
-  const logs: LogLine[] = [];
+  const logs: LogEntry[] = [];
   let homes = 0;
   const handler = createSimApiHandler(config(over), {
     agent: {
@@ -129,8 +130,8 @@ describe('POST /v1/turns: the agent behind the token', () => {
     await send('/v1/turns', { token, body: { question: 'Hi' }, headers: { 'x-correlation-id': '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60' } });
     await send('/v1/tools/call', { token, body: { name: 'apply_plan', arguments: { planId: 'plan-0001' } } });
     expect(logs).toMatchObject([
-      { level: 'info', component: 'sim-api', event: 'turn_answered', correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60', codeId: 'judges', durationMs: 0 },
-      { level: 'info', component: 'sim-api', event: 'card_action_done', codeId: 'judges', tool: 'apply_plan' },
+      { level: 'info', component: 'sim-api', message: 'turn_answered', correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60', details: { codeId: 'judges', durationMs: 0 } },
+      { level: 'info', component: 'sim-api', message: 'card_action_done', details: { codeId: 'judges', tool: 'apply_plan' } },
     ]);
     expect(JSON.stringify(logs)).not.toContain('Hi');
   });
@@ -277,7 +278,7 @@ describe('refusals (review of #110)', () => {
   it('passes a card tool failure on as Problem Details (agent_unavailable -> 503)', async () => {
     const { send, session, logs } = setup({}, undefined, { toolReply: err(toolError('agent_unavailable', 'The home could not be reached.')) });
     await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'apply_plan', arguments: { planId: 'plan-0001' } } }), 503, 'agent_unavailable');
-    expect(logs).toMatchObject([{ level: 'warn', code: 'agent_unavailable', codeId: 'judges' }]);
+    expect(logs).toMatchObject([{ level: 'warn', code: 'agent_unavailable', details: { codeId: 'judges' } }]);
   });
 
   it('answers 403 demo_disabled on /v1/turns too, before reading the token', async () => {
@@ -297,7 +298,7 @@ describe('last resort (review of #110): a throw never escapes the handler', () =
     expect(body.instance).toBe(`urn:uuid:${ID}`);
     expect(res.headers.get('access-control-allow-origin')).toBe(ORIGIN);
     expect(JSON.stringify(body)).not.toContain('exploded');
-    expect(logs).toMatchObject([{ level: 'error', component: 'sim-api', code: 'unexpected_error', category: 'internal', correlationId: ID, errorName: 'TypeError', codeId: 'judges' }]);
+    expect(logs).toMatchObject([{ level: 'error', component: 'sim-api', code: 'unexpected_error', category: 'internal', correlationId: ID, errorName: 'TypeError', details: { codeId: 'judges' } }]);
     expect(JSON.stringify(logs)).not.toContain('token=abc');
   });
 
@@ -308,12 +309,31 @@ describe('last resort (review of #110): a throw never escapes the handler', () =
     const { send, logs } = setup({}, undefined, { quota: failing });
     const token = signToken({ sub: 'judges', home: 'demo#01aaaaaaaaaaaaaa' as HomeId, iat: NOW / 1000, exp: NOW / 1000 + 3600, jti: 'j' }, { kid: 'k1', material: KEY });
     await problem(await send('/v1/turns', { token, body: { question: 'Hi' } }), 500, 'unexpected_error');
-    expect(logs).toMatchObject([{ code: 'unexpected_error', errorName: 'Error', causeName: 'ProvisionedThroughputExceededException' }]);
+    expect(logs).toMatchObject([{ code: 'unexpected_error', errorName: 'Error', details: { causeName: 'ProvisionedThroughputExceededException' } }]);
   });
 
   it('maps a throwing quota store on /v1/session to 500 too', async () => {
     const throwing: QuotaStore = { consume: () => Promise.reject(new RangeError('x')) };
     const { send } = setup({}, undefined, { quota: throwing });
     await problem(await send('/v1/session', { body: { code: CODE } }), 500, 'unexpected_error');
+  });
+});
+
+describe('log lines: the shared LogEntry of L1 (#143)', () => {
+  it('writes only valid LogEntry lines, for answers, card actions, refusals and errors, never with the code or the token', async () => {
+    const { send, session, logs } = setup({}, undefined, { ask: () => Promise.reject(new TypeError('boom')) });
+    const token = await session();
+    await send('/v1/session', { body: { code: 'not-the-demo-code-at-all' } });
+    await send('/v1/turns', { token, body: { question: 'Hi' } });
+    await send('/v1/tools/call', { token, body: { name: 'apply_plan', arguments: { planId: 'plan-0001' } } });
+    await send('/v1/turns', { body: { question: 'Hi' } });
+    expect(logs.length).toBeGreaterThanOrEqual(4);
+    for (const line of logs) expect(LogEntrySchema.safeParse(line).success, JSON.stringify(line)).toBe(true);
+    expect(logs.find((l) => l.message === 'card_action_done')).toMatchObject({ level: 'info', details: { codeId: 'judges', tool: 'apply_plan' } });
+    expect(logs.find((l) => l.code === 'unexpected_error')).toMatchObject({ level: 'error', errorName: 'TypeError', details: { codeId: 'judges' } });
+    const text = JSON.stringify(logs);
+    expect(text).not.toContain(CODE);
+    expect(text).not.toContain('not-the-demo-code-at-all');
+    expect(text).not.toContain(token);
   });
 });
