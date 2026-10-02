@@ -48,6 +48,35 @@ function entries(raw: string | undefined): [string, string][] {
     });
 }
 
+/** The settings that are not secrets: they can be checked before any secret is read (Copilot on #156). */
+export type PlainSimApiSettings = Omit<SimApiConfig, 'demoCodes' | 'keys'>;
+
+export function loadPlainSimApiSettings(env: Readonly<Record<string, string | undefined>>): Result<PlainSimApiSettings, ErrorEnvelope> {
+  const allowedOrigins = (env['SIM_ALLOWED_ORIGINS'] ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter((o) => o.length > 0);
+  if (allowedOrigins.length === 0 || !allowedOrigins.every((o) => z.url().safeParse(o).success)) return invalid('SIM_ALLOWED_ORIGINS must list the simulator origin.');
+
+  const numbers = NumbersSchema.safeParse({
+    tokenTtlS: env['SIM_TOKEN_TTL_S'] ?? '3600',
+    skewS: env['SIM_CLOCK_SKEW_S'] ?? '30',
+    turnsPerCodePerDay: env['SIM_LIMIT_TURNS_PER_CODE'] ?? '20',
+    turnsGlobalPerDay: env['SIM_LIMIT_TURNS_GLOBAL'] ?? '30',
+    toolCallsPerCodePerDay: env['SIM_LIMIT_TOOL_CALLS_PER_CODE'] ?? '20',
+    codeAttemptsPerIpPerHour: env['SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR'] ?? '10',
+    maxBodyBytes: env['SIM_MAX_BODY_BYTES'] ?? '16384',
+  });
+  if (!numbers.success) return invalid(`A SIM_* number is not valid: ${numbers.error.issues.map((i) => i.path.join('.')).join(', ')}.`);
+  const { tokenTtlS, skewS, maxBodyBytes, ...limits } = numbers.data;
+
+  // The kill switch takes true or false only (unset = on): a typo never silently leaves the demo open.
+  const enabled = env['SIM_DEMO_ENABLED']?.trim().toLowerCase();
+  if (enabled !== undefined && enabled !== 'true' && enabled !== 'false') return invalid('SIM_DEMO_ENABLED must be true or false.');
+
+  return ok({ tokenTtlS, skewS, allowedOrigins, limits, demoEnabled: enabled !== 'false', maxBodyBytes });
+}
+
 /** Locally from .env; on Lambda the codes and keys come from SSM SecureStrings. Messages never echo values. */
 export function loadSimApiConfig(env: Readonly<Record<string, string | undefined>>): Result<SimApiConfig, ErrorEnvelope> {
   const demoCodes = new Map<string, string>();
@@ -67,23 +96,6 @@ export function loadSimApiConfig(env: Readonly<Record<string, string | undefined
   }
   if (keys.length === 0) return invalid('SIM_TOKEN_KEYS is not set.');
 
-  const allowedOrigins = (env['SIM_ALLOWED_ORIGINS'] ?? '')
-    .split(',')
-    .map((o) => o.trim())
-    .filter((o) => o.length > 0);
-  if (allowedOrigins.length === 0 || !allowedOrigins.every((o) => z.url().safeParse(o).success)) return invalid('SIM_ALLOWED_ORIGINS must list the simulator origin.');
-
-  const numbers = NumbersSchema.safeParse({
-    tokenTtlS: env['SIM_TOKEN_TTL_S'] ?? '3600',
-    skewS: env['SIM_CLOCK_SKEW_S'] ?? '30',
-    turnsPerCodePerDay: env['SIM_LIMIT_TURNS_PER_CODE'] ?? '20',
-    turnsGlobalPerDay: env['SIM_LIMIT_TURNS_GLOBAL'] ?? '30',
-    toolCallsPerCodePerDay: env['SIM_LIMIT_TOOL_CALLS_PER_CODE'] ?? '20',
-    codeAttemptsPerIpPerHour: env['SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR'] ?? '10',
-    maxBodyBytes: env['SIM_MAX_BODY_BYTES'] ?? '16384',
-  });
-  if (!numbers.success) return invalid(`A SIM_* number is not valid: ${numbers.error.issues.map((i) => i.path.join('.')).join(', ')}.`);
-  const { tokenTtlS, skewS, maxBodyBytes, ...limits } = numbers.data;
-
-  return ok({ demoCodes, keys, tokenTtlS, skewS, allowedOrigins, limits, demoEnabled: env['SIM_DEMO_ENABLED']?.trim().toLowerCase() !== 'false', maxBodyBytes });
+  const plain = loadPlainSimApiSettings(env);
+  return plain.ok ? ok({ demoCodes, keys, ...plain.value }) : plain;
 }

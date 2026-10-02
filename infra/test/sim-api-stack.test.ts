@@ -1,7 +1,7 @@
 import { App, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { SimApiConfigSchema, SimApiStack, applyGuardrails, buildApp, loadInfraConfig, type SimApiConfig } from '../src/index.js';
+import { InfraConfigSchema, SimApiConfigSchema, SimApiStack, applyGuardrails, buildApp, loadInfraConfig, type SimApiConfig } from '../src/index.js';
 import { exampleConfig } from './fixtures.js';
 
 // Template assertions for the sim-api stack (#17): the demo API behind a Function URL. Bundling is skipped
@@ -127,6 +127,25 @@ describe('sim-api stack (#17)', () => {
   });
 });
 
+describe('the sim-api time budget (Copilot on #156): the caller never gets a raw 502', () => {
+  // Worst case of one request: the SSM reads at a cold start, two DynamoDB calls with every attempt, then
+  // the agent (or the MCP server), plus a margin for the SDK backoff.
+  const parse = (simApi: Partial<SimApiConfig>, state: Partial<ReturnType<typeof exampleConfig>['state']> = {}) =>
+    InfraConfigSchema.safeParse({ ...exampleConfig(), simApi: { ...exampleConfig().simApi, ...simApi }, state: { ...exampleConfig().state, ...state } });
+
+  it('accepts the cdk.json values: 2 s SSM + 2 x 3 x (0.5 + 1.5) s DynamoDB + 9 s agent + 1 s margin = 24 s, within 25 s', () => {
+    expect(parse({}).success).toBe(true);
+  });
+
+  it('refuses a function timeout that the worst case does not fit in, and names the setting', () => {
+    const result = parse({ timeoutSeconds: 15 });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('timeoutSeconds');
+    expect(parse({}, { maxAttempts: 5 }).success).toBe(false);
+    expect(parse({ mcpTimeoutMs: 20_000, agentTimeoutMs: 3000 }).success).toBe(false);
+  });
+});
+
 describe('SimApiConfigSchema', () => {
   it('accepts the example and refuses parameters outside the sim-api prefix', () => {
     expect(SimApiConfigSchema.safeParse(exampleSimApi()).success).toBe(true);
@@ -134,7 +153,7 @@ describe('SimApiConfigSchema', () => {
   });
 
   it('refuses an agent timeout that does not fit in the function timeout', () => {
-    expect(SimApiConfigSchema.safeParse({ ...exampleSimApi(), agentTimeoutMs: 15_000 }).success).toBe(false);
+    expect(SimApiConfigSchema.safeParse({ ...exampleSimApi(), agentTimeoutMs: 25_000 }).success).toBe(false);
   });
 
   it('refuses an origin with a path (CORS matches exact origins)', () => {

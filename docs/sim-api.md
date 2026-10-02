@@ -35,7 +35,7 @@ The client IP is personal data, and the table keeps 35 days of point-in-time bac
 
 A demo code attempt is counted **before** the code is compared, so concurrent guesses cannot slip past the cap, and past the cap even a right code is refused. A right code then gives its attempt back (`ADD -1`, never below zero), so only wrong codes stay counted: a jury behind one shared IP can open as many sessions as it needs, within the daily caps per code and overall (review of #139). If the give-back fails, the session still opens and the line `attempt_release_failed` is logged. Each item carries a `ttl` at the end of its window, so DynamoDB removes old counters. The limits come from the CDK config (`cold-reserve:simApi` → `limits`), never from code.
 
-If DynamoDB fails for another reason, the request fails closed (500 `unexpected_error`, logged): a cap is never skipped.
+If DynamoDB is throttled, has a server fault, times out or cannot be reached, the request fails closed with a retryable 503 `store_unavailable` (the error name in the log, never in the answer). Any other store error is a bug of ours: 500 `unexpected_error`, logged. A cap is never skipped.
 
 ## Who may do what (IAM)
 

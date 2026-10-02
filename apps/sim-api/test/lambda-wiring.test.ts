@@ -86,6 +86,15 @@ describe('loadSimApiLambda', () => {
     if (!built.ok) expect(built.error.code).toBe('config_unavailable');
   });
 
+  it('checks the plain settings (origins, caps, TTL, kill switch) before any SSM read (Copilot on #156)', async () => {
+    for (const broken of [{ SIM_ALLOWED_ORIGINS: 'not a url' }, { SIM_ALLOWED_ORIGINS: undefined }, { SIM_LIMIT_TURNS_PER_CODE: 'many' }, { SIM_TOKEN_TTL_S: '5' }, { SIM_DEMO_ENABLED: 'maybe' }]) {
+      const { asked, deps: d } = deps();
+      const built = await loadSimApiLambda({ ...ENV, ...broken }, d);
+      expect(built).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+      expect(asked).toEqual([]);
+    }
+  });
+
   it('answers invalid_config naming the setting (never a value) when a setting is missing or malformed', async () => {
     for (const broken of [{ AGENT_RUNTIME_ARN: 'not-an-arn' }, { STATE_TABLE_NAME: undefined }, { SIM_MCP_URL: 'nope' }, { SIM_DEMO_CODES_PARAMETER: undefined }]) {
       const { asked, deps: d } = deps();

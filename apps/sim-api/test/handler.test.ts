@@ -120,6 +120,27 @@ describe('POST /v1/session: a demo code for a 1-hour token', () => {
   });
 });
 
+describe('a throttled quota store (Copilot on #156): 503 store_unavailable, still fail closed', () => {
+  const throttled = (): QuotaStore => {
+    const error = () => Promise.reject(Object.assign(new Error('Rate exceeded'), { name: 'ProvisionedThroughputExceededException' }));
+    return { consume: error, release: error };
+  };
+
+  it('answers a session and a turn with 503 store_unavailable, logged with the error name, and never asks the agent', async () => {
+    const { send, logs, asked } = setup({}, undefined, { quota: throttled() });
+    const session = await send('/v1/session', { body: { code: CODE } });
+    expect(await session.clone().text()).not.toContain('Provisioned'); // the cause name stays in the log
+    await problem(session, 503, 'store_unavailable');
+    const token = signToken({ sub: 'judges', home: 'demo#01aaaaaaaaaaaaaa' as HomeId, iat: NOW / 1000, exp: NOW / 1000 + 3600, jti: 'j' }, { kid: 'k1', material: KEY });
+    await problem(await send('/v1/turns', { token, body: { question: 'Hi' } }), 503, 'store_unavailable');
+    expect(asked).toEqual([]);
+    expect(logs).toMatchObject([
+      { level: 'warn', code: 'store_unavailable', category: 'dependency_unavailable', errorName: 'ProvisionedThroughputExceededException' },
+      { level: 'warn', code: 'store_unavailable', errorName: 'ProvisionedThroughputExceededException', details: { codeId: 'judges' } },
+    ]);
+  });
+});
+
 describe('POST /v1/session: concurrent attempts (review of #110)', () => {
   it('never lets more wrong codes through than the cap, even sent at the same time', async () => {
     const { send } = setup();

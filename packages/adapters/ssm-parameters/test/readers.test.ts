@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cachedOnSuccess, extensionReader, sdkReader, type GetParameter } from '../src/index.js';
+import { cachedOnSuccess, extensionReader, sdkReader, ssmTimeoutMs, type GetParameter } from '../src/index.js';
 
 // One interface, two transports (R14, #17): a ParameterReader reads one SecureString by name and answers
 // the value, `invalid_config` (our setup: retrying cannot help) or `config_unavailable` (transient). The
@@ -76,5 +76,26 @@ describe('cachedOnSuccess', () => {
     expect(await get()).toEqual({ ok: true, value: 'token' });
     expect(await get()).toEqual({ ok: true, value: 'token' });
     expect(load).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('the read timeout (review of #162): the readers take the raw setting and fall back to 2 s', () => {
+  it('uses a finite positive value, and 2000 ms for anything else', () => {
+    expect(ssmTimeoutMs(1500)).toBe(1500);
+    expect(ssmTimeoutMs('750')).toBe(750);
+    for (const raw of [undefined, '', 'soon', '-5', 0, Number.NaN, Number.POSITIVE_INFINITY]) expect(ssmTimeoutMs(raw)).toBe(2000);
+  });
+
+  it('lets the Lambda entries pass the env value as it is', async () => {
+    const fetchFn = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ Parameter: { Value: VALUE } }))));
+    expect(await extensionReader({ fetchFn, sessionToken: 'session', timeoutMs: undefined })(NAME)).toEqual({ ok: true, value: VALUE });
+    expect(await sdkReader({ getParameter: () => Promise.resolve({ Parameter: { Value: VALUE } }), timeoutMs: 'soon' })(NAME)).toEqual({ ok: true, value: VALUE });
+  });
+});
+
+describe('the public surface', () => {
+  it('exports the ParameterReader factories, not the raw extension call', async () => {
+    const api = await import('../src/index.js');
+    expect(Object.keys(api).sort()).toEqual(['cachedOnSuccess', 'extensionReader', 'packageName', 'sdkReader', 'ssmTimeoutMs']);
   });
 });

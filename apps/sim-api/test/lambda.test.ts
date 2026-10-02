@@ -83,3 +83,13 @@ describe('createSimApiLambda', () => {
     for (const line of logs) expect(LogEntrySchema.safeParse(line).success).toBe(true);
   });
 });
+
+describe('createSimApiLambda: the wait time of a transient startup failure (Copilot on #156)', () => {
+  it('keeps retryAfterMs when it rebuilds the transient error for the caller', async () => {
+    const { log } = capture();
+    const failed = await createSimApiLambda(() => Promise.resolve(err(toolError('config_unavailable', 'Parameter /x is starting.', { retryAfterMs: 1000 }))), { log })(event());
+    expect(failed.statusCode).toBe(503);
+    expect(ProblemDetailsSchema.parse(JSON.parse(failed.body))).toMatchObject({ code: 'config_unavailable', retryAfterMs: 1000 });
+    expect(failed.body).not.toContain('/x');
+  });
+});

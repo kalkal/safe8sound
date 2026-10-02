@@ -33,7 +33,7 @@ export const handler = createLambdaHandler(
     const parameter = process.env['MCP_CLIENTS_PARAMETER'];
     const sessionToken = process.env['AWS_SESSION_TOKEN'];
     if (!parameter || !sessionToken) return err(toolError('invalid_config', 'MCP_CLIENTS_PARAMETER or AWS_SESSION_TOKEN is not set.'));
-    const clients = await extensionReader({ fetchFn: fetch, sessionToken, timeoutMs: Number(process.env['SSM_TIMEOUT_MS'] ?? 2000) })(parameter);
+    const clients = await extensionReader({ fetchFn: fetch, sessionToken, timeoutMs: process.env['SSM_TIMEOUT_MS'] })(parameter);
     if (!clients.ok) return clients;
 
     const wallClock = { now: Date.now };

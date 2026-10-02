@@ -14,9 +14,16 @@ const TRANSIENT: ReadonlySet<string> = new Set(['RuntimeClientError', 'Throttlin
 /** No HTTP answer at all: the network or DNS failed on the way to AgentCore. */
 const NETWORK: ReadonlySet<string> = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'EPIPE']);
 
+/** An AWS service error on its side: the SDK marks it `$fault: 'server'`, or its HTTP status is 5xx (Copilot on #156). */
+const isAwsServerFault = (cause: Error): boolean => {
+  const { $fault, $metadata } = cause as { $fault?: unknown; $metadata?: { httpStatusCode?: unknown } };
+  const status = $metadata?.httpStatusCode;
+  return $fault === 'server' || (typeof status === 'number' && status >= 500);
+};
+
 /** Transient: a retry may work. A bare TypeError or a non-Error throw is a bug of ours, never hidden as AWS (review of #152). */
 const isTransient = (cause: unknown): boolean =>
-  cause instanceof Error && (TRANSIENT.has(cause.name) || NETWORK.has(String((cause as { code?: unknown }).code)));
+  cause instanceof Error && (TRANSIENT.has(cause.name) || isAwsServerFault(cause) || NETWORK.has(String((cause as { code?: unknown }).code)));
 
 /**
  * The agent on AgentCore Runtime (#17, G1c): InvokeAgentRuntime, signed with sim-api's IAM role by the SDK.

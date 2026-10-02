@@ -104,7 +104,17 @@ export const InfraConfigSchema = z.strictObject({
   state: StateConfigSchema,
   agent: AgentConfigSchema,
   simApi: SimApiConfigSchema,
-});
+})
+  .superRefine((c, ctx) => {
+    // The sim-api worst case (Copilot on #156): the SSM reads at a cold start, two DynamoDB calls with every
+    // attempt (a turn counts per code and overall), the agent or the MCP server, and 1 s for the SDK backoff.
+    // It must end before the function does, so the caller gets our answer, never a raw 502.
+    const dynamo = 2 * c.state.maxAttempts * (c.state.connectTimeoutMs + c.state.requestTimeoutMs);
+    const worstMs = c.simApi.ssmTimeoutMs + dynamo + Math.max(c.simApi.agentTimeoutMs, c.simApi.mcpTimeoutMs) + 1000;
+    if (worstMs > c.simApi.timeoutSeconds * 1000) {
+      ctx.addIssue({ code: 'custom', path: ['simApi', 'timeoutSeconds'], message: `The sim-api worst case is ${String(worstMs)} ms: raise timeoutSeconds, or lower the timeouts or the DynamoDB attempts.` });
+    }
+  });
 export type InfraConfig = z.infer<typeof InfraConfigSchema>;
 
 /** Reads the `cold-reserve:*` keys of the CDK context (cdk.json or `-c key=value`). */

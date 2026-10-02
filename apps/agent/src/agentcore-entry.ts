@@ -21,13 +21,12 @@ const log = (entry: AgentLogEntry) => {
 // On AgentCore the MCP token is an SSM SecureString, read when the first invocation needs it (decided in
 // #17); locally (and in the bundle test) it can still come from AGENT_MCP_TOKEN.
 const parameter = process.env['AGENT_MCP_TOKEN_PARAMETER'];
-const ssmTimeoutMs = Number(process.env['AGENT_SSM_TIMEOUT_MS'] ?? 2000);
 const mcpToken =
   parameter === undefined || parameter === ''
     ? undefined
     : (() => {
         const client = new SSMClient({});
-        const read = sdkReader({ getParameter: (input, options) => client.send(new GetParameterCommand(input), options), timeoutMs: Number.isFinite(ssmTimeoutMs) && ssmTimeoutMs > 0 ? ssmTimeoutMs : 2000 });
+        const read = sdkReader({ getParameter: (input, options) => client.send(new GetParameterCommand(input), options), timeoutMs: process.env['AGENT_SSM_TIMEOUT_MS'] });
         return cachedOnSuccess(() => readMcpToken(read, parameter));
       })();
 

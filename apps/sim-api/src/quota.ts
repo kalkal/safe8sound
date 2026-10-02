@@ -38,6 +38,16 @@ export interface QuotaLimits {
 
 export type Quota = ReturnType<typeof createQuota>;
 
+/** Store failures a retry may fix: throttling, an AWS server fault (5xx), an SDK timeout, the network. */
+const TRANSIENT_NAMES: ReadonlySet<string> = new Set(['ProvisionedThroughputExceededException', 'ThrottlingException', 'RequestLimitExceeded', 'InternalServerError', 'ServiceUnavailable', 'TimeoutError']);
+const NETWORK_CODES: ReadonlySet<string> = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'EPIPE']);
+const isTransient = (e: unknown): e is Error => {
+  if (!(e instanceof Error)) return false;
+  const { $fault, $metadata, code } = e as { $fault?: unknown; $metadata?: { httpStatusCode?: unknown }; code?: unknown };
+  const status = $metadata?.httpStatusCode;
+  return TRANSIENT_NAMES.has(e.name) || $fault === 'server' || (typeof status === 'number' && status >= 500) || NETWORK_CODES.has(String(code));
+};
+
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
 
@@ -53,29 +63,53 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
   };
   const over = (retryAfterMs: number, message: string): Result<never, ErrorEnvelope> => err(toolError('demo_quota_exceeded', message, { retryAfterMs }));
   const DAILY = 'The demo limit for today is reached. Come back after midnight UTC.';
+  /**
+   * A transient store failure is a retryable 503 `store_unavailable` (Copilot on #156), still fail closed:
+   * nothing goes on without the count. Its error name goes to the log; anything else (a bug of ours, a
+   * client fault) is rethrown for the last resort (500).
+   */
+  // The cause name of a store failure, for the log line only (it never reaches the answer).
+  const causes = new WeakMap<ErrorEnvelope, string>();
+  const counted = async <T>(run: () => Promise<T>): Promise<Result<T, ErrorEnvelope>> => {
+    try {
+      return ok(await run());
+    } catch (e) {
+      if (!isTransient(e)) throw e;
+      const error = toolError('store_unavailable', 'The demo cannot count its limits right now. Try again in a moment.');
+      causes.set(error, e.name);
+      return err(error);
+    }
+  };
 
   return {
     async turn(codeId: string): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);
-      if (!(await store.consume(`TURNS#${codeId}#${day.id}`, limits.turnsPerCodePerDay, day.endMs))) return over(day.retryAfterMs, DAILY);
-      if (!(await store.consume(`TURNS#GLOBAL#${day.id}`, limits.turnsGlobalPerDay, day.endMs))) return over(day.retryAfterMs, DAILY);
-      return ok(undefined);
+      const perCode = await counted(() => store.consume(`TURNS#${codeId}#${day.id}`, limits.turnsPerCodePerDay, day.endMs));
+      if (!perCode.ok) return perCode;
+      if (!perCode.value) return over(day.retryAfterMs, DAILY);
+      const overall = await counted(() => store.consume(`TURNS#GLOBAL#${day.id}`, limits.turnsGlobalPerDay, day.endMs));
+      if (!overall.ok) return overall;
+      return overall.value ? ok(undefined) : over(day.retryAfterMs, DAILY);
     },
     async toolCall(codeId: string): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);
-      return (await store.consume(`TOOLS#${codeId}#${day.id}`, limits.toolCallsPerCodePerDay, day.endMs)) ? ok(undefined) : over(day.retryAfterMs, DAILY);
+      const allowed = await counted(() => store.consume(`TOOLS#${codeId}#${day.id}`, limits.toolCallsPerCodePerDay, day.endMs));
+      if (!allowed.ok) return allowed;
+      return allowed.value ? ok(undefined) : over(day.retryAfterMs, DAILY);
     },
     /**
      * Counts one demo code attempt from this IP, atomically, BEFORE the code is looked at (review of #110):
      * past the hourly cap even a right code is refused, so guessing cannot go on. A right code then gives its
      * attempt back (`release`), so only wrong codes stay counted (review of #139).
      */
-    async codeAttempt(ip: string): Promise<{ allowed: boolean; release: () => Promise<void> }> {
+    async codeAttempt(ip: string): Promise<Result<{ allowed: boolean; release: () => Promise<void> }, ErrorEnvelope>> {
       const hour = window(HOUR_MS);
       const key = `ATTEMPT#${ipKey(ip)}#${hour.id}`;
-      const allowed = await store.consume(key, limits.codeAttemptsPerIpPerHour, hour.endMs);
-      return { allowed, release: () => store.release(key) };
+      const allowed = await counted(() => store.consume(key, limits.codeAttemptsPerIpPerHour, hour.endMs));
+      return allowed.ok ? ok({ allowed: allowed.value, release: () => store.release(key) }) : allowed;
     },
+    /** The store error name behind a `store_unavailable` this quota answered, for the log. */
+    causeOf: (error: ErrorEnvelope): string | undefined => causes.get(error),
     tooManyAttempts: (): ErrorEnvelope => toolError('demo_quota_exceeded', 'Too many demo code attempts. Try again in an hour.', { retryAfterMs: window(HOUR_MS).retryAfterMs }),
   };
 }

@@ -27,7 +27,7 @@ export const exampleConfig = (): InfraConfig => ({
     tokenKeysParameter: '/cold-reserve/{stage}/sim-api/token-keys',
     mcpTokenParameter: '/cold-reserve/{stage}/sim-api/mcp-token',
     memoryMb: 512,
-    timeoutSeconds: 15,
+    timeoutSeconds: 25,
     logRetentionDays: 14,
     p95AlarmMs: 9000,
     ssmTimeoutMs: 2000,

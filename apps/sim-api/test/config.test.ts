@@ -23,6 +23,11 @@ describe('loadSimApiConfig (only hashes of codes and key ids reach logs; values 
     });
   });
 
+  it('takes only true or false for the kill switch (unset = on): a typo is invalid_config, never a silently open demo', () => {
+    expect(loadSimApiConfig({ ...ENV, SIM_DEMO_ENABLED: 'true' })).toMatchObject({ ok: true, value: { demoEnabled: true } });
+    for (const value of ['maybe', 'off', '0']) expect(loadSimApiConfig({ ...ENV, SIM_DEMO_ENABLED: value })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+
   it('switches the demo off with SIM_DEMO_ENABLED=false (kill switch)', () => {
     expect(loadSimApiConfig({ ...ENV, SIM_DEMO_ENABLED: 'false' })).toMatchObject({ ok: true, value: { demoEnabled: false } });
   });

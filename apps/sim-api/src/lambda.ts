@@ -77,7 +77,7 @@ export function createSimApiLambda(
       ready = undefined; // a later request retries the configuration
       // Our own reason stays in the log; the caller only learns whether to retry.
       deps.log(line(built.error, correlationId, { reason: built.error.message }));
-      const shown = built.error.category === 'dependency_unavailable' ? toolError(built.error.code, 'The demo cannot reach a service it needs. Try again in a moment.') : toolError('invalid_config', 'The demo is not configured correctly.');
+      const shown = built.error.category === 'dependency_unavailable' ? toolError(built.error.code, 'The demo cannot reach a service it needs. Try again in a moment.', built.error.retryAfterMs === undefined ? {} : { retryAfterMs: built.error.retryAfterMs }) : toolError('invalid_config', 'The demo is not configured correctly.');
       return problem(shown, correlationId);
     }
     try {

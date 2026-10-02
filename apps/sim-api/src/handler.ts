@@ -79,6 +79,8 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
     };
     const fail = (error: ErrorEnvelope, status?: HttpErrorStatus, headers: Record<string, string> = {}, codeId?: string) => {
       if (LOGGED.has(error.category)) {
+        // A dependency's error name (e.g. DynamoDB throttling), never its text.
+        const causeName = quota.causeOf(error);
         deps.logger.log({
           ts: new Date(deps.clock.now()).toISOString(),
           level: error.category === 'internal' ? 'error' : 'warn',
@@ -87,6 +89,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
           correlationId,
           code: error.code,
           category: error.category,
+          ...(causeName === undefined ? {} : { errorName: causeName }),
           ...(codeId === undefined ? {} : { details: { codeId } }),
         });
       }
@@ -132,11 +135,12 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         // codes cannot slip past the cap between a check and a later count. A right code gives its attempt
         // back, so only wrong codes count (review of #139).
         const attempt = await quota.codeAttempt(meta.clientIp);
-        if (!attempt.allowed) return fail(quota.tooManyAttempts());
+        if (!attempt.ok) return fail(attempt.error);
+        if (!attempt.value.allowed) return fail(quota.tooManyAttempts());
         const codeId = config.demoCodes.get(createHash('sha256').update(request.data.code).digest('hex'));
         if (codeId === undefined) return fail(toolError('invalid_demo_code', 'That demo code is not valid.'));
         try {
-          await attempt.release();
+          await attempt.value.release();
         } catch (e) {
           // The session still opens; the attempt simply stays counted. Never the IP in the log.
           deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'warn', component: 'sim-api', message: 'attempt_release_failed', correlationId, errorName: nameOf(e), details: { codeId } });

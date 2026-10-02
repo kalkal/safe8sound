@@ -78,6 +78,20 @@ describe('agentCoreTurnAgent', () => {
     expect(logs[0]).toMatchObject({ level: 'warn', errorName: 'Error' });
   });
 
+  it.each([
+    ['a server fault with an unknown name', Object.assign(new Error('x'), { name: 'SomethingNewException', $fault: 'server', $metadata: { httpStatusCode: 500 } })],
+    ['a 503 without a known name', Object.assign(new Error('x'), { name: 'ServiceUnavailable', $metadata: { httpStatusCode: 503 } })],
+  ])('maps %s (an AWS 5xx) to agent_unavailable (Copilot on #156)', async (_case, error) => {
+    const { port } = agent(() => Promise.reject(error));
+    expect(await port.ask({ home: HOME, question: 'Hi', correlationId: CID })).toMatchObject({ ok: false, error: { code: 'agent_unavailable' } });
+  });
+
+  it('keeps an AWS client fault with an unknown name as unexpected_error (our setup)', async () => {
+    const error = Object.assign(new Error('x'), { name: 'SomethingNewException', $fault: 'client', $metadata: { httpStatusCode: 400 } });
+    const { port } = agent(() => Promise.reject(error));
+    expect(await port.ask({ home: HOME, question: 'Hi', correlationId: CID })).toMatchObject({ ok: false, error: { code: 'unexpected_error' } });
+  });
+
   it('maps an SDK TimeoutError to agent_unavailable', async () => {
     const { port } = agent(() => Promise.reject(Object.assign(new Error('socket timed out'), { name: 'TimeoutError' })));
     expect(await port.ask({ home: HOME, question: 'Hi', correlationId: CID })).toMatchObject({ ok: false, error: { code: 'agent_unavailable' } });

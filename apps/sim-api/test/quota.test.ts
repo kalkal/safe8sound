@@ -7,6 +7,11 @@ const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolC
 const NOW = Date.UTC(2026, 9, 1, 23, 59, 0);
 
 const SALT = Buffer.alloc(32, 5);
+const allowedOf = async (q: ReturnType<typeof createQuota>, ip: string) => {
+  const attempt = await q.codeAttempt(ip);
+  if (!attempt.ok) throw new Error('store failed');
+  return attempt.value.allowed;
+};
 const quota = (now = NOW, store = memoryQuotaStore()) => createQuota({ store, limits: LIMITS, clock: fixedClock(now), ipSalt: SALT });
 
 describe('daily caps, checked before calling the agent (plan §13.2.4), reset at midnight UTC', () => {
@@ -41,28 +46,29 @@ describe('daily caps, checked before calling the agent (plan §13.2.4), reset at
 
   it('caps demo code attempts per IP per hour, counted atomically before the code is looked at (review of #110)', async () => {
     const q = quota();
-    expect((await q.codeAttempt('203.0.113.7')).allowed).toBe(true);
-    expect((await q.codeAttempt('203.0.113.7')).allowed).toBe(true);
-    expect((await q.codeAttempt('203.0.113.7')).allowed).toBe(false);
-    expect((await q.codeAttempt('198.51.100.1')).allowed).toBe(true);
+    expect(await allowedOf(q, '203.0.113.7')).toBe(true);
+    expect(await allowedOf(q, '203.0.113.7')).toBe(true);
+    expect(await allowedOf(q, '203.0.113.7')).toBe(false);
+    expect(await allowedOf(q, '198.51.100.1')).toBe(true);
   });
 
   it('lets no more than the cap through when attempts arrive at the same time', async () => {
     const q = quota();
     const results = await Promise.all(Array.from({ length: 6 }, () => q.codeAttempt('203.0.113.7')));
-    expect(results.filter((r) => r.allowed)).toHaveLength(2);
+    expect(results.filter((r) => r.ok && r.value.allowed)).toHaveLength(2);
   });
 
   it('gives a right code its attempt back, so only wrong codes count toward the cap (review of #139)', async () => {
     const q = quota();
     for (let i = 0; i < 5; i++) {
       const attempt = await q.codeAttempt('203.0.113.7');
-      expect(attempt.allowed).toBe(true);
-      await attempt.release();
+      if (!attempt.ok) throw new Error('store failed');
+      expect(attempt.value.allowed).toBe(true);
+      await attempt.value.release();
     }
-    expect((await q.codeAttempt('203.0.113.7')).allowed).toBe(true);
-    expect((await q.codeAttempt('203.0.113.7')).allowed).toBe(true);
-    expect((await q.codeAttempt('203.0.113.7')).allowed).toBe(false);
+    expect(await allowedOf(q, '203.0.113.7')).toBe(true);
+    expect(await allowedOf(q, '203.0.113.7')).toBe(true);
+    expect(await allowedOf(q, '203.0.113.7')).toBe(false);
   });
 
   it('never keeps the client IP in clear: the key holds a salted hash of it (personal data, PITR keeps 35 days)', async () => {
@@ -80,5 +86,33 @@ describe('daily caps, checked before calling the agent (plan §13.2.4), reset at
     expect(keys.join()).not.toContain('203.0.113.7');
     expect(keys[0]).toMatch(/^ATTEMPT#[0-9a-f]{32}#2026-10-01T23$/);
     expect(keys[1]).not.toBe(keys[0]); // another salt, another key: the hash cannot be looked up without the salt
+  });
+});
+
+describe('a slow or failing quota store (Copilot on #156)', () => {
+  const failing = (error: Error): QuotaStore => ({ consume: () => Promise.reject(error), release: () => Promise.reject(error) });
+  const named = (name: string, extra: Record<string, unknown> = {}) => Object.assign(new Error('x'), { name, ...extra });
+
+  it.each([
+    ['DynamoDB throttling', named('ProvisionedThroughputExceededException')],
+    ['request throttling', named('ThrottlingException')],
+    ['an AWS server fault', named('InternalServerError', { $fault: 'server' })],
+    ['a 503', named('ServiceUnavailable', { $metadata: { httpStatusCode: 503 } })],
+    ['an SDK timeout', named('TimeoutError')],
+    ['a network failure', Object.assign(new Error('connect'), { code: 'ECONNRESET' })],
+  ])('answers store_unavailable (503, retryable, still fail closed) for %s, keeping the error name', async (_case, error) => {
+    const q = createQuota({ store: failing(error), limits: LIMITS, clock: fixedClock(NOW), ipSalt: SALT });
+    for (const result of [await q.turn('judges'), await q.toolCall('judges'), await q.codeAttempt('203.0.113.7')]) {
+      expect(result).toMatchObject({ ok: false, error: { code: 'store_unavailable', category: 'dependency_unavailable', retryable: true } });
+      if (!result.ok) expect(q.causeOf(result.error)).toBe(error.name);
+    }
+  });
+
+  it('lets a bug of ours through (a RangeError, a client fault): the last resort answers 500', async () => {
+    for (const error of [new RangeError('bug'), named('ValidationException', { $fault: 'client' })]) {
+      const q = createQuota({ store: failing(error), limits: LIMITS, clock: fixedClock(NOW), ipSalt: SALT });
+      await expect(q.turn('judges')).rejects.toBe(error);
+      await expect(q.codeAttempt('203.0.113.7')).rejects.toBe(error);
+    }
   });
 });

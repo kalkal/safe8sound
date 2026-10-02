@@ -6,7 +6,7 @@ import { err, ok, toolError, type ErrorEnvelope, type LogEntry, type Result } fr
 import { z } from 'zod';
 import { agentCoreTurnAgent, type AgentCoreClientLike } from './adapters/agentcore.js';
 import { mcpCardTools, streamableMcpCaller } from './adapters/mcp-cards.js';
-import { loadSimApiConfig } from './config.js';
+import { loadPlainSimApiSettings, loadSimApiConfig } from './config.js';
 import { createSimApiHandler, type SimApiHandler } from './handler.js';
 import type { QuotaStore } from './quota.js';
 
@@ -41,6 +41,9 @@ export async function loadSimApiLambda(env: Readonly<Record<string, string | und
   const s = settings.data;
   const table = dynamoSettingsFrom(env);
   if (!table.ok) return table;
+  // Origins, caps, TTL and the kill switch are checked before any secret is read (Copilot on #156).
+  const plain = loadPlainSimApiSettings(env);
+  if (!plain.ok) return plain;
 
   const [demoCodes, tokenKeys, mcpToken] = await Promise.all([deps.read(s.SIM_DEMO_CODES_PARAMETER), deps.read(s.SIM_TOKEN_KEYS_PARAMETER), deps.read(s.SIM_MCP_TOKEN_PARAMETER)]);
   if (!demoCodes.ok) return demoCodes;

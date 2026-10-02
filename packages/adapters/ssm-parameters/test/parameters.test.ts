@@ -1,6 +1,6 @@
 import { ok } from '@cold-reserve/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import { readParameter } from '../src/index.js';
+import { readParameter } from '../src/parameters.js';
 
 // Moved from apps/mcp-server (#17, the sim-api stack): one SSM reader for every Lambda.
 
