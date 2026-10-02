@@ -46,6 +46,28 @@ export interface HandlerDeps {
   readonly now?: () => number;
 }
 
+const PRM_PREFIX = '/.well-known/oauth-protected-resource';
+
+/** Where the metadata document of a resource lives: the well-known prefix before the resource's path. */
+const metadataUrl = (resource: string, path: string): string => new URL(PRM_PREFIX + path, resource).href;
+
+/**
+ * The OAuth 2.0 Protected Resource Metadata document (RFC 9728, G4 step 1, #149): public, static, from config.
+ * Alexa does not read WWW-Authenticate on a 401, so this well-known path is how it finds out how to authenticate.
+ */
+function protectedResourceMetadata(req: Request, correlationId: string, pr: NonNullable<ServerConfig['protectedResource']>): Response {
+  if (req.method !== 'GET') {
+    const body = toProblemDetails(toolError('method_not_allowed', 'The metadata document answers GET only.'), { instance: `urn:uuid:${correlationId}`, status: 405 });
+    return new Response(JSON.stringify(body), { status: 405, headers: { 'content-type': PROBLEM_JSON_CONTENT_TYPE, allow: 'GET' } });
+  }
+  const doc = {
+    resource: pr.resource,
+    ...(pr.authorizationServers.length === 0 ? {} : { authorization_servers: pr.authorizationServers }),
+    bearer_methods_supported: ['header'],
+  };
+  return new Response(JSON.stringify(doc), { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'max-age=3600' } });
+}
+
 export type ToolCallOutcome = 'ok' | 'error';
 
 /** A visitor's sandbox id never reaches a log line (#134, #139): it is said as "sandbox". */
@@ -214,7 +236,16 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
     return server;
   }
 
+  /** The 401 challenge; it names the metadata document when there is one (RFC 9728 §5.1). */
+  function bearerChallenge(error?: string): string {
+    const metadata = config.protectedResource === undefined ? undefined : metadataUrl(config.protectedResource.resource, config.path);
+    return ['Bearer realm="mcp"', ...(error === undefined ? [] : [`error="${error}"`]), ...(metadata === undefined ? [] : [`resource_metadata="${metadata}"`])].join(', ');
+  }
+
   async function route(req: Request, correlationId: string): Promise<Response> {
+    if (config.protectedResource !== undefined && new URL(req.url).pathname === PRM_PREFIX + config.path) {
+      return protectedResourceMetadata(req, correlationId, config.protectedResource);
+    }
     if (new URL(req.url).pathname !== config.path) {
       return problem(toolError('route_not_found', `The MCP endpoint is ${config.path}.`), correlationId, 404);
     }
@@ -230,13 +261,13 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
     if (grant === undefined) {
       const error = toolError('missing_token', 'Send Authorization: Bearer <token>.');
       record(error, correlationId);
-      return problem(error, correlationId, undefined, { 'www-authenticate': 'Bearer realm="mcp"' });
+      return problem(error, correlationId, undefined, { 'www-authenticate': bearerChallenge() });
     }
     // A phone token opens the family inbox only, never a tool (#24).
     if (grant === null || grant.scope !== undefined) {
       const error = toolError('wrong_client', 'The token was not issued for this server.');
       record(error, correlationId);
-      return problem(error, correlationId, undefined, { 'www-authenticate': 'Bearer realm="mcp", error="invalid_token"' });
+      return problem(error, correlationId, undefined, { 'www-authenticate': bearerChallenge('invalid_token') });
     }
 
     const declared = Number(req.headers.get('content-length') ?? 0);

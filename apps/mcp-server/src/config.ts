@@ -25,6 +25,11 @@ export interface ServerConfig {
   readonly serverVersion: string;
   /** CloudWatch namespace of the per-tool latency metric (G6, #146). */
   readonly metricsNamespace: string;
+  /**
+   * OAuth 2.0 Protected Resource Metadata (RFC 9728, G4 step 1, #149): served only when the canonical URL is
+   * configured; `authorizationServers` empty until an authorization server exists.
+   */
+  readonly protectedResource?: { readonly resource: string; readonly authorizationServers: readonly string[] };
 }
 
 const MIN_TOKEN_LENGTH = 32;
@@ -63,6 +68,33 @@ export function parseClients(raw: string | undefined): Result<ReadonlyMap<string
   return ok(clients);
 }
 
+const isUrl = (raw: string): URL | undefined => {
+  try {
+    return new URL(raw);
+  } catch {
+    return undefined;
+  }
+};
+/** https, or http on the local machine only. */
+const isSecureOrLocal = (url: URL): boolean => url.protocol === 'https:' || (url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname));
+
+function protectedResourceOf(env: Readonly<Record<string, string | undefined>>, path: string): Result<ServerConfig['protectedResource'], ErrorEnvelope> {
+  const raw = env['MCP_RESOURCE_URL']?.trim();
+  if (raw === undefined || raw === '') return ok(undefined);
+  const url = isUrl(raw);
+  if (url === undefined || !isSecureOrLocal(url) || url.pathname !== path) {
+    return invalid(`MCP_RESOURCE_URL must be the server's https URL ending with ${path} (http only on the local machine).`);
+  }
+  const servers = (env['MCP_AUTHORIZATION_SERVERS'] ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (servers.some((s) => { const u = isUrl(s); return u === undefined || !isSecureOrLocal(u); })) {
+    return invalid('MCP_AUTHORIZATION_SERVERS must be a comma-separated list of https URLs.');
+  }
+  return ok({ resource: url.href, authorizationServers: servers });
+}
+
 export function loadConfig(env: Readonly<Record<string, string | undefined>>): Result<ServerConfig, ErrorEnvelope> {
   const clients = parseClients(env['MCP_CLIENTS']);
   if (!clients.ok) return clients;
@@ -70,14 +102,19 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): R
   const maxBody = env['MCP_MAX_BODY_BYTES'] === undefined ? DEFAULT_MAX_BODY_BYTES : Number(env['MCP_MAX_BODY_BYTES']);
   if (!Number.isInteger(maxBody) || maxBody <= 0) return invalid('MCP_MAX_BODY_BYTES must be a positive integer.');
 
+  const path = env['MCP_PATH'] ?? '/mcp';
+  const resource = protectedResourceOf(env, path);
+  if (!resource.ok) return resource;
+
   return ok({
+    ...(resource.value === undefined ? {} : { protectedResource: resource.value }),
     clients: clients.value,
     allowedOrigins: (env['MCP_ALLOWED_ORIGINS'] ?? '')
       .split(',')
       .map((o) => o.trim())
       .filter((o) => o.length > 0),
     requireProtocolVersionHeader: env['MCP_REQUIRE_PROTOCOL_VERSION']?.trim().toLowerCase() !== 'false',
-    path: env['MCP_PATH'] ?? '/mcp',
+    path,
     maxBodyBytes: maxBody,
     serverName: env['MCP_SERVER_NAME'] ?? 'cold-reserve',
     serverVersion: env['MCP_SERVER_VERSION'] ?? '0.0.0',
