@@ -27,7 +27,7 @@ Input: `goal` (`cool | heat | dry | auto`), plus optional `setpointC` and `roomI
    If nothing is accepted, the planner's own candidates still give the safest plan, as long as it breaks no hard limit (storm reserve, inverter, battery power). It is the **last resort** (approved in #19):
    - among those candidates, it keeps the safe room safe the longest (`safeUntil` in the guard: the battery runs out, or after the grace period the room leaves its temperature or humidity limits);
    - it is proposed with `lastResort { safeUntil, safeHours, limitedBy }` and the `last_resort_plan` warning ("safe for about X hours, until …; then …");
-   - for now it is a proposal only: apply_plan still refuses a plan whose guarantees do not all hold, until the owner decides.
+   - The owner decided (#160) that it may be applied, after a second explicit yes bound to the plan (`confirmation.token` → `lastResortToken`). The contracts are in place; until that flow lands, apply_plan still refuses a plan whose guarantees do not all hold.
 
    A refusal (`guard_rejection`, with the nearest allowed value, logged) remains when every candidate breaks a hard limit, and for a plan the model proposed.
 

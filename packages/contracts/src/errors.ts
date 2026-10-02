@@ -26,6 +26,8 @@ export const ERROR_CATALOG = {
   /** notify_family named only roles that are not registered contacts (approved in #23). */
   recipient_not_registered: { category: 'validation' },
   plan_expired: { category: 'validation' },
+  /** apply_plan got a last-resort token that is wrong, expired or already used (approved in #160). */
+  last_resort_token_invalid: { category: 'validation' },
   safety_threshold_out_of_range: { category: 'validation' },
   // HTTP transport (MCP server, F3): sent with their own status through toProblemDetails
   method_not_allowed: { category: 'validation' },

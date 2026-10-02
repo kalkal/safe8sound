@@ -8,6 +8,7 @@ import {
   StartStormModeOutputSchema,
   StormSessionSchema,
   categoryOf,
+  MODEL_NOTIFIABLE_TRANSITIONS,
 } from '../src/index.js';
 
 // Contracts of F6 (issue #23), approved in #23.
@@ -112,8 +113,15 @@ describe('storm tool contracts', () => {
   });
 
   it('notify_family sends only on the transitions that are worth a message', () => {
-    expect(SENDABLE_TRANSITIONS).toEqual(['storm_started', 'essential_level', 'power_back']);
+    expect(SENDABLE_TRANSITIONS).toEqual(['storm_started', 'essential_level', 'power_back', 'last_resort_applied']);
     expect(NotifyFamilyInputSchema.safeParse({ transition: 'storm_prepared' }).success).toBe(false);
+  });
+
+  it('the last-resort alert is sent by the server when the plan is applied, never asked by the model (#160)', () => {
+    expect(MODEL_NOTIFIABLE_TRANSITIONS).toEqual(['storm_started', 'essential_level', 'power_back']);
+    expect(NotifyFamilyInputSchema.safeParse({ transition: 'last_resort_applied' }).success).toBe(false);
+    const alert = { at: '2026-07-17T20:05:00Z', transition: 'last_resort_applied', contactRole: 'daughter', channel: 'in_app', delivered: true };
+    expect(StormSessionSchema.safeParse({ ...session, notifications: [...session.notifications, alert] }).success).toBe(true);
   });
 
   it('notify_family answers with roles and a preview, never names', () => {

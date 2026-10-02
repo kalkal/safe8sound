@@ -14,7 +14,7 @@ Every error carries a stable machine code (`snake_case`), a category and a short
 
 | Category | Examples of codes | Who can fix it | Retry? |
 |---|---|---|---|
-| `validation` | `invalid_setpoint`, `unknown_room`, `plan_expired` | the caller / the model | no (fix input) |
+| `validation` | `invalid_setpoint`, `unknown_room`, `plan_expired`, `last_resort_token_invalid` | the caller / the model | no (fix input) |
 | `guard_rejection` | `storm_reserve_violated`, `inverter_limit_exceeded`, `pacing_off_track`, `safe_room_comfort_violated` | the model re-plans; the user may change preferences | no |
 | `not_found` | `plan_not_found`, `home_not_found` | caller | no |
 | `unauthorized` / `forbidden` | `missing_token`, `wrong_client`, `origin_not_allowed`, `demo_disabled` | configuration | no |

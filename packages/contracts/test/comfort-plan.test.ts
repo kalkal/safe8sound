@@ -16,6 +16,39 @@ describe('comfort-plan tool I/O (approved in #19)', () => {
     expect(ApplyPlanInputSchema.safeParse({ planId: 'x' }).success).toBe(false);
   });
 
+  describe('the two-step confirmation of a last-resort plan (approved in #160)', () => {
+    const lastResortPlan = () => ({
+      ...examplePlan(),
+      guarantees: examplePlan().guarantees.map((g) => (g.id === 'safe_room_comfort' ? { ...g, ok: false, reason: 'Above 27 °C after 02:40.' } : g)),
+      lastResort: { safeUntil: '2026-07-18T00:40:00.000Z', safeHours: 4.5, limitedBy: 'temperature' },
+      warnings: [{ code: 'last_resort_plan', message: 'Under 26 °C until 02:40, then up to 29 °C by 07:00.' }],
+    });
+    const token = 'lr_' + 'A'.repeat(22);
+
+    it('apply_plan may carry the token of the first step', () => {
+      expect(ApplyPlanInputSchema.safeParse({ planId: 'plan_7Hq2mX9vK3', lastResortToken: token }).success).toBe(true);
+      expect(ApplyPlanInputSchema.safeParse({ planId: 'plan_7Hq2mX9vK3', lastResortToken: 'yes' }).success).toBe(false);
+      expect(ApplyPlanInputSchema.safeParse({ planId: 'plan_7Hq2mX9vK3', lastResortToken: 'lr_' + 'A'.repeat(65) }).success).toBe(false);
+    });
+
+    it('the first step returns the plan still proposed, with a token and when it expires', () => {
+      const out = { plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-17T20:10:00.000Z' } };
+      expect(ApplyPlanOutputSchema.parse(out).confirmation?.token).toBe(token);
+    });
+
+    it('a confirmation comes only with a last-resort plan that is not applied yet', () => {
+      const confirmation = { token, expiresAt: '2026-07-17T20:10:00.000Z' };
+      const applied = { plan: { ...lastResortPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation };
+      expect(ApplyPlanOutputSchema.safeParse(applied).success).toBe(false);
+      const normal = { plan: examplePlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation };
+      expect(ApplyPlanOutputSchema.safeParse(normal).success).toBe(false);
+    });
+
+    it('a wrong, stale or reused token is a validation error', () => {
+      expect(categoryOf('last_resort_token_invalid')).toBe('validation');
+    });
+  });
+
   it('get_reserve_outlook takes nothing', () => {
     expect(ReserveOutlookInputSchema.safeParse({}).success).toBe(true);
     expect(ReserveOutlookInputSchema.safeParse({ homeId: 'demo' }).success).toBe(false);

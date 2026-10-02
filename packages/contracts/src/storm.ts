@@ -22,13 +22,19 @@ export type StormPhase = z.infer<typeof StormPhaseSchema>;
 export const StormTriggerSchema = z.enum(['grid_loss', 'user', 'forecast', 'scenario']);
 export type StormTrigger = z.infer<typeof StormTriggerSchema>;
 
-export const StormTransitionSchema = z.enum(['storm_prepared', 'storm_started', 'essential_level', 'power_back']);
+export const StormTransitionSchema = z.enum(['storm_prepared', 'storm_started', 'essential_level', 'power_back', 'last_resort_applied']);
 export type StormTransition = z.infer<typeof StormTransitionSchema>;
 
-/** The transitions a family message is sent for; `storm_prepared` is only spoken (plan §11.2 p.8). */
-export const SENDABLE_TRANSITIONS = ['storm_started', 'essential_level', 'power_back'] as const satisfies readonly StormTransition[];
+/**
+ * The transitions a family message is sent for; `storm_prepared` is only spoken (plan §11.2 p.8).
+ * `last_resort_applied` is sent by the server when a last-resort plan is applied (approved in #160).
+ */
+export const SENDABLE_TRANSITIONS = ['storm_started', 'essential_level', 'power_back', 'last_resort_applied'] as const satisfies readonly StormTransition[];
 export const SendableTransitionSchema = z.enum(SENDABLE_TRANSITIONS);
 export type SendableTransition = z.infer<typeof SendableTransitionSchema>;
+
+/** The transitions notify_family accepts from the model: the last-resort alert is never the model's call (#160). */
+export const MODEL_NOTIFIABLE_TRANSITIONS = ['storm_started', 'essential_level', 'power_back'] as const satisfies readonly SendableTransition[];
 
 /**
  * A rendered family message. Only `stormMessage` in @cold-reserve/i18n produces it (from a template and
@@ -126,7 +132,7 @@ export type SafeRoomStatus = z.infer<typeof SafeRoomStatusSchema>;
 
 /** No free text, recipient, handle or phone: the server fills a template from its own state. */
 export const NotifyFamilyInputSchema = z.strictObject({
-  transition: SendableTransitionSchema,
+  transition: z.enum(MODEL_NOTIFIABLE_TRANSITIONS),
   /** Registered contact roles; all registered contacts when absent. */
   roles: z.array(RoleSchema).min(1).max(3).optional(),
 });

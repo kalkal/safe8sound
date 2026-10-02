@@ -44,6 +44,14 @@ export const PlanStepSchema = z.strictObject({
 });
 export type PlanStep = z.infer<typeof PlanStepSchema>;
 
+/**
+ * Zero-energy actions on the last-resort card (approved in #160). Only actions backed by the public-health
+ * sources in docs/heat-advice.md; the fan only below 35 °C, the guard rule already in place.
+ */
+export const LAST_RESORT_ACTIONS = ['close_curtains', 'drink_water', 'fan_below_35c'] as const;
+export const LastResortActionSchema = z.enum(LAST_RESORT_ACTIONS);
+export type LastResortAction = z.infer<typeof LastResortActionSchema>;
+
 export const PlanSchema = z
   .strictObject({
     schemaVersion: z.literal(PLAN_SCHEMA_VERSION),
@@ -82,7 +90,7 @@ export const PlanSchema = z
     /**
      * Present when no plan keeps the safe room within its limits until the next recharge: this is the safest
      * one, proposed so the person hears until when the room is safe and why (optional, added 2026-10-01,
-     * approved in #19). Whether it can be applied is not decided yet: today apply_plan refuses it.
+     * approved in #19). It is applied only after a second, explicit confirmation (approved in #160).
      */
     lastResort: z
       .strictObject({
@@ -90,6 +98,27 @@ export const PlanSchema = z
         safeHours: z.number().nonnegative(),
         /** What ends the safe hours: the battery runs out, or the room leaves its temperature or humidity limits. */
         limitedBy: z.enum(['battery', 'temperature', 'humidity']),
+        /**
+         * The honest window, whole or not at all (optional, added 2026-10-02, approved in #160): the room stays
+         * within `comfortLimitC` until `safeUntil`, then reaches `worstC` by `worstAt`.
+         */
+        comfortLimitC: CelsiusSchema.optional(),
+        worstC: CelsiusSchema.optional(),
+        worstAt: IsoDateTimeSchema.optional(),
+        /** Zero-energy actions for the card, from public-health guidance (optional, added 2026-10-02, approved in #160). */
+        actions: z.array(LastResortActionSchema).max(LAST_RESORT_ACTIONS.length).optional(),
+      })
+      .superRefine((lr, ctx) => {
+        const window = [lr.comfortLimitC, lr.worstC, lr.worstAt];
+        if (window.some((v) => v !== undefined) && window.some((v) => v === undefined)) {
+          ctx.addIssue({ code: 'custom', path: ['worstAt'], message: 'The window is given whole: comfortLimitC, worstC and worstAt together' });
+        }
+        if (lr.worstAt !== undefined && epochMs(lr.worstAt) < epochMs(lr.safeUntil)) {
+          ctx.addIssue({ code: 'custom', path: ['worstAt'], message: 'The worst point comes at or after the end of the safe hours' });
+        }
+        if (lr.actions !== undefined && new Set(lr.actions).size !== lr.actions.length) {
+          ctx.addIssue({ code: 'custom', path: ['actions'], message: 'Each action appears once' });
+        }
       })
       .optional(),
   })

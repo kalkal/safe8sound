@@ -101,5 +101,35 @@ describe('PlanSchema', () => {
       const r = PlanSchema.safeParse(plan({ guarantees: examplePlan().guarantees }));
       expect(!r.success && r.error.issues[0]?.path).toEqual(['lastResort']);
     });
+
+    describe('the honest window and the zero-energy actions (approved in #160)', () => {
+      const window = { comfortLimitC: 26, worstC: 29, worstAt: '2026-07-18T05:00:00.000Z' };
+      const actions = ['close_curtains', 'drink_water', 'fan_below_35c'];
+
+      it('says the limit kept until safeUntil, then how warm it gets and by when', () => {
+        expect(PlanSchema.parse(plan({ lastResort: { ...lastResort, ...window, actions } })).lastResort).toEqual({ ...lastResort, ...window, actions });
+      });
+
+      it('the worst point is not before the end of the safe hours', () => {
+        const r = PlanSchema.safeParse(plan({ lastResort: { ...lastResort, ...window, worstAt: '2026-07-18T01:00:00.000Z' } }));
+        expect(!r.success && r.error.issues[0]?.path).toEqual(['lastResort', 'worstAt']);
+        expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, ...window, worstAt: lastResort.safeUntil } })).success).toBe(true);
+      });
+
+      it('gives the window whole or not at all', () => {
+        expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, worstC: 29 } })).success).toBe(false);
+        expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, comfortLimitC: 26, worstC: 29 } })).success).toBe(false);
+      });
+
+      it('lists only the sourced actions, each once', () => {
+        expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, actions: ['cool_wet_cloth'] } })).success).toBe(false);
+        expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, actions: ['drink_water', 'drink_water'] } })).success).toBe(false);
+        expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, actions: [] } })).success).toBe(true);
+      });
+
+      it('an older last resort without them still reads', () => {
+        expect(PlanSchema.safeParse(plan({})).success).toBe(true);
+      });
+    });
   });
 });

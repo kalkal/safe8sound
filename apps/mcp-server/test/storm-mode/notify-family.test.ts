@@ -1,4 +1,4 @@
-import { NotifyFamilyOutputSchema, err, toolError, type SendableTransition } from '@cold-reserve/contracts';
+import { NotifyFamilyOutputSchema, err, toolError, type MODEL_NOTIFIABLE_TRANSITIONS } from '@cold-reserve/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { notifyFamily, startStormMode } from '../../src/modules/storm-mode/tools.js';
@@ -66,7 +66,7 @@ describe('notify_family', () => {
     expect(!out.ok && out.error.code).toBe('recipient_not_registered');
   });
 
-  it.each<[SendableTransition, number]>([
+  it.each<[(typeof MODEL_NOTIFIABLE_TRANSITIONS)[number], number]>([
     ['storm_started', 1],
     ['essential_level', 1],
     ['power_back', 4],

@@ -1,4 +1,4 @@
-import { err, ok, type Result, type SendableTransition, type StormMessageText } from '@cold-reserve/contracts';
+import { err, ok, type LastResortAction, type Result, type SendableTransition, type StormMessageText } from '@cold-reserve/contracts';
 
 // Every user-facing string lives in a catalog (plan §14.1). en-US for the hackathon; it-IT later.
 
@@ -53,6 +53,21 @@ const enUS = {
   'storm.essential':
     '{product} update for {name}: to keep {room} safe until {safeUntil}, the battery switched to essential mode. {room} is at {tempC} °C. No action is needed now. Next message: when the level changes or power returns.',
   'storm.powerBack': '{product} update for {name}: power came back at home at {powerBackAt}. {room} is at {tempC} °C. Storm mode has ended. No action is needed.',
+  // Sent by the server when a last-resort plan is applied (#160): the fixed "battery low, check on them" alert.
+  'storm.lastResort':
+    '{product} alert for {name}: the home battery is low. {room} is at {tempC} °C and stays within its limits until {safeUntil}, then gets warmer. Please check on them.',
+  // The last-resort card (#160): zero-energy actions and heat-illness signs, from docs/heat-advice.md.
+  'lastResort.title': 'Keep cool without power',
+  'lastResort.action.close_curtains': 'Close the curtains on the sunny side.',
+  'lastResort.action.drink_water': 'Drink water often, even without thirst.',
+  'lastResort.action.fan_below_35c': 'Use a fan only while the room is below 35 °C.',
+  'lastResort.signsTitle': 'Signs of heat stroke',
+  'lastResort.sign.confusion': 'Confusion or lack of coordination',
+  'lastResort.sign.hotSkin': 'Hot skin that is not sweating',
+  'lastResort.sign.fastBreathing': 'Fast heartbeat or fast breathing',
+  'lastResort.sign.faint': 'Fainting, or a seizure (fit)',
+  'lastResort.call': 'If you are worried, call 112.',
+  'lastResort.notMedical': 'These are general tips, not medical advice.',
   'card.expand': 'Expand',
   'card.collapse': 'Collapse',
   'card.loading': 'Loading…',
@@ -149,6 +164,7 @@ const enUS = {
   'phone.storm_started': 'Power outage (storm) at home',
   'phone.essential_level': 'Switched to Essential',
   'phone.power_back': 'Power is back at home',
+  'phone.last_resort_applied': 'Home battery low: please check in',
   'prefs.title': 'Preferences',
   'prefs.comfort': 'Comfort setpoint',
   'prefs.cooler': 'Cooler',
@@ -196,7 +212,12 @@ export function format(locale: Locale, key: MessageKey, values: Readonly<Record<
   return ok(template.replace(/\{(\w+)\}/g, (_, name: string) => filled[name] ?? ''));
 }
 
-const STORM_KEYS = { storm_started: 'storm.started', essential_level: 'storm.essential', power_back: 'storm.powerBack' } as const satisfies Record<
+const STORM_KEYS = {
+  storm_started: 'storm.started',
+  essential_level: 'storm.essential',
+  power_back: 'storm.powerBack',
+  last_resort_applied: 'storm.lastResort',
+} as const satisfies Record<
   SendableTransition,
   MessageKey
 >;
@@ -255,4 +276,28 @@ export function stormPreview(
   fields: StormMessageFields,
 ): Result<string, FormatError> {
   return renderStorm(locale, transition, contact.role, fields);
+}
+
+const HEAT_SIGNS = ['lastResort.sign.confusion', 'lastResort.sign.hotSkin', 'lastResort.sign.fastBreathing', 'lastResort.sign.faint'] as const satisfies readonly MessageKey[];
+
+/** The fixed lines of the last-resort card (#160). Tips and signs only: never presented as medical protection. */
+export interface LastResortAdvice {
+  readonly title: string;
+  readonly actions: readonly string[];
+  readonly signsTitle: string;
+  readonly signs: readonly string[];
+  readonly call: string;
+  readonly notMedical: string;
+}
+
+export function lastResortAdvice(locale: Locale, actions: readonly LastResortAction[]): LastResortAdvice {
+  const text = (key: MessageKey): string => CATALOGS[locale][key];
+  return {
+    title: text('lastResort.title'),
+    actions: actions.map((a) => text(`lastResort.action.${a}`)),
+    signsTitle: text('lastResort.signsTitle'),
+    signs: HEAT_SIGNS.map(text),
+    call: text('lastResort.call'),
+    notMedical: text('lastResort.notMedical'),
+  };
 }

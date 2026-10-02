@@ -36,6 +36,15 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
     expect(r.ok && r.value).toBe(`${PRODUCT_NAME} update for Anna: power came back at home at 6:30 AM. Bedroom is at 26.4 °C. Storm mode has ended. No action is needed.`);
   });
 
+  it('last resort applied: battery low, check on them, with until when the room is safe (#160)', () => {
+    const r = stormMessage('en-US', 'last_resort_applied', 'Anna', fields);
+    expect(r.ok && r.value).toBe(
+      `${PRODUCT_NAME} alert for Anna: the home battery is low. Bedroom is at 26.4 °C and stays within its limits until 7:30 AM, then gets warmer. Please check on them.`,
+    );
+    const noUntil = { roomName: fields.roomName, tempC: fields.tempC, atMs: fields.atMs, timeZone: fields.timeZone };
+    expect(stormMessage('en-US', 'last_resort_applied', 'Anna', noUntil)).toMatchObject({ ok: false, error: { missing: ['safeUntil'] } });
+  });
+
   it('needs the safe-until time for the messages that quote it', () => {
     const noUntil = { roomName: fields.roomName, tempC: fields.tempC, atMs: fields.atMs, powerBackAtMs: fields.powerBackAtMs, timeZone: fields.timeZone };
     expect(stormMessage('en-US', 'storm_started', 'Anna', noUntil)).toMatchObject({ ok: false, error: { missing: ['safeUntil'] } });

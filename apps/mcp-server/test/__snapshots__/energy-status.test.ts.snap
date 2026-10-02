@@ -225,6 +225,7 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                   "unknown_room",
                   "recipient_not_registered",
                   "plan_expired",
+                  "last_resort_token_invalid",
                   "safety_threshold_out_of_range",
                   "method_not_allowed",
                   "payload_too_large",
