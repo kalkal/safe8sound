@@ -88,6 +88,11 @@ A small CLI (`pnpm errors [--since 24h] [--code ...]`) reads the database log fo
 - The correlation id has one definition: `CORRELATION_ID_HEADER` and `CorrelationIdSchema` (a UUID). `correlationIdFrom(header, fresh)` keeps a well-formed id and makes a fresh one otherwise.
 - A store opened with `storeFor(homeId, { correlationId })` reports its failures with that id (`StoreErrorEvent.correlationId`).
 
+**Every tool call (G6, #146).**
+- Each MCP `tools/call` leaves one info line: `tools/call <tool>`, with the tool, `durationMs`, the outcome (`ok` or `error`, plus the error code), the correlation id and the home.
+- Each call also leaves one latency sample in CloudWatch Embedded Metric Format: metric `ToolLatency` in milliseconds, dimension `Tool`, namespace `MCP_METRICS_NAMESPACE` (default `ColdReserve/Mcp`).
+- The sample is a JSON line of its own, because EMF needs its fields at the top level and the log line is strict. On Lambda it goes to stdout; locally there is no metric.
+
 **The home's data source (#113).** `FallbackSource` switches to the simulator when the home's data is stale or lost, and says so in the log: a warning on the switch, with the reason, its category and the name of what was thrown (never its text); an info line when the home answers again. A simulator that fails for a reason a retry cannot fix (a bug, a missing EPS load) is an error with its own code, not a retryable `home_data_stale`.
 
 **Reading what is stored (R7).** Inputs stay strict. Stored items are read with `readStored`, which drops the fields this version does not know at any depth, and with `isReadableSchemaVersion`, which accepts every version up to the current one. So an additive field never breaks an older reader, and a newer version is still refused.

@@ -26,6 +26,7 @@ export function testConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     maxBodyBytes: 64 * 1024,
     serverName: 'cold-reserve-test',
     serverVersion: '0.0.0',
+    metricsNamespace: 'ColdReserve/Test',
     ...overrides,
   };
 }
@@ -64,12 +65,18 @@ export const probeModule: CapabilityModule = {
   ],
 };
 
-export function makeHandler(opts: { config?: Partial<ServerConfig>; modules?: CapabilityModule[] } = {}) {
+export function makeHandler(opts: { config?: Partial<ServerConfig>; modules?: CapabilityModule[]; now?: () => number } = {}) {
   const logs: LogEntry[] = [];
+  const metrics: Record<string, unknown>[] = [];
   const registry = createRegistry(opts.modules ?? [probeModule]);
   if (!registry.ok) throw new Error(registry.error.message);
-  const handler = createMcpHandler(testConfig(opts.config), { registry: registry.value, logger: { log: (e) => logs.push(e) } });
-  return { handler, logs };
+  const handler = createMcpHandler(testConfig(opts.config), {
+    registry: registry.value,
+    logger: { log: (e) => logs.push(e) },
+    metrics: (m) => metrics.push(m),
+    ...(opts.now === undefined ? {} : { now: opts.now }),
+  });
+  return { handler, logs, metrics };
 }
 
 export function baseHeaders(extra: Record<string, string | undefined> = {}): Headers {

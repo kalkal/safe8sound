@@ -71,6 +71,13 @@ const stdoutLogger = loggerTo(
     process.stdout.write(text);
   }),
 );
+/** The per-tool latency metric on Lambda: one EMF JSON line of its own, which CloudWatch turns into a metric (#146). */
+export const metricsTo =
+  (write: (text: string) => void) =>
+  (line: Record<string, unknown>): void => {
+    write(`${JSON.stringify(line)}\n`);
+  };
+
 const defaultLog = (entry: LambdaLogEntry) => {
   stdoutLogger.log(toLogEntry(entry));
 };

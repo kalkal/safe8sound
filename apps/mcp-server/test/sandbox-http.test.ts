@@ -12,6 +12,7 @@ const SANDBOX = 'demo#0123456789abcdef';
 function setup(maxNewPerDay = 10) {
   const created: string[] = [];
   const logs: LogEntry[] = [];
+  const metrics: Record<string, unknown>[] = [];
   const registry = createRegistry([probeModule]);
   if (!registry.ok) throw new Error(registry.error.message);
   const config = testConfig({
@@ -30,9 +31,9 @@ function setup(maxNewPerDay = 10) {
       return h;
     },
   });
-  const handler = createMcpHandler(config, { registry: registry.value, logger: { log: (e) => logs.push(e) }, sandboxes });
+  const handler = createMcpHandler(config, { registry: registry.value, logger: { log: (e) => logs.push(e) }, sandboxes, metrics: (m) => metrics.push(m) });
   const whoami = (token: string, home?: string) => post(handler, callTool('whoami', {}), { authorization: `Bearer ${token}`, 'x-cold-reserve-home': home });
-  return { whoami, created, logs };
+  return { whoami, created, logs, metrics };
 }
 
 async function refused(res: Response, status: number, code: string) {
@@ -80,11 +81,24 @@ describe('x-cold-reserve-home: sandbox homes for the demo#* grant only', () => {
     await whoami(TOKEN, SANDBOX);
     await whoami(SANDBOX_TOKEN, SANDBOX);
     await whoami(SANDBOX_TOKEN, 'demo#fedcba9876543210');
-    expect(logs).toMatchObject([
+    // The refusals (the info line of the one call that went through names its own sandbox, #146).
+    const refused = logs.filter((l) => l.level !== 'info');
+    expect(refused).toMatchObject([
       { level: 'warn', code: 'home_not_allowed', category: 'forbidden', clientId: 'agent' },
       { level: 'warn', code: 'demo_quota_exceeded', category: 'rate_limited', clientId: 'agent-sandbox' },
     ]);
     expect(logs.every((l) => typeof l.correlationId === 'string')).toBe(true);
+    expect(JSON.stringify(refused)).not.toContain('demo#');
+  });
+
+  it('a call in a sandbox leaves its line and its metric without the sandbox id (#146)', async () => {
+    const { whoami, logs, metrics } = setup(1);
+    await whoami(SANDBOX_TOKEN, SANDBOX);
+    const line = logs.find((l) => l.level === 'info');
+    expect(line).toMatchObject({ message: 'tools/call whoami', details: { home: 'sandbox' } });
+    expect(line?.homeId).toBeUndefined();
+    expect(metrics).toHaveLength(1);
     expect(JSON.stringify(logs)).not.toContain('demo#');
+    expect(JSON.stringify(metrics)).not.toContain('demo#');
   });
 });

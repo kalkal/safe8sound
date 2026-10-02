@@ -3,7 +3,7 @@ import { jsonLineSink, loggerTo } from '@cold-reserve/core';
 import { createApp } from './app.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules, createDynamoStoreFactory } from './compose.js';
-import { createLambdaHandler, installProcessHooks, storeErrorLogger, toLogEntry, type LambdaLogEntry } from './lambda.js';
+import { createLambdaHandler, installProcessHooks, storeErrorLogger, toLogEntry, type LambdaLogEntry, metricsTo } from './lambda.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 import { readParameter } from './ssm.js';
 import { stormModeWiring } from './storm-mode-config.js';
@@ -57,7 +57,16 @@ export const handler = createLambdaHandler(
     // the tools without their ui:// cards. TODO(#104): ship the card bundle with the MCP Lambda.
     const app = createApp(
       { ...process.env, MCP_CLIENTS: clients.value },
-      { wallClock, logger, modules: modules.value, comfortPlan: comfortPlan.value, stormMode: stormMode.value },
+      {
+        wallClock,
+        logger,
+        metrics: metricsTo((text) => {
+          process.stdout.write(text);
+        }),
+        modules: modules.value,
+        comfortPlan: comfortPlan.value,
+        stormMode: stormMode.value,
+      },
     );
     return app.ok ? ok(app.value.handler) : app;
   },

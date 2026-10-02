@@ -17,6 +17,8 @@ export interface AppOptions {
   /** Wall clock; the simulator runs on scenario time derived from it (plan §9.4). */
   readonly wallClock: Clock;
   readonly logger: Logger;
+  /** Where the per-tool latency metric goes (EMF lines on Lambda); none locally (G6, #146). */
+  readonly metrics?: (line: Record<string, unknown>) => void;
   /** Extra capability modules after the built-in ones (tests; future modules register here). */
   readonly modules?: readonly CapabilityModule[];
   /** Tests only: replace a home's data source (fault injection). */
@@ -210,6 +212,6 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   return ok({
     config: config.value,
     registry: registry.value,
-    handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes }),
+    handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes, ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }) }),
   });
 }

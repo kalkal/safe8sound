@@ -109,7 +109,7 @@ describe('get_home_status failure paths', () => {
     const { handler, logs } = app(ENV, { sourceOverride: () => failing });
     const result = await toolResult(await post(handler, callTool('get_home_status', {})));
     expect(result.structuredContent).toMatchObject({ code: 'home_data_stale', retryable: true, retryAfterMs: 60_000 });
-    expect(logs.map((l) => l.code)).toEqual(['home_data_stale']);
+    expect(logs.filter((l) => l.level !== 'info').map((l) => l.code)).toEqual(['home_data_stale']);
   });
 
   it('rejects any argument: the home comes from the token', async () => {

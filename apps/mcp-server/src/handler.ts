@@ -40,6 +40,32 @@ export interface HandlerDeps {
   readonly logger: Logger;
   /** Visitor sandboxes (#101): without it, no request can name a home. */
   readonly sandboxes?: Sandboxes<unknown>;
+  /** Where the per-tool latency metric goes (EMF JSON lines on Lambda); none locally (G6, #146). */
+  readonly metrics?: (line: Record<string, unknown>) => void;
+  /** Monotonic clock for durations, in ms; `performance.now` by default. */
+  readonly now?: () => number;
+}
+
+export type ToolCallOutcome = 'ok' | 'error';
+
+/** A visitor's sandbox id never reaches a log line (#134, #139): it is said as "sandbox". */
+const isSandbox = (homeId: string): boolean => SandboxHomeIdSchema.safeParse(homeId).success;
+const homeDetail = (homeId: string | undefined): { home?: 'sandbox' } => (homeId !== undefined && isSandbox(homeId) ? { home: 'sandbox' } : {});
+
+/**
+ * One latency sample in CloudWatch Embedded Metric Format: a JSON line of its own, because EMF needs its
+ * fields at the top level and the shared log line is strict (G6, #146).
+ */
+export function toolCallMetric(m: { namespace: string; tool: string; outcome: ToolCallOutcome; durationMs: number; atMs: number }): Record<string, unknown> {
+  return {
+    _aws: {
+      Timestamp: m.atMs,
+      CloudWatchMetrics: [{ Namespace: m.namespace, Dimensions: [['Tool']], Metrics: [{ Name: 'ToolLatency', Unit: 'Milliseconds' }] }],
+    },
+    Tool: m.tool,
+    Outcome: m.outcome,
+    ToolLatency: m.durationMs,
+  };
 }
 
 export type McpHandler = (req: Request) => Promise<Response>;
@@ -77,8 +103,12 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
   const authenticate = bearerAuthenticator(config.clients);
   const allowedOrigins = new Set(config.allowedOrigins);
 
+  const now = deps.now ?? (() => performance.now());
+
   function record(error: ErrorEnvelope, correlationId: string, ctx?: Partial<ToolContext>, details?: Record<string, unknown>) {
     if (!LOGGED.has(error.category)) return;
+    const sandbox = ctx?.homeId !== undefined && isSandbox(ctx.homeId);
+    const allDetails = { ...details, ...(sandbox ? { home: 'sandbox' } : {}) };
     deps.logger.log({
       ts: new Date().toISOString(),
       level: error.category === 'internal' ? 'error' : 'warn',
@@ -87,10 +117,27 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       category: error.category,
       message: error.message,
       correlationId,
-      ...(ctx?.homeId === undefined ? {} : { homeId: ctx.homeId }),
+      ...(ctx?.homeId === undefined || sandbox ? {} : { homeId: ctx.homeId }),
       ...(ctx?.clientId === undefined ? {} : { clientId: ctx.clientId }),
-      ...(details === undefined ? {} : { details }),
+      ...(Object.keys(allDetails).length === 0 ? {} : { details: allDetails }),
     });
+  }
+
+  /** One info line and one latency metric per tools/call (G6, #146). */
+  function observe(name: string, result: CallToolResult, durationMs: number, ctx: ToolContext): void {
+    const outcome: ToolCallOutcome = result.isError === true ? 'error' : 'ok';
+    const code = outcome === 'error' ? (result.structuredContent as { code?: unknown } | undefined)?.code : undefined;
+    deps.logger.log({
+      ts: new Date().toISOString(),
+      level: 'info',
+      component: 'mcp-server',
+      message: `tools/call ${name}`,
+      correlationId: ctx.correlationId,
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      clientId: ctx.clientId,
+      details: { tool: name, durationMs, outcome, ...(typeof code === 'string' ? { code } : {}), ...homeDetail(ctx.homeId) },
+    });
+    deps.metrics?.(toolCallMetric({ namespace: config.metricsNamespace, tool: name, outcome, durationMs, atMs: Date.now() }));
   }
 
   async function runTool(tool: ToolDefinition, args: unknown, ctx: ToolContext): Promise<CallToolResult> {
@@ -149,7 +196,10 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const tool = deps.registry.findTool(request.params.name, ctx.homeId);
       if (!tool) throw new McpError(RpcErrorCode.InvalidParams, `Unknown tool: ${request.params.name}`);
-      return runTool(tool, request.params.arguments, ctx);
+      const started = now();
+      const result = await runTool(tool, request.params.arguments, ctx);
+      observe(tool.name, result, Math.round(now() - started), ctx);
+      return result;
     });
     server.setRequestHandler(ListResourcesRequestSchema, () => ({
       resources: deps.registry

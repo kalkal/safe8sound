@@ -23,11 +23,14 @@ export interface ServerConfig {
   readonly maxBodyBytes: number;
   readonly serverName: string;
   readonly serverVersion: string;
+  /** CloudWatch namespace of the per-tool latency metric (G6, #146). */
+  readonly metricsNamespace: string;
 }
 
 const MIN_TOKEN_LENGTH = 32;
 const CLIENT_ID = /^[a-z][a-z0-9-]{0,31}$/;
 const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
+const DEFAULT_METRICS_NAMESPACE = 'ColdReserve/Mcp';
 
 const invalid = (message: string) => err(toolError('invalid_config', message));
 
@@ -78,5 +81,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): R
     maxBodyBytes: maxBody,
     serverName: env['MCP_SERVER_NAME'] ?? 'cold-reserve',
     serverVersion: env['MCP_SERVER_VERSION'] ?? '0.0.0',
+    metricsNamespace: env['MCP_METRICS_NAMESPACE'] ?? DEFAULT_METRICS_NAMESPACE,
   });
 }

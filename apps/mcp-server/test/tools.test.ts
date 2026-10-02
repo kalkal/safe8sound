@@ -33,7 +33,7 @@ describe('tools/call failure paths', () => {
     expect(error).toMatchObject({ code: 'invalid_input', category: 'validation', retryable: false });
     expect(error.details?.issues?.[0]?.path).toBe('note');
     expect(result.content[0]?.text).toBe(error.message);
-    expect(logs).toHaveLength(0); // validation is not kept in the error log
+    expect(logs.filter((l) => l.level !== 'info')).toHaveLength(0); // validation is not kept in the error log
   });
 
   it('treats missing arguments as an empty object', async () => {
@@ -55,14 +55,15 @@ describe('tools/call failure paths', () => {
     const result = await toolResult(await post(handler, callTool('explode', {}), { 'x-correlation-id': id }));
     expect(ErrorEnvelopeSchema.parse(result.structuredContent)).toMatchObject({ code: 'unexpected_error', category: 'internal' });
     expect(JSON.stringify(result)).not.toContain('/secret/path');
-    expect(logs).toHaveLength(1);
-    expect(logs[0]).toMatchObject({ level: 'error', code: 'unexpected_error', correlationId: id, homeId: 'demo' });
+    const errors = logs.filter((l) => l.level === 'error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ level: 'error', code: 'unexpected_error', correlationId: id, homeId: 'demo' });
   });
 
   it('turns an output that breaks its own schema into isError + output_schema_violation, logged', async () => {
     const { handler, logs } = makeHandler();
     const result = await toolResult(await post(handler, callTool('bad_output', {})));
     expect(ErrorEnvelopeSchema.parse(result.structuredContent)).toMatchObject({ code: 'output_schema_violation' });
-    expect(logs.map((l) => l.code)).toEqual(['output_schema_violation']);
+    expect(logs.filter((l) => l.level !== 'info').map((l) => l.code)).toEqual(['output_schema_violation']);
   });
 });
