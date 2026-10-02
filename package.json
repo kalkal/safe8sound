@@ -20,6 +20,7 @@
     "heavy": "node tooling/src/heavy.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm lint:css && pnpm depcruise && pnpm --filter @cold-reserve/ui-cards build:card && pnpm test",
     "e2e": "playwright test",
+    "conformance": "node tooling/src/conformance.mjs",
     "mutation": "node tooling/src/mutation.mjs"
   },
   "devDependencies": {

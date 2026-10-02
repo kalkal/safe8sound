@@ -20,6 +20,7 @@ logs/
 playwright-report/
 test-results/
 reports/mutation/
+reports/conformance/
 
 # Mutation testing sandbox
 .stryker-tmp/

@@ -1,0 +1,34 @@
+# Expected failures of the official MCP conformance suite against our server (G5, #153). Each entry fails
+# for a reason that is right for this server; anything not listed here that fails is a regression.
+server:
+  # They call the suite's reference server fixtures (tools named test_*, resources test://...), which a
+  # product server does not have: the call fails with "Unknown tool" / "Resource not found", as it should.
+  - tools-call-simple-text
+  - tools-call-image
+  - tools-call-audio
+  - tools-call-embedded-resource
+  - tools-call-mixed-content
+  - tools-call-with-logging
+  - tools-call-error
+  - tools-call-with-progress
+  - tools-call-sampling
+  - tools-call-elicitation
+  - elicitation-sep1034-defaults
+  - elicitation-sep1330-enums
+  - resources-read-text
+  - resources-read-binary
+  - resources-templates-read
+  # Capabilities this server does not declare (logging, completions, prompts, resource subscriptions):
+  # "Method not found" (-32601) is the answer the spec asks for.
+  - logging-set-level
+  - completion-complete
+  - resources-subscribe
+  - resources-unsubscribe
+  - prompts-list
+  - prompts-get-simple
+  - prompts-get-with-args
+  - prompts-get-embedded-resource
+  - prompts-get-with-image
+  # The server is stateless by design (Lambda, plan §9.2): it issues no Mcp-Session-Id, which the spec makes
+  # optional. The scenario only warns "no session ID" and has nothing else to check.
+  - server-sse-multiple-streams
