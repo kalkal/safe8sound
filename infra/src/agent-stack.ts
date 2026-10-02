@@ -32,6 +32,7 @@ export class AgentStack extends Stack {
   constructor(scope: Construct, id: string, props: AgentStackProps) {
     super(scope, id, props);
     const { stage, agent } = props;
+    const runtimeName = `cold_reserve_${stage}_agent`;
     const tokenParameter = agent.mcpTokenParameter.replace('{stage}', stage);
 
     // The bundle is built into the asset folder at synth time (scripts/bundle.ts --out); tests skip it.
@@ -80,6 +81,16 @@ export class AgentStack extends Stack {
         resources: [this.formatArn({ service: 'logs', resource: 'log-group', resourceName: '/aws/bedrock-agentcore/runtimes/*', arnFormat: ArnFormat.COLON_RESOURCE_NAME })],
       }),
     );
+    // As the AWS execution role template for a runtime does (runtime-permissions.html): a resource policy on
+    // this runtime's own log groups, and listing the groups. X-Ray and cloudwatch:PutMetricData stay out
+    // (only ADOT needs them).
+    role.addToPolicy(
+      new PolicyStatement({
+        actions: ['logs:PutResourcePolicy'],
+        resources: [this.formatArn({ service: 'logs', resource: 'log-group', resourceName: `/aws/bedrock-agentcore/runtimes/${runtimeName}-*`, arnFormat: ArnFormat.COLON_RESOURCE_NAME })],
+      }),
+    );
+    role.addToPolicy(new PolicyStatement({ actions: ['logs:DescribeLogGroups'], resources: [this.formatArn({ service: 'logs', resource: 'log-group', resourceName: '*', arnFormat: ArnFormat.COLON_RESOURCE_NAME })] }));
     // The code zip only, by its exact key: no bucket-wide or wildcard S3 actions.
     role.addToPolicy(new PolicyStatement({ actions: ['s3:GetObject'], resources: [code.bucket.arnForObjects(code.s3ObjectKey)] }));
 
@@ -93,10 +104,20 @@ export class AgentStack extends Stack {
         id: `AwsSolutions-IAM5[Resource::arn:<AWS::Partition>:logs:${this.region}:<AWS::AccountId>:log-group:/aws/bedrock-agentcore/runtimes/*]`,
         reason: 'AgentCore names the runtime log groups (/aws/bedrock-agentcore/runtimes/<runtime-id>-<endpoint>) after creation.',
       },
+      {
+        id: `AwsSolutions-IAM5[Resource::arn:<AWS::Partition>:logs:${this.region}:<AWS::AccountId>:log-group:/aws/bedrock-agentcore/runtimes/${runtimeName}-*]`,
+        reason:
+          "PutResourcePolicy on this runtime's own log groups only, whose suffix AgentCore picks; as in the AWS execution role template (https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html).",
+      },
+      {
+        id: `AwsSolutions-IAM5[Resource::arn:<AWS::Partition>:logs:${this.region}:<AWS::AccountId>:log-group:*]`,
+        reason:
+          'DescribeLogGroups cannot be scoped to one group (it lists them); read-only, and as in the AWS execution role template (https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html).',
+      },
     );
 
     const runtime = new CfnRuntime(this, 'Runtime', {
-      agentRuntimeName: `cold_reserve_${stage}_agent`,
+      agentRuntimeName: runtimeName,
       description: `The ${stage} voice agent: Strands with Bedrock, the MCP server as its only tool source.`,
       agentRuntimeArtifact: {
         codeConfiguration: { code: { s3: { bucket: code.s3BucketName, prefix: code.s3ObjectKey } }, entryPoint: ['app.js'], runtime: 'NODE_22' },

@@ -30,6 +30,7 @@ How the agent (`apps/agent`) runs on Amazon Bedrock AgentCore Runtime, and who m
 - It is **read when the first invocation needs it**, with an explicit timeout (`AGENT_SSM_TIMEOUT_MS`, 2 s by default), then **kept in memory only**. It is never logged and never put in a message.
 - **If SSM does not answer**, that invocation gets a 503 `config_unavailable`, `/ping` stays healthy, and the next invocation tries again. A missing or denied parameter is `invalid_config`.
 - The runtime role needs `ssm:GetParameter` on that one parameter, and `kms:Decrypt` only through SSM (G1b).
+- **Logs**: the runtime role may create and write the runtime's log groups and streams under `/aws/bedrock-agentcore/runtimes/`, put a resource policy on its own groups (`<runtime name>-*`) and list log groups, as the AWS execution role template does ([runtime permissions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html)). X-Ray and `cloudwatch:PutMetricData` stay out: only ADOT tracing needs them.
 
 ## Errors seen by the caller
 

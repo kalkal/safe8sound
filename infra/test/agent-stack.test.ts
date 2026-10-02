@@ -95,6 +95,19 @@ describe('agent stack: the agent on AgentCore Runtime (G1b)', () => {
     expect(JSON.stringify(ssm)).toContain('parameter/cold-reserve/dev/agent/mcp-token');
   });
 
+  it('may set up its own runtime logs as the AWS execution role template does: resource policy on its own groups, list the groups', () => {
+    // https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html (execution role,
+    // direct code deployment). X-Ray and cloudwatch:PutMetricData stay out: only ADOT needs them.
+    const statements = statementsOf(tpl('cold-reserve-dev-agent'));
+    const logs = (action: string) => statements.filter((s) => actions(s).includes(action));
+    expect(JSON.stringify(logs('logs:PutResourcePolicy').map((s) => s.Resource))).toContain('log-group:/aws/bedrock-agentcore/runtimes/cold_reserve_dev_agent-*');
+    expect(logs('logs:PutResourcePolicy').flatMap(actions)).toEqual(['logs:PutResourcePolicy']);
+    expect(JSON.stringify(logs('logs:DescribeLogGroups').map((s) => s.Resource))).toMatch(/log-group:\*"/);
+    expect(logs('logs:DescribeLogGroups').flatMap(actions)).toEqual(['logs:DescribeLogGroups']);
+    const all = statements.flatMap(actions);
+    expect(all.filter((a) => a.startsWith('xray:') || a === 'cloudwatch:PutMetricData')).toEqual([]);
+  });
+
   it('exists for every stage, with the token parameter of that stage', () => {
     tpl('cold-reserve-demo-agent').hasResourceProperties('AWS::BedrockAgentCore::Runtime', {
       EnvironmentVariables: Match.objectLike({ AGENT_MCP_TOKEN_PARAMETER: '/cold-reserve/demo/agent/mcp-token' }),
