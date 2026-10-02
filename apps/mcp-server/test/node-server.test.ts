@@ -53,4 +53,21 @@ describe('startNodeServer (local entry adapter)', () => {
     });
     expect(seen).toBe(`http://127.0.0.1:${port}/mcp?x=1`);
   });
+
+  it('a path that normalises to //host never names another host either (#149 re-review)', async () => {
+    let seen = '';
+    server = await startNodeServer((req) => ((seen = req.url), Promise.resolve(new Response('ok'))), { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: 100 });
+    const { port } = new URL(server.url);
+    for (const path of ['/.//evil.example/mcp', '//evil.example/mcp']) {
+      await new Promise<void>((resolve, reject) => {
+        const r = request({ host: '127.0.0.1', port: Number(port), method: 'GET', path }, (res) => {
+          res.resume();
+          res.on('end', resolve);
+        });
+        r.on('error', reject);
+        r.end();
+      });
+      expect(new URL(seen).host).toBe(`127.0.0.1:${port}`);
+    }
+  });
 });

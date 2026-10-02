@@ -58,7 +58,11 @@ function readBody(req: IncomingMessage, maxBytes: number): Promise<Buffer | 'too
 function localUrl(target: string | undefined, host: string, server: { address(): unknown }): URL {
   const { port } = server.address() as AddressInfo;
   const parsed = new URL(target ?? '/', 'http://placeholder');
-  return new URL(`${parsed.pathname}${parsed.search}`, `http://${host}:${String(port)}`);
+  // Set the parts on a fixed base: a path that normalises to "//other.host/..." is then a path, never a host.
+  const url = new URL(`http://${host}:${String(port)}`);
+  url.pathname = parsed.pathname;
+  url.search = parsed.search;
+  return url;
 }
 
 export function startNodeServer(handle: McpHandler, options: NodeServerOptions): Promise<RunningServer> {
