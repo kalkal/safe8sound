@@ -102,6 +102,22 @@ describe('POST /v1/session: a demo code for a 1-hour token', () => {
     await problem(await send('/v1/session', wrong), 401, 'invalid_demo_code');
     await problem(await send('/v1/session', { body: { code: CODE } }), 429, 'demo_quota_exceeded');
   });
+
+  it('counts only wrong codes toward the cap: a jury behind one shared IP opens as many sessions as it needs (review of #139)', async () => {
+    const { send } = setup();
+    for (let i = 0; i < 6; i++) expect((await send('/v1/session', { body: { code: CODE } })).status).toBe(200);
+    await problem(await send('/v1/session', { body: { code: 'not-the-demo-code-at-all' } }), 401, 'invalid_demo_code');
+    expect((await send('/v1/session', { body: { code: CODE } })).status).toBe(200);
+  });
+
+  it('logs a failed give-back of a right attempt and still opens the session (the attempt stays counted)', async () => {
+    const inner = memoryQuotaStore();
+    const store: QuotaStore = { consume: (k, l, e) => inner.consume(k, l, e), release: () => Promise.reject(Object.assign(new Error('slow'), { name: 'ThrottlingException' })) };
+    const { send, logs } = setup({}, undefined, { quota: store });
+    expect((await send('/v1/session', { body: { code: CODE } })).status).toBe(200);
+    expect(logs).toContainEqual(expect.objectContaining({ level: 'warn', message: 'attempt_release_failed', errorName: 'ThrottlingException' }));
+    expect(JSON.stringify(logs)).not.toContain('203.0.113.7');
+  });
 });
 
 describe('POST /v1/session: concurrent attempts (review of #110)', () => {
@@ -305,6 +321,7 @@ describe('last resort (review of #110): a throw never escapes the handler', () =
   it('keeps the cause chain by name: a wrapped store error logs both names', async () => {
     const failing: QuotaStore = {
       consume: () => Promise.reject(new Error('quota store down', { cause: Object.assign(new Error('x'), { name: 'ProvisionedThroughputExceededException' }) })),
+      release: () => Promise.resolve(),
     };
     const { send, logs } = setup({}, undefined, { quota: failing });
     const token = signToken({ sub: 'judges', home: 'demo#01aaaaaaaaaaaaaa' as HomeId, iat: NOW / 1000, exp: NOW / 1000 + 3600, jti: 'j' }, { kid: 'k1', material: KEY });
@@ -313,7 +330,7 @@ describe('last resort (review of #110): a throw never escapes the handler', () =
   });
 
   it('maps a throwing quota store on /v1/session to 500 too', async () => {
-    const throwing: QuotaStore = { consume: () => Promise.reject(new RangeError('x')) };
+    const throwing: QuotaStore = { consume: () => Promise.reject(new RangeError('x')), release: () => Promise.resolve() };
     const { send } = setup({}, undefined, { quota: throwing });
     await problem(await send('/v1/session', { body: { code: CODE } }), 500, 'unexpected_error');
   });

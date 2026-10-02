@@ -22,6 +22,7 @@
     "@cold-reserve/notifier-inapp": "workspace:*",
     "@cold-reserve/source-fallback": "workspace:*",
     "@cold-reserve/source-simulator": "workspace:*",
+    "@cold-reserve/ssm-parameters": "workspace:*",
     "@cold-reserve/store-dynamodb": "workspace:*",
     "@cold-reserve/store-memory": "workspace:*",
     "@cold-reserve/ui-cards": "workspace:*",

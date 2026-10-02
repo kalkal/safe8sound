@@ -10,7 +10,13 @@ export interface AgentCoreClientLike {
 }
 
 /** AgentCore answered for the container: the container (or the service) failed, a retry may work. */
-const TRANSIENT: ReadonlySet<string> = new Set(['RuntimeClientError', 'ThrottlingException', 'ServiceQuotaExceededException', 'InternalServerException', 'RetryableConflictException']);
+const TRANSIENT: ReadonlySet<string> = new Set(['RuntimeClientError', 'ThrottlingException', 'ServiceQuotaExceededException', 'InternalServerException', 'RetryableConflictException', 'TimeoutError']);
+/** No HTTP answer at all: the network or DNS failed on the way to AgentCore. */
+const NETWORK: ReadonlySet<string> = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'EPIPE']);
+
+/** Transient: a retry may work. A bare TypeError or a non-Error throw is a bug of ours, never hidden as AWS (review of #152). */
+const isTransient = (cause: unknown): boolean =>
+  cause instanceof Error && (TRANSIENT.has(cause.name) || NETWORK.has(String((cause as { code?: unknown }).code)));
 
 /**
  * The agent on AgentCore Runtime (#17, G1c): InvokeAgentRuntime, signed with sim-api's IAM role by the SDK.
@@ -57,8 +63,7 @@ export function agentCoreTurnAgent(opts: { runtimeArn: string; timeoutMs: number
         text = (await output.response?.transformToString()) ?? '';
       } catch (cause) {
         if (abortSignal.aborted) return err(toolError('agent_timeout', `The assistant did not answer within ${String(opts.timeoutMs)} ms.`));
-        const name = cause instanceof Error ? cause.name : '';
-        const error = TRANSIENT.has(name) || !(cause instanceof Error) || name === 'TypeError'
+        const error = isTransient(cause)
           ? toolError('agent_unavailable', 'The assistant is not available right now. Try again in a moment.')
           : toolError('unexpected_error', 'Something went wrong on our side.');
         logFailure(error, correlationId, cause);

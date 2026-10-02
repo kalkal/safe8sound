@@ -36,6 +36,30 @@
       "foundationModelId": "amazon.nova-2-lite-v1:0",
       "mcpTokenParameter": "/cold-reserve/{stage}/agent/mcp-token",
       "idleRuntimeSessionTimeoutSeconds": 120
+    },
+    "cold-reserve:simApi": {
+      "demoCodesParameter": "/cold-reserve/{stage}/sim-api/demo-codes",
+      "tokenKeysParameter": "/cold-reserve/{stage}/sim-api/token-keys",
+      "mcpTokenParameter": "/cold-reserve/{stage}/sim-api/mcp-token",
+      "memoryMb": 512,
+      "timeoutSeconds": 15,
+      "logRetentionDays": 14,
+      "p95AlarmMs": 9000,
+      "ssmTimeoutMs": 2000,
+      "agentTimeoutMs": 9000,
+      "mcpTimeoutMs": 3000,
+      "allowedOrigins": [],
+      "demoEnabled": {
+        "dev": true,
+        "demo": true
+      },
+      "tokenTtlS": 3600,
+      "limits": {
+        "turnsPerCodePerDay": 20,
+        "turnsGlobalPerDay": 30,
+        "toolCallsPerCodePerDay": 20,
+        "codeAttemptsPerIpPerHour": 10
+      }
     }
   }
 }

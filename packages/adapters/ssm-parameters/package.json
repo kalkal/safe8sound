@@ -1,0 +1,13 @@
+{
+  "name": "@cold-reserve/ssm-parameters",
+  "private": true,
+  "version": "0.0.0",
+  "description": "SSM parameters through the AWS Parameters and Secrets Lambda Extension (no SDK), shared by the Lambdas.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*"
+  }
+}

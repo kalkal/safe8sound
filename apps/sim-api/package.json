@@ -14,6 +14,8 @@
     "@aws-sdk/client-bedrock-agentcore": "3.1142.0",
     "@cold-reserve/contracts": "workspace:*",
     "@cold-reserve/core": "workspace:*",
+    "@cold-reserve/ssm-parameters": "workspace:*",
+    "@cold-reserve/store-dynamodb": "workspace:*",
     "@modelcontextprotocol/sdk": "1.30.1",
     "zod": "catalog:"
   }

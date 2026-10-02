@@ -352,6 +352,9 @@ importers:
       '@cold-reserve/source-simulator':
         specifier: workspace:*
         version: link:../../packages/adapters/source-simulator
+      '@cold-reserve/ssm-parameters':
+        specifier: workspace:*
+        version: link:../../packages/adapters/ssm-parameters
       '@cold-reserve/store-dynamodb':
         specifier: workspace:*
         version: link:../../packages/adapters/store-dynamodb
@@ -386,6 +389,12 @@ importers:
       '@cold-reserve/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@cold-reserve/ssm-parameters':
+        specifier: workspace:*
+        version: link:../../packages/adapters/ssm-parameters
+      '@cold-reserve/store-dynamodb':
+        specifier: workspace:*
+        version: link:../../packages/adapters/store-dynamodb
       '@modelcontextprotocol/sdk':
         specifier: 1.30.1
         version: 1.30.1(supports-color@10.2.2)(zod@4.6.5)
@@ -500,6 +509,12 @@ importers:
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
+
+  packages/adapters/ssm-parameters:
+    dependencies:
+      '@cold-reserve/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
 
   packages/adapters/store-dynamodb:
     dependencies:

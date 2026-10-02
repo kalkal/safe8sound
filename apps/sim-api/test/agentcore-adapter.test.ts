@@ -72,6 +72,26 @@ describe('agentCoreTurnAgent', () => {
     },
   );
 
+  it.each(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN'])('maps a network failure (%s, no HTTP answer) to agent_unavailable', async (code) => {
+    const { port, logs } = agent(() => Promise.reject(Object.assign(new Error(`connect ${code}`), { code })));
+    expect(await port.ask({ home: HOME, question: 'Hi', correlationId: CID })).toMatchObject({ ok: false, error: { code: 'agent_unavailable' } });
+    expect(logs[0]).toMatchObject({ level: 'warn', errorName: 'Error' });
+  });
+
+  it('maps an SDK TimeoutError to agent_unavailable', async () => {
+    const { port } = agent(() => Promise.reject(Object.assign(new Error('socket timed out'), { name: 'TimeoutError' })));
+    expect(await port.ask({ home: HOME, question: 'Hi', correlationId: CID })).toMatchObject({ ok: false, error: { code: 'agent_unavailable' } });
+  });
+
+  it('never hides a bug of ours as an AWS problem: a bare TypeError or a non-Error throw is unexpected_error (review of #152)', async () => {
+    for (const thrown of [new TypeError("Cannot read properties of undefined (reading 'x')"), 'boom', undefined]) {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the point of the test: a throw that is not an Error
+      const { port, logs } = agent(() => Promise.reject(thrown));
+      expect(await port.ask({ home: HOME, question: 'Hi', correlationId: CID })).toMatchObject({ ok: false, error: { code: 'unexpected_error', category: 'internal' } });
+      expect(logs[0]).toMatchObject({ level: 'error', code: 'unexpected_error' });
+    }
+  });
+
   it.each([['AccessDeniedException', 403], ['ValidationException', 400], ['ResourceNotFoundException', 404]])('maps %s (our setup) to unexpected_error, logged at error level', async (name, status) => {
     const { port, logs } = agent(() => Promise.reject(sdkError(name, status)));
     expect(await port.ask({ home: HOME, question: 'Hi', correlationId: CID })).toMatchObject({ ok: false, error: { code: 'unexpected_error', category: 'internal' } });

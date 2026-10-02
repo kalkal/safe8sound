@@ -39,7 +39,7 @@ When the container answers a 4xx or 5xx, AgentCore returns **424 `RuntimeClientE
 - **Only an unexpected throw is a real 5xx** (the Node adapter's last resort), which the caller sees as a 424.
 - **sim-api's AgentCore adapter** (`apps/sim-api/src/adapters/agentcore.ts`) calls `InvokeAgentRuntime` with the SDK, signed by sim-api's role, with one runtime session per sandbox home (a hash of the home). It turns:
   - a `TurnFailure` back into the same error, with a fixed message (`fromAgentFailure`, shared with the HTTP adapter). An agent refusal of sim-api itself becomes `unexpected_error`, logged with the agent's code;
-  - a 424 and the other transient AWS errors into `agent_unavailable` (dependency_unavailable);
+  - a 424, the other transient AWS errors and network failures (no HTTP answer) into `agent_unavailable` (dependency_unavailable); a bare `TypeError` or a throw that is not an Error is a bug of ours and becomes `unexpected_error`;
   - access, validation and not-found errors into `unexpected_error`.
 
   Every failure is logged with its error name and HTTP status, never the SDK text.

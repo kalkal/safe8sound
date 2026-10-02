@@ -1,11 +1,11 @@
 import { err, ok, toolError } from '@cold-reserve/contracts';
 import { jsonLineSink, loggerTo } from '@cold-reserve/core';
+import { readParameter } from '@cold-reserve/ssm-parameters';
 import { createApp } from './app.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules, createDynamoStoreFactory } from './compose.js';
 import { createLambdaHandler, installProcessHooks, storeErrorLogger, toLogEntry, type LambdaLogEntry, metricsTo } from './lambda.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
-import { readParameter } from './ssm.js';
 import { stormModeWiring } from './storm-mode-config.js';
 
 // Lambda entry: the client tokens come from SSM (SecureString) named by MCP_CLIENTS_PARAMETER;

@@ -59,6 +59,43 @@ export const AgentConfigSchema = z.strictObject({
 });
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 
+const simApiParameter = z.string().regex(/^\/[a-z0-9-]+\/\{stage\}\/sim-api\/[A-Za-z0-9_.-]+$/);
+/** An exact origin: scheme, host and optional port, no path (CORS compares origins exactly). */
+const origin = z.url().refine((u) => new URL(u).origin === u, { message: 'An origin has no path or trailing slash.' });
+
+/**
+ * The sim-api Lambda (#17): the demo API the web simulator calls. Only parameter NAMES live here, never
+ * the codes, keys or tokens; `{stage}` is replaced by the stage name.
+ */
+export const SimApiConfigSchema = z
+  .strictObject({
+    demoCodesParameter: simApiParameter,
+    tokenKeysParameter: simApiParameter,
+    mcpTokenParameter: simApiParameter,
+    /** Optional, as for the MCP server: a new account cannot reserve any until the quota is raised. */
+    reservedConcurrency: z.strictObject({ dev: positiveInt, demo: positiveInt }).optional(),
+    memoryMb: z.number().int().min(128).max(10_240),
+    timeoutSeconds: z.number().int().min(1).max(900),
+    logRetentionDays: z.enum(RetentionDays),
+    p95AlarmMs: positiveInt,
+    ssmTimeoutMs: positiveInt,
+    agentTimeoutMs: z.number().int().min(100).max(30_000),
+    mcpTimeoutMs: z.number().int().min(100).max(30_000),
+    /** The simulator's origins; empty until the web stack lands (the function then answers invalid_config). */
+    allowedOrigins: z.array(origin),
+    /** Kill switch per stage (plan §13.2.4). */
+    demoEnabled: z.strictObject({ dev: z.boolean(), demo: z.boolean() }),
+    tokenTtlS: z.number().int().min(60).max(3600),
+    limits: z.strictObject({
+      turnsPerCodePerDay: z.number().int().min(1).max(10_000),
+      turnsGlobalPerDay: z.number().int().min(1).max(100_000),
+      toolCallsPerCodePerDay: z.number().int().min(1).max(10_000),
+      codeAttemptsPerIpPerHour: z.number().int().min(1).max(1000),
+    }),
+  })
+  .refine((c) => c.agentTimeoutMs < c.timeoutSeconds * 1000, { message: 'The agent timeout must end before the function timeout.', path: ['agentTimeoutMs'] });
+export type SimApiConfig = z.infer<typeof SimApiConfigSchema>;
+
 export const InfraConfigSchema = z.strictObject({
   /** AWS region, e.g. us-east-1. Never hard-coded in stacks. */
   region: z.string().regex(/^[a-z]{2}(-[a-z]+)+-\d$/),
@@ -66,6 +103,7 @@ export const InfraConfigSchema = z.strictObject({
   mcp: McpConfigSchema,
   state: StateConfigSchema,
   agent: AgentConfigSchema,
+  simApi: SimApiConfigSchema,
 });
 export type InfraConfig = z.infer<typeof InfraConfigSchema>;
 
@@ -77,10 +115,11 @@ export function loadInfraConfig(context: (key: string) => unknown): Result<Infra
     mcp: context('cold-reserve:mcp'),
     state: context('cold-reserve:state'),
     agent: context('cold-reserve:agent'),
+    simApi: context('cold-reserve:simApi'),
   });
   if (parsed.success) return ok(parsed.data);
   return err(
-    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp, :state or :agent.', {
+    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp, :state, :agent or :simApi.', {
       details: { issues: parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message.slice(0, 200) })) },
     }),
   );

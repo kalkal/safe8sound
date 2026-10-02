@@ -59,10 +59,12 @@ const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unav
 const nameOf = (e: unknown): string => (e instanceof Error ? e.name : typeof e);
 
 export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): SimApiHandler {
-  const quota = createQuota({ store: deps.quota, limits: config.limits, clock: deps.clock });
   const origins = new Set(config.allowedOrigins);
   const [signingKey] = config.keys;
   if (!signingKey) throw new Error('sim-api needs a signing key');
+  // The signing key is secret and already in SSM: it salts the IP hash too (a key rotation only resets the
+  // current hour's attempt counts).
+  const quota = createQuota({ store: deps.quota, limits: config.limits, clock: deps.clock, ipSalt: signingKey.material });
 
   return async (req, meta) => {
     const correlationId = correlationIdFrom(req.headers.get(CORRELATION_ID_HEADER), randomUUID);
@@ -127,10 +129,18 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         const request = SessionRequestSchema.safeParse(body);
         if (!request.success) return fail(toolError('invalid_input', 'Send {"code": "<demo code>"}.'));
         // One atomic count per attempt BEFORE the code is compared (review of #110): concurrent wrong
-        // codes cannot slip past the cap between a check and a later count.
-        if (!(await quota.codeAttempt(meta.clientIp))) return fail(quota.tooManyAttempts());
+        // codes cannot slip past the cap between a check and a later count. A right code gives its attempt
+        // back, so only wrong codes count (review of #139).
+        const attempt = await quota.codeAttempt(meta.clientIp);
+        if (!attempt.allowed) return fail(quota.tooManyAttempts());
         const codeId = config.demoCodes.get(createHash('sha256').update(request.data.code).digest('hex'));
         if (codeId === undefined) return fail(toolError('invalid_demo_code', 'That demo code is not valid.'));
+        try {
+          await attempt.release();
+        } catch (e) {
+          // The session still opens; the attempt simply stays counted. Never the IP in the log.
+          deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'warn', component: 'sim-api', message: 'attempt_release_failed', correlationId, errorName: nameOf(e), details: { codeId } });
+        }
         const iat = Math.floor(deps.clock.now() / 1000);
         const claims: DemoClaims = { sub: codeId, home: SandboxHomeIdSchema.parse(`demo#${deps.randomHex()}`), iat, exp: iat + config.tokenTtlS, jti: randomUUID() };
         const reply: SessionReply = { token: signToken(claims, signingKey), expiresAt: new Date(claims.exp * 1000).toISOString() };

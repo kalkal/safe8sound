@@ -5,6 +5,7 @@ import type { InfraConfig, StageName } from './config.js';
 import { AgentStack } from './agent-stack.js';
 import { DataStack } from './data-stack.js';
 import { McpStack } from './mcp-stack.js';
+import { SimApiStack } from './sim-api-stack.js';
 
 /** Placeholder for the shared resources; F5/F8 add the web and agent stacks. */
 export class FoundationStack extends Stack {
@@ -28,7 +29,16 @@ export class ColdReserveStage extends Stage {
     new FoundationStack(this, 'foundation', common('foundation'));
     const data = new DataStack(this, 'data', { ...common('data'), retain: stageName === 'demo' });
     const mcp = new McpStack(this, 'mcp', { ...common('mcp'), stage: stageName, mcp: config.mcp, state: config.state, table: data.table });
-    new AgentStack(this, 'agent', { ...common('agent'), stage: stageName, agent: config.agent, mcpFunctionUrl: mcp.functionUrl });
+    const agent = new AgentStack(this, 'agent', { ...common('agent'), stage: stageName, agent: config.agent, mcpFunctionUrl: mcp.functionUrl });
+    new SimApiStack(this, 'sim-api', {
+      ...common('sim-api'),
+      stage: stageName,
+      simApi: config.simApi,
+      state: config.state,
+      table: data.table,
+      mcpFunctionUrl: mcp.functionUrl,
+      runtimeArn: agent.runtimeArn,
+    });
   }
 }
 

@@ -1,7 +1,8 @@
 import { celsius } from '@cold-reserve/contracts';
+import { defaultDynamoClient, type DynamoClientSettings } from '@cold-reserve/store-dynamodb';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { describe, expect, it } from 'vitest';
-import { composeModules, createDynamoStoreFactory, defaultDynamoClient, profileFor, type DynamoClientSettings } from '../src/compose.js';
+import { composeModules, createDynamoStoreFactory, profileFor } from '../src/compose.js';
 import { loadPreferencesConfig, preferencesConfigFile } from '../src/preferences-config.js';
 import { homeId } from './helpers.js';
 
