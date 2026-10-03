@@ -46,12 +46,11 @@ export const handler = createLambdaHandler(
     if (!storeFor.ok) return storeFor;
     const modules = composeModules({ preferences: preferences.value, storeFor: storeFor.value, clock: wallClock });
     if (!modules.ok) return modules;
-    const comfortPlan = comfortPlanWiring({ storeFor: storeFor.value, preferences: preferences.value, clock: wallClock });
-    if (!comfortPlan.ok) return comfortPlan;
-
     // The family phone's inbox lives in the same table (#24); its HTTP route is not served here.
     const stormMode = stormModeWiring({ storeFor: storeFor.value, preferences: preferences.value, clock: wallClock });
     if (!stormMode.ok) return stormMode;
+    const comfortPlan = comfortPlanWiring({ storeFor: storeFor.value, preferences: preferences.value, clock: wallClock, notifier: stormMode.value.notifier });
+    if (!comfortPlan.ok) return comfortPlan;
 
     // No cardDocuments yet: the built card bundle is not shipped with the function, so the Lambda serves
     // the tools without their ui:// cards. TODO(#104): ship the card bundle with the MCP Lambda.

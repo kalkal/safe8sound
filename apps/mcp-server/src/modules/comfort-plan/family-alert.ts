@@ -1,0 +1,57 @@
+import { epochMs, toolError, type ErrorEnvelope, type HomeProfile, type Plan, type Preferences, type Snapshot } from '@cold-reserve/contracts';
+import type { Notifier } from '@cold-reserve/core';
+import { LOCALES, stormMessage, type Locale } from '@cold-reserve/i18n';
+
+// The family alert of a last resort (#160): the fixed "battery low, please check on them" text, to the
+// registered contacts only, when the plan is really applied. Until when comes from the plan itself, so the
+// family reads the same time the person heard.
+
+export interface AlertOutcome {
+  readonly sent: number;
+  /** Registered contacts the alert did not reach. */
+  readonly failed: number;
+  /** The first delivery that failed; the plan stays applied, the caller logs it. */
+  readonly failure?: ErrorEnvelope;
+}
+
+const localeOf = (language: string): Locale => LOCALES.find((l) => l === language) ?? 'en-US';
+
+export async function alertFamily(
+  notifier: Notifier,
+  input: { readonly plan: Plan; readonly profile: HomeProfile; readonly preferences: Preferences; readonly snapshot: Snapshot; readonly nowMs: number },
+): Promise<AlertOutcome> {
+  const { plan, profile, preferences, snapshot } = input;
+  if (plan.lastResort === undefined) return { sent: 0, failed: 0 };
+  const roomId = preferences.safeRoomId;
+  const tempC = snapshot.rooms.find((r) => r.id === roomId)?.tempC;
+  if (tempC === undefined) {
+    const failure = toolError('home_data_stale', `No reading from the safe room ${roomId}.`, { details: { roomId } });
+    return { sent: 0, failed: preferences.familyContacts.length, failure };
+  }
+  const fields = {
+    roomName: profile.rooms.find((r) => r.id === roomId)?.name ?? roomId,
+    tempC,
+    atMs: input.nowMs,
+    safeUntilMs: epochMs(plan.lastResort.safeUntil),
+    timeZone: profile.location.tz,
+  };
+  const at = new Date(input.nowMs).toISOString();
+  let sent = 0;
+  let failed = 0;
+  let failure: ErrorEnvelope | undefined;
+  for (const contact of preferences.familyContacts) {
+    const text = stormMessage(localeOf(preferences.language), 'last_resort_applied', contact.name, fields);
+    if (!text.ok) {
+      failure ??= toolError('unexpected_error', `The last-resort alert misses ${text.error.missing.join(', ')}.`);
+      failed += 1;
+      continue;
+    }
+    const delivered = await notifier.send({ homeId: snapshot.homeId, contact, transition: 'last_resort_applied', text: text.value, at });
+    if (delivered.ok) sent += 1;
+    else {
+      failed += 1;
+      failure ??= delivered.error;
+    }
+  }
+  return { sent, failed, ...(failure === undefined ? {} : { failure }) };
+}

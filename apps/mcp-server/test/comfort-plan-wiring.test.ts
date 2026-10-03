@@ -8,7 +8,7 @@ import { createApp } from '../src/app.js';
 import { comfortPlanWiring, loadComfortPlanConfig } from '../src/comfort-plan-config.js';
 import { parseComfortPlanConfig } from '../src/modules/comfort-plan/config.js';
 import { loadPreferencesConfig, preferencesConfigFile } from '../src/preferences-config.js';
-import { TOKEN } from './helpers.js';
+import { TOKEN, quietNotifier } from './helpers.js';
 
 const clock = fixedClock(Date.parse('2026-09-30T10:00:00Z'));
 const prefs = () => {
@@ -36,7 +36,7 @@ describe('comfort-plan wiring', () => {
   it('uses the saved preferences, or the config defaults for the home', async () => {
     const backing = createMemoryBacking();
     const storeFor = memoryStateStoreFactory({ backing, clock });
-    const wiring = comfortPlanWiring({ storeFor, preferences: prefs(), clock });
+    const wiring = comfortPlanWiring({ storeFor, preferences: prefs(), clock, notifier: quietNotifier });
     if (!wiring.ok) throw new Error(wiring.error.message);
     const demo = HomeIdSchema.parse('demo');
     const defaults = await wiring.value.preferencesFor(demo, demoProfile());
@@ -48,7 +48,7 @@ describe('comfort-plan wiring', () => {
   });
 
   it('plan ids are fresh and valid', () => {
-    const wiring = comfortPlanWiring({ storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock }), preferences: prefs(), clock });
+    const wiring = comfortPlanWiring({ storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock }), preferences: prefs(), clock, notifier: quietNotifier });
     if (!wiring.ok) throw new Error(wiring.error.message);
     const a = wiring.value.newPlanId();
     expect(a).toMatch(/^plan_[A-Za-z0-9]{20}$/);
@@ -56,7 +56,7 @@ describe('comfort-plan wiring', () => {
   });
 
   it('the app registers the module when it is wired, for the demo and the real home', () => {
-    const wiring = comfortPlanWiring({ storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock }), preferences: prefs(), clock });
+    const wiring = comfortPlanWiring({ storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock }), preferences: prefs(), clock, notifier: quietNotifier });
     if (!wiring.ok) throw new Error(wiring.error.message);
     const app = createApp({ MCP_CLIENTS: `agent@demo=${TOKEN}` }, { wallClock: clock, logger: { log: () => undefined }, comfortPlan: wiring.value });
     if (!app.ok) throw new Error(app.error.message);

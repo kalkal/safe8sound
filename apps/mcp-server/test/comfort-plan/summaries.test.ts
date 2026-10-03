@@ -211,6 +211,15 @@ describe('what the model reads', () => {
     expect(applySummary({ ...r.value, alreadyApplied: true })).toContain('was already applied');
   });
 
+  it('apply_plan, a last resort applied: says how the family alert went, plainly (#170)', () => {
+    const applied = { plan: { ...examplePlan(), status: 'applied' } as Plan, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] };
+    expect(applySummary({ ...applied, familyAlert: { sent: 2, failed: 0 } })).toContain('2 registered family contacts were alerted.');
+    expect(applySummary({ ...applied, familyAlert: { sent: 1, failed: 0 } })).toContain('1 registered family contact was alerted.');
+    expect(applySummary({ ...applied, familyAlert: { sent: 1, failed: 1 } })).toContain('The family alert could not be sent to 1 of 2 contacts: call them now.');
+    expect(applySummary({ ...applied, familyAlert: { sent: 0, failed: 0 } })).toContain('No family contact is registered, so nobody was alerted.');
+    expect(applySummary(applied)).not.toContain('family');
+  });
+
   it('apply_plan, first yes to a last resort: nothing applied, the risk to read, the family alert, and the second call only after a second yes (#160)', async () => {
     const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(30) }) });
     const p = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
@@ -221,7 +230,7 @@ describe('what the model reads', () => {
     const warning = p.value.warnings?.find((x) => x.code === 'last_resort_plan')?.message ?? 'missing';
     expect(text).toMatch(/^Not applied yet: this is a last resort\. /);
     expect(text).toContain(warning);
-    // The family alert is promised only where it is sent (#160 part d).
+    // The family alert is said when it happened, never promised (#170 review).
     expect(text).not.toContain('family');
     expect(text).toContain(
       `Only if the person says yes again, call apply_plan with planId ${p.value.id} and lastResortToken ${r.value.confirmation.token} (valid until ${localTimeText(r.value.confirmation.expiresAt)}).`,

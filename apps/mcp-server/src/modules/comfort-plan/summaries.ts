@@ -130,10 +130,19 @@ export function applySummary(o: ApplyPlanOutput): string {
       `Only if the person says yes again, call apply_plan with planId ${o.plan.id} and lastResortToken ${o.confirmation.token} (valid until ${localTimeText(o.confirmation.expiresAt)}).`
     );
   }
-  const head = o.alreadyApplied ? `Plan ${o.plan.id} was already applied.` : `Plan ${o.plan.id} applied${o.advisoryOnly ? ' as advice' : ''}.`;
+  const applied = o.alreadyApplied ? `Plan ${o.plan.id} was already applied.` : `Plan ${o.plan.id} applied${o.advisoryOnly ? ' as advice' : ''}.`;
+  const head = o.familyAlert === undefined ? applied : `${applied} ${familyAlertText(o.familyAlert)}`;
   if (!o.advisoryOnly) return head;
   const steps = o.manualInstructions.map((m) => m.text).join('; ');
   return `${head} Nothing is commanded on this home: set it by hand. ${steps}.`;
+}
+
+/** How the family alert of a last resort went (#170): said plainly, a failure with what to do now. */
+function familyAlertText(a: NonNullable<ApplyPlanOutput['familyAlert']>): string {
+  const total = a.sent + a.failed;
+  if (total === 0) return 'No family contact is registered, so nobody was alerted.';
+  if (a.failed > 0) return `The family alert could not be sent to ${String(a.failed)} of ${String(total)} contacts: call them now.`;
+  return `${String(a.sent)} registered family ${a.sent === 1 ? 'contact was' : 'contacts were'} alerted.`;
 }
 
 export function outlookSummary(o: ReserveOutlook): string {

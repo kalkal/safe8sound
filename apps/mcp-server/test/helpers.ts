@@ -1,9 +1,13 @@
 import { HomeIdSchema, ok, type HomeId } from '@cold-reserve/contracts';
+import type { Notifier } from '@cold-reserve/core';
 import { z } from 'zod';
 import type { ServerConfig } from '../src/config.js';
 import { createMcpHandler, type LogEntry } from '../src/handler.js';
 import { createRegistry, type CapabilityModule } from '../src/registry.js';
 import { defineTool } from '../src/tool.js';
+
+/** A family phone that accepts every message: for tests that do not look at the inbox. */
+export const quietNotifier: Notifier = { send: () => Promise.resolve(ok(undefined)) };
 
 export const TOKEN = 'a'.repeat(32);
 export const HOME_TOKEN = 'h'.repeat(32);

@@ -8,7 +8,7 @@ import { comfortPlanWiring } from '../src/comfort-plan-config.js';
 import { composeModules } from '../src/compose.js';
 import { loadPreferencesConfig, preferencesConfigFile } from '../src/preferences-config.js';
 import { stormModeWiring } from '../src/storm-mode-config.js';
-import { TOKEN, post, toolsList } from './helpers.js';
+import { TOKEN, post, toolsList, quietNotifier } from './helpers.js';
 
 // The Agent Skill of #22 (skills/home-energy/SKILL.md) against the real server: a valid frontmatter,
 // and every tool it names is one the server lists. No LLM: the skill text is checked, not a model.
@@ -32,7 +32,7 @@ async function listedTools(): Promise<string[]> {
   if (!preferences.ok) throw new Error(preferences.error.message);
   const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock });
   const modules = composeModules({ preferences: preferences.value, storeFor, clock });
-  const comfortPlan = comfortPlanWiring({ storeFor, preferences: preferences.value, clock });
+  const comfortPlan = comfortPlanWiring({ storeFor, preferences: preferences.value, clock, notifier: quietNotifier });
   const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock });
   if (!modules.ok || !comfortPlan.ok || !stormMode.ok) throw new Error('wiring failed');
   const app = createApp(

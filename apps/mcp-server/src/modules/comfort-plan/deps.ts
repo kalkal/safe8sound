@@ -1,5 +1,5 @@
 import type { ErrorEnvelope, Forecast, HomeId, HomeProfile, Preferences, Result } from '@cold-reserve/contracts';
-import type { Clock, HomeDataSource, Logger, SimParams, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, HomeDataSource, Logger, Notifier, SimParams, StateStoreFactory } from '@cold-reserve/core';
 import type { GuardConfig } from '@cold-reserve/guard';
 import type { ComfortPlanConfig } from './config.js';
 
@@ -29,4 +29,6 @@ export interface ComfortPlanDeps {
   readonly newPlanId: () => string;
   /** The shared log (#111): failures the module survives, and the audit trail of a last resort. */
   readonly logger: Logger;
+  /** The family phone (#24): the alert when a last resort is applied (#160). */
+  readonly notifier: Notifier;
 }

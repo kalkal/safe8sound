@@ -44,6 +44,15 @@ describe('comfort-plan tool I/O (approved in #19)', () => {
       expect(ApplyPlanOutputSchema.safeParse(normal).success).toBe(false);
     });
 
+    it('says how the family alert went when a last resort is applied: sent and failed, whole numbers (#170)', () => {
+      const applied = { plan: { ...lastResortPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] };
+      expect(ApplyPlanOutputSchema.parse({ ...applied, familyAlert: { sent: 1, failed: 0 } }).familyAlert).toEqual({ sent: 1, failed: 0 });
+      expect(ApplyPlanOutputSchema.safeParse({ ...applied, familyAlert: { sent: -1, failed: 0 } }).success).toBe(false);
+      expect(ApplyPlanOutputSchema.safeParse({ ...applied, familyAlert: { sent: 1.5, failed: 0 } }).success).toBe(false);
+      const r = ApplyPlanOutputSchema.safeParse({ ...applied, plan: { ...examplePlan(), status: 'applied' }, familyAlert: { sent: 1, failed: 0 } });
+      expect(!r.success && r.error.issues[0]?.path).toEqual(['familyAlert']);
+    });
+
     it('a wrong, stale or reused token is a validation error', () => {
       expect(categoryOf('last_resort_token_invalid')).toBe('validation');
     });

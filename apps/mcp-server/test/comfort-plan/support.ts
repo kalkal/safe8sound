@@ -1,6 +1,7 @@
 import { HomeIdSchema, PreferencesSchema, err, ok, toolError, type Forecast, type HomeId, type Preferences, type Snapshot } from '@cold-reserve/contracts';
 import { examplePreferences } from '@cold-reserve/contracts/fixtures';
-import { fixedClock, memoryLogger, type Clock, type StateStoreFactory, type StoreScope } from '@cold-reserve/core';
+import { fixedClock, memoryLogger, type Clock, type Notifier, type StateStoreFactory, type StoreScope } from '@cold-reserve/core';
+import { createInAppNotifier } from '@cold-reserve/notifier-inapp';
 import { parseGuardConfig } from '@cold-reserve/guard';
 import rawGuardConfig from '@cold-reserve/guard/config/guard.json' with { type: 'json' };
 import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
@@ -38,7 +39,7 @@ export function comfortConfig() {
 }
 
 /** A simulator scenario at hour `atH`, with every dependency of the module. */
-export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean } = {}) {
+export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean; notifier?: Notifier } = {}) {
   const profile = demoProfile();
   const scenario = builtInScenario(id);
   const startMs = Date.parse(scenario.startAt);
@@ -62,6 +63,9 @@ export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; read
     });
   };
   const logger = memoryLogger();
+  // The family phone (#24): the same in-app inbox storm mode writes to.
+  const phone = createInAppNotifier({ storeFor: memory, maxPerHome: 20 });
+  if (!phone.ok) throw new Error(phone.error.message);
   const homeId = over.homeId ?? DEMO;
   let snapshotOf = (h: HomeId): Snapshot => {
     const s = { ...sim.snapshotAt(scenarioMs), homeId: h };
@@ -85,6 +89,7 @@ export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; read
     guard: guardConfig(),
     config: comfortConfig(),
     logger,
+    notifier: over.notifier ?? phone.value.notifier,
     newPlanId: () => `plan_test_${String(++n).padStart(4, '0')}`,
   };
   const ctx: ToolContext = { correlationId: 'test-correlation', clientId: 'test', homeId };
@@ -94,6 +99,11 @@ export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; read
     const before = snapshotOf;
     snapshotOf = (h) => f(before(h));
   };
-  return { deps, ctx, store, clock, profile, setSnapshot, logger, scopes };
+  const inbox = async () => {
+    const listed = await phone.value.inbox(homeId);
+    if (!listed.ok) throw new Error(listed.error.message);
+    return listed.value;
+  };
+  return { deps, ctx, store, clock, profile, setSnapshot, logger, scopes, inbox };
 }
 

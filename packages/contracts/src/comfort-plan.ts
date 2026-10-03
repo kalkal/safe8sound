@@ -49,10 +49,18 @@ export const ApplyPlanOutputSchema = z
      * model sends this token back (optional, added 2026-10-02, approved in #160).
      */
     confirmation: z.strictObject({ token: LastResortTokenSchema, expiresAt: IsoDateTimeSchema }).optional(),
+    /**
+     * How the family alert went when this call applied a last resort: registered contacts reached and not
+     * reached; both zero when no contact is registered (optional, added 2026-10-03, approved in #170).
+     */
+    familyAlert: z.strictObject({ sent: z.number().int().nonnegative(), failed: z.number().int().nonnegative() }).optional(),
   })
   .superRefine((o, ctx) => {
     if (!o.advisoryOnly && o.manualInstructions.length > 0) {
       ctx.addIssue({ code: 'custom', path: ['manualInstructions'], message: 'Manual instructions come only with advice' });
+    }
+    if (o.familyAlert !== undefined && (o.plan.lastResort === undefined || o.plan.status !== 'applied')) {
+      ctx.addIssue({ code: 'custom', path: ['familyAlert'], message: 'A family alert comes only with a last-resort plan applied' });
     }
     if (o.confirmation !== undefined && (o.plan.lastResort === undefined || o.plan.status !== 'proposed')) {
       ctx.addIssue({ code: 'custom', path: ['confirmation'], message: 'A confirmation comes only with a last-resort plan not applied yet' });

@@ -9,7 +9,7 @@ import { createApp } from '../../src/app.js';
 import { comfortPlanWiring } from '../../src/comfort-plan-config.js';
 import { startNodeServer } from '../../src/node-server.js';
 import { loadPreferencesConfig, preferencesConfigFile } from '../../src/preferences-config.js';
-import { HOME_TOKEN, TOKEN } from '../helpers.js';
+import { HOME_TOKEN, TOKEN, quietNotifier } from '../helpers.js';
 
 // The hot-day and storm flows end to end: the official SDK client over real HTTP, the production
 // registry with the comfort-plan module, the seeded simulator and F5's in-memory store. Model turns are
@@ -22,7 +22,7 @@ const wall = fixedClock(Date.parse('2026-09-30T10:00:00Z'));
 async function withServer<T>(env: Record<string, string>, run: (call: (token: string, name: string, args: Record<string, unknown>) => Promise<Awaited<ReturnType<Client['callTool']>>>) => Promise<T>): Promise<T> {
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) throw new Error(preferences.error.message);
-  const comfortPlan = comfortPlanWiring({ storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wall }), preferences: preferences.value, clock: wall });
+  const comfortPlan = comfortPlanWiring({ storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wall }), preferences: preferences.value, clock: wall, notifier: quietNotifier });
   if (!comfortPlan.ok) throw new Error(comfortPlan.error.message);
   const app = createApp({ MCP_CLIENTS: `agent@demo=${TOKEN},video@home=${HOME_TOKEN}`, ...env }, { wallClock: wall, logger: { log: () => undefined }, comfortPlan: comfortPlan.value });
   if (!app.ok) throw new Error(app.error.message);

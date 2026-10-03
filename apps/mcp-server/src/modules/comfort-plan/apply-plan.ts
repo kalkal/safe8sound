@@ -17,6 +17,7 @@ import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import { localIso } from '../../time.js';
 import type { ToolContext } from '../../tool.js';
 import { newLastResortToken, planHash, sha256Hex } from './confirm-token.js';
+import { alertFamily } from './family-alert.js';
 import type { ComfortPlanDeps } from './deps.js';
 import { HARD_LIMITS, guardFrame, loadInputs } from './plan-comfort.js';
 import { recordRejection } from './rejections.js';
@@ -86,7 +87,36 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
 
   const applied = await store.applyPlan(input.planId);
   if (!applied.ok) return applied;
-  if (lastResort && !applied.value.alreadyApplied) logLastResort(deps, ctx, applied.value.plan, 'last_resort_applied', 'Last-resort plan applied.');
+  if (lastResort && !applied.value.alreadyApplied) {
+    logLastResort(deps, ctx, applied.value.plan, 'last_resort_applied', 'Last-resort plan applied.');
+    const alert = await alertFamily(deps.notifier, { plan: applied.value.plan, profile, preferences, snapshot, nowMs: deps.clock.now() });
+    const counts = { sent: alert.sent, failed: alert.failed };
+    // Counts only: never a name, a handle or the text of the message.
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'info',
+      component: 'mcp-server',
+      message: `Last-resort family alert: ${String(alert.sent)} of ${String(alert.sent + alert.failed)} sent.`,
+      correlationId: ctx.correlationId,
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      details: { event: 'last_resort_alert_sent', planId: applied.value.plan.id, sent: alert.sent, total: alert.sent + alert.failed, ...homeDetail(ctx.homeId) },
+    });
+    // The plan stays applied: a failed alert is said in the log and to the person, never swallowed.
+    if (alert.failure !== undefined) {
+      deps.logger.log({
+        ts: new Date(deps.clock.now()).toISOString(),
+        level: 'warn',
+        component: 'mcp-server',
+        message: `Last-resort family alert not delivered (${String(alert.sent)} sent).`,
+        correlationId: ctx.correlationId,
+        code: alert.failure.code,
+        category: alert.failure.category,
+        ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+        details: { event: 'last_resort_alert_failed', planId: applied.value.plan.id, ...homeDetail(ctx.homeId) },
+      });
+    }
+    return ok({ ...outcome(applied.value.plan, false, profile), familyAlert: counts });
+  }
   return ok(outcome(applied.value.plan, applied.value.alreadyApplied, profile));
 }
 

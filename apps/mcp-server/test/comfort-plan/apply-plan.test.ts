@@ -1,10 +1,11 @@
-import { ApplyPlanOutputSchema, PlanIdSchema, celsius, pct, type Forecast, type Plan, type Snapshot } from '@cold-reserve/contracts';
+import { ApplyPlanOutputSchema, PlanIdSchema, PreferencesSchema, celsius, err, pct, toolError, type Forecast, type Plan, type Snapshot } from '@cold-reserve/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { sha256Hex } from '../../src/modules/comfort-plan/confirm-token.js';
 import { planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
-import { MIN, REAL, world } from './support.js';
+import { applySummary } from '../../src/modules/comfort-plan/summaries.js';
+import { MIN, REAL, preferences, world } from './support.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
 const runs = (n: number): number => Number(process.env['FC_RUNS'] ?? n);
@@ -271,6 +272,75 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
     };
     const retry = await applyPlan({ ...w.deps, storeFor }, { planId: plan.id, lastResortToken: token }, w.ctx);
     expect(retry.ok && retry.value).toMatchObject({ alreadyApplied: true, plan: { status: 'applied' } });
+  });
+
+  describe('the family alert (#160): once, when the plan is really applied', () => {
+    const clock = (w: ReturnType<typeof world>, iso: string) =>
+      new Intl.DateTimeFormat('en-US', { timeZone: w.profile.location.tz, hour: 'numeric', minute: '2-digit' }).format(Date.parse(iso));
+
+    it('every registered contact gets the fixed text, with until when the plan keeps the safe room safe', async () => {
+      const w = stormAt(30);
+      const plan = await lastResort(w);
+      const { token } = await firstYes(w, plan);
+      expect(await w.inbox()).toEqual([]);
+      await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+      const inbox = await w.inbox();
+      expect(inbox).toHaveLength(1);
+      expect(inbox[0]).toMatchObject({ role: 'daughter', channel: 'in_app', transition: 'last_resort_applied' });
+      expect(inbox[0]?.text).toContain('the home battery is low');
+      expect(inbox[0]?.text).toContain(`until ${clock(w, plan.lastResort?.safeUntil ?? '')}`);
+      expect(inbox[0]?.text).toContain('Please check on them.');
+      const applied = await w.store.getPlan(plan.id);
+      expect(applied.ok && applied.value.status).toBe('applied');
+      await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+      expect(await w.inbox()).toHaveLength(1);
+    });
+
+    it('on the real home too: the alert is a message, not a command to the home, and the person hears it went out', async () => {
+      const w = stormAt(30, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, origin: live }) });
+      const plan = await lastResort(w);
+      const r = await applyPlan(w.deps, { planId: plan.id }, w.ctx);
+      expect((await w.inbox()).map((m) => m.transition)).toEqual(['last_resort_applied']);
+      expect(r.ok && r.value.familyAlert).toEqual({ sent: 1, failed: 0 });
+      expect(r.ok && applySummary(r.value)).toContain('1 registered family contact was alerted.');
+    });
+
+    it('the result says how it went: sent once, nothing on a repeat, failed when the phone is down, zero with no contact', async () => {
+      const w = stormAt(30);
+      const plan = await lastResort(w);
+      const { token } = await firstYes(w, plan);
+      const done = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+      expect(done.ok && done.value.familyAlert).toEqual({ sent: 1, failed: 0 });
+      const repeat = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+      expect(repeat.ok && repeat.value.familyAlert).toBeUndefined();
+      const nobody = stormAt(30, { preferences: PreferencesSchema.parse({ ...preferences, familyContacts: [] }) });
+      const p2 = await lastResort(nobody);
+      const t2 = await firstYes(nobody, p2);
+      const none = await applyPlan(nobody.deps, { planId: p2.id, lastResortToken: t2.token }, nobody.ctx);
+      expect(none.ok && none.value.familyAlert).toEqual({ sent: 0, failed: 0 });
+      const sent = nobody.logger.lines.find((l) => l.details?.['event'] === 'last_resort_alert_sent');
+      expect(sent?.details).toMatchObject({ sent: 0, total: 0 });
+    });
+
+    it('a normal plan sends nothing', async () => {
+      const w = world('heatwave', 14);
+      const plan = await proposed(w);
+      await applyPlan(w.deps, { planId: plan.id }, w.ctx);
+      expect(await w.inbox()).toEqual([]);
+    });
+
+    it('a failed alert does not undo the plan: it is logged as a warning with its code', async () => {
+      const down = { send: () => Promise.resolve(err(toolError('store_unavailable', 'The phone is down.'))) };
+      const w = stormAt(30, { notifier: down });
+      const plan = await lastResort(w);
+      const { token } = await firstYes(w, plan);
+      const r = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+      expect(r.ok && r.value.plan.status).toBe('applied');
+      expect(r.ok && r.value.familyAlert).toEqual({ sent: 0, failed: 1 });
+      expect(r.ok && applySummary(r.value)).toContain('The family alert could not be sent to 1 of 1 contacts: call them now.');
+      const warn = w.logger.lines.find((l) => l.details?.['event'] === 'last_resort_alert_failed');
+      expect(warn).toMatchObject({ level: 'warn', code: 'store_unavailable', category: 'dependency_unavailable', correlationId: 'test-correlation' });
+    });
   });
 
   it('refuses a token on a plan that is not a last resort', async () => {

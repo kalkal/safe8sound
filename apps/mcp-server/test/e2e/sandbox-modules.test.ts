@@ -11,7 +11,7 @@ import { composeModules } from '../../src/compose.js';
 import { startNodeServer } from '../../src/node-server.js';
 import { loadPreferencesConfig, preferencesConfigFile } from '../../src/preferences-config.js';
 import { stormModeWiring } from '../../src/storm-mode-config.js';
-import { TOKEN } from '../helpers.js';
+import { TOKEN, quietNotifier } from '../helpers.js';
 
 // Visitor sandboxes (#101) over real HTTP, wired like src/local.ts: every module resolves demo#<16 hex>
 // (R2 of the 2026-10-01 architecture check), and two sandboxes never see each other's data.
@@ -30,7 +30,7 @@ async function startServer() {
   if (!preferences.ok) throw new Error(preferences.error.message);
   const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wall });
   const modules = composeModules({ preferences: preferences.value, storeFor, clock: wall });
-  const comfortPlan = comfortPlanWiring({ storeFor, preferences: preferences.value, clock: wall });
+  const comfortPlan = comfortPlanWiring({ storeFor, preferences: preferences.value, clock: wall, notifier: quietNotifier });
   const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock: wall });
   if (!modules.ok) throw new Error(modules.error.message);
   if (!comfortPlan.ok) throw new Error(comfortPlan.error.message);

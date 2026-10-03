@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { err, ok, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Preferences, type Result } from '@cold-reserve/contracts';
-import type { Clock, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, Notifier, StateStoreFactory } from '@cold-reserve/core';
 import { parseGuardConfig, type GuardConfig } from '@cold-reserve/guard';
 import guardFile from '@cold-reserve/guard/config/guard.json' with { type: 'json' };
 import file from '../config/comfort-plan.json' with { type: 'json' };
@@ -30,12 +30,14 @@ export interface ComfortPlanWiring {
   readonly config: ComfortPlanConfig;
   readonly guard: GuardConfig;
   readonly newPlanId: () => string;
+  /** The family phone storm mode writes to: the alert of an applied last resort (#160). */
+  readonly notifier: Notifier;
 }
 
 /** 20 random letters and digits after `plan_`: unguessable, and inside PlanIdSchema. */
 const newPlanId = (): string => `plan_${randomBytes(15).toString('base64url').replace(/[-_]/g, 'x').slice(0, 20)}`;
 
-export function comfortPlanWiring(opts: { storeFor: StateStoreFactory; preferences: PreferencesConfig; clock: Clock }): Result<ComfortPlanWiring, ErrorEnvelope> {
+export function comfortPlanWiring(opts: { storeFor: StateStoreFactory; preferences: PreferencesConfig; clock: Clock; notifier: Notifier }): Result<ComfortPlanWiring, ErrorEnvelope> {
   const config = loadComfortPlanConfig();
   if (!config.ok) return config;
   return ok({
@@ -49,5 +51,6 @@ export function comfortPlanWiring(opts: { storeFor: StateStoreFactory; preferenc
     config: config.value.comfort,
     guard: config.value.guard,
     newPlanId,
+    notifier: opts.notifier,
   });
 }
