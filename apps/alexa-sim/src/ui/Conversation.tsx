@@ -7,7 +7,7 @@ import type { Agent, AgentAnswer, DemoSession } from '../agent/index.js';
 import type { VoiceConfig } from '../config.js';
 import { conversationMachine, type AskInput, type AskOutput, type ConversationEvent } from '../machine.js';
 import { log, voiceFailureEvent } from '../log.js';
-import { useVoice } from '../voice/use-voice.js';
+import { useVoice, type StudioVoice } from '../voice/use-voice.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { AnswerCard } from './AnswerCard.js';
 import { DemoCodeGate } from './DemoCodeGate.js';
@@ -23,17 +23,23 @@ export interface ConversationProps {
   voice: VoiceConfig;
   /** Remote mode only: without a token the demo code field replaces the question field. */
   session?: DemoSession;
+  /** Remote mode only: the replies may be read by the studio voice (Polly, F8d #25). */
+  studioVoice?: StudioVoice;
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session }: ConversationProps) {
+export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice }: ConversationProps) {
   const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
   // The voice adapters send machine events; the machine exists only after them, hence the ref.
   const sendRef = useRef<(event: ConversationEvent) => void>(() => undefined);
-  const voice = useVoice(voiceConfig, (event) => {
-    sendRef.current(event);
-  });
+  const voice = useVoice(
+    voiceConfig,
+    (event) => {
+      sendRef.current(event);
+    },
+    studioVoice,
+  );
   const { recognizer, speaker } = voice;
   // The machine owns the flow; the answer itself stays in the query cache (plan §9.4).
   const machine = useMemo(
@@ -54,7 +60,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
         actions: {
           startRecognition: () => recognizer?.start(),
           stopRecognition: () => recognizer?.stop(),
-          speak: ({ context }) => speaker?.speak(context.speech ?? ''),
+          speak: ({ context }) => speaker?.speak(context.speech ?? '', context.turnId ?? undefined),
           cancelSpeech: () => speaker?.cancel(),
           logVoiceFailure: (_, failure) => {
             log(voiceFailureEvent(failure));
@@ -66,7 +72,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
   const [snapshot, send] = useMachine(machine, { input: { replyTimeoutMs: turnBudgetMs, voice: voice.settings } });
   sendRef.current = send;
   const { question, turnId, error, canRetry, micAvailable, speakReplies } = snapshot.context;
-  const privacy = privacyNotice({ micAvailable, speakReplies });
+  const privacy = privacyNotice({ micAvailable, speakReplies, studioVoice: voice.studioVoice });
   const notice = voiceNotice(snapshot.context);
   const listening = snapshot.matches('listening');
   const speaking = snapshot.matches('speaking');
@@ -204,6 +210,11 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
             </button>
           )}
         </div>
+        {voice.browserVoiceNotice && speakReplies && (
+          <p className="notice" role="status">
+            {t('voice.browserVoice')}
+          </p>
+        )}
         {privacy !== null && <p className="notice">{t(privacy)}</p>}
       </form>
       )}

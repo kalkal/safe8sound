@@ -19,7 +19,8 @@ describe('simulator config', () => {
           voiceName: undefined,
           speakReplies: true,
           listenTimeoutMs: 8_000,
-          speakStartTimeoutMs: 2_000,
+          speakStartTimeoutMs: 3_000,
+          studioVoiceTimeoutMs: 1_500,
           speakTimeoutBaseMs: 4_000,
           speakTimeoutPerCharMs: 80,
         },
@@ -60,6 +61,11 @@ describe('simulator config', () => {
     });
     expect(parseConfig({ VITE_SPEAK_REPLIES: 'maybe' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
     expect(parseConfig({ VITE_LISTEN_TIMEOUT_MS: '0' }, '', false)).toMatchObject({ ok: false });
+  });
+
+  it('gives the studio voice its own timeout, and leaves room after it for the browser voice to start (F8d, #25)', () => {
+    expect(parseConfig({ VITE_STUDIO_VOICE_TIMEOUT_MS: '1000', VITE_SPEAK_START_TIMEOUT_MS: '2000' }, '', false)).toMatchObject({ ok: true, value: { voice: { studioVoiceTimeoutMs: 1000 } } });
+    expect(parseConfig({ VITE_STUDIO_VOICE_TIMEOUT_MS: '1500', VITE_SPEAK_START_TIMEOUT_MS: '2000' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
   it('lets ?voice=fake switch to scripted speech events only in dev (voice E2E tests)', () => {

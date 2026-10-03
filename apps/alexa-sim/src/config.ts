@@ -26,9 +26,13 @@ const VoiceConfigSchema = z.strictObject({
   speakReplies: z.enum(['true', 'false']).transform((v) => v === 'true'),
   listenTimeoutMs: ms,
   speakStartTimeoutMs: ms,
+  /** The studio voice (Polly, F8d #25) gives up after this; the browser voice then reads the reply. */
+  studioVoiceTimeoutMs: ms,
   speakTimeoutBaseMs: ms,
   speakTimeoutPerCharMs: ms,
-});
+})
+  // After the studio voice gives up, the browser voice still needs time to start (≈ 840 ms the first time, spike S5).
+  .refine((v) => v.speakStartTimeoutMs >= v.studioVoiceTimeoutMs + 1000, { path: ['speakStartTimeoutMs'], message: 'The speak-start timeout must leave 1 s after the studio voice timeout' });
 export type VoiceConfig = z.infer<typeof VoiceConfigSchema>;
 
 const ConfigSchema = z
@@ -70,8 +74,10 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>, s
       voiceName: env['VITE_VOICE_NAME'],
       speakReplies: env['VITE_SPEAK_REPLIES'] ?? 'true',
       listenTimeoutMs: env['VITE_LISTEN_TIMEOUT_MS'] ?? 8_000,
-      // A network voice offline hangs silently: give up on audio after 2 s (spike S5).
-      speakStartTimeoutMs: env['VITE_SPEAK_START_TIMEOUT_MS'] ?? 2_000,
+      // A network voice offline hangs silently: give up on audio after 2 s (spike S5), plus 1 s when the
+      // studio voice may come first and fall back (F8d, #25).
+      speakStartTimeoutMs: env['VITE_SPEAK_START_TIMEOUT_MS'] ?? 3_000,
+      studioVoiceTimeoutMs: env['VITE_STUDIO_VOICE_TIMEOUT_MS'] ?? 1_500,
       speakTimeoutBaseMs: env['VITE_SPEAK_TIMEOUT_BASE_MS'] ?? 4_000,
       speakTimeoutPerCharMs: env['VITE_SPEAK_TIMEOUT_PER_CHAR_MS'] ?? 80,
     },

@@ -29,4 +29,10 @@ describe('privacyNotice (#133 review): what may leave the device, said whenever 
     expect(privacyNotice({ micAvailable: false, speakReplies: true })).toBe('voice.privacyReplies');
     expect(privacyNotice({ micAvailable: false, speakReplies: false })).toBeNull();
   });
+
+  it('names Amazon Polly when the studio voice may read the answers (F8d, #25)', () => {
+    expect(privacyNotice({ micAvailable: true, speakReplies: true, studioVoice: true })).toBe('voice.privacyStudio');
+    expect(privacyNotice({ micAvailable: false, speakReplies: true, studioVoice: true })).toBe('voice.privacyStudioReplies');
+    expect(privacyNotice({ micAvailable: true, speakReplies: false, studioVoice: true })).toBe('voice.privacyMic');
+  });
 });

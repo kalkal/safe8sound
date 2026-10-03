@@ -13,7 +13,8 @@ export interface Recognizer {
 }
 
 export interface Speaker {
-  speak(text: string): void;
+  /** `turnId`: the turn's correlation id, for the studio voice's request and logs (the browser voice ignores it). */
+  speak(text: string, turnId?: string): void;
   cancel(): void;
 }
 

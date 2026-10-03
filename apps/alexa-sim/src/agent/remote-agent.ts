@@ -13,6 +13,7 @@ import {
 } from '@cold-reserve/contracts';
 import { toolErrorResult, type Agent, type AgentAnswer, type ToolCallResult } from './agent.js';
 import type { DemoSession } from './demo-session.js';
+import type { SpeechTickets } from '../voice/studio-voice.js';
 import { TurnReplySchema, readCards } from './wire.js';
 
 export interface RemoteAgentConfig {
@@ -22,6 +23,8 @@ export interface RemoteAgentConfig {
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
   /** The demo session (#101): its token goes with every request; without it card actions stay off. */
   session?: Pick<DemoSession, 'token' | 'invalidate'>;
+  /** The studio voice (F8d, #25): the ticket of each reply, for the speaker; never part of the answer. */
+  tickets?: Pick<SpeechTickets, 'remember'>;
 }
 
 /** sim-api refused the token: the session is forgotten and the UI asks for the code again. */
@@ -75,7 +78,7 @@ export function createRemoteAgent(config: RemoteAgentConfig): Agent {
     ask: async (question, context) => {
       const sent = await post('/v1/turns', { question }, context.correlationId, context.signal);
       if (!sent.ok) return sent;
-      return sent.value.status < 300 ? parseReply(sent.value.text, context.correlationId) : err(failure(sent.value.status, sent.value.text));
+      return sent.value.status < 300 ? parseReply(sent.value.text, context.correlationId, config.tickets) : err(failure(sent.value.status, sent.value.text));
     },
   };
 }
@@ -88,10 +91,11 @@ function parseJson(body: string): unknown {
   }
 }
 
-function parseReply(body: string, correlationId: string): Result<AgentAnswer, ErrorEnvelope> {
+function parseReply(body: string, correlationId: string, tickets?: Pick<SpeechTickets, 'remember'>): Result<AgentAnswer, ErrorEnvelope> {
   const parsed = TurnReplySchema.safeParse(parseJson(body));
   if (!parsed.success) return err(toolError('output_schema_violation', 'The assistant sent a reply in an unexpected format.'));
-  const { text, status, cards } = parsed.data;
+  const { text, status, cards, speech } = parsed.data;
+  if (speech !== undefined) tickets?.remember(text, speech.ticket);
   const slots = readCards(cards, { correlationId });
   return ok({ text, ...(status !== undefined && { status }), ...(slots !== undefined && { cards: slots }) });
 }

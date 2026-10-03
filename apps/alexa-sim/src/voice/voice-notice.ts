@@ -13,10 +13,14 @@ export function voiceNotice({ voiceError, suggestText }: { voiceError: VoiceErro
   return suggestText ? 'voice.typeInstead' : 'voice.reprompt';
 }
 
-type PrivacyKey = 'voice.privacy' | 'voice.privacyMic' | 'voice.privacyReplies';
+type PrivacyKey = 'voice.privacy' | 'voice.privacyMic' | 'voice.privacyReplies' | 'voice.privacyStudio' | 'voice.privacyStudioReplies';
 
-/** What may leave the device (§12.4 P6): the voice to recognition, and the answers to a network voice. */
-export function privacyNotice({ micAvailable, speakReplies }: { micAvailable: boolean; speakReplies: boolean }): PrivacyKey | null {
+/**
+ * What may leave the device (§12.4 P6): the voice to recognition, and the answers to a network voice, or to
+ * Amazon Polly when the studio voice may read them (F8d, #25).
+ */
+export function privacyNotice({ micAvailable, speakReplies, studioVoice = false }: { micAvailable: boolean; speakReplies: boolean; studioVoice?: boolean }): PrivacyKey | null {
+  if (studioVoice && speakReplies) return micAvailable ? 'voice.privacyStudio' : 'voice.privacyStudioReplies';
   if (micAvailable && speakReplies) return 'voice.privacy';
   if (micAvailable) return 'voice.privacyMic';
   return speakReplies ? 'voice.privacyReplies' : null;

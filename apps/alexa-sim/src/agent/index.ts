@@ -7,6 +7,7 @@ import { createRemoteAgent } from './remote-agent.js';
 import script from './script.v1.json' with { type: 'json' };
 import type { ScriptedPhone } from '../phone/phone-feed.js';
 import { createScriptedAgent } from './scripted-agent.js';
+import type { SpeechTickets } from '../voice/studio-voice.js';
 
 export type { Agent, AgentAnswer } from './agent.js';
 export type { DemoSession } from './demo-session.js';
@@ -20,11 +21,12 @@ export function buildSession(config: SimConfig): DemoSession | undefined {
  * ScriptedAgent by config; otherwise RemoteAgent with the scripted degraded mode behind it.
  * A broken script builds no agent at all: the remote one would have no degraded mode.
  */
-export function buildAgent(config: SimConfig, scriptSource: unknown = script, phone?: ScriptedPhone, session?: DemoSession): Result<Agent, ErrorEnvelope> {
+export function buildAgent(config: SimConfig, scriptSource: unknown = script, phone?: ScriptedPhone, session?: DemoSession, tickets?: SpeechTickets): Result<Agent, ErrorEnvelope> {
   const scripted = createScriptedAgent(scriptSource, phone === undefined ? {} : { phone });
   if (!scripted.ok || config.agent === 'scripted' || config.simApiUrl === undefined) return scripted;
   // Behind the remote agent the script answers status questions only (degraded mode, error-handling §5).
   const degraded = createScriptedAgent(scriptSource, { degraded: true });
   if (!degraded.ok) return degraded;
-  return ok(withScriptedFallback(createRemoteAgent({ baseUrl: config.simApiUrl, timeoutMs: config.agentTimeoutMs, ...(session === undefined ? {} : { session }) }), degraded.value));
+  const remote = createRemoteAgent({ baseUrl: config.simApiUrl, timeoutMs: config.agentTimeoutMs, ...(session === undefined ? {} : { session }), ...(tickets === undefined ? {} : { tickets }) });
+  return ok(withScriptedFallback(remote, degraded.value));
 }

@@ -33,6 +33,9 @@ const enUS = {
   'voice.typeInstead': "Voice isn't working right now. Type your question instead.",
   'voice.micBlocked': 'The microphone is blocked or unavailable. Type your question instead.',
   'voice.silent': "I couldn't read the answer aloud. It's on the screen.",
+  'voice.browserVoice': "When the studio voice isn't available, your browser's voice reads the answer instead.",
+  'voice.privacyStudio': "Your voice goes to your browser's speech service to be turned into text. The answers read aloud go to Amazon Polly, or to your browser's speech service when the studio voice isn't available.",
+  'voice.privacyStudioReplies': "The answers read aloud go to Amazon Polly, or to your browser's speech service when the studio voice isn't available.",
   // Demo code in remote mode (#101): never stored, wiped after the exchange.
   'demo.label': 'Demo code',
   'demo.start': 'Start',

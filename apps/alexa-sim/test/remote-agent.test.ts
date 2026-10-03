@@ -2,6 +2,7 @@ import { ErrorEnvelopeSchema, PROBLEM_JSON_CONTENT_TYPE, toProblemDetails, toolE
 import { describe, expect, it } from 'vitest';
 import { hotDayPlan } from '@cold-reserve/ui-cards';
 import { createRemoteAgent } from '../src/agent/remote-agent.js';
+import { createSpeechTickets } from '../src/voice/studio-voice.js';
 
 const BASE = 'http://sim-api.test';
 const reply = {
@@ -160,5 +161,21 @@ describe('RemoteAgent with a demo session (#101): the token travels, card action
     const result = await withSession(() => json(problem, 429, PROBLEM_JSON_CONTENT_TYPE)).agent.callTool('apply_plan', { planId: 'plan-0001' }, { correlationId: 'c' });
     expect(result.isError).toBe(true);
     expect(ErrorEnvelopeSchema.parse(result.structuredContent).code).toBe('demo_quota_exceeded');
+  });
+});
+
+describe('RemoteAgent and the studio voice (F8d, #25)', () => {
+  it('remembers the speech ticket of each reply for the speaker, and keeps it out of the answer', async () => {
+    const tickets = createSpeechTickets();
+    const remote = createRemoteAgent({ baseUrl: BASE, timeoutMs: 1_000, fetch: () => json({ ...reply, speech: { ticket: 'k1.abc' } }), tickets });
+    const result = await remote.ask('Battery?', { correlationId: 'turn-1' });
+    expect(result).toEqual({ ok: true, value: reply });
+    expect(tickets.ticketFor(reply.text)).toBe('k1.abc');
+  });
+
+  it('remembers nothing for a reply without a ticket (speech off on the sim-api)', async () => {
+    const tickets = createSpeechTickets();
+    await createRemoteAgent({ baseUrl: BASE, timeoutMs: 1_000, fetch: () => json(reply), tickets }).ask('Battery?', { correlationId: 'turn-1' });
+    expect(tickets.ticketFor(reply.text)).toBeUndefined();
   });
 });

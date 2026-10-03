@@ -5,7 +5,7 @@ import type { SimConfig } from '../src/config.js';
 
 const base: SimConfig = {
   agent: 'scripted', simApiUrl: undefined, agentTimeoutMs: 1_000, turnBudgetMs: 2_000, homeTimeZone: 'Europe/Rome', phone: 'scripted', phonePollMs: 5_000,
-  voice: { speech: 'fake', lang: 'en-US', speakReplies: false, listenTimeoutMs: 1, speakStartTimeoutMs: 1, speakTimeoutBaseMs: 1, speakTimeoutPerCharMs: 1 },
+  voice: { speech: 'fake', lang: 'en-US', speakReplies: false, listenTimeoutMs: 1, speakStartTimeoutMs: 1, studioVoiceTimeoutMs: 1, speakTimeoutBaseMs: 1, speakTimeoutPerCharMs: 1 },
 };
 const remote: SimConfig = { ...base, agent: 'remote', simApiUrl: 'http://sim-api.test' };
 const ctx = { correlationId: 'c' };
