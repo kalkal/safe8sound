@@ -1,7 +1,7 @@
 import { LAST_RESORT_ACTIONS, type LastResortAction, type Season } from '@cold-reserve/contracts';
 
-// The honest window of a last resort (#160): the limit the safe room keeps from now until safeUntil, then how
-// far it goes and by when, along the projection of the chosen plan.
+// The honest window of a last resort (#160): from safeUntil on, how far past its limit the safe room goes and
+// by when, along the projection of the chosen plan.
 
 interface WindowPoint {
   readonly ms: number;
@@ -9,20 +9,15 @@ interface WindowPoint {
 }
 
 export interface WindowOptions {
-  readonly nowMs: number;
   readonly untilMs: number;
   readonly roomId: string;
   readonly season: Season;
   /** The temperature limit in force at an instant: the cooling maximum (lowered at night) or the heating minimum. */
   readonly limitAt: (ms: number) => number;
-  /**
-   * Whether the sentence says the room stays inside the limit until safeUntil ("stays under 26 °C until …").
-   * When the battery ends the safe hours it says "the battery lasts until …; the room then reaches …" instead.
-   */
-  readonly claimsUntil: boolean;
 }
 
 export interface LastResortWindow {
+  /** The limit in force at the worst point. */
   readonly comfortLimitC: number;
   /** Rounded to one decimal, as it is said. */
   readonly worstC: number;
@@ -30,30 +25,44 @@ export interface LastResortWindow {
 }
 
 /**
- * The limit in force at safeUntil, then the warmest (the coldest when heating) point of the safe room from
- * there on, the earliest on a tie. Only a true sentence: undefined when it claims the room stays inside that
- * limit until safeUntil and the room is past it anywhere from now on (the grace period, a lower night limit),
- * when the room never goes past it afterwards, or when the projection has no such point.
+ * From safeUntil on, the warmest (the coldest when heating) point of the safe room that is past the limit in
+ * force at that point, the earliest on a tie, with that limit. Undefined when no such point is past its limit
+ * once rounded as it is said, or the projection has none. It says nothing of the time before safeUntil.
  */
 export function lastResortWindow(points: readonly WindowPoint[], opts: WindowOptions): LastResortWindow | undefined {
   const heating = opts.season === 'heating';
-  const comfortLimitC = opts.limitAt(opts.untilMs);
-  const past = (tempC: number) => (heating ? tempC < comfortLimitC : tempC > comfortLimitC);
-  let worst: { tempC: number; ms: number } | undefined;
+  const past = (tempC: number, limitC: number) => (heating ? tempC < limitC : tempC > limitC);
+  let worst: { tempC: number; ms: number; limitC: number } | undefined;
   for (const p of points) {
-    if (p.ms < opts.nowMs) continue;
+    if (p.ms < opts.untilMs) continue;
     const room = p.rooms.find((r) => r.id === opts.roomId);
     if (room === undefined) continue;
-    if (p.ms < opts.untilMs) {
-      if (opts.claimsUntil && past(room.tempC)) return undefined;
-      continue;
-    }
-    const worse = worst === undefined || (heating ? room.tempC < worst.tempC : room.tempC > worst.tempC);
-    if (worse) worst = { tempC: room.tempC, ms: p.ms };
+    const limitC = opts.limitAt(p.ms);
+    if (!past(room.tempC, limitC)) continue;
+    if (worst === undefined || (heating ? room.tempC < worst.tempC : room.tempC > worst.tempC)) worst = { tempC: room.tempC, ms: p.ms, limitC };
   }
   if (worst === undefined) return undefined;
   const worstC = Math.round(worst.tempC * 10) / 10;
-  return past(worstC) ? { comfortLimitC, worstC, worstAtMs: worst.ms } : undefined;
+  return past(worstC, worst.limitC) ? { comfortLimitC: worst.limitC, worstC, worstAtMs: worst.ms } : undefined;
+}
+
+/**
+ * When cooling: the limit at safeUntil if the safe hours end because it came down there (the night threshold),
+ * not because the room crossed it: lower than at the step before, the room inside the earlier limit and above
+ * the new one. Undefined otherwise, or without both points of the safe room.
+ */
+export function loweredLimit(
+  points: readonly WindowPoint[],
+  opts: { readonly untilMs: number; readonly stepMs: number; readonly roomId: string; readonly limitAt: (ms: number) => number },
+): number | undefined {
+  const tempAt = (ms: number) => points.find((p) => p.ms === ms)?.rooms.find((r) => r.id === opts.roomId)?.tempC;
+  const beforeMs = opts.untilMs - opts.stepMs;
+  const before = tempAt(beforeMs);
+  const now = tempAt(opts.untilMs);
+  if (before === undefined || now === undefined) return undefined;
+  const limitBefore = opts.limitAt(beforeMs);
+  const limitNow = opts.limitAt(opts.untilMs);
+  return limitNow < limitBefore && before <= limitBefore && now > limitNow ? limitNow : undefined;
 }
 
 /** The zero-energy actions on the card: all of them against the heat, none when the room is heated. */

@@ -23,7 +23,7 @@ import { buildContext, counterfactualOf, currentControls, nightCoolingLimit, pro
 import type { ToolContext } from '../../tool.js';
 import { localIso, localTimeText } from '../../time.js';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
-import { lastResortActions, lastResortWindow } from './last-resort.js';
+import { lastResortActions, lastResortWindow, loweredLimit } from './last-resort.js';
 import { recordRejection } from './rejections.js';
 
 // plan_comfort, the first of the two phases (plan §9.2): read-only on the home, it proposes a plan and
@@ -200,7 +200,7 @@ interface LastResort {
 
 /**
  * The safest of the candidates when none holds every guarantee: among those that break no hard limit
- * (storm reserve, inverter, battery power) but fail a guarantee, the one whose safe room stays safe the
+ * (storm reserve, inverter, battery power) but fail the safe room's comfort or its night recovery, the one whose safe room stays safe the
  * longest; the first, the most comfortable, on a tie. Undefined when every candidate breaks a hard limit.
  */
 function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInput: GuardInput): LastResort | undefined {
@@ -213,7 +213,10 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
   let best: { attempt: Attempt; untilMs: number; limitedBy: SafeLimit; points: GuardContext['points'] } | undefined;
   for (const a of tried) {
     const guarantees = a.verdict.guarantees;
-    if (guarantees.every((g) => g.ok) || guarantees.some((g) => HARD_LIMITS.includes(g.id) && !g.ok)) continue;
+    if (guarantees.some((g) => HARD_LIMITS.includes(g.id) && !g.ok)) continue;
+    // Only the safe room's own limits make a last resort (#160): a plan that fails only the pace stays a refusal.
+    const roomFails = guarantees.some((g) => g.id === 'safe_room_comfort' && !g.ok) || a.verdict.nightRecovery?.status === 'unmet';
+    if (!roomFails) continue;
     const context = buildContext({ ...a.guardInput, plan: a.candidate });
     const control = controlFromSteps(a.candidate.steps, currentControls(snapshot));
     // A point is what the previous step left: the plan dried the room into it if that step was drying.
@@ -242,9 +245,14 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
           : limitThen < cooling.maxC
             ? `the room goes above ${String(limitThen)} °C, the night limit`
             : `the room goes above its ${String(cooling.maxC)} °C maximum`;
-  // The honest window (#160): the limit kept until safeUntil, then how far the room goes and by when; the
+  // The honest window (#160): from safeUntil, how far past the limit in force the room goes and by when; the
   // summary says it (the warning keeps its 300 characters for the reason).
-  const window = lastResortWindow(best.points, { nowMs, untilMs: best.untilMs, roomId: preferences.safeRoomId, season, limitAt, claimsUntil: limitedBy !== 'battery' });
+  const window = lastResortWindow(best.points, { untilMs: best.untilMs, roomId: preferences.safeRoomId, season, limitAt });
+  // Decided from the data, not from the time (#166): the limit came down at safeUntil with the room above it.
+  const lowered =
+    window !== undefined && limitedBy === 'temperature' && season !== 'heating'
+      ? loweredLimit(best.points, { untilMs: best.untilMs, stepMs, roomId: preferences.safeRoomId, limitAt })
+      : undefined;
   return {
     attempt: best.attempt,
     lastResort: {
@@ -252,6 +260,7 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
       safeHours,
       limitedBy,
       ...(window === undefined ? {} : { comfortLimitC: celsius(window.comfortLimitC), worstC: celsius(window.worstC), worstAt: localIso(window.worstAtMs, profile.location.tz) }),
+      ...(lowered === undefined ? {} : { loweredLimitC: celsius(lowered) }),
       actions: lastResortActions(season),
     },
     warning: {

@@ -218,11 +218,19 @@ describe('last resort (approved in #19: proposal only)', () => {
     it('at 30 % the battery ends the safe hours at night: the window names the 26 °C night limit, and the zero-energy actions', async () => {
       const { lr } = await lastResortOf(noElderly(30));
       expect(lr.limitedBy).toBe('battery');
+      expect(lr.loweredLimitC).toBeUndefined();
       expect(lr.comfortLimitC).toBe(26);
       expect(lr.worstC).toBeGreaterThan(26);
       expect(lr.worstAt).toMatch(/\+02:00$/);
       expect(Date.parse(lr.worstAt ?? '')).toBeGreaterThanOrEqual(Date.parse(lr.safeUntil));
       expect(lr.actions).toEqual([...LAST_RESORT_ACTIONS]);
+    });
+
+    it('a plan that fails only the pace is a refusal, not a last resort: nobody in the safe room, the room stays inside its limits', async () => {
+      const wide = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 30, maxPct: 80 } } });
+      const empty = world('storm-blackout', 3, { preferences: wide, snapshot: (s) => ({ ...s, batterySocPct: pct(30), rooms: s.rooms.map((x) => ({ ...x, occupants: [] })) }) });
+      const r = await planComfort(empty.deps, { goal: 'cool' }, empty.ctx);
+      expect(!r.ok && r.error.code).toBe('pacing_off_track');
     });
 
     it('a safety maximum of 30 °C still says 26 °C at night', async () => {
@@ -231,13 +239,16 @@ describe('last resort (approved in #19: proposal only)', () => {
       expect(lr.comfortLimitC).toBe(26);
     });
 
-    it('with an elderly person the 24 °C night limit ends the safe hours when the night starts, and nothing claims the room was under it', async () => {
+    it('with an elderly person the 24 °C night limit ends the safe hours when the night starts, and the window says how far above it the room is', async () => {
       const { lr, warning } = await lastResortOf(stormAt(30));
       expect(lr.limitedBy).toBe('temperature');
       expect(lr.safeUntil).toBe('2026-07-17T22:00:00+02:00');
       expect(warning).toMatch(/then the room goes above 24 °C, the night limit\.$/);
-      // The room is above 24 °C before 22:00 (its day limit is 27 °C): "stays under 24 °C until 10 PM" would be false.
-      expect(lr.comfortLimitC).toBeUndefined();
+      // The limit comes down to 24 °C at 22:00 with the room above it: the window says how far above, and by when.
+      expect(lr.comfortLimitC).toBe(24);
+      expect(lr.loweredLimitC).toBe(24);
+      expect(lr.worstC).toBeGreaterThan(24);
+      expect(Date.parse(lr.worstAt ?? '')).toBeGreaterThanOrEqual(Date.parse(lr.safeUntil));
     });
   });
 

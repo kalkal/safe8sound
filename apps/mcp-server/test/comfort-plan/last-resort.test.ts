@@ -1,67 +1,62 @@
 import { LAST_RESORT_ACTIONS } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { lastResortActions, lastResortWindow } from '../../src/modules/comfort-plan/last-resort.js';
+import { lastResortActions, lastResortWindow, loweredLimit } from '../../src/modules/comfort-plan/last-resort.js';
 
-// The honest window of a last resort (#160): the limit the safe room keeps from now until safeUntil, then how
-// far it goes and by when, along the projection of the chosen plan.
+// The honest window of a last resort (#160): from safeUntil on, the point where the safe room is furthest past
+// the limit in force at that point (the night threshold lowers it), that limit, and when.
 
 const H = 3_600_000;
 const T0 = Date.parse('2026-07-17T20:00:00Z');
 const points = (temps: readonly number[]) => temps.map((t, i) => ({ ms: T0 + i * H, rooms: [{ id: 'bedroom-1', tempC: t }, { id: 'living', tempC: 40 }] }));
-const opts = { nowMs: T0, roomId: 'bedroom-1', season: 'cooling' as const, limitAt: () => 27, claimsUntil: true };
+const opts = { roomId: 'bedroom-1', season: 'cooling' as const, limitAt: () => 27 };
+/** 27 °C by day, 26 °C from T0 + 2 h (the night window). */
+const night = (ms: number) => (ms >= T0 + 2 * H ? 26 : 27);
 
 describe('lastResortWindow', () => {
-  it('cooling: the limit kept until safeUntil, then the warmest point from there on, and when', () => {
+  it('cooling: the warmest point past its limit from safeUntil on, its limit, and when', () => {
     const w = lastResortWindow(points([25, 26, 27, 27.6, 29.24, 28.5]), { ...opts, untilMs: T0 + 3 * H });
     expect(w).toEqual({ comfortLimitC: 27, worstC: 29.2, worstAtMs: T0 + 4 * H });
   });
 
-  it('heating: the minimum kept, then the coldest point', () => {
+  it('heating: the coldest point under the minimum', () => {
     const w = lastResortWindow(points([20, 19, 17.5, 16.86, 17]), { ...opts, season: 'heating', limitAt: () => 18, untilMs: T0 + 2 * H });
     expect(w).toEqual({ comfortLimitC: 18, worstC: 16.9, worstAtMs: T0 + 3 * H });
   });
 
-  it('the limit is the one in force at safeUntil: the night threshold, when the night lowers it', () => {
-    const night = (ms: number) => (ms >= T0 + 2 * H ? 26 : 27);
-    const w = lastResortWindow(points([25.5, 25.8, 26, 26.4, 27.1]), { ...opts, limitAt: night, untilMs: T0 + 3 * H });
-    expect(w).toEqual({ comfortLimitC: 26, worstC: 27.1, worstAtMs: T0 + 4 * H });
+  it('compares each point with the limit in force there: a night peak of 26.8 °C is past the 26 °C night limit', () => {
+    // The battery runs out at T0 + 1 h, before the night: by day 26.5 °C is inside, at night 26.8 °C is not.
+    const w = lastResortWindow(points([25, 26.5, 26.8, 26.2]), { ...opts, limitAt: night, untilMs: T0 + H });
+    expect(w).toEqual({ comfortLimitC: 26, worstC: 26.8, worstAtMs: T0 + 2 * H });
   });
 
-  it('says nothing when the room is past that limit before safeUntil (the grace period, or a lower night limit)', () => {
-    expect(lastResortWindow(points([30, 26, 26.5, 27.4]), { ...opts, untilMs: T0 + 2 * H })).toBeUndefined();
-    const night = (ms: number) => (ms >= T0 + 2 * H ? 24 : 27);
-    expect(lastResortWindow(points([26, 26, 26, 27]), { ...opts, limitAt: night, untilMs: T0 + 2 * H })).toBeUndefined();
-    expect(lastResortWindow(points([20, 17.5, 18, 17]), { ...opts, season: 'heating', limitAt: () => 18, untilMs: T0 + 2 * H })).toBeUndefined();
+  it('reports the limit at the worst point: 27.5 °C at night is past the 26 °C night limit, not the 27 °C day one', () => {
+    const w = lastResortWindow(points([25, 26, 27.5, 26.5]), { ...opts, limitAt: night, untilMs: T0 + H });
+    expect(w).toEqual({ comfortLimitC: 26, worstC: 27.5, worstAtMs: T0 + 2 * H });
   });
 
-  it('when the battery ends the safe hours nothing is claimed before it, so an earlier peak does not matter', () => {
-    const w = lastResortWindow(points([26.5, 26.5, 26, 27.4]), { ...opts, limitAt: (ms) => (ms >= T0 + 2 * H ? 26 : 27), claimsUntil: false, untilMs: T0 + 2 * H });
-    expect(w).toEqual({ comfortLimitC: 26, worstC: 27.4, worstAtMs: T0 + 3 * H });
+  it('when the night lowers the limit at safeUntil, the room above it gives the window (the elderly case)', () => {
+    const elderly = (ms: number) => (ms >= T0 + 2 * H ? 24 : 27);
+    const w = lastResortWindow(points([26, 26, 26, 25.4, 24.5]), { ...opts, limitAt: elderly, untilMs: T0 + 2 * H });
+    expect(w).toEqual({ comfortLimitC: 24, worstC: 26, worstAtMs: T0 + 2 * H });
   });
 
-  it('looks from now on: a point before now does not count', () => {
-    const w = lastResortWindow(points([30, 26, 26.5, 27.4]), { ...opts, nowMs: T0 + H, untilMs: T0 + 2 * H });
-    expect(w).toEqual({ comfortLimitC: 27, worstC: 27.4, worstAtMs: T0 + 3 * H });
-  });
-
-  it('the limit itself is still inside', () => {
-    expect(lastResortWindow(points([27, 27, 28]), { ...opts, untilMs: T0 + 2 * H })?.worstC).toBe(28);
+  it('looks from safeUntil on only', () => {
+    expect(lastResortWindow(points([30, 26, 26.5]), { ...opts, untilMs: T0 + H })).toBeUndefined();
   });
 
   it('the first of equal worst points, so the time is the earliest it gets there', () => {
-    const w = lastResortWindow(points([26, 28, 28, 27]), { ...opts, untilMs: T0 + H });
-    expect(w?.worstAtMs).toBe(T0 + H);
+    expect(lastResortWindow(points([26, 28, 28, 27]), { ...opts, untilMs: T0 + H })?.worstAtMs).toBe(T0 + H);
   });
 
   it('looks at the safe room only', () => {
-    const w = lastResortWindow(points([26, 27.5]), { ...opts, untilMs: T0 + H });
-    expect(w?.worstC).toBe(27.5);
+    expect(lastResortWindow(points([26, 27.5]), { ...opts, untilMs: T0 + H })?.worstC).toBe(27.5);
   });
 
-  it('is undefined when the room stays inside its limit after safeUntil too (the battery or the humidity end the safe hours)', () => {
+  it('is undefined when no point from safeUntil on is past its limit, even once rounded', () => {
     expect(lastResortWindow(points([26, 26.5, 27]), { ...opts, untilMs: T0 + H })).toBeUndefined();
     expect(lastResortWindow(points([26, 27.04]), { ...opts, untilMs: T0 + H })).toBeUndefined();
     expect(lastResortWindow(points([20, 18, 18.04]), { ...opts, season: 'heating', limitAt: () => 18, untilMs: T0 + H })).toBeUndefined();
+    expect(lastResortWindow(points([20, 17.96]), { ...opts, season: 'heating', limitAt: () => 18, untilMs: T0 + H })).toBeUndefined();
     expect(lastResortWindow(points([20, 17.94]), { ...opts, season: 'heating', limitAt: () => 18, untilMs: T0 + H })?.worstC).toBe(17.9);
   });
 
@@ -72,6 +67,28 @@ describe('lastResortWindow', () => {
 
   it('the neutral season reads like cooling', () => {
     expect(lastResortWindow(points([26, 27.5]), { ...opts, season: 'neutral', untilMs: T0 + H })?.comfortLimitC).toBe(27);
+  });
+});
+
+describe('loweredLimit: the safe hours end because the limit came down, not because the room crossed it', () => {
+  const at = { roomId: 'bedroom-1', stepMs: H, limitAt: (ms: number) => (ms >= T0 + 2 * H ? 24 : 27) };
+
+  it('the limit drops at safeUntil, the room was inside the one before and is above the new one: that new limit', () => {
+    expect(loweredLimit(points([26, 26, 25, 24.5]), { ...at, untilMs: T0 + 2 * H })).toBe(24);
+  });
+
+  it('not when the limit did not change there (a crossing, even at 10 PM)', () => {
+    expect(loweredLimit(points([23, 23.5, 24.5]), { ...at, limitAt: () => 24, untilMs: T0 + 2 * H })).toBeUndefined();
+  });
+
+  it('not when the room was already past the earlier limit, nor when it is inside the new one', () => {
+    expect(loweredLimit(points([26, 27.5, 25]), { ...at, untilMs: T0 + 2 * H })).toBeUndefined();
+    expect(loweredLimit(points([23, 23, 23.5]), { ...at, untilMs: T0 + 2 * H })).toBeUndefined();
+  });
+
+  it('not without both points of the safe room', () => {
+    expect(loweredLimit(points([26, 26, 25]), { ...at, untilMs: T0 })).toBeUndefined();
+    expect(loweredLimit(points([26, 26, 25]), { ...at, roomId: 'attic', untilMs: T0 + 2 * H })).toBeUndefined();
   });
 });
 

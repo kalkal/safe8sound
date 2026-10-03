@@ -16,7 +16,11 @@ export type { ComfortHome, ComfortPlanDeps } from './deps.js';
 
 export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
   const night = deps.guard.nightRecovery;
-  const summaryOptions = { nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour) };
+  const summaryOptions = {
+    nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour),
+    nightStartHour: night.windowStartHour,
+    nightEndHour: night.windowEndHour,
+  };
   return {
     id: 'comfort-plan',
     enabledFor: (homeId) => deps.homes(homeId) !== undefined,

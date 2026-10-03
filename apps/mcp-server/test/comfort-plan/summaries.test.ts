@@ -14,7 +14,7 @@ import { REAL, guardConfig, world } from './support.js';
 
 const one = (x: number) => x.toFixed(1);
 const night = guardConfig().nightRecovery;
-const NIGHT = { nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour) };
+const NIGHT = { nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour), nightStartHour: night.windowStartHour, nightEndHour: night.windowEndHour };
 
 describe('what the model reads', () => {
   it('plan_comfort: plan id, level, horizon, every guarantee with its reason, the reserve, the night and the counterfactual', async () => {
@@ -108,21 +108,63 @@ describe('what the model reads', () => {
     if (lr?.worstAt === undefined || lr.worstC === undefined || lr.comfortLimitC === undefined) throw new Error('no window');
     expect(lr.limitedBy).toBe('battery');
     expect(planSummary(r.value, NIGHT)).toContain(
-      `The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room then goes up to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}, past its ${String(lr.comfortLimitC)} °C limit.`,
+      `The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room then goes up to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}, past its ${String(lr.comfortLimitC)} °C night limit.`,
     );
   });
 
-  it('when the temperature ends it, says the limit kept and how far the room then goes; heating says above and down to; no window, nothing more', () => {
+  it('when the temperature ends it: safe until, then how far past which limit; heating says down to; no window, nothing more', () => {
     const lastResort = { safeUntil: '2026-01-18T03:00:00+01:00', safeHours: 5, limitedBy: 'temperature' as const };
     const plan = (lr: object) => ({ ...examplePlan(), lastResort: lr }) as Plan;
-    const cooling = { ...lastResort, safeUntil: '2026-07-18T02:40:00+02:00', comfortLimitC: 26, worstC: 29, worstAt: '2026-07-18T07:00:00+02:00' };
+    const cooling = { ...lastResort, safeUntil: '2026-07-18T02:40:00+02:00', comfortLimitC: 26, worstC: 29, worstAt: '2026-07-18T06:00:00+02:00' };
     expect(planSummary(plan(cooling), NIGHT)).toContain(
-      `The safe room stays under 26 °C until ${localTimeText(cooling.safeUntil)}, then up to 29 °C by ${localTimeText(cooling.worstAt)}.`,
+      `Safe until ${localTimeText(cooling.safeUntil)}; the safe room then goes up to 29 °C by ${localTimeText(cooling.worstAt)}, past its 26 °C night limit.`,
     );
+    const byDay = { ...cooling, comfortLimitC: 27, worstAt: '2026-07-18T09:00:00+02:00' };
+    expect(planSummary(plan(byDay), NIGHT)).toContain(`past its 27 °C limit.`);
     expect(planSummary(plan({ ...lastResort, comfortLimitC: 18, worstC: 16.9, worstAt: '2026-01-18T07:00:00+01:00' }), NIGHT)).toContain(
-      `The safe room stays above 18 °C until ${localTimeText(lastResort.safeUntil)}, then down to 16.9 °C by ${localTimeText('2026-01-18T07:00:00+01:00')}.`,
+      `Safe until ${localTimeText(lastResort.safeUntil)}; the safe room then goes down to 16.9 °C by ${localTimeText('2026-01-18T07:00:00+01:00')}, past its 18 °C limit.`,
     );
-    expect(planSummary(plan(lastResort), NIGHT)).not.toContain('The safe room stays');
+    expect(planSummary(plan(lastResort), NIGHT)).not.toContain('the safe room then goes');
+  });
+
+  it('when the limit comes down as the safe hours end, says so with the limit then in force, never that the room crossed it (the elderly case)', () => {
+    const at = '2026-07-17T22:00:00+02:00';
+    const lr = { safeUntil: at, safeHours: 7, limitedBy: 'temperature' as const, comfortLimitC: 24, worstC: 25, worstAt: at, loweredLimitC: 24 };
+    const text = planSummary({ ...examplePlan(), lastResort: lr } as Plan, NIGHT);
+    expect(text).toContain(`From ${localTimeText(at)} the limit is 24 °C and the safe room is above it: at ${localTimeText(at)} it is at 25 °C.`);
+    expect(text).not.toContain('up to 25 °C by');
+    // The worst point later, in the day, past a 27 °C limit: the sentence still names the 24 °C limit of safeUntil.
+    const later = { ...lr, comfortLimitC: 27, worstC: 27.4, worstAt: '2026-07-18T09:00:00+02:00' };
+    expect(planSummary({ ...examplePlan(), lastResort: later } as Plan, NIGHT)).toContain(
+      `From ${localTimeText(at)} the limit is 24 °C and the safe room is above it, up to 27.4 °C by ${localTimeText(later.worstAt)}.`,
+    );
+  });
+
+  it('a 10 PM end that is a crossing, not a lowered limit, is never told as a lowered limit', () => {
+    const at = '2026-07-17T22:00:00+02:00';
+    const lr = { safeUntil: at, safeHours: 7, limitedBy: 'temperature' as const, comfortLimitC: 26, worstC: 26.5, worstAt: '2026-07-18T01:00:00+02:00' };
+    const text = planSummary({ ...examplePlan(), lastResort: lr } as Plan, NIGHT);
+    expect(text).not.toContain('the limit is');
+    expect(text).toContain(`Safe until ${localTimeText(at)}; the safe room then goes up to 26.5 °C by ${localTimeText(lr.worstAt)}, past its 26 °C night limit.`);
+  });
+
+  it('when the worst point is at safeUntil, says "at" that time, never "up to … by" it', () => {
+    const at = '2026-07-18T01:15:00+02:00';
+    const lr = { safeUntil: at, safeHours: 10, limitedBy: 'battery' as const, comfortLimitC: 26, worstC: 26.4, worstAt: at };
+    expect(planSummary({ ...examplePlan(), lastResort: lr } as Plan, NIGHT)).toContain(
+      `The battery lasts until ${localTimeText(at)}; at ${localTimeText(at)} the safe room is at 26.4 °C, past its 26 °C night limit.`,
+    );
+  });
+
+  it('plan_comfort, end to end: grandpa in the safe room at 30 % hears that the 24 °C limit comes at 10 PM with the room above it', async () => {
+    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(30) }) });
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const lr = r.value.lastResort;
+    if (lr?.worstC === undefined || lr.worstAt === undefined) throw new Error('no window');
+    expect(lr.loweredLimitC).toBe(24);
+    const how = lr.worstAt === lr.safeUntil ? `: at ${localTimeText(lr.worstAt)} it is at ${String(lr.worstC)} °C.` : `, up to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}.`;
+    expect(planSummary(r.value, NIGHT)).toContain(`From ${localTimeText(lr.safeUntil)} the limit is 24 °C and the safe room is above it${how}`);
   });
 
   it('plan_comfort: what the plan does in each room, and every step down the person pre-authorizes (plan §9.4)', async () => {

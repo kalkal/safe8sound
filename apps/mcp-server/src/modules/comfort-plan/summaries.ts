@@ -1,4 +1,4 @@
-import { DATA_GROUPS, isFullyLive, type ApplyPlanOutput, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
+import { DATA_GROUPS, epochMs, isFullyLive, type ApplyPlanOutput, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
 import { localTimeText } from '../../time.js';
 
 // The text content of each tool result. The agent (Strands) reads only this text, not structuredContent
@@ -33,9 +33,43 @@ function lineText(l: CounterfactualLine): string {
   return `${String(l.peakTempC)} °C at ${l.peakAt} (${one(l.heatIndexDegreeHours)} heat-index degree-hours, ${one(l.hoursAtOrBelowThreshold)} night hours at or below the threshold)`;
 }
 
-/** What the plan text needs besides the plan: the length of the night window (guard config). */
+/** What the plan text needs besides the plan: the night window (guard config). */
 export interface PlanSummaryOptions {
   readonly nightWindowHours: number;
+  /** Wall-clock hours of the night window, to name the night limit of a last resort (#160). */
+  readonly nightStartHour: number;
+  readonly nightEndHour: number;
+}
+
+/** The wall-clock hour of a time already in the home's zone (localIso), read from the text itself. */
+function wallHour(iso: string): number {
+  const m = /T(\d\d):(\d\d)/.exec(iso);
+  return m === null ? Number.NaN : Number(m[1]) + Number(m[2]) / 60;
+}
+
+const inNight = (hour: number, o: PlanSummaryOptions) =>
+  o.nightStartHour > o.nightEndHour ? hour >= o.nightStartHour || hour < o.nightEndHour : hour >= o.nightStartHour && hour < o.nightEndHour;
+
+/** The window of a last resort (#160), every number of it, never a claim about the time before safeUntil. */
+function windowText(lr: NonNullable<Plan['lastResort']>, opts: PlanSummaryOptions): string | undefined {
+  if (lr.comfortLimitC === undefined || lr.worstC === undefined || lr.worstAt === undefined) return undefined;
+  // The room has gone past the limit (contract): below it is the heating season.
+  const heating = lr.worstC < lr.comfortLimitC;
+  const until = localTimeText(lr.safeUntil);
+  const by = localTimeText(lr.worstAt);
+  // The worst point is the end of the safe hours itself: "at" that time, never "up to … by" it.
+  const atEnd = epochMs(lr.worstAt) === epochMs(lr.safeUntil);
+  const temp = `${String(lr.worstC)} °C`;
+  // The limit came down at safeUntil with the room above it (decided by plan_comfort from the data, #166).
+  if (lr.loweredLimitC !== undefined) {
+    const head = `From ${until} the limit is ${String(lr.loweredLimitC)} °C and the safe room is above it`;
+    return atEnd ? `${head}: at ${until} it is at ${temp}.` : `${head}, up to ${temp} by ${by}.`;
+  }
+  const limit = `${String(lr.comfortLimitC)} °C${!heating && inNight(wallHour(lr.worstAt), opts) ? ' night' : ''} limit`;
+  const then = atEnd
+    ? `at ${until} the safe room is at ${temp}, past its ${limit}.`
+    : `the safe room then goes ${heating ? 'down' : 'up'} to ${temp} by ${by}, past its ${limit}.`;
+  return lr.limitedBy === 'battery' ? `The battery lasts until ${until}; ${then}` : `Safe until ${until}; ${then}`;
 }
 
 export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
@@ -59,18 +93,8 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
         `with this plan at ${lineText(plan)}.`,
     );
   }
-  // The honest window of a last resort (#160), every number of it.
-  const lr = p.lastResort;
-  if (lr?.comfortLimitC !== undefined && lr.worstC !== undefined && lr.worstAt !== undefined) {
-    // The room has gone past the limit (contract): below it is the heating season.
-    const heating = lr.worstC < lr.comfortLimitC;
-    const reaches = `${heating ? 'down' : 'up'} to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}`;
-    parts.push(
-      lr.limitedBy === 'battery'
-        ? `The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room then goes ${reaches}, past its ${String(lr.comfortLimitC)} °C limit.`
-        : `The safe room stays ${heating ? 'above' : 'under'} ${String(lr.comfortLimitC)} °C until ${localTimeText(lr.safeUntil)}, then ${reaches}.`,
-    );
-  }
+  const window = p.lastResort === undefined ? undefined : windowText(p.lastResort, opts);
+  if (window !== undefined) parts.push(window);
   // A last resort cannot be applied yet (the two-step confirmation comes next, #160): say until when, do not offer it.
   parts.push(
     p.lastResort === undefined

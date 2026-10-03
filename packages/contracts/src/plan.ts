@@ -99,14 +99,19 @@ export const PlanSchema = z
         /** What ends the safe hours: the battery runs out, or the room leaves its temperature or humidity limits. */
         limitedBy: z.enum(['battery', 'temperature', 'humidity']),
         /**
-         * The honest window, whole or not at all (optional, added 2026-10-02, approved in #160): `comfortLimitC`
-         * is the limit in force at `safeUntil` (at night the night-recovery threshold when lower), and the room is
-         * past it at `worstC` by `worstAt`. When the temperature or the humidity ends the safe hours, the room also
-         * stays inside that limit from now until `safeUntil`.
+         * The honest window, whole or not at all (optional, added 2026-10-02, approved in #160): from `safeUntil`
+         * on, the warmest point past its limit (the coldest when heating) is `worstC` at `worstAt`; `comfortLimitC`
+         * is the limit in force then (at night the night-recovery threshold when lower). It says nothing of the time
+         * before `safeUntil`.
          */
         comfortLimitC: CelsiusSchema.optional(),
         worstC: CelsiusSchema.optional(),
         worstAt: IsoDateTimeSchema.optional(),
+        /**
+         * Present when the safe hours end because the limit came down at `safeUntil` (the night threshold) with the
+         * room inside the earlier limit and above the new one: that new limit (optional, added 2026-10-03, #166).
+         */
+        loweredLimitC: CelsiusSchema.optional(),
         /** Zero-energy actions for the card, from public-health guidance (optional, added 2026-10-02, approved in #160). */
         actions: z.array(LastResortActionSchema).max(LAST_RESORT_ACTIONS.length).optional(),
       })
@@ -121,6 +126,9 @@ export const PlanSchema = z
         }
         if (lr.worstAt !== undefined && epochMs(lr.worstAt) < epochMs(lr.safeUntil)) {
           ctx.addIssue({ code: 'custom', path: ['worstAt'], message: 'The worst point comes at or after the end of the safe hours' });
+        }
+        if (lr.loweredLimitC !== undefined && (lr.limitedBy !== 'temperature' || lr.worstC === undefined)) {
+          ctx.addIssue({ code: 'custom', path: ['loweredLimitC'], message: 'A lowered limit ends the safe hours on temperature, with its window' });
         }
         if (lr.actions !== undefined && new Set(lr.actions).size !== lr.actions.length) {
           ctx.addIssue({ code: 'custom', path: ['actions'], message: 'Each action appears once' });

@@ -122,6 +122,13 @@ describe('PlanSchema', () => {
         expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, ...window, comfortLimitC: 18, worstC: 16.9 } })).success).toBe(true);
       });
 
+      it('may say the limit came down at safeUntil with the room above it, and to what (#166)', () => {
+        const lowered = { ...lastResort, limitedBy: 'temperature', ...window, comfortLimitC: 24, worstC: 25, loweredLimitC: 24 };
+        expect(PlanSchema.parse(plan({ lastResort: lowered })).lastResort?.loweredLimitC).toBe(24);
+        const r = PlanSchema.safeParse(plan({ lastResort: { ...lastResort, loweredLimitC: 24 } }));
+        expect(!r.success && r.error.issues[0]?.path).toEqual(['lastResort', 'loweredLimitC']);
+      });
+
       it('gives the window whole or not at all', () => {
         expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, worstC: 29 } })).success).toBe(false);
         expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, comfortLimitC: 26, worstC: 29 } })).success).toBe(false);
