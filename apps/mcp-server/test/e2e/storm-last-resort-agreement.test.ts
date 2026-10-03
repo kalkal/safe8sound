@@ -2,6 +2,7 @@ import { PlanSchema, SafeRoomStatusSchema, type Plan, type SafeRoomStatus } from
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { createLocalApp } from '../../src/local-app.js';
 import { startNodeServer } from '../../src/node-server.js';
@@ -11,6 +12,9 @@ import { TOKEN } from '../helpers.js';
 // One physics for "safe until" (Q7-A of #24): the storm card reads the guard's hold of the safe room
 // (holdSafeRoom), pre-cooled toward the night limit; the last-resort plan reads the same engine and limits.
 // The battery level is set at the scenario start (hour 0): by hour 8, 30 % has become 16 %.
+
+// Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
+const runs = (n: number): number => Number(process.env['FC_RUNS'] ?? n);
 
 /** The storm card and a plan_comfort answer at a scenario start hour and start battery level, on the local entry. */
 async function at(startH: number, startSocPct: number): Promise<{ status: SafeRoomStatus; plan: Plan }> {
@@ -32,10 +36,11 @@ async function at(startH: number, startSocPct: number): Promise<{ status: SafeRo
 }
 
 describe('the storm card and the last-resort plan on one physics', () => {
-  it('hour 8, 30 % at the start (16 % now), grandpa: both name 22:00, two hours on', async () => {
+  it('hour 8, 30 % at the start (16 % now), grandpa: both name 22:00, two hours on, when the night limit starts', async () => {
     const { status, plan } = await at(8, 30);
     expect(status.occupantRoles).toContain('grandpa');
-    expect(plan.lastResort).toMatchObject({ limitedBy: 'battery' });
+    // The hold cannot pre-cool to 24 °C in time on 16 %: the night limit ends the hours, with charge left.
+    expect(plan.lastResort?.limitedBy).toBe('temperature');
     expect(status.safeUntil).toBe(plan.lastResort?.safeUntil);
     expect(status.safeUntil).toMatch(/T22:00:00\+02:00$/);
     expect(status.safeHours).toBe(2);
@@ -49,12 +54,36 @@ describe('the storm card and the last-resort plan on one physics', () => {
     expect(status.safeHours).toBe(24);
   });
 
-  it('hour 4, 30 %: pre-cooled, the storm card holds past midnight (01:20), never earlier than the last resort', async () => {
-    const { status, plan } = await at(4, 30);
-    expect(status.safeUntil).toMatch(/T01:20:00\+02:00$/);
-    const lastResort = plan.lastResort?.safeUntil;
-    expect(lastResort).toBeDefined();
-    // Until the last resort becomes the hold itself (next PR), the card is the better of the two.
-    expect(Date.parse(status.safeUntil)).toBeGreaterThanOrEqual(Date.parse(lastResort ?? ''));
+  it.each([
+    [4, 30, '2026-07-18T01:20:00+02:00'],
+    [6, 20, '2026-07-17T21:15:00+02:00'],
+    [6, 30, '2026-07-17T23:10:00+02:00'],
+    [8, 30, '2026-07-17T22:00:00+02:00'],
+  ])('hour %i with %i percent at the start: the last resort is the hold, both name %s (#24, decision A)', async (h, soc, until) => {
+    const { status, plan } = await at(h, soc);
+    expect(plan.lastResort).toBeDefined();
+    // Pinned as times, not only equal: a regression of the hold would move both together.
+    expect(status.safeUntil).toBe(until);
+    expect(plan.lastResort?.safeUntil).toBe(until);
+    expect(status.safeHours).toBe(plan.lastResort?.safeHours);
   });
+
+  it('hour 6, 20 %: both run out of battery before 22:00, at the same time (the energy side)', async () => {
+    const { status, plan } = await at(6, 20);
+    expect(plan.lastResort?.limitedBy).toBe('battery');
+    expect(status.safeUntil).toBe('2026-07-17T21:15:00+02:00');
+    expect(status.safeUntil).toBe(plan.lastResort?.safeUntil);
+  });
+
+  it('property: whatever the battery and the hour, a last resort and a storm card under its cap name the same time', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.integer({ min: 3, max: 10 }), fc.integer({ min: 15, max: 100 }), async (h, soc) => {
+        const { status, plan } = await at(h, soc);
+        if (plan.lastResort === undefined || status.safeHours >= 24) return;
+        expect(status.safeUntil).toBe(plan.lastResort.safeUntil);
+      }),
+      // Each case starts a local server and plans a storm night (about a second).
+      { numRuns: runs(20) },
+    );
+  }, 300_000);
 });

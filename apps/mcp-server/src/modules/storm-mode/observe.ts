@@ -56,8 +56,9 @@ export const levelOf = (session: StormSession | undefined): { level: Level; leve
 
 /**
  * Safe hours of #23 on one physics (Q7-A of #24): the guard's hold of the safe room (holdSafeRoom), the same
- * projection as the last-resort plan. The safe room's split holds the limit in force (at night the
- * night-recovery limit, elderly when an elderly role sleeps there), dry or cool by humidity, every other room
+ * projection as the last-resort plan, which is this hold (#24, decision A). The safe room's split pre-cools
+ * toward the strictest limit ahead (at night the night-recovery limit, elderly when an elderly role sleeps
+ * there) or holds the limit in force, whichever stays safe longer; dry or cool by humidity, every other room
  * off; on battery alone, down to the hardware floor, also while preparing with the grid still up (what the
  * storm will have). Capped at `capHours`; counted from the home's reading.
  */

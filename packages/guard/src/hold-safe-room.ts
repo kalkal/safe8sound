@@ -4,8 +4,10 @@ import { projectFrom, type GuardInput } from './context.js';
 import { nightCoolingLimit, safeUntil, type SafeLimit } from './safe-until.js';
 
 // One physics for "how long can the safe room hold" (#160, #24): the last resort and storm mode's safe hours
-// read the same projection. The safe room's split is held at the limit in force (at night the night-recovery
-// threshold when lower), dry or cool by its humidity with the planner's rule; every other room is off.
+// read the same projection, and the last resort IS this hold (#24, decision A). When cooling, the safe room's
+// split aims at the strictest limit it will face within the pre-cooling lead (the night-recovery threshold from
+// the evening), or at the limit in force when that stays safe longer; dry or cool by its humidity with the
+// planner's rule; every other room is off. When heating it holds the minimum plus the margin.
 // A room without a humidity reading starts from the indoorEquilibriumRh estimate (projectFrom), like the guard.
 
 /** The safe room's temperature limit at an instant: the cooling maximum (lowered at night) or the heating minimum. */
@@ -60,7 +62,8 @@ export function holdSafeRoom(input: HoldSafeRoomInput, opts: HoldSafeRoomOptions
   }
   const leadMs = input.config.safeRoom.preCoolLeadMinutes * 60_000;
   const plain = holdWith(input, opts, 0);
-  if (leadMs === 0) return ok(plain);
+  // The lead is for cooling only: the heating minimum does not change at night.
+  if (leadMs === 0 || input.season === 'heating') return ok(plain);
   // Pre-cooling (#24) costs battery: with too little of it the room can stay safe longer by holding only the
   // limit in force. Like the last resort, the hold keeps whichever stays safe longer (plain on a tie).
   const preCooled = holdWith(input, opts, leadMs);
@@ -80,7 +83,7 @@ function holdWith(input: HoldSafeRoomInput, opts: HoldSafeRoomOptions, leadMs: n
   const heating = input.season === 'heating';
   const targetAt = (ms: number): number => {
     let target = limitAt(ms);
-    for (let t = ms + stepMs; t <= ms + leadMs; t += stepMs) target = heating ? Math.max(target, limitAt(t)) : Math.min(target, limitAt(t));
+    for (let t = ms + stepMs; t <= ms + leadMs; t += stepMs) target = Math.min(target, limitAt(t));
     return target;
   };
   const band = humidityBandWithin(opts.humidityBand, input.preferences.safety.humidity);

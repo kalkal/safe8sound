@@ -128,12 +128,18 @@ describe('holdSafeRoom', () => {
     expect(r.safeUntil === undefined || r.safeUntil.ms > Date.parse('2026-07-15T22:00:00+02:00')).toBe(true);
   });
 
-  it('keeps whichever hold stays safe longer: pre-cooling never ends the safe hours sooner than holding the limit in force', () => {
+  it('on a low battery the plain hold wins: pre-cooling would empty it before the night limit (literal)', () => {
     const base = input({ nightRecoveryMode: 'elderly', snapshot: snapshot({ tempC: 26, socPct: 14, gridAvailable: false }) });
-    const plain = held({ ...base, config: { ...base.config, safeRoom: { ...base.config.safeRoom, preCoolLeadMinutes: 0 } } });
     const chosen = held(base);
-    const end = (h: HeldSafeRoom) => h.safeUntil?.ms ?? Number.POSITIVE_INFINITY;
-    expect(end(chosen)).toBeGreaterThanOrEqual(end(plain));
+    // Holding 26.5 °C until 22:00 costs less than cooling to 23.5 °C from 20:00: the room stays safe until the
+    // night limit starts, with charge left; pre-cooling would run the battery out first.
+    expect(chosen.safeUntil).toEqual({ ms: Date.parse('2026-07-15T22:00:00+02:00'), limitedBy: 'temperature' });
+    expect(setpointAt(chosen, T0)).toBe(safeRoomLimitAt(base)(T0) - opts.marginK);
+  });
+
+  it('heating: the lead is for cooling only, the hold keeps the heating minimum plus the margin', () => {
+    const i = input({ season: 'heating' });
+    expect(setpointAt(held(i), T0)).toBe(preferences.safety.heating.minC + opts.marginK);
   });
 
   it('without a lead, the split holds only the limit in force, and the 24 °C night limit ends the hours at 22:00', () => {

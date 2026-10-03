@@ -19,7 +19,7 @@ import {
   type Snapshot,
 } from '@cold-reserve/contracts';
 import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, seasonFor, withTargets, type HumidityMode } from '@cold-reserve/core';
-import { buildContext, counterfactualOf, currentControls, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
+import { buildContext, counterfactualOf, currentControls, holdSafeRoom, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
 import { localIso, localTimeText } from '../../time.js';
@@ -134,7 +134,23 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   const store = deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId });
   // No plan holds every guarantee: the planner's own candidates still give the safest one, as long as it
   // breaks no hard limit. A plan the model proposed is answered with the refusal.
-  const safest = chosen === undefined && !overridden ? lastResortOf(tried, deps, guardInput) : undefined;
+  // The last resort is the hold of the safe room (#24, decision A): the same control storm mode's safe hours
+  // read, as plan steps, checked by the guard like any plan. The other candidates only when the hold does not qualify.
+  const holdFailed = (error: ErrorEnvelope) => {
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'warn',
+      component: 'mcp-server',
+      message: 'The hold of the safe room could not be projected: the last resort comes from the candidates.',
+      correlationId: ctx.correlationId,
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      code: error.code,
+      category: error.category,
+      details: { event: 'last_resort_hold_failed', ...homeDetail(ctx.homeId) },
+    });
+  };
+  const fromHold = chosen === undefined && !overridden ? lastResortOf(holdAttempts(deps, guardInput, holdFailed), deps, guardInput) : undefined;
+  const safest = fromHold ?? (chosen === undefined && !overridden ? lastResortOf(tried, deps, guardInput) : undefined);
   if (chosen === undefined && safest !== undefined) chosen = safest.attempt;
   if (chosen === undefined) {
     const rejection = last === undefined ? undefined : rejectionOf(last.verdict);
@@ -189,6 +205,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
       ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
       details: {
         event: 'last_resort_proposed',
+        source: fromHold === undefined ? 'candidates' : 'hold',
         planId: parsed.data.id,
         failed: safest.attempt.verdict.guarantees.filter((g) => !g.ok).map((g) => g.id),
         ...homeDetail(ctx.homeId),
@@ -315,16 +332,7 @@ function tryRung(
     config: deps.config.planner,
     ...(setpointC === undefined ? {} : { setpointC }),
   });
-  // Until the next recharge the forecast shows, else as far as the weather is known.
-  const forecastEndMs = Math.max(atMs, ...guardInput.forecast.hourly.map((h) => Date.parse(h.ts) + 3_600_000));
-  const recharge = darkWindow({
-    forecast: guardInput.forecast,
-    fromMs: atMs,
-    pvPeakW: profile.pvPeakW,
-    lossRatio: deps.model.pv.lossRatio,
-    essentialLoadW: deps.guard.reserve.essentialLoadW,
-  });
-  const horizonMs = recharge?.toMs ?? forecastEndMs;
+  const horizonMs = horizonOf(deps, guardInput, atMs);
   const cycleEndMs = horizonMs;
   const paced =
     cycle === undefined
@@ -343,6 +351,65 @@ function tryRung(
   const steps = withTargets(humid, { socMin, fromMs: atMs, toMs: context.horizonMs, safeRoomId: preferences.safeRoomId, config: deps.config.planner });
   const candidate: CandidatePlan = { horizonAt: new Date(context.horizonMs).toISOString(), steps, ladder };
   return { candidate, verdict: runGuard({ ...guardInput, plan: candidate }), guardInput };
+}
+
+/** Until the next recharge the forecast shows, else as far as the weather is known. */
+function horizonOf(deps: ComfortPlanDeps, guardInput: GuardInput, atMs: number): number {
+  const forecastEndMs = Math.max(atMs, ...guardInput.forecast.hourly.map((h) => Date.parse(h.ts) + 3_600_000));
+  const recharge = darkWindow({
+    forecast: guardInput.forecast,
+    fromMs: atMs,
+    pvPeakW: guardInput.profile.pvPeakW,
+    lossRatio: deps.model.pv.lossRatio,
+    essentialLoadW: deps.guard.reserve.essentialLoadW,
+  });
+  return recharge?.toMs ?? forecastEndMs;
+}
+
+/**
+ * The hold of the safe room as a plan (#24, decision A): the guard's holdSafeRoom (pre-cooled toward the night
+ * limit, dry or cool by humidity) until the horizon, as plan steps. The safe room at essential with the hold's
+ * mode and setpoint at every change; every other room with a unit off. Battery targets from the projection, as
+ * for any candidate, and the guard checks it like any plan: the hard limits stay hard. None when there is no hold.
+ */
+function holdAttempts(deps: ComfortPlanDeps, guardInput: GuardInput, onFail: (error: ErrorEnvelope) => void): Attempt[] {
+  const { snapshot, profile, preferences, season, plan } = guardInput;
+  const atMs = Date.parse(snapshot.ts);
+  const horizonMs = horizonOf(deps, guardInput, atMs);
+  const dischargeFloorPct = snapshot.gridAvailable ? reserveOf(guardInput).reserveFloorSocPct : pct(profile.battery.minSocHwPct);
+  const held = holdSafeRoom(guardInput, { toMs: horizonMs, dischargeFloorPct, humidityBand: deps.config.planner.humidityBand, marginK: deps.config.planner.essentialMarginK });
+  if (!held.ok) {
+    onFail(held.error);
+    return [];
+  }
+  // A safe-room-only essential plan pre-authorizes no other step: its ladder is essential alone.
+  const ladder = plan.ladder.slice(-1);
+  const safeId = preferences.safeRoomId;
+  const ts = (ms: number) => new Date(ms).toISOString();
+  const base = { fanOn: false, level: 'essential' as const, batteryTargetSocPct: snapshot.batterySocPct };
+  const comfortC = season === 'heating' ? preferences.comfortC.heating : preferences.comfortC.cooling;
+  const off = profile.rooms.filter((r) => r.id !== safeId && r.hvacUnits.length > 0).map((r): PlanStep => ({ ...base, ts: ts(atMs), roomId: r.id, hvacMode: 'off', setpointC: comfortC }));
+  const safe: PlanStep[] = [];
+  const stepMs = deps.guard.projection.stepMinutes * 60_000;
+  let previous: string | undefined;
+  for (let ms = atMs; ms < horizonMs; ms += stepMs) {
+    const hvac = held.value.controlsAt(ms).find((c) => c.id === safeId)?.hvac;
+    if (hvac === undefined) continue;
+    const key = `${hvac.mode}|${String(hvac.setpointC)}`;
+    if (key === previous) continue;
+    previous = key;
+    safe.push({ ...base, ts: ts(ms), roomId: safeId, hvacMode: hvac.mode, setpointC: hvac.setpointC });
+  }
+  if (safe.length === 0) return [];
+  const steps0 = [...off, ...safe];
+  const context = buildContext({ ...guardInput, plan: { horizonAt: ts(horizonMs), steps: steps0, ladder } });
+  const socMin = (fromMs: number, toMs: number) => {
+    const socs = context.points.filter((p) => p.ms >= fromMs && p.ms < toMs).map((p) => p.socPct);
+    return socs.length === 0 ? (context.points.at(-1)?.socPct ?? snapshot.batterySocPct) : Math.min(...socs);
+  };
+  const steps = withTargets(steps0, { socMin, fromMs: atMs, toMs: context.horizonMs, safeRoomId: safeId, config: deps.config.planner });
+  const candidate: CandidatePlan = { horizonAt: ts(context.horizonMs), steps, ladder };
+  return [{ candidate, verdict: runGuard({ ...guardInput, plan: candidate }), guardInput }];
 }
 
 /**

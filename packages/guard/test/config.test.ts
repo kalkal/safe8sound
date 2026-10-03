@@ -20,6 +20,11 @@ describe('guard config', () => {
 });
 
 describe('guard config errors', () => {
+  it.each([-1, 721, 1.5])('refuses a pre-cooling lead of %s minutes (whole minutes, 0 to 12 hours)', (lead) => {
+    const c = parseGuardConfig({ ...rawConfig, safeRoom: { ...rawConfig.safeRoom, preCoolLeadMinutes: lead } });
+    expect(!c.ok && c.error).toMatchObject({ code: 'invalid_config', details: { issues: [{ path: 'safeRoom.preCoolLeadMinutes' }] } });
+  });
+
   it('says the configuration is not valid and names the field', () => {
     const c = parseGuardConfig({ ...rawConfig, pacing: { ...rawConfig.pacing, maxChangesPerHour: 0 } });
     expect(!c.ok && c.error).toMatchObject({ message: 'The guard configuration is not valid.', details: { issues: [{ path: 'pacing.maxChangesPerHour' }] } });

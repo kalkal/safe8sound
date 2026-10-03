@@ -28,8 +28,9 @@ export const GuardConfigSchema = z.strictObject({
   safeRoom: z.strictObject({
     graceMinutes: nonNegative,
     /**
-     * How far ahead the safe-room hold looks for a lower limit (#24): it cools toward the strictest limit within
-     * this lead, so the room is already inside the night limit when it starts. 0 holds only the limit in force.
+     * How far ahead the safe-room hold looks for a lower limit (#24), cooling only: it cools toward the strictest
+     * limit within this lead, so the room is already inside the night limit when it starts. 0 holds only the
+     * limit in force.
      */
     preCoolLeadMinutes: z.number().int().min(0).max(12 * 60),
   }),

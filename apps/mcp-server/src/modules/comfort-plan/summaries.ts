@@ -76,8 +76,17 @@ function windowText(lr: NonNullable<Plan['lastResort']>, opts: PlanSummaryOption
 
 export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   const level = p.steps[0]?.level ?? p.ladder[0]?.level ?? 'comfort';
+  const commanded = p.advisoryOnly ? 'advice only, nothing is commanded' : 'nothing changes until apply_plan';
+  const lr = p.lastResort;
+  // A last resort opens with its honest window (CE-21): the model reads the first sentence first.
+  const head =
+    lr === undefined
+      ? `Proposed plan ${p.id}: ${level} level until ${localTimeText(p.horizonAt)}`
+      : lr.limitedBy === 'battery'
+        ? `Proposed last-resort plan ${p.id}: the safe room alone, until the battery runs out at ${localTimeText(lr.safeUntil)}`
+        : `Proposed last-resort plan ${p.id}: the safe room alone, within its limits until ${localTimeText(lr.safeUntil)}`;
   const parts = [
-    `Proposed plan ${p.id}: ${level} level until ${localTimeText(p.horizonAt)} (${p.advisoryOnly ? 'advice only, nothing is commanded' : 'nothing changes until apply_plan'}), built on ${dataText(p.sourceOrigin)}.`,
+    `${head} (${commanded}), built on ${dataText(p.sourceOrigin)}.`,
     `What it does: ${roomSettings(p)}.`,
     `Confirming it also allows these steps down if the battery falls behind: ${p.ladder.map(rungText).join('; ')}.`,
     `Guarantees: ${p.guarantees.map((g) => `${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`).join(' ')}`,

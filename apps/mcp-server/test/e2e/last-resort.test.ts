@@ -71,10 +71,12 @@ describe('storm, battery 30 %: the last resort, confirmed twice, tells the famil
       const plan = PlanSchema.parse(planned.structuredContent);
       const lr = plan.lastResort;
       if (lr?.worstC === undefined || lr.worstAt === undefined) throw new Error('no last resort with a window');
-      expect(lr.loweredLimitC).toBe(24);
+      // The last resort is the hold (#24, decision A): pre-cooled, the room is inside 24 °C when the night starts.
+      expect(lr.loweredLimitC).toBeUndefined();
       expect(lr.actions).toEqual(['close_curtains', 'drink_water', 'fan_below_35c']);
       expect(plan.guarantees.filter((g) => ['storm_reserve', 'inverter_limit', 'battery_power'].includes(g.id)).every((g) => g.ok)).toBe(true);
-      expect(textOf(planned)).toContain(`From ${localTimeText(lr.safeUntil)} the limit is 24 °C and the safe room is above it`);
+      // The first sentence carries the honest window (CE-21).
+      expect(textOf(planned)).toMatch(new RegExp(`^Proposed last-resort plan ${plan.id}: the safe room alone, (within its limits until|until the battery runs out at) ${localTimeText(lr.safeUntil)} `));
 
       // 2. The first yes applies nothing: a token, the risk to read, and the alert announced.
       const first = await call('apply_plan', { planId: plan.id });

@@ -9,7 +9,8 @@ const H = 3_600_000;
 
 /**
  * The acceptance rule of #23 on one physics (Q7-A of #24): the guard's hold of the safe room on battery alone,
- * down to the hardware floor, at the limit in force (the night-recovery limit at night), dry or cool by humidity,
+ * down to the hardware floor, pre-cooled toward the night-recovery limit (or at the limit in force when that
+ * stays safe longer), dry or cool by humidity,
  * capped at `capHours`. The same engine and the same limit as the last-resort plan.
  */
 export function expectedHold(input: { snapshot: Snapshot; forecast: Forecast; profile: HomeProfile; preferences: Preferences; config: StormModeConfig }): { hours: number; untilMs: number } {

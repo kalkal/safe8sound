@@ -2,6 +2,7 @@ import { GUARANTEE_IDS, HomeProfileSchema, LAST_RESORT_ACTIONS, PlanIdSchema, Pl
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
+import { holdSafeRoom } from '@cold-reserve/guard';
 import { guardFrame, loadInputs, planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { REAL, preferences, world } from './support.js';
 
@@ -193,6 +194,47 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(saved.ok && saved.value.status).toBe('proposed');
   });
 
+  it('the last resort IS the hold of the safe room (#24, decision A): the safe room alone at essential, every other room off', async () => {
+    const w = stormAt(30);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const p = PlanSchema.parse(r.value);
+    expect(p.lastResort).toBeDefined();
+    const safe = p.steps.filter((s) => s.roomId === 'bedroom-1');
+    const others = p.steps.filter((s) => s.roomId !== 'bedroom-1');
+    expect(safe.length).toBeGreaterThan(0);
+    expect(safe.every((s) => s.level === 'essential' && !s.fanOn && (s.hvacMode === 'cool' || s.hvacMode === 'dry'))).toBe(true);
+    expect(others.length).toBeGreaterThan(0);
+    expect(others.every((s) => s.hvacMode === 'off' && !s.fanOn)).toBe(true);
+    // A safe-room-only essential plan pre-authorizes no other step: its ladder is essential alone.
+    expect(p.ladder.map((r) => r.level)).toEqual(['essential']);
+    // The log says where the last resort came from (#182 review).
+    expect(w.logger.lines.find((l) => l.details?.['event'] === 'last_resort_proposed')?.details?.['source']).toBe('hold');
+    // The hard limits stay hard: the guard checked the hold like any plan.
+    expect(p.guarantees.filter((g) => HARD.includes(g.id)).every((g) => g.ok)).toBe(true);
+    // Its safe-until is the guard's hold of the safe room: the time the storm card names.
+    const snap = await w.deps.homes(w.ctx.homeId)?.source.snapshot();
+    if (!snap?.ok) throw new Error('no snapshot');
+    const forecast = w.deps.homes(w.ctx.homeId)?.forecast();
+    if (forecast === undefined) throw new Error('no forecast');
+    const held = holdSafeRoom(
+      { snapshot: snap.value, forecast, profile: w.profile, preferences, ...guardFrame(w.deps, 'cool', { snapshot: snap.value, forecast, preferences }), model: w.deps.model, config: w.deps.guard },
+      { toMs: Date.parse(p.horizonAt), dischargeFloorPct: pct(w.profile.battery.minSocHwPct), humidityBand: w.deps.config.planner.humidityBand, marginK: w.deps.config.planner.essentialMarginK },
+    );
+    if (!held.ok || held.value.safeUntil === undefined) throw new Error('the hold should end inside the horizon');
+    expect(Date.parse(p.lastResort?.safeUntil ?? '')).toBe(Math.floor(held.value.safeUntil.ms / 1000) * 1000);
+    expect(p.lastResort?.limitedBy).toBe(held.value.safeUntil.limitedBy);
+  });
+
+  it('when the hold cannot be projected, a warn line with its code says so, and the candidates answer (#182 review)', async () => {
+    const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(30), rooms: s.rooms.filter((x) => x.id !== 'bedroom-1') }) });
+    await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    const warn = w.logger.lines.find((l) => l.details?.['event'] === 'last_resort_hold_failed');
+    expect(warn).toMatchObject({ level: 'warn', code: 'unknown_room', category: 'validation', correlationId: 'test-correlation' });
+    const proposed = w.logger.lines.find((l) => l.details?.['event'] === 'last_resort_proposed');
+    if (proposed !== undefined) expect(proposed.details?.['source']).toBe('candidates');
+  });
+
   it('the safe hours start now and end at the time given', async () => {
     const w = stormAt(35);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
@@ -239,14 +281,13 @@ describe('last resort (approved in #19: proposal only)', () => {
       expect(lr.comfortLimitC).toBe(26);
     });
 
-    it('with an elderly person the 24 °C night limit ends the safe hours when the night starts, and the window says how far above it the room is', async () => {
-      const { lr, warning } = await lastResortOf(stormAt(30));
-      expect(lr.limitedBy).toBe('temperature');
-      expect(lr.safeUntil).toBe('2026-07-17T22:00:00+02:00');
-      expect(warning).toMatch(/then the room goes above 24 °C, the night limit\.$/);
-      // The limit comes down to 24 °C at 22:00 with the room above it: the window says how far above, and by when.
+    it('with an elderly person the hold pre-cools to the 24 °C night limit: safe past 22:00, and the window says how far above it the room goes', async () => {
+      const { lr } = await lastResortOf(stormAt(30));
+      // Without pre-cooling the 24 °C night limit ended his hours at 22:00 with charge left.
+      expect(Date.parse(lr.safeUntil)).toBeGreaterThan(Date.parse('2026-07-17T22:00:00+02:00'));
+      // Pinned: pre-cooled, his room holds the 24 °C night limit until the battery runs out at 00:40.
+      expect({ safeUntil: lr.safeUntil, limitedBy: lr.limitedBy }).toEqual({ safeUntil: '2026-07-18T00:40:00+02:00', limitedBy: 'battery' });
       expect(lr.comfortLimitC).toBe(24);
-      expect(lr.loweredLimitC).toBe(24);
       expect(lr.worstC).toBeGreaterThan(24);
       expect(Date.parse(lr.worstAt ?? '')).toBeGreaterThanOrEqual(Date.parse(lr.safeUntil));
     });
