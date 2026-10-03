@@ -11,7 +11,8 @@ import { cardDocument } from './host/card-documents.js';
 import { CardHostProvider } from './host/card-host.js';
 import { Conversation } from './ui/Conversation.js';
 import { configErrorEvent, log, logUnhandled } from './log.js';
-import { createScriptedPhone } from './phone/phone-feed.js';
+import { createInboxPhone } from './phone/inbox-phone.js';
+import { createScriptedPhone, type PhoneFeed } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { t } from './ui/text.js';
@@ -22,11 +23,15 @@ if (container === null) throw new Error('Missing #root element');
 document.title = t('sim.title');
 
 const config = parseConfig(import.meta.env, window.location.search, import.meta.env.DEV);
-// The family phone (surface C, #24): fed by the scripted scene. TODO(#24): a feed that polls GET /phone/inbox for the remote agent.
-const phone = createScriptedPhone();
+// The family phone (surface C, #24): the scripted scene's messages, or the real inbox read through the
+// dev server's proxy, which adds the phone token (the browser never holds it).
+const scriptedPhone = config.ok && config.value.phone === 'scripted' ? createScriptedPhone() : undefined;
+const phone: PhoneFeed =
+  scriptedPhone ??
+  createInboxPhone({ fetchFn: (url, init) => fetch(url, init), pollMs: config.ok ? config.value.phonePollMs : 5_000, log, newId: () => crypto.randomUUID() });
 // The demo session of remote mode (#101): the code is exchanged for a token, never stored.
 const session = config.ok ? buildSession(config.value) : undefined;
-const agent = config.ok ? buildAgent(config.value, undefined, phone, session) : config;
+const agent = config.ok ? buildAgent(config.value, undefined, scriptedPhone, session) : config;
 if (!agent.ok) log(configErrorEvent(agent.error));
 const queryClient = new QueryClient();
 
@@ -61,7 +66,7 @@ function Simulator({ agent, config, session }: { agent: Agent; config: SimConfig
           <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} {...(session === undefined ? {} : { session })} />
         </QueryClientProvider>
       </CardHostProvider>
-      {config.agent === 'scripted' && (
+      {(config.agent === 'scripted' || config.phone === 'inbox') && (
         <ErrorBoundary>
           <PhonePanel feed={phone} timeZone={config.homeTimeZone} />
         </ErrorBoundary>

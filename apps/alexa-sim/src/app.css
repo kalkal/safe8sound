@@ -297,8 +297,9 @@
   }
 }
 
-/* Calm by default: with reduced motion nothing on the page moves (plan §11.2 p.13). */
-@layer base {
+/* Calm by default (plan §11.2 p.13, issue #24): with reduced motion nothing moves. In the overrides
+   layer, so no component rule, whatever its specificity, can bring motion back. */
+@layer overrides {
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

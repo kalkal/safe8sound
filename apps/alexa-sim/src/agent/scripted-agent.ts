@@ -1,6 +1,7 @@
 import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { z } from 'zod';
 import type { Agent, AgentAnswer } from './agent.js';
+import { log as defaultLog, type Log } from '../log.js';
 import { PHONE_FIXTURE_NAMES, phoneMessage } from '../phone/phone-fixtures.js';
 import type { ScriptedPhone } from '../phone/phone-feed.js';
 import { SCRIPT_FIXTURES, SCRIPT_FIXTURE_NAMES } from './script-fixtures.js';
@@ -60,6 +61,8 @@ export interface ScriptedAgentOptions {
   degraded?: boolean;
   /** The simulated family phone: the scene's messages arrive there. */
   phone?: ScriptedPhone;
+  /** Where a delivery is logged: code, correlation id and transition, never the text (it carries a name). */
+  log?: Log;
 }
 
 export function createScriptedAgent(source: unknown, options: ScriptedAgentOptions = {}): Result<Agent, ErrorEnvelope> {
@@ -77,7 +80,7 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
   return ok({
     canCallTools: options.degraded !== true,
     callTool: (name, args) => Promise.resolve(options.degraded === true ? refuseAction() : scriptedToolCall(name, args, script.status?.ts)),
-    ask: (question) => {
+    ask: (question, context) => {
       const q = normalise(question);
       const entry = entries.find((e) => e.patterns.some((p) => q.includes(p)));
       if (entry === undefined) return Promise.resolve(ok({ text: fallback }));
@@ -85,7 +88,11 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
       const answer: AgentAnswer =
         entry.withStatus && status !== undefined ? { text: entry.text.replaceAll('{soc}', String(status.batterySocPct)), status } : { text: entry.text };
       if (entry.cards !== undefined) answer.cards = entry.cards.map((card) => SCRIPT_FIXTURES[card.fixture]());
-      if (entry.phone !== undefined) options.phone?.deliver(entry.phone.map((m) => phoneMessage(m.fixture)));
+      if (entry.phone !== undefined && options.phone !== undefined) {
+        const messages = entry.phone.map((m) => phoneMessage(m.fixture));
+        options.phone.deliver(messages);
+        for (const m of messages) (options.log ?? defaultLog)({ level: 'info', code: 'phone_delivered', correlationId: context.correlationId, details: { transition: m.transition } });
+      }
       return Promise.resolve(ok(answer));
     },
   });

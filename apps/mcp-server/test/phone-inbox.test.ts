@@ -89,6 +89,15 @@ describe('GET /phone/inbox', () => {
     expect(await res.json()).toMatchObject({ code: 'wrong_client' });
   });
 
+  it("logs with the phone's correlation id when it sends one, so both sides share it", async () => {
+    const { handle, logs } = setup(() => Promise.resolve(err(toolError('store_unavailable', 'The table is down.'))));
+    const id = '0f8f8a3e-6a5b-4c1d-9e2f-1234567890ab';
+    await get(handle, { ...bearer(PHONE_TOKEN), 'x-correlation-id': id });
+    expect(logs.at(-1)).toMatchObject({ code: 'store_unavailable', correlationId: id });
+    await get(handle, { ...bearer(PHONE_TOKEN), 'x-correlation-id': 'not-a-uuid' });
+    expect(logs.at(-1)?.correlationId).not.toBe('not-a-uuid');
+  });
+
   it('accepts GET only', async () => {
     const res = await get(setup().handle, bearer(PHONE_TOKEN), 'POST');
     expect(res.status).toBe(405);

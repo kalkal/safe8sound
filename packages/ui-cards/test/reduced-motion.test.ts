@@ -20,8 +20,8 @@ function reducedMotionBlock(source: string): string | undefined {
 }
 
 describe('reduced motion', () => {
-  it('base.css stops every transition and animation, and zeroes the duration token', () => {
-    const block = reducedMotionBlock(css('base.css'));
+  it('cards.css (in every card document) stops every transition and animation, and zeroes the duration token', () => {
+    const block = reducedMotionBlock(css('cards.css'));
     expect(block).toBeDefined();
     expect(block).toMatch(/--duration-fast:\s*0ms/);
     expect(block).toMatch(/transition-duration:\s*0ms/);
@@ -30,8 +30,17 @@ describe('reduced motion', () => {
     expect(block).toMatch(/\*::before/);
   });
 
+  it('lives in the overrides layer, so no component rule can bring motion back', () => {
+    const source = css('cards.css');
+    const overrides = source.indexOf('@layer overrides {');
+    expect(overrides).toBeGreaterThan(-1);
+    expect(source.indexOf('@media (prefers-reduced-motion: reduce)')).toBeGreaterThan(overrides);
+  });
+
   it('no card rule hard-codes a duration: motion uses the tokens', () => {
-    const declarations = [...css('cards.css').matchAll(/(transition|animation)[\w-]*\s*:\s*([^;]+);/g)];
+    const source = css('cards.css');
+    const motionRule = reducedMotionBlock(source) ?? '';
+    const declarations = [...source.replace(motionRule, '').matchAll(/(transition|animation)[\w-]*\s*:\s*([^;]+);/g)];
     for (const [, , value] of declarations) expect(value).not.toMatch(/\d+m?s\b/);
   });
 });

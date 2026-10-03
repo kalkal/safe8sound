@@ -11,15 +11,20 @@ async function ask(page: Page, question: string) {
   await page.getByRole('button', { name: 'Ask' }).click();
 }
 
+/** Numbers and times as whole tokens; a time is written HH:MM ("6:40" and "06:40" are the same time). */
+function numberTokens(text: string): Set<string> {
+  const tokens = text.match(/(?<![\d.:])\d+(?:[.:]\d+)?(?![\d.:])/g) ?? [];
+  return new Set(tokens.map((t) => (/^\d:\d\d$/.test(t) ? `0${t}` : t)));
+}
+
 /**
- * Voice and screen say the same numbers (Amazon CX guide; design review row 17): every number or time
- * in the spoken answer appears in one of its cards. "6:40" matches the card's "06:40".
+ * Voice and screen say the same numbers (Amazon CX guide; design review row 17): every number or time in
+ * the spoken answer is a whole token of the safe-room card, the card the sentence describes.
  */
-async function expectVoiceMatchesCard(page: Page, frames: readonly string[]) {
-  const answer = page.getByTestId('answer').last();
-  const spoken = (await answer.locator('.answer-text').innerText()).match(/\d+(?:[.:]\d+)?/g) ?? [];
-  const shown = (await Promise.all(frames.map((title) => page.frameLocator(`iframe[title="${title}"]`).locator('body').innerText()))).join('\n');
-  for (const n of spoken) expect(shown, `"${n}" is said but not shown`).toContain(n);
+async function expectVoiceMatchesSafeRoom(page: Page) {
+  const spoken = numberTokens(await page.getByTestId('answer').last().locator('.answer-text').innerText());
+  const shown = numberTokens(await page.frameLocator('iframe[title="Safe room card"]').locator('body').innerText());
+  for (const n of spoken) expect(shown.has(n), `"${n}" is said but not shown on the safe-room card`).toBe(true);
 }
 
 test('scene 3: power out → safe room and the night, the daughter is told; Essential; power is back', async ({ page }) => {
@@ -36,7 +41,7 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await expect(safeRoom.locator('html')).toHaveClass(/theme-storm/);
   await expect(page.frameLocator('iframe[title="Plan card"]').getByRole('region', { name: 'Plan' })).toBeVisible();
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toContainText('keeps it safe until');
-  await expectVoiceMatchesCard(page, ['Safe room card', 'Plan card']);
+  await expectVoiceMatchesSafeRoom(page);
 
   await ask(page, 'Switch to essential');
   await expect(phone.getByRole('article', { name: 'Switched to Essential' })).toBeVisible();
@@ -47,24 +52,44 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await expect(phone.getByRole('article', { name: 'Power is back at home' })).toContainText('power came back at home at 5:48');
 });
 
-test('reduced motion: nothing in the storm card or on the page is animated', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+test('reduced motion: an element that really animates stops, in the card frame and on the page', async ({ page }) => {
   await page.goto('/');
   await ask(page, "The power's out");
   const frame = page.frameLocator('iframe[title="Safe room card"]');
   await expect(frame.getByRole('alert')).toBeVisible();
-  // The preference reaches the sandboxed frame too, and nothing there or on the page moves.
-  expect(await frame.locator('.storm-banner').evaluate(motionOf)).toEqual({ reduce: true, motion: '0s|0s' });
-  expect(await page.locator('.phone').evaluate(motionOf)).toEqual({ reduce: true, motion: '0s|0s' });
+  // Without the preference the probe moves, so the check below can fail.
+  expect(await frame.locator('body').evaluate(probeMotion)).toEqual({ reduce: false, motion: '2s|1s' });
+  expect(await page.locator('body').evaluate(probeMotion)).toEqual({ reduce: false, motion: '2s|1s' });
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await frame.locator('body').evaluate(probeMotion)).toEqual({ reduce: true, motion: '0s|0s' });
+  expect(await page.locator('body').evaluate(probeMotion)).toEqual({ reduce: true, motion: '0s|0s' });
 });
 
-/** The element's window, typed by hand: the e2e tsconfig has no DOM types. Runs in the browser. */
-interface BrowserWindow {
-  matchMedia(query: string): { matches: boolean };
-  getComputedStyle(element: unknown): { transitionDuration: string; animationDuration: string };
+/** The document and window, typed by hand: the e2e tsconfig has no DOM types. Runs in the browser. */
+interface ProbeDocument {
+  createElement(tag: string): { className: string; textContent: string; remove(): void };
+  defaultView: {
+    matchMedia(query: string): { matches: boolean };
+    getComputedStyle(element: unknown): { animationDuration: string; transitionDuration: string };
+  };
 }
-function motionOf(element: unknown): { reduce: boolean; motion: string } {
-  const view = (element as { ownerDocument: { defaultView: BrowserWindow } }).ownerDocument.defaultView;
-  const style = view.getComputedStyle(element);
-  return { reduce: view.matchMedia('(prefers-reduced-motion: reduce)').matches, motion: `${style.transitionDuration}|${style.animationDuration}` };
+
+/**
+ * Adds a component-layer rule that animates (2 s) and transitions (1 s), as a card could, measures the
+ * element, then removes it. The reduced-motion rule lives in the overrides layer, so it must win.
+ */
+function probeMotion(body: unknown): { reduce: boolean; motion: string } {
+  const doc = (body as { ownerDocument: ProbeDocument }).ownerDocument;
+  const host = body as { append(...nodes: unknown[]): void };
+  const style = doc.createElement('style');
+  style.textContent = '@layer components { .motion-probe { animation: probe-spin 2s infinite; transition: opacity 1s; } }';
+  const probe = doc.createElement('div');
+  probe.className = 'motion-probe';
+  host.append(style, probe);
+  const computed = doc.defaultView.getComputedStyle(probe);
+  const result = { reduce: doc.defaultView.matchMedia('(prefers-reduced-motion: reduce)').matches, motion: `${computed.animationDuration}|${computed.transitionDuration}` };
+  probe.remove();
+  style.remove();
+  return result;
 }

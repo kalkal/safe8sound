@@ -115,6 +115,16 @@ describe('ScriptedAgent: the storm scene and the family phone (#24)', () => {
     expect(phone.messages()).toEqual([]);
   });
 
+  it('logs each delivery with the turn id and the transition, never the text (it names the contact)', async () => {
+    const phone = createScriptedPhone();
+    const lines: unknown[] = [];
+    const created = createScriptedAgent(script, { phone, log: (e) => lines.push(e) });
+    if (!created.ok) throw new Error(created.error.message);
+    await created.value.ask("The power's out", { correlationId: 'turn-1' });
+    expect(lines).toEqual([{ level: 'info', code: 'phone_delivered', correlationId: 'turn-1', details: { transition: 'storm_started' } }]);
+    expect(JSON.stringify(lines)).not.toMatch(/Sara|alert for/);
+  });
+
   it('in the degraded mode never pretends a message was sent', async () => {
     const phone = createScriptedPhone();
     const created = createScriptedAgent(script, { degraded: true, phone });

@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import {
+  CORRELATION_ID_HEADER,
   PROBLEM_JSON_CONTENT_TYPE,
   PhoneInboxSchema,
+  correlationIdFrom,
   toProblemDetails,
   toolError,
   type ErrorEnvelope,
@@ -51,7 +53,8 @@ export function createPhoneInboxHandler(config: ServerConfig, deps: PhoneInboxDe
   }
 
   return async (req) => {
-    const correlationId = randomUUID();
+    // The browser's poll id when it is a UUID, so its log line and ours share one id (review of #169).
+    const correlationId = correlationIdFrom(req.headers.get(CORRELATION_ID_HEADER), randomUUID);
     const origin = req.headers.get('origin');
     const cors: Record<string, string> = origin !== null && allowedOrigins.has(origin) ? { 'access-control-allow-origin': origin, vary: 'Origin' } : {};
     const problem = (error: ErrorEnvelope, status?: HttpErrorStatus, headers: Record<string, string> = {}) => {

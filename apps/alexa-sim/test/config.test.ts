@@ -11,6 +11,8 @@ describe('simulator config', () => {
         agentTimeoutMs: 8_000,
         turnBudgetMs: 10_000,
         homeTimeZone: 'Europe/Rome',
+        phone: 'scripted',
+        phonePollMs: 5_000,
         voice: {
           speech: 'browser',
           lang: 'en-US',
@@ -23,6 +25,11 @@ describe('simulator config', () => {
         },
       },
     });
+  });
+
+  it('reads the phone from the real inbox when asked, and refuses an unknown phone source (#24)', () => {
+    expect(parseConfig({ VITE_PHONE: 'inbox', VITE_PHONE_POLL_MS: '2000' }, '', false)).toMatchObject({ ok: true, value: { phone: 'inbox', phonePollMs: 2000 } });
+    expect(parseConfig({ VITE_PHONE: 'sms' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
   it('reads the remote agent settings from the environment', () => {

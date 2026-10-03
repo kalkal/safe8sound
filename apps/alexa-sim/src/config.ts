@@ -40,6 +40,9 @@ const ConfigSchema = z
     /** IANA zone of the home: every time on screen is on the home's clock (sim-api will provide it per home). */
     homeTimeZone: z.string().refine(isTimeZone, { message: 'Unknown IANA time zone' }),
     voice: VoiceConfigSchema,
+    /** The family phone (#24): the scripted scene's messages, or the real inbox through the dev proxy. */
+    phone: z.enum(['scripted', 'inbox']),
+    phonePollMs: ms,
   })
   .refine((c) => c.agent === 'scripted' || c.simApiUrl !== undefined, { path: ['simApiUrl'], message: 'The remote agent needs a sim-api URL' })
   .refine((c) => c.turnBudgetMs >= c.agentTimeoutMs, { path: ['turnBudgetMs'], message: 'The turn budget must cover the agent timeout' });
@@ -59,6 +62,8 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>, s
     agentTimeoutMs: env['VITE_AGENT_TIMEOUT_MS'] ?? 8_000,
     turnBudgetMs: env['VITE_TURN_BUDGET_MS'] ?? 10_000,
     homeTimeZone: env['VITE_HOME_TIME_ZONE'] ?? DEFAULT_HOME_TIME_ZONE,
+    phone: env['VITE_PHONE'] ?? 'scripted',
+    phonePollMs: env['VITE_PHONE_POLL_MS'] ?? 5_000,
     voice: {
       speech: fakeSpeech ? 'fake' : 'browser',
       lang: env['VITE_VOICE_LANG'] ?? 'en-US',
