@@ -11,6 +11,7 @@ import { useVoice, type StudioVoice } from '../voice/use-voice.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { AnswerCard } from './AnswerCard.js';
 import { DemoCodeGate } from './DemoCodeGate.js';
+import { ExampleQuestions } from './ExampleQuestions.js';
 import { t } from './text.js';
 
 type TurnResult = Result<AgentAnswer, ErrorEnvelope>;
@@ -180,12 +181,23 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
       ) : (
       <form className="ask" onSubmit={onSubmit}>
         <label htmlFor="question">{t('chat.label')}</label>
+        <p id="question-hint" className="muted">
+          {t('chat.hint')}
+        </p>
+        <ExampleQuestions
+          onPick={(question) => {
+            // Only fills the field: the person reads it and presses Ask (never sent by itself).
+            setDraft(question);
+            inputRef.current?.focus();
+          }}
+        />
         <div className="ask-row">
           <input
             id="question"
             ref={inputRef}
             name="question"
             autoComplete="off"
+            aria-describedby="question-hint"
             placeholder={t('chat.placeholder')}
             value={draft}
             onChange={(e) => {

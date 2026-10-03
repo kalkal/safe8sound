@@ -58,7 +58,7 @@ describe('StormSessionSchema', () => {
 
   it('records notifications by role and channel only: names and handles are refused', () => {
     const [n] = session.notifications;
-    expect(StormSessionSchema.safeParse({ ...session, notifications: [{ ...n, name: 'Anna' }] }).success).toBe(false);
+    expect(StormSessionSchema.safeParse({ ...session, notifications: [{ ...n, name: 'Ana' }] }).success).toBe(false);
     expect(StormSessionSchema.safeParse({ ...session, notifications: [{ ...n, handle: '+39 333' }] }).success).toBe(false);
   });
 });
@@ -127,7 +127,7 @@ describe('storm tool contracts', () => {
   it('notify_family answers with roles and a preview, never names', () => {
     const out = { sent: [{ role: 'daughter', channel: 'in_app' }], skipped: [{ role: 'neighbour', reason: 'not_registered' }], preview: 'Storm: …' };
     expect(NotifyFamilyOutputSchema.safeParse(out).success).toBe(true);
-    expect(NotifyFamilyOutputSchema.safeParse({ ...out, sent: [{ role: 'daughter', channel: 'in_app', name: 'Anna' }] }).success).toBe(false);
+    expect(NotifyFamilyOutputSchema.safeParse({ ...out, sent: [{ role: 'daughter', channel: 'in_app', name: 'Ana' }] }).success).toBe(false);
   });
 
   it('has an error code for a request naming only unregistered roles', () => {

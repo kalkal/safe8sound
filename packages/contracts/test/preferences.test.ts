@@ -25,7 +25,7 @@ describe('PreferencesSchema', () => {
 
   it('allows at most three family contacts', () => {
     const input = examplePreferences();
-    const contact = { role: 'daughter', name: 'Anna', channel: 'in_app', handle: 'phone-1' };
+    const contact = { role: 'daughter', name: 'Ana', channel: 'in_app', handle: 'phone-1' };
     expect(PreferencesSchema.safeParse({ ...input, familyContacts: [contact, contact, contact] }).success).toBe(true);
     expect(PreferencesSchema.safeParse({ ...input, familyContacts: [contact, contact, contact, contact] }).success).toBe(false);
   });

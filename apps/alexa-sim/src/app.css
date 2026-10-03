@@ -198,6 +198,24 @@
     display: flex;
     gap: var(--space-2);
   }
+
+  /* Three example questions (guided test, 3/10): touch targets in a row that wraps at phone width. */
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .chip-button {
+    min-block-size: var(--target-min);
+    padding-inline: var(--space-4);
+    border: var(--border-thin) solid var(--surface-card-line);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+    font: inherit;
+    cursor: pointer;
+  }
 }
 
 @layer surfaces {

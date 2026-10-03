@@ -14,6 +14,12 @@ const enUS = {
   'data.simulatedBadge': 'SIMULATED',
   'sim.title': '{product} · Alexa+ simulator',
   'chat.label': 'Ask a question',
+  // The first screen explains itself (guided test, 3/10): what to ask, and three examples that only fill the field.
+  'chat.hint': 'Ask about your home battery, a hot day or a power cut. Or pick an example:',
+  'examples.label': 'Example questions',
+  'examples.battery': 'Battery level',
+  'examples.hotDay': 'A hot day',
+  'examples.powerCut': 'Power cut',
   'chat.placeholder': "What's my battery level?",
   'chat.send': 'Ask',
   'chat.thinking': 'Thinking…',
