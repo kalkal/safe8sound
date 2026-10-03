@@ -8,7 +8,9 @@ import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
 import type { ComfortPlanWiring } from './comfort-plan-config.js';
 import { comfortPlanModule } from './modules/comfort-plan/index.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
-import { stormModeModule } from './modules/storm-mode/index.js';
+import { stormModeModule, type StormModeDeps } from './modules/storm-mode/index.js';
+import { familyReply } from './modules/storm-mode/tools.js';
+import type { PhoneReplyHandler } from './phone-inbox.js';
 import type { StormModeWiring } from './storm-mode-config.js';
 import { createSandboxes } from './sandboxes.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
@@ -69,6 +71,8 @@ export interface App {
   readonly config: ServerConfig;
   readonly registry: ModuleRegistry;
   readonly handler: McpHandler;
+  /** The family phone's reply (POST /phone/reply, #24), over the storm module's own deps; absent without it. */
+  readonly familyReply?: PhoneReplyHandler;
 }
 
 const HOUR_MS = 3_600_000;
@@ -249,10 +253,11 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly } : undefined;
   };
 
+  const stormDeps: StormModeDeps | undefined = opts.stormMode === undefined ? undefined : { ...opts.stormMode, model: params, homes: planningHome, logger: opts.logger };
   const modules = [
     energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver }),
     ...(opts.comfortPlan === undefined ? [] : [comfortPlanModule({ ...opts.comfortPlan, model: params, homes: planningHome, logger: opts.logger })]),
-    ...(opts.stormMode === undefined ? [] : [stormModeModule({ ...opts.stormMode, model: params, homes: planningHome, logger: opts.logger })]),
+    ...(stormDeps === undefined ? [] : [stormModeModule(stormDeps)]),
     ...(opts.modules ?? []),
   ];
   const registry = createRegistry(opts.cardDocuments === undefined ? modules : withCardResources(modules, opts.cardDocuments));
@@ -262,5 +267,6 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     config: config.value,
     registry: registry.value,
     handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes, ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }) }),
+    ...(stormDeps === undefined ? {} : { familyReply: (input, ctx) => familyReply(stormDeps, input, ctx) }),
   });
 }

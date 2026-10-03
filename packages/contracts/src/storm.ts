@@ -152,3 +152,13 @@ export const NotifyFamilyOutputSchema = z.strictObject({
   /** The message as the model may see it: roles, never names. */
   preview: z.string().min(1).max(600),
 });
+
+/**
+ * The answer of POST /phone/reply (approved in #24, Q5): the reply as recorded, and for check_status the
+ * safe room as the phone shows it (no names, no handles: the status carries roles only).
+ */
+export const PhoneReplyOutputSchema = z.strictObject({
+  recorded: FamilyReplySchema,
+  status: SafeRoomStatusSchema.optional(),
+});
+export type PhoneReplyOutput = z.infer<typeof PhoneReplyOutputSchema>;

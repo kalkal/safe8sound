@@ -74,6 +74,8 @@ export const ERROR_CATALOG = {
   device_unreachable: { category: 'dependency_unavailable' },
   // rate_limited: wait retryAfterMs
   demo_quota_exceeded: { category: 'rate_limited' },
+  /** A family phone replied again too soon (per role, approved in #24). */
+  family_reply_rate_limited: { category: 'rate_limited' },
   /** A second question for a home while one is still running (#101): retry after retryAfterMs. */
   turn_in_progress: { category: 'rate_limited' },
   // internal: a bug, alert

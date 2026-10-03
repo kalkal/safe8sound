@@ -1,7 +1,7 @@
-import { InboxMessageSchema, PhoneInboxSchema, err, ok, toolError, type HomeId, type InboxMessage } from '@cold-reserve/contracts';
+import { InboxMessageSchema, PhoneInboxSchema, PhoneReplyOutputSchema, err, ok, toolError, type HomeId, type InboxMessage } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { createMcpHandler, type LogEntry } from '../src/handler.js';
-import { createLocalHandler, createPhoneInboxHandler, PHONE_INBOX_PATH } from '../src/phone-inbox.js';
+import { createLocalHandler, createPhoneInboxHandler, PHONE_INBOX_PATH, PHONE_REPLY_PATH, type PhoneReplyHandler } from '../src/phone-inbox.js';
 import { createRegistry } from '../src/registry.js';
 import { ALLOWED_ORIGIN, HOME_TOKEN, TOKEN, homeId, probeModule, testConfig } from './helpers.js';
 
@@ -130,5 +130,87 @@ describe('GET /phone/inbox', () => {
     const res = await setup().handle(new Request('http://127.0.0.1:3316/elsewhere'));
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({ code: 'route_not_found' });
+  });
+});
+
+describe('POST /phone/reply (queue item 3, #24): the family phone answers with a closed set of replies', () => {
+  const URL_REPLY = `http://127.0.0.1:3316${PHONE_REPLY_PATH}`;
+  const recorded = { role: 'family', reply: 'on_my_way' as const, at: '2026-07-17T15:40:00.000Z' };
+
+  function withReply(reply: PhoneReplyHandler = (input, ctx) => Promise.resolve(ok({ recorded: { ...recorded, role: ctx.clientId, reply: input.reply } }))) {
+    const logs: LogEntry[] = [];
+    const calls: { input: unknown; ctx: unknown }[] = [];
+    const config = testConfig({ clients: new Map([...testConfig().clients, [PHONE_TOKEN, { clientId: 'family', homeId: homeId('demo'), scope: 'phone' as const }]]) });
+    const phone = createPhoneInboxHandler(config, {
+      inbox: () => Promise.resolve(ok([])),
+      reply: (input, ctx) => {
+        calls.push({ input, ctx });
+        return reply(input, ctx);
+      },
+      logger: { log: (e) => logs.push(e) },
+    });
+    const registry = createRegistry([probeModule]);
+    if (!registry.ok) throw new Error(registry.error.message);
+    const mcp = createMcpHandler(config, { registry: registry.value, logger: { log: (e) => logs.push(e) } });
+    return { handle: createLocalHandler(mcp, phone), logs, calls };
+  }
+  const post = (handle: (r: Request) => Promise<Response>, body: string, headers: Record<string, string> = {}) =>
+    handle(new Request(URL_REPLY, { method: 'POST', body, headers: { 'content-type': 'application/json', ...headers } }));
+
+  it('records the reply for the role of the phone token, never a role from the body', async () => {
+    const { handle, calls } = withReply();
+    const res = await post(handle, JSON.stringify({ reply: 'on_my_way' }), bearer(PHONE_TOKEN));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(PhoneReplyOutputSchema.parse(await res.json()).recorded).toMatchObject({ role: 'family', reply: 'on_my_way' });
+    expect(calls[0]?.ctx).toMatchObject({ clientId: 'family', homeId: 'demo' });
+    const spoofed = await post(handle, JSON.stringify({ reply: 'on_my_way', role: 'son' }), bearer(PHONE_TOKEN));
+    expect(spoofed.status).toBe(400);
+  });
+
+  it('refuses free text, an unknown reply, a body that is not JSON, or one too large (400), before any call', async () => {
+    const { handle, calls } = withReply();
+    // The last body is schema-valid but over 256 bytes: only the size check refuses it.
+    for (const body of [JSON.stringify({ reply: 'call me' }), 'not json', `${JSON.stringify({ reply: 'on_my_way' })}${' '.repeat(300)}`]) {
+      const res = await post(handle, body, bearer(PHONE_TOKEN));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: 'invalid_input' });
+    }
+    expect(calls).toEqual([]);
+  });
+
+  it('only for a phone token: the agent token is refused, as on the inbox', async () => {
+    const { handle, calls } = withReply();
+    expect((await post(handle, JSON.stringify({ reply: 'on_my_way' }))).status).toBe(401);
+    const agent = await post(handle, JSON.stringify({ reply: 'on_my_way' }), bearer(TOKEN));
+    expect(agent.status).toBe(401);
+    expect(await agent.json()).toMatchObject({ code: 'wrong_client' });
+    expect(calls).toEqual([]);
+  });
+
+  it('a reply too soon is 429 with Retry-After, as Problem Details, and logged with the code', async () => {
+    const { handle, logs } = withReply(() => Promise.resolve(err(toolError('family_reply_rate_limited', 'Too soon.', { retryAfterMs: 20_000 }))));
+    const res = await post(handle, JSON.stringify({ reply: 'check_status' }), bearer(PHONE_TOKEN));
+    expect(res.status).toBe(429);
+    expect(res.headers.get('retry-after')).toBe('20');
+    expect(await res.json()).toMatchObject({ code: 'family_reply_rate_limited' });
+    expect(logs.at(-1)).toMatchObject({ code: 'family_reply_rate_limited', clientId: 'family' });
+  });
+
+  it('accepts POST only on the reply path, with a CORS preflight for an allowed Origin', async () => {
+    const { handle } = withReply();
+    const res = await handle(new Request(URL_REPLY, { method: 'GET', headers: bearer(PHONE_TOKEN) }));
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('POST, OPTIONS');
+    const preflight = await handle(new Request(URL_REPLY, { method: 'OPTIONS', headers: { origin: ALLOWED_ORIGIN, 'access-control-request-method': 'POST' } }));
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('access-control-allow-methods')).toBe('POST');
+    expect(preflight.headers.get('access-control-allow-headers')).toBe('authorization, content-type');
+  });
+
+  it('without a reply function (no storm module) the path is not served', async () => {
+    const { handle } = setup();
+    const res = await handle(new Request(URL_REPLY, { method: 'POST', body: '{}', headers: bearer(PHONE_TOKEN) }));
+    expect(res.status).toBe(404);
   });
 });

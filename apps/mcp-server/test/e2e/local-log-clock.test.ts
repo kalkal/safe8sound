@@ -42,6 +42,9 @@ describe('local entry: log lines on the wall clock', () => {
     const stamped = wallStamped(logger, { now: () => WALL });
     stamped.log({ ts: new Date(WALL).toISOString(), level: 'info', component: 'mcp-server', message: 'm', correlationId: 'c' });
     expect(logger.lines[0]).toEqual({ ts: new Date(WALL).toISOString(), level: 'info', component: 'mcp-server', message: 'm', correlationId: 'c' });
+    // A domain on the wall clock stamps its own millisecond: under a second apart is the same time, no scenarioTs.
+    stamped.log({ ts: new Date(WALL - 1).toISOString(), level: 'info', component: 'mcp-server', message: 'm', correlationId: 'c' });
+    expect(logger.lines[1]?.details).toBeUndefined();
     const throwing = wallStamped({ log: () => { throw new Error('sink'); } }, { now: () => WALL });
     expect(() => {
       throwing.log({ ts: '2026-07-17T20:00:00.000Z', level: 'info', component: 'mcp-server', message: 'm', correlationId: 'c' });

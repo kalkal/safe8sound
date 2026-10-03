@@ -37,7 +37,9 @@ export function wallStamped(logger: Logger, wallClock: Clock): Logger {
     log: (entry) => {
       try {
         const ts = new Date(wallClock.now()).toISOString();
-        logger.log(entry.ts === ts ? entry : { ...entry, ts, details: { ...entry.details, scenarioTs: entry.ts } });
+        // Under a second apart is the same time (a domain on the wall clock stamps its own millisecond).
+        const sameTime = Math.abs(Date.parse(entry.ts) - Date.parse(ts)) < 1000;
+        logger.log(sameTime ? { ...entry, ts } : { ...entry, ts, details: { ...entry.details, scenarioTs: entry.ts } });
       } catch {
         // Nowhere left to report it: the line is lost, the request goes on.
       }

@@ -5,6 +5,8 @@ import {
   type ErrorEnvelope,
   type NotifyFamilyInputSchema,
   type NotifyFamilyOutputSchema,
+  type PhoneReply,
+  type PhoneReplyOutput,
   type Result,
   type SafeRoomStatus,
   type SendableTransition,
@@ -12,11 +14,12 @@ import {
   type StartStormModeOutputSchema,
   type StormSession,
 } from '@cold-reserve/contracts';
-import { effectiveStormMode, prepareDevices } from '@cold-reserve/core';
+import { effectiveStormMode, prepareDevices, replyAllowed } from '@cold-reserve/core';
 import { stormPreview } from '@cold-reserve/i18n';
 import type { z } from 'zod';
 import type { ToolContext } from '../../tool.js';
 import type { StormModeDeps } from './deps.js';
+import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import { localIso } from '../../time.js';
 import { deliver, detect, levelOf, localeOf, messageFields, readHome, readingEvent, type Observed } from './observe.js';
 
@@ -124,4 +127,51 @@ export async function notifyFamily(deps: StormModeDeps, input: NotifyFamilyInput
   const preview = stormPreview(localeOf(o.value.preferences.language), input.transition, { role }, messageFields(o.value, sent.value.session));
   if (!preview.ok) return err(toolError('unexpected_error', `The ${input.transition} preview misses ${preview.error.missing.join(', ')}.`));
   return ok({ sent: [...plan.sent], skipped: [...plan.skipped], preview: preview.value });
+}
+
+/** How many replies a storm session keeps, the latest last. */
+const MAX_REPLIES = 50;
+
+/**
+ * POST /phone/reply (queue item 3, approved in #24): the family phone answers "I'm on my way" or "Check status".
+ * The role is the phone's own client id (from its token), never the body; it must be a registered contact. One
+ * reply per role every `minReplySeconds`; recorded on the latest storm session by role. "Check status" also
+ * returns the safe room as the phone shows it: roles only, never names.
+ */
+export async function familyReply(deps: StormModeDeps, input: { reply: PhoneReply }, ctx: ToolContext): Promise<Result<PhoneReplyOutput, ErrorEnvelope>> {
+  const o = await readHome(deps, ctx);
+  if (!o.ok) return o;
+  const session = o.value.session;
+  if (session === undefined || session.phase === 'ended') {
+    return err(toolError('invalid_input', 'There is no storm in progress to reply to.', { details: { field: 'reply' } }));
+  }
+  const role = ctx.clientId;
+  if (!o.value.preferences.familyContacts.some((c) => c.role === role)) {
+    return err(toolError('recipient_not_registered', 'This phone is not a family contact registered in the app.', { details: { field: 'role' } }));
+  }
+  const nowMs = deps.clock.now();
+  const replies = session.familyReplies ?? [];
+  const minMs = deps.config.minReplySeconds * 1000;
+  if (!replyAllowed({ replies, role, nowMs, minIntervalSeconds: deps.config.minReplySeconds })) {
+    const lastMs = Math.max(...replies.filter((r) => r.role === role).map((r) => Date.parse(r.at)));
+    return err(toolError('family_reply_rate_limited', 'A reply was just sent: try again in a moment.', { retryAfterMs: Math.max(1, lastMs + minMs - nowMs) }));
+  }
+  // "Check status" reads the room first: a reply is recorded only when the phone gets its whole answer, so a
+  // failed read never leaves a recorded reply that makes the retry "too soon" (#194 review).
+  const status = input.reply === 'check_status' ? await safeRoomStatus(deps, ctx) : undefined;
+  if (status !== undefined && !status.ok) return status;
+  const recorded = { role, reply: input.reply, at: new Date(nowMs).toISOString() };
+  // TODO(#24 follow-up): a plain put of the whole session; the storm detector and the phone are two writers.
+  const saved = await o.value.store.saveStormSession({ ...session, familyReplies: [...replies, recorded].slice(-MAX_REPLIES) });
+  if (!saved.ok) return saved;
+  deps.logger.log({
+    ts: new Date(nowMs).toISOString(),
+    level: 'info',
+    component: 'mcp-server',
+    message: 'A family reply was recorded.',
+    correlationId: ctx.correlationId,
+    ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+    details: { event: 'family_reply_recorded', role, reply: input.reply, ...homeDetail(ctx.homeId) },
+  });
+  return ok(status === undefined ? { recorded } : { recorded, status: status.value });
 }

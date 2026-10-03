@@ -76,14 +76,19 @@ describe('the storm card and the last-resort plan on one physics', () => {
   });
 
   it('property: whatever the battery and the hour, a last resort and a storm card under its cap name the same time', async () => {
+    let checked = 0;
     await fc.assert(
-      fc.asyncProperty(fc.integer({ min: 3, max: 10 }), fc.integer({ min: 15, max: 100 }), async (h, soc) => {
+      // Low batteries, where a last resort exists: most cases really compare the two times.
+      fc.asyncProperty(fc.integer({ min: 3, max: 10 }), fc.integer({ min: 15, max: 45 }), async (h, soc) => {
         const { status, plan } = await at(h, soc);
         if (plan.lastResort === undefined || status.safeHours >= 24) return;
+        checked++;
         expect(status.safeUntil).toBe(plan.lastResort.safeUntil);
       }),
       // Each case starts a local server and plans a storm night (about a second).
       { numRuns: runs(20) },
     );
+    // A property that skips every case proves nothing (#182 re-review).
+    expect(checked).toBeGreaterThanOrEqual(Math.ceil(runs(20) / 2));
   }, 300_000);
 });

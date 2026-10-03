@@ -1,9 +1,10 @@
 {
-  "$comment": "Storm mode (issue #23). capHours: the longest horizon safe hours are quoted for (the safe hours are the guard's hold of the safe room, Q7-A of #24). stableGridMinutes: minutes of grid back before the storm ends (plan §9.2). minIntervalMinutes: one family message per transition and person within this interval. The EPS load besides the safe-room split is the home profile's epsBaseLoadW (#19). inApp.maxPerHome: how many of the phone's messages are listed (they are kept in the StateStore with its own retention).",
+  "$comment": "Storm mode (issue #23). capHours: the longest horizon safe hours are quoted for (the safe hours are the guard's hold of the safe room, Q7-A of #24). stableGridMinutes: minutes of grid back before the storm ends (plan §9.2). minIntervalMinutes: one family message per transition and person within this interval. minReplySeconds: a family phone may reply again after this many seconds, per role. The EPS load besides the safe-room split is the home profile's epsBaseLoadW (#19). inApp.maxPerHome: how many of the phone's messages are listed (they are kept in the StateStore with its own retention).",
   "schemaVersion": 1,
   "capHours": 24,
   "stableGridMinutes": 10,
   "minIntervalMinutes": 60,
+  "minReplySeconds": 30,
   "inApp": {
     "maxPerHome": 50
   }

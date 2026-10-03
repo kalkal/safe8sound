@@ -226,13 +226,15 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(p.lastResort?.limitedBy).toBe(held.value.safeUntil.limitedBy);
   });
 
-  it('when the hold cannot be projected, a warn line with its code says so, and the candidates answer (#182 review)', async () => {
+  it('when the hold cannot be projected, a warn line with its code says so, and the candidates answer: here a refusal (#182 review)', async () => {
     const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(30), rooms: s.rooms.filter((x) => x.id !== 'bedroom-1') }) });
-    await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     const warn = w.logger.lines.find((l) => l.details?.['event'] === 'last_resort_hold_failed');
     expect(warn).toMatchObject({ level: 'warn', code: 'unknown_room', category: 'validation', correlationId: 'test-correlation' });
     const proposed = w.logger.lines.find((l) => l.details?.['event'] === 'last_resort_proposed');
-    if (proposed !== undefined) expect(proposed.details?.['source']).toBe('candidates');
+    // Without the safe room's reading no candidate names a safe-until either: no last resort, the guard's refusal.
+    expect(r.ok ? undefined : r.error.code).toBe('safe_room_comfort_violated');
+    expect(proposed).toBeUndefined();
   });
 
   it('the safe hours start now and end at the time given', async () => {

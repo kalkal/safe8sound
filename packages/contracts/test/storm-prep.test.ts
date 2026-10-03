@@ -1,7 +1,8 @@
 import { exampleHomeProfile } from '../src/fixtures.js';
 import { describe, expect, it } from 'vitest';
 import { HomeProfileSchema } from '../src/home.js';
-import { SafeRoomStatusSchema, StormSessionSchema } from '../src/storm.js';
+import { PhoneReplyOutputSchema, SafeRoomStatusSchema, StormSessionSchema } from '../src/storm.js';
+import { toolError } from '../src/errors.js';
 import { DeviceAdviceSchema, DeviceSecuredSchema, FamilyReplySchema, PhoneReplyInputSchema, StormDeviceSchema } from '../src/storm-prep.js';
 
 // Queue items 3 and 7 (approved in #24): devices made safe before the storm, and the family's replies.
@@ -80,5 +81,17 @@ describe('family replies from the phone', () => {
       lastCheckIn: reply,
     });
     expect(status.lastCheckIn).toEqual(reply);
+  });
+});
+
+describe('the answer of POST /phone/reply', () => {
+  it('carries the recorded reply, and the safe room only for check_status (roles, never names)', () => {
+    const recorded = { role: 'daughter', reply: 'on_my_way', at: '2026-07-18T21:30:00Z' };
+    expect(PhoneReplyOutputSchema.parse({ recorded })).toEqual({ recorded });
+    expect(PhoneReplyOutputSchema.safeParse({ recorded, name: 'Sara' }).success).toBe(false);
+  });
+
+  it('has its own rate-limit code, retryable', () => {
+    expect(toolError('family_reply_rate_limited', 'Too soon.', { retryAfterMs: 20_000 })).toMatchObject({ category: 'rate_limited', retryable: true, retryAfterMs: 20_000 });
   });
 });
