@@ -75,7 +75,7 @@ function windowText(lr: NonNullable<Plan['lastResort']>, opts: PlanSummaryOption
 export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   const level = p.steps[0]?.level ?? p.ladder[0]?.level ?? 'comfort';
   const parts = [
-    `Proposed plan ${p.id}: ${level} level until ${p.horizonAt} (${p.advisoryOnly ? 'advice only, nothing is commanded' : 'nothing changes until apply_plan'}), built on ${dataText(p.sourceOrigin)}.`,
+    `Proposed plan ${p.id}: ${level} level until ${localTimeText(p.horizonAt)} (${p.advisoryOnly ? 'advice only, nothing is commanded' : 'nothing changes until apply_plan'}), built on ${dataText(p.sourceOrigin)}.`,
     `What it does: ${roomSettings(p)}.`,
     `Confirming it also allows these steps down if the battery falls behind: ${p.ladder.map(rungText).join('; ')}.`,
     `Guarantees: ${p.guarantees.map((g) => `${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`).join(' ')}`,
@@ -148,6 +148,6 @@ function familyAlertText(a: NonNullable<ApplyPlanOutput['familyAlert']>): string
 export function outlookSummary(o: ReserveOutlook): string {
   return (
     `On the battery alone: about ${one(o.hoursAtCurrentLevel)} hours at ${o.level} level, or ${one(o.hoursAtEssential)} hours at essential with the same energy; ` +
-    `the storm reserve alone gives ${one(o.reserveHoursAtEssential)} hours at essential. As of ${o.ts} (${dataText(o.origin)}).`
+    `the storm reserve alone gives ${one(o.reserveHoursAtEssential)} hours at essential. As of ${localTimeText(o.ts)} (${dataText(o.origin)}).`
   );
 }

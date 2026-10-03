@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
 import { reserveOutlook } from '../../src/modules/comfort-plan/reserve-outlook.js';
 import { REAL, world } from './support.js';
+import { localIso } from '../../src/time.js';
 
 describe('get_reserve_outlook (the ice cubes)', () => {
   it('counts the hours with the guard’s reserve, at the configured level loads, valid against the contract', async () => {
@@ -25,7 +26,8 @@ describe('get_reserve_outlook (the ice cubes)', () => {
       currentLoadW: w.deps.config.outlook.levelLoadW.comfort,
       essentialLoadW: w.deps.guard.reserve.essentialLoadW,
     });
-    expect(o).toEqual({ level: 'comfort', ...hours, gridAvailable: true, origin: snap.value.origin, ts: snap.value.ts });
+    // The same instant as the reading, said in the home's time zone (#160).
+    expect(o).toEqual({ level: 'comfort', ...hours, gridAvailable: true, origin: snap.value.origin, ts: localIso(Date.parse(snap.value.ts), w.profile.location.tz) });
   });
 
   it('off grid (the storm) counts down to the hardware floor', async () => {

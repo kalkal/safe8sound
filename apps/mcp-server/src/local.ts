@@ -1,14 +1,9 @@
 import type { ErrorEnvelope, Result } from '@cold-reserve/contracts';
-import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
-import { createApp } from './app.js';
 import { cardDocumentsFromFiles, workspaceCardFiles } from './cards.js';
 import { forLocalEntry } from './config.js';
-import { comfortPlanWiring } from './comfort-plan-config.js';
-import { composeModules } from './compose.js';
+import { createLocalApp } from './local-app.js';
 import { startNodeServer } from './node-server.js';
 import { createLocalHandler, createPhoneInboxHandler } from './phone-inbox.js';
-import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
-import { stormModeWiring } from './storm-mode-config.js';
 
 // Local Node entry: 127.0.0.1 only (plan §13.2.3). Tokens from MCP_CLIENTS in the environment.
 // State lives in memory: it survives new MCP sessions, not a restart of this process.
@@ -24,13 +19,11 @@ function orExit<T>(result: Result<T, ErrorEnvelope>): T {
 }
 
 const wallClock = { now: Date.now };
-const preferences = orExit(loadPreferencesConfig(preferencesConfigFile()));
-const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wallClock });
-const modules = orExit(composeModules({ preferences, storeFor, clock: wallClock }));
-const stormMode = orExit(stormModeWiring({ storeFor, preferences, clock: wallClock }));
-const comfortPlan = orExit(comfortPlanWiring({ storeFor, preferences, clock: wallClock, notifier: stormMode.notifier }));
-const cardDocuments = cardDocumentsFromFiles(workspaceCardFiles());
-const app = orExit(createApp(process.env, { wallClock, logger: { log }, modules, comfortPlan, stormMode, cardDocuments }));
+const local = orExit(createLocalApp(process.env, { wallClock, logger: { log }, cardDocuments: cardDocumentsFromFiles(workspaceCardFiles()) }));
+const { app, stormMode } = local;
+if (process.env['MCP_SCENARIO_START_SOC_PCT'] !== undefined) {
+  log({ level: 'info', message: `Local lever: the scenario starts with the battery at ${process.env['MCP_SCENARIO_START_SOC_PCT']}%.`, correlationId: 'startup' });
+}
 // MCP_RESOURCE_URL=auto is for Lambda only (#149): locally the canonical URL has no trustworthy source.
 orExit(forLocalEntry(app.config));
 

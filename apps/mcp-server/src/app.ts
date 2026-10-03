@@ -1,4 +1,4 @@
-import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, err, ok, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
+import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
 import { epsBaseLoadW, scenarioClock, utcDayStart, type Clock, type HomeDataSource } from '@cold-reserve/core';
 import { FallbackSource, type SourceEvent } from '@cold-reserve/source-fallback';
 import { SCENARIO_IDS, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
@@ -29,6 +29,33 @@ export interface AppOptions {
   readonly stormMode?: StormModeWiring;
   /** The ui:// card documents (#92): when given, the tools that show a card link it. */
   readonly cardDocuments?: CardDocuments;
+  /**
+   * The scenario clock, when the caller built its store and modules on it (the local entry): one clock for
+   * everything. Otherwise createApp derives it from the environment with `scenarioClockFor`.
+   */
+  readonly scenarioClock?: Clock;
+  /** Local entry only: the battery at the scenario start, in % (MCP_SCENARIO_START_SOC_PCT), to reach the last resort. */
+  readonly scenarioStartSocPct?: number;
+}
+
+/**
+ * The one scenario clock (#160): scenario time from the wall clock, the scenario, its start hour, speed and
+ * anchor. createApp and the local entry use this same definition, so the simulator, the plans, the storm
+ * sessions and the local store agree on "now".
+ */
+export function scenarioClockFor(env: Readonly<Record<string, string | undefined>>, wall: Clock): Result<Clock, ErrorEnvelope> {
+  const scenarioId = env['MCP_SCENARIO'] ?? 'clear-day';
+  if (!(SCENARIO_IDS as readonly string[]).includes(scenarioId)) {
+    return err(toolError('invalid_config', `MCP_SCENARIO must be one of ${SCENARIO_IDS.join(', ')}.`));
+  }
+  const startH = number(env, 'MCP_SCENARIO_START_H', 0);
+  if (!startH.ok) return startH;
+  const speed = number(env, 'MCP_SCENARIO_SPEED', 1);
+  if (!speed.ok) return speed;
+  const scenario = builtInScenario(scenarioId as ScenarioId);
+  const anchor = scenarioAnchor(env['MCP_SCENARIO_ANCHOR'], wall.now(), scenario.startAt);
+  if (!anchor.ok) return anchor;
+  return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: Date.parse(scenario.startAt) + startH.value * HOUR_MS, speed: speed.value }));
 }
 
 export interface App {
@@ -163,15 +190,18 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const sandboxMaxNew = number(env, 'MCP_SANDBOX_MAX_NEW_PER_DAY', 100);
   if (!sandboxTtlH.ok) return sandboxTtlH;
   if (!sandboxMaxNew.ok) return sandboxMaxNew;
-  const speed = number(env, 'MCP_SCENARIO_SPEED', 1);
   if (!startH.ok) return startH;
-  if (!speed.ok) return speed;
 
-  const scenario = builtInScenario(scenarioId as ScenarioId);
+  const builtIn = builtInScenario(scenarioId as ScenarioId);
+  const startSoc = opts.scenarioStartSocPct;
+  if (startSoc !== undefined && startSoc < demoProfile().battery.minSocHwPct) {
+    return err(toolError('invalid_config', `MCP_SCENARIO_START_SOC_PCT is below the hardware floor of ${String(demoProfile().battery.minSocHwPct)}%.`));
+  }
+  const scenario = startSoc === undefined ? builtIn : { ...builtIn, initial: { ...builtIn.initial, batterySocPct: pct(startSoc) } };
   const scenarioStartMs = Date.parse(scenario.startAt) + startH.value * HOUR_MS;
-  const anchor = scenarioAnchor(env['MCP_SCENARIO_ANCHOR'], opts.wallClock.now(), scenario.startAt);
-  if (!anchor.ok) return anchor;
-  const clock = scenarioClock({ wall: opts.wallClock, anchorMs: anchor.value, scenarioStartMs, speed: speed.value });
+  const derived = opts.scenarioClock === undefined ? scenarioClockFor(env, opts.wallClock) : ok(opts.scenarioClock);
+  if (!derived.ok) return derived;
+  const clock = derived.value;
   const params = defaultSimParams();
   const levelSince = new Date(scenarioStartMs).toISOString();
 

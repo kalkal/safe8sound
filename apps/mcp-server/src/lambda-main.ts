@@ -37,6 +37,10 @@ export const handler = createLambdaHandler(
     if (!clients.ok) return clients;
 
     const wallClock = { now: Date.now };
+    // A local-only lever (#160): never on Lambda, where it is ignored and said once at start-up.
+    if (process.env['MCP_SCENARIO_START_SOC_PCT'] !== undefined) {
+      logger.log({ ts: new Date().toISOString(), level: 'info', component: 'mcp-server', message: 'MCP_SCENARIO_START_SOC_PCT is for the local entry only: ignored here.', correlationId: 'startup' });
+    }
     const preferences = loadPreferencesConfig(preferencesConfigFile());
     if (!preferences.ok) return preferences;
     const storeFor = createDynamoStoreFactory(process.env, {

@@ -153,7 +153,8 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     status: 'proposed',
     createdAt: new Date(nowMs).toISOString(),
     expiresAt: new Date(nowMs + deps.config.planTtlMinutes * 60_000).toISOString(),
-    horizonAt: chosen.candidate.horizonAt,
+    // In the home's time zone: the voice says the same time the card shows (#160).
+    horizonAt: localIso(Date.parse(chosen.candidate.horizonAt), profile.location.tz),
     goal: input.goal,
     ladder: chosen.candidate.ladder,
     steps: chosen.candidate.steps,

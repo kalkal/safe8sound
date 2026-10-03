@@ -1,6 +1,7 @@
 import { ok, type ErrorEnvelope, type Level, type ReserveOutlook, type Result } from '@cold-reserve/contracts';
 import { reserveOutlookHours } from '@cold-reserve/core';
 import { reserveOf } from '@cold-reserve/guard';
+import { localIso } from '../../time.js';
 import type { ToolContext } from '../../tool.js';
 import type { ComfortPlanDeps } from './deps.js';
 import { loadInputs } from './plan-comfort.js';
@@ -26,5 +27,6 @@ export async function reserveOutlook(deps: ComfortPlanDeps, _input: Record<strin
     currentLoadW: loads[CURRENT_LEVEL],
     essentialLoadW: loads.essential,
   });
-  return ok({ level: CURRENT_LEVEL, ...hours, gridAvailable: snapshot.gridAvailable, origin: snapshot.origin, ts: snapshot.ts });
+  // In the home's time zone, as every other time the person hears (#160).
+  return ok({ level: CURRENT_LEVEL, ...hours, gridAvailable: snapshot.gridAvailable, origin: snapshot.origin, ts: localIso(Date.parse(snapshot.ts), profile.location.tz) });
 }
