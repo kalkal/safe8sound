@@ -161,7 +161,7 @@ export async function familyReply(deps: StormModeDeps, input: { reply: PhoneRepl
   const status = input.reply === 'check_status' ? await safeRoomStatus(deps, ctx) : undefined;
   if (status !== undefined && !status.ok) return status;
   const recorded = { role, reply: input.reply, at: new Date(nowMs).toISOString() };
-  // TODO(#24 follow-up): a plain put of the whole session; the storm detector and the phone are two writers.
+  // TODO(#197): a plain put of the whole session; the storm detector and the phone are two writers.
   const saved = await o.value.store.saveStormSession({ ...session, familyReplies: [...replies, recorded].slice(-MAX_REPLIES) });
   if (!saved.ok) return saved;
   deps.logger.log({

@@ -134,4 +134,37 @@ describe('createInboxPhone', () => {
     ]);
     expect(JSON.stringify(lines)).not.toMatch(/Sara|alert for/);
   });
+
+  describe('reply (queue item 3, #24): the family answers from the phone', () => {
+    it('posts the reply to its own origin with a correlation id and no credentials; the token is the proxy\'s', async () => {
+      const { phone, calls } = setup(() => Promise.resolve(json(200, { recorded: { role: 'daughter', reply: 'on_my_way', at: '2026-07-17T19:45:00Z' } })));
+      const out = await phone.reply?.('on_my_way');
+      expect(out).toEqual({ ok: true });
+      expect(calls[0]?.url).toBe('/phone/reply');
+      expect(calls[0]?.init).toMatchObject({ method: 'POST', credentials: 'omit', body: JSON.stringify({ reply: 'on_my_way' }) });
+      expect((calls[0]?.init?.headers as Record<string, string>)['x-correlation-id']).toBe('poll-1');
+      expect(JSON.stringify(calls[0]?.init)).not.toMatch(/Bearer/i);
+    });
+
+    it('check status brings back the safe room', async () => {
+      const status = { safeRoomId: 'bedroom-1', tempC: 25.5, occupantRoles: ['grandpa'], level: 'essential', levelReason: 'storm', safeHours: 5, safeUntil: '2026-07-18T01:20:00+02:00', stormPhase: 'active', origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated', scenario: 'storm-blackout' }, homeLink: 'ok' };
+      const { phone } = setup(() => Promise.resolve(json(200, { recorded: { role: 'daughter', reply: 'check_status', at: '2026-07-17T19:45:00Z' }, status })));
+      const out = await phone.reply?.('check_status');
+      expect(out).toMatchObject({ ok: true, status: { safeUntil: '2026-07-18T01:20:00+02:00', tempC: 25.5 } });
+    });
+
+    it('too soon: the code and when to retry, from Retry-After; logged with its code, never a text', async () => {
+      const { phone, lines } = setup(() =>
+        Promise.resolve(new Response(JSON.stringify({ code: 'family_reply_rate_limited', detail: 'x' }), { status: 429, headers: { 'content-type': 'application/problem+json', 'retry-after': '20' } })),
+      );
+      expect(await phone.reply?.('on_my_way')).toEqual({ ok: false, code: 'family_reply_rate_limited', retryAfterMs: 20_000 });
+      expect(lines.at(-1)).toMatchObject({ level: 'warn', code: 'family_reply_rate_limited', correlationId: 'poll-1' });
+    });
+
+    it('an unreachable server is a failure the panel can say, never a throw', async () => {
+      const { phone, lines } = setup(() => Promise.reject(new TypeError('offline')));
+      expect(await phone.reply?.('on_my_way')).toEqual({ ok: false, code: 'phone_reply_unreachable' });
+      expect(lines.at(-1)).toMatchObject({ code: 'phone_reply_unreachable' });
+    });
+  });
 });

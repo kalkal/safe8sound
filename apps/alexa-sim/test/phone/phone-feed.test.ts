@@ -49,4 +49,10 @@ describe('phone fixtures: real templates, valid contract messages', () => {
     expect(phoneMessage('power-back').text).toContain('power came back at home at 5:48');
     expect(phoneMessage('storm-started').text).toContain('keeps it safe until 6:40');
   });
+
+  it('the scripted phone accepts a reply and never invents a safe-room status (no numbers off the script)', async () => {
+    const phone = createScriptedPhone();
+    expect(await phone.reply?.('on_my_way')).toEqual({ ok: true });
+    expect(await phone.reply?.('check_status')).toEqual({ ok: true });
+  });
 });

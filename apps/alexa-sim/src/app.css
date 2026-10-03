@@ -258,6 +258,18 @@
     }
   }
 
+  /* The family's replies (#24): one row of touch targets that wraps on a narrow phone. */
+  .phone-replies {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+
+    & [role="status"] {
+      flex-basis: 100%;
+    }
+  }
+
   .phone-list {
     display: grid;
     gap: var(--space-3);

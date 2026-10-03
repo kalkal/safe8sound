@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PHONE_INBOX_PATH, phoneProxy, requirePhoneProxy } from '../../vite.phone-proxy.js';
+import { PHONE_INBOX_PATH, PHONE_REPLY_PATH, phoneProxy, requirePhoneProxy } from '../../vite.phone-proxy.js';
 
 // The family phone's token stays on the dev server (review of #136): the browser asks its own origin for
 // /phone/inbox, the Vite proxy adds the bearer token. Never a VITE_* variable, never in the bundle or logs.
@@ -29,7 +29,7 @@ describe('phoneProxy (vite dev server)', () => {
   it('proxies exactly /phone/inbox to the MCP server, adding the phone token there', () => {
     const proxy = phoneProxy(env);
     expect(PHONE_INBOX_PATH).toBe('^/phone/inbox$');
-    expect(Object.keys(proxy ?? {})).toEqual([PHONE_INBOX_PATH]);
+    expect(Object.keys(proxy ?? {})).toEqual([PHONE_INBOX_PATH, PHONE_REPLY_PATH]);
     const options = proxy?.[PHONE_INBOX_PATH];
     if (!options) throw new Error('no proxy');
     expect(options.target).toBe('http://127.0.0.1:3316');
@@ -49,6 +49,18 @@ describe('phoneProxy (vite dev server)', () => {
     expect(bypass('POST', 'same-origin')).toBe(false);
     expect(bypass('GET', 'cross-site')).toBe(false);
     expect(bypass('GET', 'same-site')).toBe(false);
+  });
+
+  it('proxies exactly /phone/reply for same-site POST only, adding the token there (queue item 3, #24)', () => {
+    expect(PHONE_REPLY_PATH).toBe('^/phone/reply$');
+    const options = phoneProxy(env)?.[PHONE_REPLY_PATH];
+    if (!options) throw new Error('no reply proxy');
+    expect(forward(options).get('authorization')).toBe(`Bearer ${TOKEN}`);
+    const bypass = (method: string, site?: string) =>
+      options.bypass?.({ method, headers: site === undefined ? {} : { 'sec-fetch-site': site } } as never, undefined, options);
+    expect(bypass('POST', 'same-origin')).toBeUndefined();
+    expect(bypass('GET', 'same-origin')).toBe(false);
+    expect(bypass('POST', 'cross-site')).toBe(false);
   });
 
   it('never puts the token in the options themselves (they can be printed by the dev server)', () => {

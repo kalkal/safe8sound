@@ -1,8 +1,8 @@
-import type { InboxMessage } from '@cold-reserve/contracts';
+import type { InboxMessage, PhoneReply } from '@cold-reserve/contracts';
 import { PRODUCT_NAME } from '@cold-reserve/i18n';
-import { useId, useSyncExternalStore } from 'react';
+import { useId, useRef, useState, useSyncExternalStore } from 'react';
 import { t } from '../ui/text.js';
-import type { PhoneFeed } from './phone-feed.js';
+import type { PhoneFeed, PhoneReplyResult } from './phone-feed.js';
 
 // Surface C (plan §11.1, §11.3): the phone of the family member away from home. It shows the
 // Mileti-style messages the server sent, newest first; new ones are announced politely (the
@@ -22,6 +22,51 @@ function Notification({ message, timeZone }: { message: InboxMessage; timeZone: 
   );
 }
 
+/** What the phone says after a reply, in words: never a code. */
+function outcomeText(reply: PhoneReply, result: PhoneReplyResult, timeZone: string): string {
+  if (!result.ok) {
+    if (result.code === 'family_reply_rate_limited' && result.retryAfterMs !== undefined) return t('phone.tooSoon', { seconds: String(Math.ceil(result.retryAfterMs / 1000)) });
+    return t('phone.notSent');
+  }
+  if (result.status !== undefined) return t('phone.status', { temp: String(result.status.tempC), time: clock(result.status.safeUntil, timeZone) });
+  return t(reply === 'on_my_way' ? 'phone.sentOnMyWay' : 'phone.sentCheck');
+}
+
+/** The family's closed set of replies, by touch; one call at a time. */
+function Replies({ reply, timeZone }: { reply: NonNullable<PhoneFeed['reply']>; timeZone: string }) {
+  const [sending, setSending] = useState(false);
+  const [said, setSaid] = useState<string | undefined>(undefined);
+  // A second tap before the re-render must not send twice: the guard is a ref, the state only disables.
+  const inFlight = useRef(false);
+  const send = (answer: PhoneReply) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setSending(true);
+    void reply(answer).then((result) => {
+      inFlight.current = false;
+      setSaid(outcomeText(answer, result, timeZone));
+      setSending(false);
+    });
+  };
+  return (
+    <div className="phone-replies" role="group" aria-label={t('phone.replies')}>
+      <button type="button" className="button" disabled={sending} onClick={() => {
+          send('on_my_way');
+        }}>
+        {t('phone.onMyWay')}
+      </button>
+      <button type="button" className="button" disabled={sending} onClick={() => {
+          send('check_status');
+        }}>
+        {t('phone.checkStatus')}
+      </button>
+      <p className="muted" role="status">
+        {said ?? ''}
+      </p>
+    </div>
+  );
+}
+
 export function PhonePanel({ feed, timeZone }: { feed: PhoneFeed; timeZone: string }) {
   const messages = useSyncExternalStore(feed.subscribe, feed.messages);
   const titleId = useId();
@@ -29,6 +74,8 @@ export function PhonePanel({ feed, timeZone }: { feed: PhoneFeed; timeZone: stri
     <section className="phone" aria-labelledby={titleId}>
       <h2 id={titleId}>{t('phone.title')}</h2>
       {messages.length === 0 && <p className="muted">{t('phone.empty')}</p>}
+      {/* Something to answer to: the replies come with the first message. */}
+      {messages.length > 0 && feed.reply !== undefined && <Replies reply={feed.reply} timeZone={timeZone} />}
       <ol className="phone-list" aria-label={t('phone.list')} aria-live="polite">
         {messages.map((m) => (
           <li key={`${m.at}|${m.transition}|${m.role}`}>

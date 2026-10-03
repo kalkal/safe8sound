@@ -1,7 +1,7 @@
-import { PhoneInboxSchema, type InboxMessage } from '@cold-reserve/contracts';
+import { PhoneInboxSchema, PhoneReplyOutputSchema, type InboxMessage, type PhoneReply } from '@cold-reserve/contracts';
 import { z } from 'zod';
 import type { Log } from '../log.js';
-import type { PhoneFeed } from './phone-feed.js';
+import type { PhoneFeed, PhoneReplyResult } from './phone-feed.js';
 
 // The family phone reads the real inbox (#127, review of #136): same-origin GET /phone/inbox, which the
 // dev server proxies to the MCP server adding the phone's token (vite.phone-proxy.ts). The browser never
@@ -9,6 +9,7 @@ import type { PhoneFeed } from './phone-feed.js';
 // Logs carry the code and the poll's correlation id, never a message text (it names the contact).
 
 const INBOX_PATH = '/phone/inbox';
+const REPLY_PATH = '/phone/reply';
 const ProblemSchema = z.object({ code: z.string().min(1).max(64) });
 
 export interface InboxPhoneOptions {
@@ -70,7 +71,46 @@ export function createInboxPhone(options: InboxPhoneOptions): PhoneFeed {
     for (const listener of listeners) listener();
   }
 
+  /** POST /phone/reply through the same proxy: the role is the proxy's token, never sent from here. */
+  async function reply(answer: PhoneReply): Promise<PhoneReplyResult> {
+    const correlationId = options.newId();
+    const abort = new AbortController();
+    const timeout = setTimeout(() => {
+      abort.abort();
+    }, timeoutMs);
+    let response: Response;
+    try {
+      response = await options.fetchFn(REPLY_PATH, {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json', 'x-correlation-id': correlationId },
+        body: JSON.stringify({ reply: answer }),
+        credentials: 'omit',
+        signal: abort.signal,
+      });
+    } catch (error) {
+      const code = abort.signal.aborted ? 'phone_reply_timeout' : 'phone_reply_unreachable';
+      options.log({ level: 'warn', code, correlationId, error });
+      return { ok: false, code };
+    } finally {
+      clearTimeout(timeout);
+    }
+    const body: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      const code = ProblemSchema.safeParse(body).data?.code ?? 'unexpected_error';
+      options.log({ level: 'warn', code, correlationId, details: { status: response.status } });
+      const retry = Number(response.headers.get('retry-after'));
+      return Number.isFinite(retry) && retry > 0 ? { ok: false, code, retryAfterMs: retry * 1000 } : { ok: false, code };
+    }
+    const parsed = PhoneReplyOutputSchema.safeParse(body);
+    if (!parsed.success) {
+      options.log({ level: 'warn', code: 'output_schema_violation', correlationId, details: { issues: parsed.error.issues.length } });
+      return { ok: false, code: 'output_schema_violation' };
+    }
+    return parsed.data.status === undefined ? { ok: true } : { ok: true, status: parsed.data.status };
+  }
+
   return {
+    reply,
     messages: () => current,
     subscribe: (listener) => {
       listeners.add(listener);
