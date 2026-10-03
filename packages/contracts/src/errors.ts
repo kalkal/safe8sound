@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GuaranteeIdSchema } from './guarantees.js';
+import { GuaranteeIdSchema, GuaranteeResultSchema } from './guarantees.js';
 import { MeasureUnitSchema } from './units.js';
 
 // Error taxonomy shared by every package (docs/error-handling.md §2).
@@ -112,6 +112,8 @@ export const ErrorDetailsSchema = z.strictObject({
   ageSeconds: z.number().int().nonnegative().optional(),
   planId: z.string().min(1).max(64).optional(),
   roomId: z.string().min(1).max(64).optional(),
+  /** A guard refusal's whole verdict, for the REJECTED receipt card (approved in #186): at most the five rows. */
+  guarantees: z.array(GuaranteeResultSchema).max(5).optional(),
 });
 export type ErrorDetails = z.infer<typeof ErrorDetailsSchema>;
 

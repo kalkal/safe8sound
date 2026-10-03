@@ -144,6 +144,10 @@ const enUS = {
   'receipt.approved': 'APPROVED',
   'receipt.rejected': 'REJECTED',
   'receipt.lastResort': 'LAST RESORT: {failed} NOT MET',
+  // A plan the guard refused (#186): no plan id was saved, only the proposal.
+  'receipt.titleProposed': 'Guard · proposed plan',
+  'receipt.listProposed': 'Guard check for the proposed plan',
+  'plan.refused': 'The guard refused this plan: {message}',
   'guarantee.storm_reserve': 'Storm reserve',
   'guarantee.inverter_limit': 'Inverter limit',
   'guarantee.battery_power': 'Battery power',
@@ -217,6 +221,7 @@ const enUS = {
   'phone.status': 'Safe room at {temp} °C, safe until {time}.',
   'phone.tooSoon': 'Just sent: try again in {seconds} s.',
   'phone.notSent': 'Not sent: try again.',
+  'phone.sending': 'Sending…',
   'prefs.title': 'Preferences',
   'prefs.comfort': 'Comfort setpoint',
   'prefs.cooler': 'Cooler',

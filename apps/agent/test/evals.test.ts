@@ -148,3 +148,17 @@ describe('runEvals on the Strands loop with the fake model (no Bedrock: cost rul
     expect(report.results.every((r) => !r.pass && r.error === 'agent_unavailable')).toBe(true);
   });
 });
+
+describe('referencePolicy (the local and CI fake model)', () => {
+  const call = (lastUserText: string, toolResults: string[] = []) => ({ messageCount: 1, lastUserText, toolResults, systemPrompt: '', toolNames: [], tools: [] });
+
+  it('every room at 21 °C: proposes exactly that, for the guard to refuse (#186, scene 2b)', () => {
+    expect(referencePolicy(call('Cool every room to 21 degrees now.'))).toEqual({
+      toolUse: { name: 'plan_comfort', input: { goal: 'cool', setpointC: 21, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] } },
+    });
+  });
+
+  it('says a tool error in its own words, without the "Error:" the loop puts before it', () => {
+    expect(referencePolicy(call('x', ['Error: Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W.']))).toEqual({ text: 'Peak load 8.0 kW is above the limit.' });
+  });
+});

@@ -1,5 +1,6 @@
 import {
   ApplyPlanOutputSchema,
+  ErrorEnvelopeSchema,
   GetPreferencesOutputSchema,
   PlanSchema,
   ReserveOutlookSchema,
@@ -9,6 +10,7 @@ import {
   err,
   ok,
   type ApplyPlanOutput,
+  type ErrorEnvelope,
   type GetPreferencesOutput,
   type Plan,
   type PublicPreferences,
@@ -48,6 +50,8 @@ export type CardState =
   | { kind: 'preferences'; data: GetPreferencesOutput }
   | { kind: 'storm'; data: SafeRoomStatus }
   | { kind: 'home'; data: HomeStatus }
+  /** A plan the guard refused, with its whole verdict: the REJECTED receipt (#186). */
+  | { kind: 'refused'; data: ErrorEnvelope }
   | { kind: 'error'; message: string; retryable: boolean };
 
 /** The storm theme only with the grid measured down (plan §11.2 p.13: storm is recognised by more than colour). */
@@ -73,6 +77,11 @@ const EnvelopeSchema = z.object({ message: z.string().min(1), retryable: z.boole
 /** Never trusts the tool result: a failed tool says why in words, contract drift is a calm error, logged. */
 export function parseCardResult(kind: CardKind, result: ToolResultLike): CardState {
   if (result.isError === true) {
+    // The plan card shows a guard refusal as its receipt when the refusal carries all five rows (#186).
+    const refusal = ErrorEnvelopeSchema.safeParse(result.structuredContent);
+    if (kind === 'plan' && refusal.success && refusal.data.category === 'guard_rejection' && refusal.data.details?.guarantees?.length === 5) {
+      return { kind: 'refused', data: refusal.data };
+    }
     const envelope = EnvelopeSchema.safeParse(result.structuredContent);
     return { kind: 'error', message: envelope.success ? envelope.data.message : t('card.failed'), retryable: envelope.success && envelope.data.retryable };
   }

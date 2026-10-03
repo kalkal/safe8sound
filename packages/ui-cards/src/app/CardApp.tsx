@@ -1,6 +1,6 @@
 import type { ApplyPlanOutput } from '@cold-reserve/contracts';
 import { useEffect, useRef, useState } from 'react';
-import { GuardReceipt } from '../GuardReceipt.js';
+import { GuardReceipt, RefusalReceipt } from '../GuardReceipt.js';
 import { IceCubesCard } from '../IceCubesCard.js';
 import { PlanCard } from '../PlanCard.js';
 import { PreferencesCard } from '../PreferencesCard.js';
@@ -65,6 +65,13 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
           />
           {!canAct && <p className="muted">{t('card.noActions')}</p>}
           <GuardReceipt plan={state.data} />
+        </>
+      );
+    case 'refused':
+      return (
+        <>
+          <p role="alert">{t('plan.refused', { message: state.data.message })}</p>
+          <RefusalReceipt refusal={state.data} />
         </>
       );
     case 'applied':

@@ -1,4 +1,4 @@
-import { GUARANTEE_IDS, type GuaranteeResult, type Plan } from '@cold-reserve/contracts';
+import { GUARANTEE_IDS, type DataOriginValue, type ErrorEnvelope, type GuaranteeResult, type Plan } from '@cold-reserve/contracts';
 import { CardShell } from './CardShell.js';
 import { isSimulated } from './plan-model.js';
 import { formatMeasure, t } from './text.js';
@@ -8,26 +8,57 @@ const REAL_HOME_ID = 'home';
 
 /** The guard as a till receipt (signature element 4): all five guarantees, deterministic, no AI. */
 export function GuardReceipt({ plan }: { plan: Plan }) {
-  const results = GUARANTEE_IDS.map((id) => plan.guarantees.find((g) => g.id === id)).filter((g) => g !== undefined);
+  const simulated = isSimulated(plan);
+  return (
+    <ReceiptView
+      guarantees={plan.guarantees}
+      title={t('receipt.title', { id: plan.id })}
+      list={t('receipt.list', { id: plan.id })}
+      origin={simulated ? 'simulated' : 'live'}
+      caveat={simulated && plan.homeId === REAL_HOME_ID}
+      lastResort={plan.lastResort !== undefined}
+    />
+  );
+}
+
+/**
+ * A plan the guard refused (#186): the receipt from the refusal's own verdict, all five rows, REJECTED. No plan
+ * was saved, so it is "the proposed plan"; the refusal does not carry the data origin, so no badge is guessed.
+ */
+export function RefusalReceipt({ refusal }: { refusal: ErrorEnvelope }) {
+  return <ReceiptView guarantees={refusal.details?.guarantees ?? []} title={t('receipt.titleProposed')} list={t('receipt.listProposed')} caveat={false} lastResort={false} />;
+}
+
+interface ReceiptViewProps {
+  guarantees: readonly GuaranteeResult[];
+  title: string;
+  list: string;
+  origin?: DataOriginValue;
+  /** Guarantees computed on simulated data for the real home: said, never presented as about the real home. */
+  caveat: boolean;
+  lastResort: boolean;
+}
+
+function ReceiptView({ guarantees, title, list, origin, caveat, lastResort }: ReceiptViewProps) {
+  const results = GUARANTEE_IDS.map((id) => guarantees.find((g) => g.id === id)).filter((g) => g !== undefined);
   const passed = results.filter((g) => g.ok).length;
   const approved = passed === GUARANTEE_IDS.length;
-  const simulated = isSimulated(plan);
   // A last resort is offered on purpose when a guarantee cannot hold (#160): it says which, never a bare REJECTED.
   const failed = results.filter((g) => !g.ok).map((g) => t(`guarantee.${g.id}`));
-  const stamp = approved ? t('receipt.approved') : plan.lastResort !== undefined ? t('receipt.lastResort', { failed: failed.join(', ') }) : t('receipt.rejected');
+  const stamp = approved ? t('receipt.approved') : lastResort ? t('receipt.lastResort', { failed: failed.join(', ') }) : t('receipt.rejected');
   return (
-    <CardShell title={t('receipt.heading')} origin={simulated ? 'simulated' : 'live'}>
+    <CardShell title={t('receipt.heading')} {...(origin === undefined ? {} : { origin })}>
       <ol className="flow" aria-label={t('receipt.flow')}>
         <li>{t('receipt.proposes')}</li>
         <li data-current="true">{t('receipt.decides')}</li>
         <li>{t('receipt.confirm')}</li>
       </ol>
       {/* Guarantees computed on simulated data are never presented as guarantees about the real home. */}
-      {simulated && plan.homeId === REAL_HOME_ID && <p className="warning">{t('receipt.simulatedCaveat')}</p>}
+      {caveat && <p className="warning">{t('receipt.simulatedCaveat')}</p>}
       <div className="receipt">
-        <p className="receipt-title">{t('receipt.title', { id: plan.id })}</p>
+        <p className="receipt-title">{title}</p>
         <p className="receipt-subtitle">{t('receipt.subtitle')}</p>
-        <ul className="receipt-rows" aria-label={t('receipt.list', { id: plan.id })}>
+        <ul className="receipt-rows" aria-label={list}>
           {results.map((g) => (
             <ReceiptRow key={g.id} result={g} />
           ))}

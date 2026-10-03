@@ -31,6 +31,8 @@ export function readToolCall(
 ): Result<CardToolCall, ErrorEnvelope> {
   const args = params.arguments ?? {};
   if (card.tool === 'plan_comfort' && params.name === 'apply_plan') {
+    // A refused plan (#186) has nothing to apply.
+    if (!('id' in card.result)) return refuse('A refused plan cannot be applied.');
     const parsed = ApplyPlanInputSchema.safeParse(args);
     // The plan card applies its own plan, never another one.
     if (!parsed.success || parsed.data.planId !== card.result.id) return refuse('This card may only apply its own plan.');

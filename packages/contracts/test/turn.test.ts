@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GuardRefusalSchema,
   ProblemDetailsSchema,
   SessionReplySchema,
   SessionRequestSchema,
   SpeechRequestSchema,
   StatusFactsSchema,
+  ToolCardSchema,
   ToolCallReplySchema,
   ToolCallRequestSchema,
   TurnFailureSchema,
@@ -110,5 +112,22 @@ describe('speech wire (F8d, #25, approved in #25): a reply spoken by Polly only 
     for (const bad of [{ text: '', ticket: TICKET }, { text: 'x'.repeat(601), ticket: TICKET }, { text: 'Hi.' }, { text: 'Hi.', ticket: TICKET, voice: 'Matthew' }, { text: 'Hi.', ticket: 'x'.repeat(257) }]) {
       expect(SpeechRequestSchema.safeParse(bad).success).toBe(false);
     }
+  });
+});
+
+describe('the plan card shows a guard refusal (#186, approved)', () => {
+  const rows = ['storm_reserve', 'inverter_limit', 'battery_power', 'safe_room_comfort', 'pacing_on_track'].map((id) => ({ id, ok: id !== 'inverter_limit', reason: 'r' }));
+  const refusal = { code: 'inverter_limit_exceeded', category: 'guard_rejection', message: 'Too much.', retryable: false, details: { guarantee: 'inverter_limit', guarantees: rows } };
+
+  it('a guard refusal with its five rows is a plan_comfort card; a plan still is', () => {
+    expect(GuardRefusalSchema.safeParse(refusal).success).toBe(true);
+    expect(ToolCardSchema.safeParse({ tool: 'plan_comfort', result: refusal }).success).toBe(true);
+  });
+
+  it('any other error is not: another category, or a refusal without its five rows', () => {
+    expect(GuardRefusalSchema.safeParse(toolError('store_unavailable', 'Down.')).success).toBe(false);
+    expect(GuardRefusalSchema.safeParse({ ...refusal, details: { guarantee: 'inverter_limit' } }).success).toBe(false);
+    expect(GuardRefusalSchema.safeParse({ ...refusal, details: { guarantees: rows.slice(0, 4) } }).success).toBe(false);
+    expect(ToolCardSchema.safeParse({ tool: 'apply_plan', result: refusal }).success).toBe(false);
   });
 });

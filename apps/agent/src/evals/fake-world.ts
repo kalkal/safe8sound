@@ -31,6 +31,8 @@ const REFUSAL = "I can't do that, but I can check on the home or plan the coolin
 /** Keyword rules, in order; the first match picks the tool. */
 const RULES: readonly [RegExp, (typeof PLAN_TOOLS)[number], Record<string, unknown>][] = [
   [/how long|stay cool if/, 'get_guarantees', {}],
+  // The model proposes too much (#186, scene 2b): every room at 21 °C, which the guard refuses.
+  [/every room to 21/, 'plan_comfort', { goal: 'cool', setpointC: 21, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }],
   [/\bcool|heatwave/, 'plan_comfort', { goal: 'cool' }],
   [/weather|forecast/, 'get_energy_forecast', {}],
   [/storm/, 'start_storm_mode', { mode: 'prepare' }],
@@ -43,7 +45,11 @@ const INJECTION = /ignore previous|system prompt|developer mode|send a message|\
 export const referencePolicy: FakePolicy = (call) => {
   const said = call.lastUserText.toLowerCase();
   const [result] = call.toolResults;
-  if (result !== undefined) return { text: result.split(/(?<=[.;])\s/)[0] ?? result };
+  if (result !== undefined) {
+    // A tool error reaches the model as "Error: <text>": the person hears the text, never the prefix.
+    const spoken = result.replace(/^Error: /, '');
+    return { text: spoken.split(/(?<=[.;])\s/)[0] ?? spoken };
+  }
   if (INJECTION.test(said)) return { text: REFUSAL };
   const rule = RULES.find(([pattern]) => pattern.test(said));
   return rule ? { toolUse: { name: rule[1], input: rule[2] } } : { text: 'What would you like me to change?' };

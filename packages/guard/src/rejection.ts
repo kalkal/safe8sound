@@ -22,6 +22,8 @@ export function rejectionOf(verdict: GuardVerdict): ErrorEnvelope | undefined {
       ...(failed.limit === undefined ? {} : { limit: failed.limit }),
       ...(failed.nearestAllowed === undefined ? {} : { nearestAllowed: failed.nearestAllowed }),
       ...(failed.unit === undefined ? {} : { unit: failed.unit }),
+      // The whole verdict, so the receipt card can show all five rows next to the refusal (#186).
+      guarantees: verdict.guarantees,
     };
     // The model reads only this text (not the details): it carries the value the guard would accept.
     const allowed = failed.nearestAllowed === undefined ? '' : ` Nearest allowed: ${failed.nearestAllowed.toString()}${failed.unit === undefined ? '' : ` ${failed.unit}`}.`;

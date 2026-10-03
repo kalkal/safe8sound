@@ -12,7 +12,7 @@ import {
   renderCardHtml,
   safeTimeZone,
 } from '../src/app/card-kinds.js';
-import { hotDayPlan, stormPlan, safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
+import { hotDayPlan, inverterRefusal, stormPlan, safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
 import { homeInStorm } from '../src/home-fixtures.js';
 
 afterEach(() => {
@@ -33,6 +33,14 @@ describe('CARD_KINDS: one ui:// resource per tool that shows a card', () => {
 });
 
 describe('parseCardResult: the tool result as the card sees it, never trusted unvalidated', () => {
+  it('a plan the guard refused, with its verdict, is a REJECTED receipt; any other error stays an error (#186)', () => {
+    const refusal = inverterRefusal();
+    expect(parseCardResult('plan', { isError: true, content: [], structuredContent: refusal })).toEqual({ kind: 'refused', data: refusal });
+    const bare = { ...refusal, details: { guarantee: 'inverter_limit' } };
+    expect(parseCardResult('plan', { isError: true, content: [], structuredContent: bare })).toMatchObject({ kind: 'error' });
+    expect(parseCardResult('plan', { isError: true, content: [], structuredContent: toolError('store_unavailable', 'Down.') })).toMatchObject({ kind: 'error' });
+  });
+
   it('reads structuredContent with the contract schema of the card', () => {
     expect(parseCardResult('plan', { content: [], structuredContent: hotDayPlan() })).toMatchObject({ kind: 'plan', data: { id: 'plan_7Hq2mX9vK3' } });
     const view = { preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };

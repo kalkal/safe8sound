@@ -1,4 +1,4 @@
-import { PlanSchema, SafeRoomStatusSchema, type Plan, type SafeRoomStatus } from '@cold-reserve/contracts';
+import { ErrorEnvelopeSchema, PlanSchema, SafeRoomStatusSchema, type ErrorEnvelope, type Plan, type SafeRoomStatus } from '@cold-reserve/contracts';
 import { examplePlan } from '@cold-reserve/contracts/fixtures';
 
 // Card fixtures, built only from the contract fixtures and parsed by the contract schemas.
@@ -72,6 +72,23 @@ export function lastResortPlan(): Plan {
   };
   plan.warnings = [{ code: 'last_resort_plan', message: 'Last resort: within its limits until 22:00, then up to 26.1 °C by 03:00.' }];
   return PlanSchema.parse(plan);
+}
+
+/**
+ * The guard refuses a plan the model proposed (#186): 21 °C in every room is more than the inverter gives on
+ * grid. The refusal carries the whole verdict, so the receipt shows all five rows.
+ */
+export function inverterRefusal(): ErrorEnvelope {
+  const guarantees = rejectedPlan().guarantees.map((g) =>
+    g.id === 'inverter_limit' ? { ...g, reason: 'Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid.', measured: 8000, limit: 6000, nearestAllowed: 6000 } : g,
+  );
+  return ErrorEnvelopeSchema.parse({
+    code: 'inverter_limit_exceeded',
+    category: 'guard_rejection',
+    message: 'Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W.',
+    retryable: false,
+    details: { guarantee: 'inverter_limit', measured: 8000, limit: 6000, nearestAllowed: 6000, unit: 'W', guarantees },
+  });
 }
 
 /** The real home during the hackathon: advice only, with a warning the voice must say. */

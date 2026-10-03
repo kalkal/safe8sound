@@ -133,4 +133,12 @@ describe('ErrorEnvelopeSchema', () => {
   it('rejects free-form details (details has a real type)', () => {
     expect(ErrorEnvelopeSchema.safeParse({ ...base, details: { stack: 'at foo()' } }).success).toBe(false);
   });
+
+  it('a guard refusal may carry the whole verdict: at most the five guarantee rows (#186)', () => {
+    const rows = ['storm_reserve', 'inverter_limit', 'battery_power', 'safe_room_comfort', 'pacing_on_track'].map((id) => ({ id, ok: id !== 'inverter_limit', reason: 'r' }));
+    const refusal = { code: 'inverter_limit_exceeded', category: 'guard_rejection', message: 'Too much.', retryable: false, details: { guarantee: 'inverter_limit', guarantees: rows } };
+    expect(ErrorEnvelopeSchema.safeParse(refusal).success).toBe(true);
+    const six = { ...refusal, details: { guarantees: [...rows, rows[0]] } };
+    expect(ErrorEnvelopeSchema.safeParse(six).success).toBe(false);
+  });
 });

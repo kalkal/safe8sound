@@ -46,7 +46,8 @@ describe('rejectionOf', () => {
       category: 'guard_rejection',
       message: 'Too much. Nearest allowed: 5 W.',
       retryable: false,
-      details: { guarantee: id, measured: 7, limit: 5, nearestAllowed: 5, unit: 'W' },
+      // The whole verdict rides along, so the receipt can show all five rows (#186).
+      details: { guarantee: id, measured: 7, limit: 5, nearestAllowed: 5, unit: 'W', guarantees: all(failing) },
     });
   });
 

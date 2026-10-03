@@ -12,7 +12,7 @@ export const refuseAction = (): ToolCallResult =>
 
 function applyPlan(args: Record<string, unknown>): ToolCallResult {
   const lastResort = SCRIPT_FIXTURES['last-resort-plan']();
-  if (lastResort.tool === 'plan_comfort' && args['planId'] === lastResort.result.id) return applyLastResort(args['lastResortToken']);
+  if (lastResort.tool === 'plan_comfort' && 'id' in lastResort.result && args['planId'] === lastResort.result.id) return applyLastResort(args['lastResortToken']);
   const applied = SCRIPT_FIXTURES['hot-day-applied']();
   if (applied.tool !== 'apply_plan' || args['planId'] !== applied.result.plan.id) {
     return toolErrorResult(toolError('plan_not_found', 'That plan is not known: ask for a new one.'));

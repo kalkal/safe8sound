@@ -47,6 +47,18 @@
       ]
     },
     {
+      "id": "plan-refused",
+      "patterns": ["every room to 21"],
+      "text": "The guard refused that plan: peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid.",
+      "withStatus": false,
+      "cards": [
+        {
+          "tool": "plan_comfort",
+          "fixture": "plan-refused"
+        }
+      ]
+    },
+    {
       "id": "last-resort",
       "patterns": ["last resort", "hot night"],
       "text": "I can't keep the bedroom within the night limit. Last resort: it stays within its limits until 22:00, then goes up to 26.1 degrees by 03:00. To apply it, tap Apply the last-resort plan on the card.",

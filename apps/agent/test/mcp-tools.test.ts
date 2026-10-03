@@ -94,6 +94,26 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
     expect(recorder.cards()).toEqual([]);
   });
 
+  it('a guard refusal with its verdict becomes the plan card (REJECTED receipt), and the model still gets the error text (#186)', async () => {
+    const rows = ['storm_reserve', 'inverter_limit', 'battery_power', 'safe_room_comfort', 'pacing_on_track'].map((id) => ({ id, ok: id !== 'inverter_limit', reason: 'r' }));
+    const refusal = { code: 'inverter_limit_exceeded', category: 'guard_rejection', message: 'Peak load too high. Nearest allowed: 6000 W.', retryable: false, details: { guarantee: 'inverter_limit', guarantees: rows } };
+    const { session } = fakeSession({ plan_comfort: { text: refusal.message, structuredContent: refusal, isError: true } });
+    const recorder = createTurnRecorder();
+    const tools = await mcpToolset(session, recorder);
+    await expect(run(tools, 'plan_comfort', { goal: 'cool' })).rejects.toThrow('Nearest allowed: 6000 W.');
+    expect(recorder.cards()).toEqual([{ tool: 'plan_comfort', result: refusal }]);
+  });
+
+  it('a refusal without its verdict, or an error of another kind, stays text only', async () => {
+    const { session } = fakeSession({
+      plan_comfort: { text: 'No.', structuredContent: { code: 'inverter_limit_exceeded', category: 'guard_rejection', message: 'No.', retryable: false }, isError: true },
+    });
+    const recorder = createTurnRecorder();
+    const tools = await mcpToolset(session, recorder);
+    await expect(run(tools, 'plan_comfort', { goal: 'cool' })).rejects.toThrow('No.');
+    expect(recorder.cards()).toEqual([]);
+  });
+
   it('passes the model arguments through unchanged: a "home" argument is the server\'s problem, never a header', async () => {
     const { session, calls } = fakeSession({ get_home_status: { text: 'ok' } });
     const tools = await mcpToolset(session, createTurnRecorder());

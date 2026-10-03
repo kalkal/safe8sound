@@ -16,7 +16,7 @@ export {
   type ToolResultLike,
 } from './app/card-kinds.js';
 export { CardShell, OriginBadge } from './CardShell.js';
-export { GuardReceipt } from './GuardReceipt.js';
+export { GuardReceipt, RefusalReceipt } from './GuardReceipt.js';
 export { IceCubesCard, cubeFills } from './IceCubesCard.js';
 export { PlanCard, type PlanCardProps } from './PlanCard.js';
 export { PreferencesCard, type PreferencesCardProps } from './PreferencesCard.js';
@@ -24,6 +24,6 @@ export { FloorPlanCard } from './FloorPlanCard.js';
 export { ManualControlCard, type ManualReason } from './ManualControlCard.js';
 export { SafeRoomCard } from './SafeRoomCard.js';
 export { homeInStorm } from './home-fixtures.js';
-export { advisoryPlan, hotDayPlan, lastResortPlan, rejectedPlan, safeRoomCalm, safeRoomInStorm, stormPlan } from './fixtures.js';
+export { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, rejectedPlan, safeRoomCalm, safeRoomInStorm, stormPlan } from './fixtures.js';
 export { homeClock, levelSpans, pacingGeometry } from './plan-model.js';
 export { cardThemeFor, type CardTheme } from './theme.js';

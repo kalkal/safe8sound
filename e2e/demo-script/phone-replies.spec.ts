@@ -3,7 +3,8 @@ import { expect, test } from '../no-network.js';
 // Queue item 3 (#24): during the storm the daughter's phone answers by touch, "I'm on my way" or "Check status".
 // One tap, one reply; the phone says it was sent. ScriptedAgent and the scripted phone only.
 
-test('the family phone answers during the storm, by touch', async ({ page }) => {
+test('the family phone answers during the storm, by touch, on a 375 px phone', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/');
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
   // Nothing to answer before a message arrives.

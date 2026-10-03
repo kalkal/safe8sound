@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CardApp } from '../src/app/CardApp.js';
 import type { CardState } from '../src/app/card-kinds.js';
-import { advisoryPlan, hotDayPlan, lastResortPlan, safeRoomInStorm } from '../src/fixtures.js';
+import { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, safeRoomInStorm } from '../src/fixtures.js';
 import { homeInStorm } from '../src/home-fixtures.js';
 
 afterEach(cleanup);
@@ -123,6 +123,14 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     show({ kind: 'storm', data: safeRoomInStorm() });
     expect(screen.getByRole('region', { name: 'Safe room · Bedroom 1' })).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toContain('Storm mode');
+  });
+
+  it('a refused plan: what the guard said, with the nearest allowed value, and the REJECTED receipt; nothing to apply (#186)', () => {
+    show({ kind: 'refused', data: inverterRefusal() });
+    expect(screen.getByRole('alert').textContent).toBe('The guard refused this plan: Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W.');
+    expect(screen.getByRole('region', { name: 'Guard check' })).toBeTruthy();
+    expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');
+    expect(screen.queryByRole('button', { name: /Apply/ })).toBeNull();
   });
 
   it('shows the ice cubes', () => {

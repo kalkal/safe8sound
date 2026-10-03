@@ -1,4 +1,4 @@
-import { CORRELATION_ID_HEADER, HOME_HEADER, StatusFactsSchema, ToolCardSchema, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
+import { CORRELATION_ID_HEADER, GuardRefusalSchema, HOME_HEADER, StatusFactsSchema, ToolCardSchema, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -77,8 +77,12 @@ export async function mcpToolset(session: McpSession, recorder: TurnRecorder): P
           // The Strands loop passes its cancel signal (turn deadline); a direct invoke may not.
           const signal = (context as { cancelSignal?: AbortSignal } | undefined)?.cancelSignal;
           const result = await session.callTool(info.name, args, signal, recorder.correlationId());
-          // A tool error reaches the model as an error result (with its text); it never becomes a card.
-          if (result.isError === true) throw new Error(textOf(result));
+          // A tool error reaches the model as an error result (with its text). Only a guard refusal with its
+          // verdict also becomes a card, the REJECTED receipt (#186); every other error stays text.
+          if (result.isError === true) {
+            if (info.name === 'plan_comfort' && GuardRefusalSchema.safeParse(result.structuredContent).success) recorder.record(info.name, result.structuredContent);
+            throw new Error(textOf(result));
+          }
           recorder.record(info.name, result.structuredContent);
           return textOf(result);
         },

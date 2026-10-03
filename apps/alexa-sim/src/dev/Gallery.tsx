@@ -3,6 +3,7 @@ import { HomeProfileSchema, PlanSchema, PreferencesSchema, ReserveOutlookSchema,
 import { exampleHomeProfile, examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import {
   GuardReceipt,
+  RefusalReceipt,
   IceCubesCard,
   PlanCard,
   PreferencesCard,
@@ -12,6 +13,7 @@ import {
   advisoryPlan,
   cardThemeFor,
   hotDayPlan,
+  inverterRefusal,
   lastResortPlan,
   rejectedPlan,
   homeInStorm,
@@ -51,6 +53,7 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       <PlanCard plan={stormPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <PlanCard plan={lastResortPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <GuardReceipt plan={lastResortPlan()} />
+      <RefusalReceipt refusal={inverterRefusal()} />
       <SafeRoomCard status={safeRoomInStorm()} />
       <FloorPlanCard status={homeInStorm()} />
       <ManualControlCard

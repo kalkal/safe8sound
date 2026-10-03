@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { ApplyPlanOutputSchema } from '@cold-reserve/contracts';
+import { ApplyPlanOutputSchema, GuardRefusalSchema } from '@cold-reserve/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDemoSession } from '../../src/agent/demo-session.js';
 import { createRemoteAgent } from '../../src/agent/remote-agent.js';
@@ -89,6 +89,22 @@ describe('remote mode: simulator -> sim-api -> agent -> MCP server', () => {
     expect(answer.value.status?.origin).toMatchObject({ energy: 'simulated' });
   }, 60_000);
 
+  it('a plan the guard refuses comes back with its REJECTED receipt card, and the voice says why (#186)', async () => {
+    const { session, agent } = remote();
+    await session.start(CODE);
+    const answer = await agent.ask('Cool every room to 21 degrees now.', { correlationId: crypto.randomUUID() });
+    expect(answer.ok).toBe(true);
+    if (!answer.ok) return;
+    const card = answer.value.cards?.find((c) => c.tool === 'plan_comfort');
+    if (card?.tool !== 'plan_comfort' || 'id' in card.result) throw new Error('no refusal card');
+    const refusal = GuardRefusalSchema.parse(card.result);
+    expect(refusal.details?.guarantees?.filter((g) => !g.ok).map((g) => g.id)).toContain(refusal.details?.guarantee);
+    expect(refusal.details?.nearestAllowed).toBeDefined();
+    // The voice says the refusal's own reason, never "applied".
+    expect(answer.value.text).toBe(refusal.message.split(/(?<=[.;])\s/)[0]);
+    expect(answer.value.text).not.toMatch(/applied/i);
+  }, 60_000);
+
   it('applies a plan from its card (the card action goes through sim-api to the MCP server)', async () => {
     const { session, agent } = remote();
     await session.start(CODE);
@@ -97,7 +113,7 @@ describe('remote mode: simulator -> sim-api -> agent -> MCP server', () => {
     if (!answer.ok) return;
     const card = answer.value.cards?.find((c) => c.tool === 'plan_comfort');
     expect(card?.tool).toBe('plan_comfort');
-    if (card?.tool !== 'plan_comfort') return;
+    if (card?.tool !== 'plan_comfort' || !('id' in card.result)) throw new Error('no plan card');
     const applied = await agent.callTool('apply_plan', { planId: card.result.id }, { correlationId: crypto.randomUUID() });
     expect(applied.isError).toBeFalsy();
     // The applied plan itself, as the card shows it (review of #140): the same plan, applied once, on a sandbox.

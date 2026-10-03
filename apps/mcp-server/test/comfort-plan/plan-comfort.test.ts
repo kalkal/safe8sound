@@ -52,6 +52,9 @@ describe('plan_comfort (two-phase: propose)', () => {
     if (r.ok) return;
     expect(r.error.category).toBe('guard_rejection');
     expect(r.error.details?.nearestAllowed).toBeDefined();
+    // The whole verdict rides along for the REJECTED receipt (#186): five rows, the failing one among them.
+    expect(r.error.details?.guarantees?.map((g) => g.id)).toEqual([...GUARANTEE_IDS]);
+    expect(r.error.details?.guarantees?.find((g) => g.id === r.error.details?.guarantee)?.ok).toBe(false);
     const missing = await w.store.getPlan(PlanIdSchema.parse('plan_test_0001'));
     expect(missing.ok).toBe(false);
     const rejections = await w.store.listGuardRejections();

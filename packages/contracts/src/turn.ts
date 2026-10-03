@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ApplyPlanInputSchema, ApplyPlanOutputSchema } from './comfort-plan.js';
 import { IsoDateTimeSchema } from './common.js';
-import { ErrorCategorySchema, ErrorCodeSchema, categoryOf } from './errors.js';
+import { ErrorCategorySchema, ErrorCodeSchema, ErrorEnvelopeSchema, categoryOf } from './errors.js';
 import { DataOriginSchema } from './origin.js';
 import { PlanSchema } from './plan.js';
 import { GetPreferencesOutputSchema, SetPreferencesInputSchema } from './preferences-view.js';
@@ -35,8 +35,17 @@ export const StatusFactsSchema = z.strictObject({
 export type StatusFacts = z.infer<typeof StatusFactsSchema>;
 
 /** A tool result the answer shows as a card: the MCP structuredContent, validated by its contract. */
+/**
+ * A plan the guard refused, with its whole verdict (approved in #186): the plan card shows it as the REJECTED
+ * receipt. Only a guard_rejection with the five guarantee rows; every other error stays text.
+ */
+export const GuardRefusalSchema = ErrorEnvelopeSchema.refine((e) => e.category === 'guard_rejection' && e.details?.guarantees?.length === 5, {
+  message: 'A guard refusal carries the five guarantee rows',
+});
+export type GuardRefusal = z.infer<typeof GuardRefusalSchema>;
+
 export const ToolCardSchema = z.discriminatedUnion('tool', [
-  z.strictObject({ tool: z.literal('plan_comfort'), result: PlanSchema }),
+  z.strictObject({ tool: z.literal('plan_comfort'), result: z.union([PlanSchema, GuardRefusalSchema]) }),
   z.strictObject({ tool: z.literal('apply_plan'), result: ApplyPlanOutputSchema }),
   z.strictObject({ tool: z.literal('get_reserve_outlook'), result: ReserveOutlookSchema }),
   z.strictObject({ tool: z.literal('get_preferences'), result: GetPreferencesOutputSchema }),

@@ -61,7 +61,7 @@ function Replies({ reply, timeZone }: { reply: NonNullable<PhoneFeed['reply']>; 
         {t('phone.checkStatus')}
       </button>
       <p className="muted" role="status">
-        {said ?? ''}
+        {sending ? t('phone.sending') : (said ?? '')}
       </p>
     </div>
   );

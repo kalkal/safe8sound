@@ -292,6 +292,58 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                     ],
                     "type": "string",
                   },
+                  "guarantees": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "enum": [
+                            "storm_reserve",
+                            "inverter_limit",
+                            "battery_power",
+                            "safe_room_comfort",
+                            "pacing_on_track",
+                          ],
+                          "type": "string",
+                        },
+                        "limit": {
+                          "type": "number",
+                        },
+                        "measured": {
+                          "type": "number",
+                        },
+                        "nearestAllowed": {
+                          "type": "number",
+                        },
+                        "ok": {
+                          "type": "boolean",
+                        },
+                        "reason": {
+                          "maxLength": 300,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "unit": {
+                          "enum": [
+                            "W",
+                            "Wh",
+                            "%",
+                            "C",
+                            "min",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "id",
+                        "ok",
+                        "reason",
+                      ],
+                      "type": "object",
+                    },
+                    "maxItems": 5,
+                    "type": "array",
+                  },
                   "issues": {
                     "items": {
                       "additionalProperties": false,

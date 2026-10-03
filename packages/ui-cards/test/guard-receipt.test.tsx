@@ -2,8 +2,8 @@
 import { PlanSchema, type Plan } from '@cold-reserve/contracts';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { GuardReceipt } from '../src/GuardReceipt.js';
-import { advisoryPlan, hotDayPlan, lastResortPlan, rejectedPlan } from '../src/fixtures.js';
+import { GuardReceipt, RefusalReceipt } from '../src/GuardReceipt.js';
+import { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, rejectedPlan } from '../src/fixtures.js';
 
 afterEach(cleanup);
 
@@ -86,5 +86,17 @@ describe('GuardReceipt', () => {
   it('a plan the guard refuses is still REJECTED', () => {
     render(<GuardReceipt plan={rejectedPlan()} />);
     expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');
+  });
+
+  it('a refusal shows all five rows from its verdict, the failing one marked in words, and REJECTED (#186)', () => {
+    render(<RefusalReceipt refusal={inverterRefusal()} />);
+    const list = screen.getByRole('list', { name: 'Guard check for the proposed plan' });
+    const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(5);
+    const inverter = items.find((r) => within(r).getByTestId('guarantee-name').textContent === 'Inverter limit');
+    expect(inverter && within(inverter).getByTestId('guarantee-verdict').textContent).toBe('FAIL');
+    expect(inverter?.textContent).toContain('nearest allowed 6 kW');
+    expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');
+    expect(screen.getByText('4/5 PASS · no AI in this check')).toBeTruthy();
   });
 });

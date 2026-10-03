@@ -1,6 +1,6 @@
 import { ReserveOutlookSchema, toolError } from '@cold-reserve/contracts';
 import { exampleReserveOutlook } from '@cold-reserve/contracts/fixtures';
-import { hotDayPlan, lastResortPlan } from '@cold-reserve/ui-cards';
+import { hotDayPlan, inverterRefusal, lastResortPlan } from '@cold-reserve/ui-cards';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent } from '../../src/agent/agent.js';
 import type { ToolCard } from '../../src/agent/wire.js';
@@ -29,6 +29,11 @@ describe('readToolCall: each card bound to its own action', () => {
     const args = { planId: 'plan_7Hq2mX9vK3', lastResortToken: `lr_${'A'.repeat(32)}` };
     expect(readToolCall({ name: 'apply_plan', arguments: args }, planCard)).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
     expect(readToolCall({ name: 'apply_plan', arguments: args }, planCard, createFrameConfirmation())).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+  });
+
+  it('a refused plan has nothing to apply: its card may call nothing (#186)', () => {
+    const refused: ToolCard = { tool: 'plan_comfort', result: inverterRefusal() };
+    expect(readToolCall({ name: 'apply_plan', arguments: { planId: 'plan_7Hq2mX9vK3' } }, refused)).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
   });
 
   it('lets the preferences card save a confirmed change only', () => {

@@ -49,7 +49,9 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
       hostContext: { ...contextRef.current, displayMode: 'inline', availableDisplayModes: ['inline'] },
     });
     bridge.addEventListener('initialized', () => {
-      bridge.sendToolResult({ content: [], structuredContent: card.result }).catch((error: unknown) => {
+      // A refused plan (#186) reaches the frame as what it is: an error result, with the guard's verdict.
+      const refused = card.tool === 'plan_comfort' && !('id' in card.result);
+      bridge.sendToolResult({ content: [], structuredContent: card.result, ...(refused ? { isError: true } : {}) }).catch((error: unknown) => {
         log({ level: 'error', code: 'unexpected_error', correlationId: turnId, error, details: { step: 'send_tool_result', card: card.tool } });
         setFailed(true);
       });

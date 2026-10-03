@@ -1,6 +1,6 @@
 import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
-import { homeInStorm, hotDayPlan, lastResortPlan, safeRoomCalm, safeRoomInStorm, stormPlan } from '@cold-reserve/ui-cards';
+import { homeInStorm, hotDayPlan, inverterRefusal, lastResortPlan, safeRoomCalm, safeRoomInStorm, stormPlan } from '@cold-reserve/ui-cards';
 import { ToolCardSchema, type ToolCard } from './wire.js';
 
 // The tool results the script can show, by name: built from the contract fixtures, the same data the
@@ -19,6 +19,8 @@ export const SCRIPT_FIXTURES = {
       tool: 'apply_plan',
       result: { plan: { ...hotDayPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] },
     }),
+  /** The model proposed too much (#186, scene 2b): the guard's refusal with its whole verdict. */
+  'plan-refused': () => card({ tool: 'plan_comfort', result: inverterRefusal() }),
   /** A last resort (#160): the night limit cannot hold; the plan says until when, and how warm after. */
   'last-resort-plan': () => card({ tool: 'plan_comfort', result: lastResortPlan() }),
   /** The first yes: nothing is applied, the confirmation asks for a second yes. */
