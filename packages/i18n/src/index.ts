@@ -71,8 +71,9 @@ const enUS = {
   'lastResort.sign.faint': 'Fainting, or a seizure (fit)',
   'lastResort.call': 'If you are worried, call 112.',
   'lastResort.notMedical': 'These are general tips, not medical advice.',
-  'card.expand': 'Expand',
-  'card.collapse': 'Collapse',
+  // The whole frame, through the host (plan §11.2 p.2, #200): the words say what happens.
+  'card.fullScreen': 'Full screen',
+  'card.back': 'Back',
   'card.loading': 'Loading…',
   'card.failed': 'This card could not be shown.',
   'card.noActions': 'Card actions are not available here: say it instead.',

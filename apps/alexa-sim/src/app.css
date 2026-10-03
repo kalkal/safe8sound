@@ -231,6 +231,15 @@
     border: 0;
   }
 
+  /* Full screen only when the person asks (plan §11.2 p.2, #200): the frame covers the page until "Back". */
+  .card-frame-host[data-fullscreen="true"] {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    padding: var(--space-2);
+    background: var(--surface-card);
+  }
+
   .theme-toggle {
     justify-self: end;
   }

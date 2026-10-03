@@ -74,13 +74,9 @@ describe('PlanCard', () => {
     expect(screen.getAllByText('not needed')).toHaveLength(4);
   });
 
-  it('stays inline until the person expands it', () => {
+  it('a card has no button that only flips its own label (#200): full screen belongs to the frame', () => {
     show(hotDayPlan());
-    const expand = screen.getByRole('button', { name: 'Expand' });
-    expect(expand.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(expand);
-    expect(screen.getByRole('button', { name: 'Collapse' }).getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('region', { name: 'Plan' }).dataset['expanded']).toBe('true');
+    expect(screen.queryByRole('button', { name: /Expand|Collapse/ })).toBeNull();
   });
 
   it('in a storm draws no floor and says the storm reserve is in use', () => {

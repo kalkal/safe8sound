@@ -184,4 +184,39 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     show({ kind: 'preferences', data: view }, undefined, false);
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
   });
+
+  describe('full screen only when the person asks (plan §11.2 p.2, #200)', () => {
+    const view = (display?: { canFullscreen: boolean; fullscreen: boolean; toggle: () => void }) =>
+      render(<CardApp state={{ kind: 'plan', data: hotDayPlan() }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} {...(display === undefined ? {} : { display })} />);
+
+    it('offers one "Full screen" for the whole frame when the host can show it, and asks the host on a tap', () => {
+      const toggle = vi.fn();
+      view({ canFullscreen: true, fullscreen: false, toggle });
+      // The plan and its receipt are two cards, one frame: one button.
+      expect(screen.getAllByRole('button', { name: 'Full screen' })).toHaveLength(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
+      expect(toggle).toHaveBeenCalledTimes(1);
+    });
+
+    it('in full screen says "Back", and Escape goes back too', () => {
+      const toggle = vi.fn();
+      view({ canFullscreen: true, fullscreen: true, toggle });
+      expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(toggle).toHaveBeenCalledTimes(1);
+    });
+
+    it('Escape inline does nothing; a host without full screen gets no button at all', () => {
+      const toggle = vi.fn();
+      view({ canFullscreen: true, fullscreen: false, toggle });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(toggle).not.toHaveBeenCalled();
+      cleanup();
+      view({ canFullscreen: false, fullscreen: false, toggle });
+      expect(screen.queryByRole('button', { name: 'Full screen' })).toBeNull();
+      cleanup();
+      view();
+      expect(screen.queryByRole('button', { name: 'Full screen' })).toBeNull();
+    });
+  });
 });

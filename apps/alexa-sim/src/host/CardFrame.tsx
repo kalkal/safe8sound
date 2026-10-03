@@ -6,6 +6,7 @@ import { log } from '../log.js';
 import { t } from '../ui/text.js';
 import { useCardHost } from './card-host.js';
 import { FrameTransport } from './frame-guard.js';
+import { makeRestInert } from './inert.js';
 import { answerCardCall, createFrameConfirmation } from './tool-calls.js';
 
 // One MCP Apps card (plan §9.3–9.4): a sandboxed srcdoc iframe without allow-same-origin, the host's
@@ -15,6 +16,8 @@ import { answerCardCall, createFrameConfirmation } from './tool-calls.js';
 
 const HOST_INFO = { name: 'cold-reserve-alexa-sim', version: '0.1.0' };
 const INITIAL_HEIGHT_PX = 360;
+/** The modes this host can show a card in (#200): full screen only when the person asks for it. */
+const DISPLAY_MODES: ('inline' | 'fullscreen')[] = ['inline', 'fullscreen'];
 
 /** The card kind that shows a tool's result; a tool without a card has none (never another card's kind). */
 export const kindOf = (tool: string): CardKind | undefined => (Object.keys(CARD_KINDS) as CardKind[]).find((kind) => CARD_KINDS[kind].tool === tool);
@@ -38,6 +41,7 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
   contextRef.current = { theme, timeZone };
   const [height, setHeight] = useState(INITIAL_HEIGHT_PX);
   const [failed, setFailed] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     const iframe = frameRef.current;
@@ -46,7 +50,7 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
     // Card actions only when the agent can run them: the card hides Apply/Save otherwise.
     const capabilities = agent.canCallTools ? { serverTools: {}, logging: {} } : { logging: {} };
     const bridge = new AppBridge(null, HOST_INFO, capabilities, {
-      hostContext: { ...contextRef.current, displayMode: 'inline', availableDisplayModes: ['inline'] },
+      hostContext: { ...contextRef.current, displayMode: 'inline', availableDisplayModes: DISPLAY_MODES },
     });
     bridge.addEventListener('initialized', () => {
       // A refused plan (#186) reaches the frame as what it is: an error result, with the guard's verdict.
@@ -56,6 +60,12 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
         setFailed(true);
       });
     });
+    // The card asks; the host decides and answers with the mode it really set (MCP Apps).
+    bridge.onrequestdisplaymode = ({ mode }) => {
+      const next = mode === 'fullscreen' ? 'fullscreen' : 'inline';
+      setFullscreen(next === 'fullscreen');
+      return Promise.resolve({ mode: next });
+    };
     bridge.addEventListener('sizechange', ({ height: h }) => {
       if (typeof h === 'number' && h > 0) setHeight(Math.ceil(h));
     });
@@ -84,17 +94,47 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
   }, [agent, card, document, turnId]);
 
   useEffect(() => {
-    bridgeRef.current?.setHostContext({ theme, timeZone, displayMode: 'inline', availableDisplayModes: ['inline'] });
-  }, [theme, timeZone]);
+    bridgeRef.current?.setHostContext({ theme, timeZone, displayMode: fullscreen ? 'fullscreen' : 'inline', availableDisplayModes: DISPLAY_MODES });
+  }, [theme, timeZone, fullscreen]);
+
+  // Full screen: Escape on the page goes back too (inside the frame the card handles it), and focus follows
+  // the frame in and back, so a keyboard user is never left behind the overlay.
+  const shownMode = useRef(fullscreen);
+  const hostRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Only a change of mode moves focus: a frame that just appeared never takes it from the Ask box.
+    // Focus already inside the frame (the card's own Back, by keyboard) stays where it is.
+    if (shownMode.current !== fullscreen && window.document.activeElement !== frameRef.current) frameRef.current?.focus();
+    shownMode.current = fullscreen;
+    if (!fullscreen) return undefined;
+    // A modal dialog: the rest of the page is inert until Back (#206 review).
+    const restoreRest = hostRef.current === null ? undefined : makeRestInert(hostRef.current);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      restoreRest?.();
+    };
+  }, [fullscreen]);
 
   if (!document.ok || failed) return <p role="alert">{t('surface.failed')}</p>;
+  // The wrapper is always there, so the frame is never remounted (that would reload the card).
   return (
-    <iframe
-      ref={frameRef}
-      className="card-frame"
-      title={t(`cardFrame.${kind}`)}
-      sandbox="allow-scripts"
-      style={{ blockSize: `${String(height)}px`, colorScheme: theme }}
-    />
+    <div
+      ref={hostRef}
+      className="card-frame-host"
+      data-fullscreen={fullscreen}
+      {...(fullscreen ? { role: 'dialog', 'aria-modal': true, 'aria-label': t(`cardFrame.${kind}`) } : {})}
+    >
+      <iframe
+        ref={frameRef}
+        className="card-frame"
+        title={t(`cardFrame.${kind}`)}
+        sandbox="allow-scripts"
+        style={{ blockSize: fullscreen ? '100%' : `${String(height)}px`, colorScheme: theme }}
+      />
+    </div>
   );
 }

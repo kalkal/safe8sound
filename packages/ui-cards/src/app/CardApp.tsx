@@ -9,6 +9,7 @@ import { ManualControlCard } from '../ManualControlCard.js';
 import { SafeRoomCard } from '../SafeRoomCard.js';
 import { homeClock } from '../plan-model.js';
 import { t } from '../text.js';
+import { DisplayToggle, type DisplayControl } from '../CardShell.js';
 import { CardErrorBoundary } from './CardErrorBoundary.js';
 import type { CardState } from './card-kinds.js';
 
@@ -22,12 +23,15 @@ export interface CardAppProps {
   onCallTool: (name: string, args: Record<string, unknown>) => void;
   /** The outcome of the last action (e.g. "Preferences saved." or the error in words). */
   notice?: { ok: boolean; text: string };
+  /** Full screen for the whole frame, when the host offers it (#200). */
+  display?: DisplayControl;
 }
 
 /** The content of one ui:// frame. The host owns the conversation; the card only shows and asks. */
-export function CardApp({ notice, ...props }: CardAppProps) {
+export function CardApp({ notice, display, ...props }: CardAppProps) {
   return (
     <CardErrorBoundary>
+      {display !== undefined && <DisplayToggle display={display} />}
       {notice !== undefined &&
         (notice.ok ? (
           <p className="notice" role="status">

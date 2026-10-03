@@ -1,5 +1,5 @@
 import { useApp, type McpUiHostContext } from '@modelcontextprotocol/ext-apps/react';
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { t } from '../text.js';
 import { cardThemeFor } from '../theme.js';
@@ -10,7 +10,7 @@ import { isCardKind, isStormState, parseCardResult, parseSaveResult, safeTimeZon
 // Entry of the ui:// card bundle. The document names its card (data-card); the host sends the tool
 // result and the context (theme, time zone) through the MCP Apps bridge. Covered by the host e2e tests.
 
-type Context = Pick<McpUiHostContext, 'theme' | 'timeZone'>;
+type Context = Pick<McpUiHostContext, 'theme' | 'timeZone' | 'displayMode' | 'availableDisplayModes'>;
 
 function Card({ kind }: { kind: CardKind }) {
   const [state, setState] = useState<CardState>({ kind: 'waiting' });
@@ -19,20 +19,34 @@ function Card({ kind }: { kind: CardKind }) {
 
   const { app, error } = useApp({
     appInfo: { name: 'cold-reserve-cards', version: '0.1.0' },
-    capabilities: {},
+    // The card can be shown inline or full screen (#200); the host decides which it offers.
+    capabilities: { availableDisplayModes: ['inline', 'fullscreen'] },
     onAppCreated: (created) => {
       created.addEventListener('toolresult', (result) => {
         setState(parseCardResult(kind, result));
       });
-      created.addEventListener('hostcontextchanged', ({ theme, timeZone }) => {
-        setContext((previous) => ({ ...previous, ...(theme !== undefined && { theme }), ...(timeZone !== undefined && { timeZone }) }));
+      created.addEventListener('hostcontextchanged', ({ theme, timeZone, displayMode, availableDisplayModes }) => {
+        setContext((previous) => ({
+          ...previous,
+          ...(theme !== undefined && { theme }),
+          ...(timeZone !== undefined && { timeZone }),
+          ...(displayMode !== undefined && { displayMode }),
+          ...(availableDisplayModes !== undefined && { availableDisplayModes }),
+        }));
       });
     },
   });
 
   useEffect(() => {
     const initial = app?.getHostContext();
-    if (initial) setContext({ ...(initial.theme !== undefined && { theme: initial.theme }), ...(initial.timeZone !== undefined && { timeZone: initial.timeZone }) });
+    if (initial) {
+      setContext({
+        ...(initial.theme !== undefined && { theme: initial.theme }),
+        ...(initial.timeZone !== undefined && { timeZone: initial.timeZone }),
+        ...(initial.displayMode !== undefined && { displayMode: initial.displayMode }),
+        ...(initial.availableDisplayModes !== undefined && { availableDisplayModes: initial.availableDisplayModes }),
+      });
+    }
   }, [app]);
 
   useEffect(() => {
@@ -43,12 +57,26 @@ function Card({ kind }: { kind: CardKind }) {
     document.documentElement.classList.toggle('theme-storm', isStormState(state));
   }, [state]);
 
+  // Full screen for the whole frame, only through the host and only when it offers it (#200).
+  const fullscreen = context.displayMode === 'fullscreen';
+  const toggleDisplay = useCallback(() => {
+    void app
+      ?.requestDisplayMode({ mode: fullscreen ? 'inline' : 'fullscreen' })
+      .then(({ mode }) => {
+        setContext((previous) => ({ ...previous, displayMode: mode }));
+      })
+      .catch((error: unknown) => {
+        log({ level: 'warn', code: 'display_mode_failed', error });
+      });
+  }, [app, fullscreen]);
+
   if (error) return <p role="alert">{t('card.failed')}</p>;
   return (
     <CardApp
       state={state}
       timeZone={safeTimeZone(context.timeZone)}
       canAct={app?.getHostCapabilities()?.serverTools !== undefined}
+      display={{ canFullscreen: context.availableDisplayModes?.includes('fullscreen') === true, fullscreen, toggle: toggleDisplay }}
       {...(notice !== undefined && { notice })}
       onCallTool={(name, args) => {
         void app
