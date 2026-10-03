@@ -95,7 +95,7 @@ describe('ScriptedAgent: the storm scene and the family phone (#24)', () => {
   it('shows the safe room and the night when the power goes out, and the daughter gets the alert', async () => {
     const { agent: a, phone } = withPhone();
     const reply = await a.ask("The power's out", ctx);
-    expect(reply.ok && reply.value.cards?.map((c) => c.tool)).toEqual(['get_safe_room_status', 'plan_comfort']);
+    expect(reply.ok && reply.value.cards?.map((c) => c.tool)).toEqual(['get_safe_room_status', 'plan_comfort', 'get_home_status']);
     expect(phone.messages().map((m) => m.transition)).toEqual(['storm_started']);
   });
 

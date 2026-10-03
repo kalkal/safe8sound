@@ -3,6 +3,8 @@ import { GuardReceipt } from '../GuardReceipt.js';
 import { IceCubesCard } from '../IceCubesCard.js';
 import { PlanCard } from '../PlanCard.js';
 import { PreferencesCard } from '../PreferencesCard.js';
+import { FloorPlanCard } from '../FloorPlanCard.js';
+import { ManualControlCard } from '../ManualControlCard.js';
 import { SafeRoomCard } from '../SafeRoomCard.js';
 import { t } from '../text.js';
 import { CardErrorBoundary } from './CardErrorBoundary.js';
@@ -69,6 +71,8 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
       return <IceCubesCard outlook={state.data} />;
     case 'storm':
       return <SafeRoomCard status={state.data} />;
+    case 'home':
+      return <FloorPlanCard status={state.data} />;
     case 'preferences':
       return (
         <>
@@ -89,19 +93,16 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
 function AppliedPlan({ result, timeZone }: { result: ApplyPlanOutput; timeZone: string }) {
   const { plan, alreadyApplied, advisoryOnly, manualInstructions, confirmation } = result;
   // The first yes to a last resort applies nothing (#160): the card must not say "applied".
-  const notice = confirmation !== undefined ? 'plan.notYetApplied' : alreadyApplied ? 'plan.alreadyApplied' : 'plan.applied';
+  // Advice is never "applied": nothing changes in the home, the person does it (plan §11.6).
+  const notice =
+    confirmation !== undefined ? 'plan.notYetApplied' : advisoryOnly ? 'plan.appliedAsAdvice' : alreadyApplied ? 'plan.alreadyApplied' : 'plan.applied';
   return (
     <>
       <p className="notice" role="status">
         {t(notice)}
       </p>
-      {advisoryOnly && manualInstructions.length > 0 && (
-        <ul className="manual" aria-label={t('plan.manual')}>
-          {manualInstructions.map((m) => (
-            <li key={m.roomId}>{m.text}</li>
-          ))}
-        </ul>
-      )}
+      {/* The real home is read-only during the hackathon: the splits are set by hand (plan §11.6). */}
+      {advisoryOnly && manualInstructions.length > 0 && <ManualControlCard instructions={manualInstructions} reason="read_only" />}
       <PlanCard plan={plan} timeZone={timeZone} />
     </>
   );

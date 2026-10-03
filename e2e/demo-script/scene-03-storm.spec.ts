@@ -40,6 +40,11 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await expect(card.getByRole('alert')).toContainText('Storm mode · the grid is down');
   await expect(safeRoom.locator('html')).toHaveClass(/theme-storm/);
   await expect(page.frameLocator('iframe[title="Plan card"]').getByRole('region', { name: 'Plan' })).toBeVisible();
+  // The thermal floor plan (G8): the safe room served, the other rooms waiting, with the reason in words.
+  const home = page.frameLocator('iframe[title="Home card"]').getByRole('region', { name: 'The home right now' });
+  await expect(home.getByText('Grid down: the battery feeds the safe room only.')).toBeVisible();
+  await expect(home.getByRole('listitem', { name: 'Bedroom 1' })).toContainText('Served');
+  await expect(home.getByRole('listitem', { name: 'Living' })).toContainText('Waiting: the level cools fewer rooms right now');
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toContainText('keeps it safe until');
   await expectVoiceMatchesSafeRoom(page);
 

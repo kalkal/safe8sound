@@ -4,6 +4,7 @@ import {
   PlanSchema,
   ReserveOutlookSchema,
   SafeRoomStatusSchema,
+  HomeStatusSchema,
   SetPreferencesOutputSchema,
   err,
   ok,
@@ -14,6 +15,7 @@ import {
   type Result,
   type ReserveOutlook,
   type SafeRoomStatus,
+  type HomeStatus,
 } from '@cold-reserve/contracts';
 import { z } from 'zod';
 import { t } from '../text.js';
@@ -28,6 +30,8 @@ export const CARD_KINDS = {
   reserve: { tool: 'get_reserve_outlook', uri: 'ui://cold-reserve/reserve-outlook', schema: ReserveOutlookSchema },
   preferences: { tool: 'get_preferences', uri: 'ui://cold-reserve/preferences', schema: GetPreferencesOutputSchema },
   storm: { tool: 'get_safe_room_status', uri: 'ui://cold-reserve/safe-room', schema: SafeRoomStatusSchema },
+  /** The thermal floor plan (plan §11.6): which rooms are served or waiting, and why. */
+  home: { tool: 'get_home_status', uri: 'ui://cold-reserve/home', schema: HomeStatusSchema },
 } as const;
 export type CardKind = keyof typeof CARD_KINDS;
 export const isCardKind = (value: unknown): value is CardKind => typeof value === 'string' && value in CARD_KINDS;
@@ -39,6 +43,7 @@ export type CardState =
   | { kind: 'reserve'; data: ReserveOutlook }
   | { kind: 'preferences'; data: GetPreferencesOutput }
   | { kind: 'storm'; data: SafeRoomStatus }
+  | { kind: 'home'; data: HomeStatus }
   | { kind: 'error'; message: string; retryable: boolean };
 
 /** The storm theme only with the grid measured down (plan §11.2 p.13: storm is recognised by more than colour). */
@@ -48,6 +53,7 @@ export function isStormState(state: CardState): boolean {
   if (state.kind === 'reserve') return state.data.gridAvailable === false;
   // An active storm session exists only after the grid was measured down.
   if (state.kind === 'storm') return state.data.stormPhase === 'active';
+  if (state.kind === 'home') return !state.data.gridAvailable;
   return false;
 }
 

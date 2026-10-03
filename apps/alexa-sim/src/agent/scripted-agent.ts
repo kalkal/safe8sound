@@ -8,7 +8,7 @@ import { SCRIPT_FIXTURES, SCRIPT_FIXTURE_NAMES } from './script-fixtures.js';
 import { refuseAction, scriptedToolCall } from './scripted-tools.js';
 import { StatusFactsSchema, type ToolName } from './wire.js';
 
-const TOOL_NAMES = ['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences', 'get_safe_room_status'] as const satisfies readonly ToolName[];
+const TOOL_NAMES = ['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences', 'get_safe_room_status', 'get_home_status'] as const satisfies readonly ToolName[];
 
 // Deterministic answers from a versioned script file: no network, no LLM, no clock, no randomness.
 // Used in every test and in CI (cost rule), and as the degraded mode when the remote agent is down.

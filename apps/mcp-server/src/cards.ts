@@ -19,6 +19,7 @@ const CARD_TEXT: Record<CardKind, { title: string; description: string }> = {
   applied: { title: 'Applied plan card', description: 'The guard receipt of an applied plan: the five guarantees and the stamp.' },
   reserve: { title: 'Reserve outlook card', description: 'The battery reserve as ice cubes, in hours.' },
   preferences: { title: 'Preferences card', description: 'Setpoint, safe room, room priority, reserve and contacts by role.' },
+  home: { title: 'Home card', description: 'The thermal floor plan: each room served or waiting, and why, and whether the grid is down.' },
   storm: { title: 'Safe room card', description: 'The safe room in a storm: comfortable until when, who is in it, the level and why.' },
 };
 

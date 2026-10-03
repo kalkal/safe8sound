@@ -30,7 +30,8 @@ export interface McpSession {
 }
 
 /** The tools whose results the simulator shows as cards (TurnReply.cards). */
-const CARD_TOOLS: ReadonlySet<string> = new Set(['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences']);
+// get_home_status is not a card here yet: a floor plan on every battery answer would clutter the screen (#171).
+const CARD_TOOLS: ReadonlySet<string> = new Set(['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences', 'get_safe_room_status']);
 
 /** What a turn produced besides the text: valid cards and the status facts of get_home_status. */
 export function createTurnRecorder() {

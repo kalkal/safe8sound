@@ -77,7 +77,8 @@
       "withStatus": false,
       "cards": [
         { "tool": "get_safe_room_status", "fixture": "safe-room-storm" },
-        { "tool": "plan_comfort", "fixture": "storm-plan" }
+        { "tool": "plan_comfort", "fixture": "storm-plan" },
+        { "tool": "get_home_status", "fixture": "home-storm" }
       ],
       "phone": [{ "fixture": "storm-started" }]
     },

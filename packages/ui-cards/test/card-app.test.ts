@@ -13,6 +13,7 @@ import {
   safeTimeZone,
 } from '../src/app/card-kinds.js';
 import { hotDayPlan, stormPlan, safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
+import { homeInStorm } from '../src/home-fixtures.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -26,6 +27,7 @@ describe('CARD_KINDS: one ui:// resource per tool that shows a card', () => {
       reserve: ['get_reserve_outlook', 'ui://cold-reserve/reserve-outlook'],
       preferences: ['get_preferences', 'ui://cold-reserve/preferences'],
       storm: ['get_safe_room_status', 'ui://cold-reserve/safe-room'],
+      home: ['get_home_status', 'ui://cold-reserve/home'],
     });
   });
 });
@@ -112,6 +114,11 @@ describe('isStormState: the card switches to the storm theme only with the grid 
     expect(isStormState({ kind: 'reserve', data: { ...outlook, gridAvailable: false } })).toBe(true);
     expect(isStormState({ kind: 'reserve', data: { ...outlook, gridAvailable: true } })).toBe(false);
     expect(isStormState({ kind: 'reserve', data: outlook })).toBe(false);
+  });
+
+  it('is true for the home status only with the grid measured down', () => {
+    expect(isStormState({ kind: 'home', data: homeInStorm() })).toBe(true);
+    expect(isStormState({ kind: 'home', data: { ...homeInStorm(), gridAvailable: true } })).toBe(false);
   });
 
   it('is true for the safe room only while the storm is active', () => {

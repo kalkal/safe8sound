@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CardApp } from '../src/app/CardApp.js';
 import type { CardState } from '../src/app/card-kinds.js';
 import { advisoryPlan, hotDayPlan, safeRoomInStorm } from '../src/fixtures.js';
+import { homeInStorm } from '../src/home-fixtures.js';
 
 afterEach(cleanup);
 
@@ -42,12 +43,22 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(document.body.textContent).not.toContain(token);
   });
 
-  it('shows an applied plan, with the manual instructions when it is advice only', () => {
+  it('shows an applied plan, with the manual-control card when it is advice only (plan §11.6)', () => {
     const plan = { ...advisoryPlan(), status: 'applied' as const };
     show({ kind: 'applied', data: { plan, alreadyApplied: false, advisoryOnly: true, manualInstructions: [{ roomId: 'bedroom-1', text: 'Bedroom: dry at 26.5 °C' }] } });
-    expect(screen.getByRole('status').textContent).toBe('Plan applied.');
-    expect(screen.getByRole('list', { name: 'Do this by hand' }).textContent).toBe('Bedroom: dry at 26.5 °C');
+    expect(screen.getAllByRole('status')[0]?.textContent).toBe('Applied as advice: nothing is changed automatically; follow the steps below.');
+    expect(screen.queryByText('Plan applied.')).toBeNull();
+    const manual = screen.getByRole('region', { name: 'Manual control' });
+    expect(manual.textContent).toContain('This home is read-only for now');
+    expect(screen.getByRole('list', { name: 'Set by hand' }).textContent).toContain('Bedroom: dry at 26.5 °C');
+    expect(screen.getByRole('button', { name: 'Done: Bedroom: dry at 26.5 °C' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();
+  });
+
+  it('shows the home as a floor plan for get_home_status', () => {
+    show({ kind: 'home', data: homeInStorm() });
+    expect(screen.getByRole('region', { name: 'The home right now' })).toBeTruthy();
+    expect(screen.getByRole('listitem', { name: 'Bedroom 1' }).textContent).toContain('Served');
   });
 
   it('shows the safe room for the storm card', () => {

@@ -6,11 +6,14 @@ import {
   IceCubesCard,
   PlanCard,
   PreferencesCard,
+  FloorPlanCard,
+  ManualControlCard,
   SafeRoomCard,
   advisoryPlan,
   cardThemeFor,
   hotDayPlan,
   rejectedPlan,
+  homeInStorm,
   safeRoomCalm,
   safeRoomInStorm,
   stormPlan,
@@ -46,6 +49,14 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       <PlanCard plan={advisoryPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <PlanCard plan={stormPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <SafeRoomCard status={safeRoomInStorm()} />
+      <FloorPlanCard status={homeInStorm()} />
+      <ManualControlCard
+        instructions={[
+          { roomId: 'bedroom-1', text: 'Bedroom: dry at 26 °C' },
+          { roomId: 'living', text: 'Living room: off' },
+        ]}
+        reason="cloud_unreachable"
+      />
       <SafeRoomCard status={{ ...safeRoomCalm(), homeLink: 'stale' }} />
     </div>
   );

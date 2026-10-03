@@ -491,3 +491,86 @@
     }
   }
 }
+
+/* The thermal floor plan and the manual-control card (plan §11.6). */
+@layer components {
+  .floor-plan {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .room-tile {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-3);
+    border: var(--border-thin) solid var(--surface-card-line);
+    border-radius: var(--radius-cube);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+
+    &[data-state="served"] {
+      border-color: var(--status-ok);
+    }
+
+    &[data-state="waiting"] {
+      border-style: dashed;
+    }
+  }
+
+  .room-name,
+  .room-state {
+    font-weight: var(--font-weight-bold);
+  }
+
+  .room-temp {
+    font-family: var(--font-data);
+  }
+
+  .manual-list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    & li {
+      display: flex;
+      gap: var(--space-3);
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-cube);
+      background: var(--surface-card-raised);
+      color: var(--text-primary);
+    }
+  }
+
+  /* Done is said by a mark and a strike-through, not by colour alone. */
+  .manual-list li[data-done="true"] span {
+    text-decoration: line-through;
+
+    &::before {
+      content: "✓ ";
+    }
+  }
+
+  .manual-done {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding-inline: var(--space-4);
+    border: var(--border-thin) solid var(--surface-card-line);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card);
+    color: var(--text-primary);
+    font: inherit;
+
+    &[aria-pressed="true"] {
+      border-color: var(--status-ok);
+      background: var(--surface-card-raised);
+    }
+  }
+}

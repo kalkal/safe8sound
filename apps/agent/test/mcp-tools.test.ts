@@ -60,6 +60,25 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
     expect(recorder.status()).toEqual({ batterySocPct: 45, origin: STATUS.origin, ts: STATUS.ts });
   });
 
+  it('shows the safe-room card too; the floor plan is not a card on every status answer (#24, #171)', async () => {
+    const SAFE_ROOM = {
+      safeRoomId: 'bedroom-1',
+      tempC: 26.8,
+      occupantRoles: ['grandpa'],
+      level: 'essential',
+      levelReason: 'storm',
+      safeHours: 10,
+      safeUntil: '2026-07-18T06:40:00+02:00',
+      stormPhase: 'active',
+      origin: STATUS.origin,
+      homeLink: 'ok',
+    };
+    const { session } = fakeSession({ get_safe_room_status: { text: 'Safe room.', structuredContent: SAFE_ROOM } });
+    const recorder = createTurnRecorder();
+    await run(await mcpToolset(session, recorder), 'get_safe_room_status', {});
+    expect(recorder.cards()).toEqual([{ tool: 'get_safe_room_status', result: SAFE_ROOM }]);
+  });
+
   it('drops a card whose result breaks its contract (one bad card never costs the answer)', async () => {
     const { session } = fakeSession({ plan_comfort: { text: 'Plan proposed.', structuredContent: { id: 'not-a-plan' } } });
     const recorder = createTurnRecorder();
