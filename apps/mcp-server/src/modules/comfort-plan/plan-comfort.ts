@@ -23,7 +23,7 @@ import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, 
 import { buildContext, counterfactualOf, currentControls, holdSafeRoom, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
-import { localIso, localTimeText } from '../../time.js';
+import { localIso, localTimeText } from '@cold-reserve/core';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
 import { lastResortActions, lastResortWindow, loweredLimit } from './last-resort.js';
 import { recordRejection } from './rejections.js';

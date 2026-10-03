@@ -1,7 +1,7 @@
 import { ok, type ErrorEnvelope, type Level, type ReserveOutlook, type Result } from '@cold-reserve/contracts';
 import { reserveOutlookHours } from '@cold-reserve/core';
 import { reserveOf } from '@cold-reserve/guard';
-import { localIso } from '../../time.js';
+import { localIso } from '@cold-reserve/core';
 import type { ToolContext } from '../../tool.js';
 import type { ComfortPlanDeps } from './deps.js';
 import { loadInputs } from './plan-comfort.js';

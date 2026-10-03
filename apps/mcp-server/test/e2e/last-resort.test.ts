@@ -11,7 +11,7 @@ import { comfortPlanWiring } from '../../src/comfort-plan-config.js';
 import { startNodeServer } from '../../src/node-server.js';
 import { loadPreferencesConfig, preferencesConfigFile } from '../../src/preferences-config.js';
 import { stormModeWiring } from '../../src/storm-mode-config.js';
-import { localTimeText } from '../../src/time.js';
+import { localTimeText } from '@cold-reserve/core';
 import { settableClock } from '../comfort-plan/support.js';
 import { TOKEN } from '../helpers.js';
 import { preferences } from '../storm-mode/support.js';

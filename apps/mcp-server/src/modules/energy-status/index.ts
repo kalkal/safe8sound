@@ -2,7 +2,7 @@ import { HomeStatusSchema, err, ok, toolError, type HomeId, type HomeProfile, ty
 import type { HomeDataSource } from '@cold-reserve/core';
 import { z } from 'zod';
 import type { CapabilityModule } from '../../registry.js';
-import { localIso, localTimeText } from '../../time.js';
+import { localIso, localTimeText } from '@cold-reserve/core';
 import { defineTool } from '../../tool.js';
 import type { StatusDeriver } from './status-deriver.js';
 

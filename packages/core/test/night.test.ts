@@ -1,6 +1,7 @@
 import { celsius, pct, watt } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { OFFSET_CACHE_LIMIT, heatIndexExcessC, localHour, nextNightWindow, nightMetrics, offsetCacheSize, type NightWindowConfig } from '../src/night.js';
+import { heatIndexExcessC, nextNightWindow, nightMetrics, type NightWindowConfig } from '../src/night.js';
+import { OFFSET_CACHE_LIMIT, localHour, offsetCacheSize } from '../src/time.js';
 import type { ProjectionPoint } from '../src/projection.js';
 
 const TZ = 'Europe/Rome';

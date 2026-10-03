@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { notifySummary, safeRoomSummary, startSummary } from '../../src/modules/storm-mode/summaries.js';
-import { localIso, localTimeText } from '../../src/time.js';
+import { localIso, localTimeText } from '@cold-reserve/core';
 import { notifyFamily, safeRoomStatus, startStormMode } from '../../src/modules/storm-mode/tools.js';
 import { world } from './support.js';
 

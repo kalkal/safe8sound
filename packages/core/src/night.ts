@@ -1,6 +1,7 @@
 import type { Celsius, Pct } from '@cold-reserve/contracts';
 import { feelsLikeC } from './comfort.js';
 import type { ProjectionPoint } from './projection.js';
+import { localHour } from './time.js';
 
 // Night recovery metrics of a room over a projection (feature queue item 1). Definitions:
 // - night window 22:00-07:00 local time: bedroom night hours of CIBSE TM59
@@ -26,45 +27,6 @@ export interface NightMetrics {
   /** Hours with the room air at or below the threshold. */
   readonly achievedHours: number;
   readonly heatIndexDegreeHours: number;
-}
-
-const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
-/**
- * Wall clock minus UTC, modulo a day, per time zone and UTC hour: offsets change only on whole hours
- * (half-hour zones still change on the hour), and Intl is slow. A bounded LRU: a warm Lambda serving many
- * days never grows it past the limit.
- */
-export const OFFSET_CACHE_LIMIT = 1024;
-const offsets = new Map<string, number>();
-
-/** Entries in the offset cache (for tests). */
-export const offsetCacheSize = (): number => offsets.size;
-
-function offsetMs(hourStartMs: number, tz: string): number {
-  const key = `${tz}|${String(hourStartMs)}`;
-  const cached = offsets.get(key);
-  if (cached !== undefined) {
-    // Most recently used goes last; the oldest is first in the Map's order.
-    offsets.delete(key);
-    offsets.set(key, cached);
-    return cached;
-  }
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(hourStartMs);
-  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
-  const offset = (part('hour') * 60 + part('minute')) * 60_000 - (hourStartMs % DAY_MS);
-  if (offsets.size >= OFFSET_CACHE_LIMIT) {
-    const oldest = offsets.keys().next().value;
-    if (oldest !== undefined) offsets.delete(oldest);
-  }
-  offsets.set(key, offset);
-  return offset;
-}
-
-/** Wall-clock hour (0-24, fractional) in the home time zone. */
-export function localHour(ms: number, tz: string): number {
-  const local = ms + offsetMs(Math.floor(ms / HOUR_MS) * HOUR_MS, tz);
-  return (((local % DAY_MS) + DAY_MS) % DAY_MS) / HOUR_MS;
 }
 
 /** Heat index above the base, in K; zero where the NOAA heat index is not defined (air below 26.7 °C). */

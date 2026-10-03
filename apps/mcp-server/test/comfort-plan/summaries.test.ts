@@ -6,7 +6,7 @@ import { applySummary, outlookSummary, planSummary } from '../../src/modules/com
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { reserveOutlook } from '../../src/modules/comfort-plan/reserve-outlook.js';
-import { localIso, localTimeText } from '../../src/time.js';
+import { localIso, localTimeText } from '@cold-reserve/core';
 import { REAL, guardConfig, world } from './support.js';
 
 // The agent (Strands) reads only the text content of a tool result, not structuredContent (F7): every

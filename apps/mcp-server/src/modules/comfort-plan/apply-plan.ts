@@ -14,7 +14,7 @@ import {
 import { epsBaseLoadW, invalidLastResortToken, type StateStore } from '@cold-reserve/core';
 import { rejectionOf, runGuard, type GuardVerdict } from '@cold-reserve/guard';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
-import { localIso } from '../../time.js';
+import { localIso } from '@cold-reserve/core';
 import type { ToolContext } from '../../tool.js';
 import { newLastResortToken, planHash, sha256Hex } from './confirm-token.js';
 import { alertFamily } from './family-alert.js';

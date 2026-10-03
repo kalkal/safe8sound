@@ -1,7 +1,7 @@
 import { DATA_GROUPS, isFullyLive, type DataOrigin, type NotifyFamilyOutputSchema, type SafeRoomStatus, type StartStormModeOutputSchema } from '@cold-reserve/contracts';
 import { format } from '@cold-reserve/i18n';
 import type { z } from 'zod';
-import { localTimeText } from '../../time.js';
+import { localTimeText } from '@cold-reserve/core';
 
 // The text content of each storm tool result. The agent (Strands) reads only this text (F7 finding):
 // safe hours, until when, the level and its reason, and the roles told or skipped are all here.

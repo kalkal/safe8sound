@@ -20,7 +20,7 @@ import type { z } from 'zod';
 import type { ToolContext } from '../../tool.js';
 import type { StormModeDeps } from './deps.js';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
-import { localIso } from '../../time.js';
+import { localIso } from '@cold-reserve/core';
 import { deliver, detect, levelOf, localeOf, messageFields, readHome, readingEvent, type Observed } from './observe.js';
 
 

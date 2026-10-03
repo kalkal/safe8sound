@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
 import { reserveOutlook } from '../../src/modules/comfort-plan/reserve-outlook.js';
 import { REAL, world } from './support.js';
-import { localIso } from '../../src/time.js';
+import { localIso } from '@cold-reserve/core';
 
 describe('get_reserve_outlook (the ice cubes)', () => {
   it('counts the hours with the guard’s reserve, at the configured level loads, valid against the contract', async () => {

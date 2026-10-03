@@ -2,7 +2,7 @@ import { GUARANTEE_IDS, HomeIdSchema, HomeProfileSchema, LAST_RESORT_ACTIONS, Pl
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
-import { localTimeText } from '../../src/time.js';
+import { localTimeText } from '@cold-reserve/core';
 import { holdSafeRoom } from '@cold-reserve/guard';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
 import { guardFrame, loadInputs, planComfort, withAlternative } from '../../src/modules/comfort-plan/plan-comfort.js';

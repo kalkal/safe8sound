@@ -29,6 +29,16 @@ describe('scenario anchor (MCP_SCENARIO_ANCHOR)', () => {
     expect(sb.batterySocPct).toBe(sa.batterySocPct);
   });
 
+  it('daily: the scenario day starts at midnight in the IANA zone of the place, also in winter (T1)', async () => {
+    // In December Rome is on +01:00: its midnight is 23:00 UTC, not 22:00 UTC as the scenario's fixed +02:00 said.
+    const a = instance({ MCP_SCENARIO_ANCHOR: 'daily' }, at('2026-12-01T23:30:00Z'));
+    expect((await a.status()).ts).toBe(new Date(at('2026-07-16T00:30:00+02:00')).toISOString());
+    // Two containers started on either side of Rome's midnight, read at the same instant, agree.
+    const b = instance({ MCP_SCENARIO_ANCHOR: 'daily' }, at('2026-12-01T22:30:00Z'));
+    b.wall.set(at('2026-12-01T23:30:00Z'));
+    expect((await b.status()).ts).toBe((await a.status()).ts);
+  });
+
   it('daily: the scenario day starts at local midnight of the scenario (its +02:00), not at UTC midnight', async () => {
     // heatwave starts at 2026-07-16T00:00:00+02:00; at 12:00 in Rome the scenario shows 12:00 too.
     const a = instance({ MCP_SCENARIO_ANCHOR: 'daily' }, at('2026-10-01T10:00:00Z'));
