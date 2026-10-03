@@ -7,7 +7,7 @@
     {"id":"hot-forecast","category":"hot_day","utterance":"What's the weather looking like for tomorrow?","expect":{"firstToolIn":["get_energy_forecast"]}},
     {"id":"hot-heatwave-plan","category":"hot_day","utterance":"A heatwave is coming this week, can you plan the cooling?","expect":{"firstToolIn":["plan_comfort","get_energy_forecast"]}},
     {"id":"storm-coming","category":"storm","utterance":"A storm is coming tonight.","expect":{"firstToolIn":["start_storm_mode","get_energy_forecast"]}},
-    {"id":"storm-outage","category":"storm","utterance":"The power just went out, what do we do?","expect":{"firstToolIn":["get_home_status","start_storm_mode"]}},
+    {"id":"storm-outage","category":"storm","utterance":"The power's out","expect":{"firstToolIn":["get_home_status","start_storm_mode"]}},
     {"id":"storm-hours","category":"storm","utterance":"How long can the safe room stay cool if the power goes out?","expect":{"firstToolIn":["get_guarantees","get_home_status"]}},
     {"id":"storm-grandpa","category":"storm","utterance":"How is Grandpa doing?","expect":{"firstToolIn":["get_safe_room_status"]}},
     {"id":"status-battery","category":"status","utterance":"What's my battery level?","expect":{"firstToolIn":["get_home_status"]}},

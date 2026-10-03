@@ -54,9 +54,9 @@ const normalise = (text: string): string => ` ${text.toLowerCase().replace(/[^a-
 
 export interface ScriptedAgentOptions {
   /**
-   * As the degraded mode behind the remote agent: status answers only. Entries that show a card (a plan,
-   * an applied plan, preferences) or sends a family message are never used, so a failure can never be
-   * reported as a success.
+   * As the degraded mode behind the remote agent: status answers only (entries `withStatus`, no card, no
+   * family message). Every other entry speaks of an action, a plan or a card that the degraded mode never has,
+   * so it gets the honest degraded answer instead: a failure is never reported as a success (#209).
    */
   degraded?: boolean;
   /** The simulated family phone: the scene's messages arrive there. */
@@ -73,7 +73,7 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
   }
   const script = parsed.data;
   const entries = script.entries
-    .filter((entry) => options.degraded !== true || (entry.cards === undefined && entry.phone === undefined))
+    .filter((entry) => options.degraded !== true || (entry.withStatus && entry.cards === undefined && entry.phone === undefined))
     .map((entry) => ({ ...entry, patterns: entry.patterns.map(normalise) }));
   const fallback = options.degraded === true ? script.degradedFallback : script.fallback;
 

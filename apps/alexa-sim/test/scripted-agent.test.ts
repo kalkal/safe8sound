@@ -89,6 +89,22 @@ describe('ScriptedAgent', () => {
     expect(createScriptedAgent({ ...script, entries: [entry] })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
+  it('in degraded mode no entry claims an action, a plan or a card that is not there (#209)', async () => {
+    const created = createScriptedAgent(script, { degraded: true });
+    if (!created.ok) throw new Error(created.error.message);
+    const claims = /(^|\W)(I've|I have|I'll|switched|applied|let your|told|sent|stays available|on the card|tap )(\W|$)/i;
+    for (const entry of script.entries) {
+      const reply = await created.value.ask(entry.patterns[0] ?? '', ctx);
+      if (!reply.ok) throw new Error(reply.error.message);
+      expect(reply.value.text, `${entry.id} in degraded mode`).not.toMatch(claims);
+      expect(reply.value.cards ?? []).toEqual([]);
+    }
+    // "Not now" and "apply the last resort" talk about a plan or a card the degraded mode never shows.
+    for (const said of ['Not now', 'Yes, apply the last resort', "The power's out"]) {
+      expect(await created.value.ask(said, ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
+    }
+  });
+
   it('in degraded mode answers status only: never an action, a plan or any card', async () => {
     const created = createScriptedAgent(script, { degraded: true });
     if (!created.ok) throw new Error(created.error.message);

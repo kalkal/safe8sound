@@ -111,3 +111,17 @@ test('sim-api answers 503 → the degraded mode leaves one JSON log line with th
   ]);
   for (const line of lines.filter(isVoice)) expect(line).toMatchObject({ correlationId, details: { phase: 'speaking' } });
 });
+
+test("remote agent down → \"The power's out\" gets the honest degraded answer, never a fake action or a phone message (#209)", async ({ page }) => {
+  await page.route('**/sim-api/v1/turns', (route) => route.fulfill({ status: 503, body: 'Service Unavailable' }));
+  await openRemote(page);
+  await page.getByLabel('Ask a question').fill("The power's out");
+  await page.getByRole('button', { name: 'Ask' }).click();
+
+  await expect(page.getByRole('note')).toHaveText("I can't reach the assistant right now, so this is a scripted answer.");
+  const answer = page.getByTestId('answer').last();
+  await expect(answer).toContainText('Nothing was changed.');
+  await expect(answer).not.toContainText("I've");
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: "Your daughter's phone (simulated)" }).getByRole('article')).toHaveCount(0);
+});
