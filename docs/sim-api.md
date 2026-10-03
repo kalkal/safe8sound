@@ -51,6 +51,17 @@ The function has its own role, with no managed policies:
 - **CORS** is answered by the handler only, for the exact simulator origins in `SIM_ALLOWED_ORIGINS`: preflight `OPTIONS` (`POST` only, the headers `authorization`, `content-type` and `x-correlation-id`), and `Access-Control-Allow-Origin` with `x-correlation-id` exposed on every answer to an allowed origin. Any other origin gets `origin_not_allowed`. The Function URL has **no CORS configuration** of its own: for `POST`, Lambda would send its CORS headers as well as the function's, and the browser refuses two `Access-Control-Allow-Origin` values (review of #156). Until the web stack sets an origin, the function answers `invalid_config`.
 - **Kill switch**: `demoEnabled` per stage in the CDK config; when off, every POST to a demo route answers `demo_disabled`.
 
+## Spoken replies (Amazon Polly, F8d)
+
+The answers can be read aloud in a studio voice (Amazon Polly, neural, en-US; the voice id is one setting, `SIM_SPEECH_VOICE`, default `Joanna`). The design was approved in #25:
+
+- **Only real replies are spoken.** When speech is on, a turn reply carries `speech.ticket`: an HMAC-SHA256, with the token signing key, over the token's `jti`, the engine, the voice and the reply text. `POST /v1/speech {text, ticket}` speaks that exact text only; any other text, token or voice is `invalid_input`. The ticket needs no storage and expires with the token.
+- **Cache first.** The audio of a text is kept in S3 under `sha256(engine|voice|mp3|text)`, so a phrase is synthesized once (the scripted demo phrases cost nothing after the first time). A failed cache read or write is logged (`speech_cache_failed`) and the reply is still spoken.
+- **Caps.** Characters sent to Polly are counted per demo code and overall per UTC day, on the same atomic `DEMO#` counters (`DEMO#SPEECH#<codeId>#<day>`, `DEMO#SPEECH#GLOBAL#<day>`; defaults 6,000 and 30,000). Cache hits are free.
+- **Kill switch.** `SIM_SPEECH_ENABLED` (true or false, off by default): when off, replies carry no ticket and `/v1/speech` answers 503 `polly_unavailable`.
+- **Failures.** Polly down, slow or refusing is 503 `polly_unavailable`. The browser then reads that reply with its own voice and says so once; the answer is never lost.
+- **Privacy.** Only the reply text goes to Polly, never a question, a log line or personal data. Logs carry the demo code id, the number of characters and whether it came from the cache, never the text. Opting out of Polly using the texts to improve Amazon's AI services (AWS Organizations) is the owner's step before the demo deploy.
+
 ## Tests
 
 - Unit: `apps/sim-api/test/lambda.test.ts` (the event adapter), `lambda-wiring.test.ts` (secrets from SSM only, settings checked before anything is read), `packages/adapters/store-dynamodb/test/counter.test.ts` (the conditional counter), `infra/test/sim-api-stack.test.ts` (IAM, CORS, env, alarms, cdk-nag).

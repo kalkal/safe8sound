@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   PROBLEM_JSON_CONTENT_TYPE,
   SessionRequestSchema,
+  SpeechRequestSchema,
   ToolCallRequestSchema,
   TurnRequestSchema,
   toProblemDetails,
@@ -19,8 +20,9 @@ import {
 } from '@cold-reserve/contracts';
 import { CORRELATION_ID_HEADER, SandboxHomeIdSchema, correlationIdFrom } from '@cold-reserve/contracts';
 import type { Clock } from '@cold-reserve/core';
-import type { SimApiConfig } from './config.js';
+import type { SimApiConfig, SpeechEngine } from './config.js';
 import { createQuota, type QuotaStore } from './quota.js';
+import { signSpeechTicket, verifySpeechTicket } from './speech-ticket.js';
 import { signToken, verifyToken, type DemoClaims } from './token.js';
 
 /** The agent behind a turn (AgentCore after S2; the local agent entry until then). */
@@ -42,6 +44,17 @@ export type LogLine = LogEntry;
 /** The line of a refused or failed request (kept as a name for the adapters). */
 export type ErrorLine = LogEntry;
 
+/** Amazon Polly behind the sim-api (F8d, #25): the mp3 of one reply text, or polly_unavailable. */
+export interface SpeechPort {
+  synthesize(input: { text: string; engine: SpeechEngine; voice: string; correlationId: string }): Promise<Result<Uint8Array, ErrorEnvelope>>;
+}
+
+/** The spoken replies already paid for (S3, approved in #25). Any failure is thrown: the caller logs it and goes on. */
+export interface SpeechCachePort {
+  get(key: string): Promise<Uint8Array | undefined>;
+  put(key: string, audio: Uint8Array): Promise<void>;
+}
+
 export interface SimApiDeps {
   readonly agent: TurnAgentPort;
   readonly tools: CardToolPort;
@@ -50,11 +63,13 @@ export interface SimApiDeps {
   /** 16 random hex characters for a visitor's sandbox home. */
   readonly randomHex: () => string;
   readonly logger: { log(line: LogEntry): void };
+  /** Polly and its cache; without them (or with SIM_SPEECH_ENABLED off) replies carry no ticket. */
+  readonly speech?: { readonly synth: SpeechPort; readonly cache: SpeechCachePort };
 }
 
 export type SimApiHandler = (req: Request, meta: { clientIp: string }) => Promise<Response>;
 
-const ROUTES = new Set(['/v1/session', '/v1/turns', '/v1/tools/call']);
+const ROUTES = new Set(['/v1/session', '/v1/turns', '/v1/tools/call', '/v1/speech']);
 const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unavailable', 'unauthorized', 'rate_limited']);
 const nameOf = (e: unknown): string => (e instanceof Error ? e.name : typeof e);
 
@@ -64,6 +79,8 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
   if (!signingKey) throw new Error('sim-api needs a signing key');
   // The signing key is secret and already in SSM: it salts the IP hash too (a key rotation only resets the
   // current hour's attempt counts).
+  const { engine, voice } = config.speech;
+  const speaking = config.speech.enabled && deps.speech !== undefined;
   const quota = createQuota({ store: deps.quota, limits: config.limits, clock: deps.clock, ipSalt: signingKey.material });
 
   return async (req, meta) => {
@@ -72,7 +89,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
     /** Set only for an allowlisted Origin: CORS headers go back to that origin alone. */
     const allowedOrigin = origin !== null && origins.has(origin) ? origin : undefined;
     const startedMs = deps.clock.now();
-    const info = (line: { event: 'turn_answered' | 'card_action_done'; codeId: string; tool?: string }) => {
+    const info = (line: { event: 'turn_answered' | 'card_action_done' | 'speech_served'; codeId: string; tool?: string; cached?: boolean; chars?: number }) => {
       const now = deps.clock.now();
       const { event, ...details } = line;
       deps.logger.log({ ts: new Date(now).toISOString(), level: 'info', component: 'sim-api', message: event, correlationId, details: { ...details, durationMs: now - startedMs } });
@@ -104,6 +121,51 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       }
       h.append('vary', 'Origin');
       return new Response(status === 204 ? null : JSON.stringify(body), { status, headers: h });
+    };
+
+    // The cache only saves money: a failure is logged and the answer goes on.
+    const cacheFailed = (step: 'get' | 'put', e: unknown) => {
+      deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'warn', component: 'sim-api', message: 'speech_cache_failed', correlationId, errorName: nameOf(e), details: { step } });
+    };
+    /**
+     * POST /v1/speech (F8d, #25): only the text a ticket was made for, cache first (free), then Polly within
+     * the character caps. A failed cache never stops the answer; the audio is never logged, nor the text.
+     */
+    const speak = async (body: unknown, codeId: string, jti: string): Promise<Response> => {
+      if (!speaking) return fail(toolError('polly_unavailable', 'The studio voice is off right now.'), undefined, {}, codeId);
+      const request = SpeechRequestSchema.safeParse(body);
+      if (!request.success) return fail(toolError('invalid_input', 'Send {"text": "...", "ticket": "..."} only.'));
+      const { text, ticket } = request.data;
+      if (!verifySpeechTicket(ticket, { jti, text, engine, voice }, config.keys)) return fail(toolError('invalid_input', 'This reply cannot be spoken.'));
+
+      const key = createHash('sha256').update(`${engine}|${voice}|mp3|${text}`).digest('hex');
+      let audio: Uint8Array | undefined;
+      try {
+        audio = await deps.speech.cache.get(key);
+      } catch (e) {
+        cacheFailed('get', e);
+      }
+      const cached = audio !== undefined;
+      if (audio === undefined) {
+        const allowed = await quota.speech(codeId, text.length);
+        if (!allowed.ok) return fail(allowed.error, undefined, {}, codeId);
+        const made = await deps.speech.synth.synthesize({ text, engine, voice, correlationId });
+        if (!made.ok) return fail(made.error, undefined, {}, codeId);
+        audio = made.value;
+        try {
+          await deps.speech.cache.put(key, audio);
+        } catch (e) {
+          cacheFailed('put', e);
+        }
+      }
+      info({ event: 'speech_served', codeId, cached, chars: text.length });
+      const h = new Headers({ 'content-type': 'audio/mpeg', 'cache-control': 'private, max-age=3600', 'x-correlation-id': correlationId });
+      if (allowedOrigin !== undefined) {
+        h.set('access-control-allow-origin', allowedOrigin);
+        h.set('access-control-expose-headers', 'x-correlation-id');
+      }
+      h.append('vary', 'Origin');
+      return new Response(audio, { status: 200, headers: h });
     };
 
     // Last resort: a throw from a port, the quota store or the body never escapes as a raw 500.
@@ -155,8 +217,10 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       if (bearer === undefined) return fail(toolError('missing_token', 'Enter the demo code first.'), undefined, { 'www-authenticate': 'Bearer realm="sim-api"' });
       const claims = verifyToken(bearer, { keys: config.keys, nowS: deps.clock.now() / 1000, skewS: config.skewS });
       if (!claims.ok) return fail(claims.error, undefined, { 'www-authenticate': 'Bearer realm="sim-api", error="invalid_token"' });
-      const { sub: codeId, home } = claims.value;
+      const { sub: codeId, home, jti } = claims.value;
       codeIdOfRequest = codeId;
+
+      if (path === '/v1/speech') return speak(body, codeId, jti);
 
       if (path === '/v1/turns') {
         const request = TurnRequestSchema.safeParse(body);
@@ -166,7 +230,9 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         const reply = await deps.agent.ask({ home, question: request.data.question, correlationId });
         if (!reply.ok) return fail(reply.error, undefined, {}, codeId);
         info({ event: 'turn_answered', codeId });
-        return respond(200, reply.value);
+        // The ticket of this very text, token and voice (approved in #25): only real replies are spoken.
+        const speech = speaking ? { speech: { ticket: signSpeechTicket({ jti, text: reply.value.text, engine, voice }, signingKey) } } : {};
+        return respond(200, { ...reply.value, ...speech });
       }
 
       const request = ToolCallRequestSchema.safeParse(body);

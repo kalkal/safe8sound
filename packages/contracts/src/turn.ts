@@ -48,14 +48,29 @@ export const ToolCardSchema = z.discriminatedUnion('tool', [
 export type ToolCard = z.infer<typeof ToolCardSchema>;
 export type CardToolName = ToolCard['tool'];
 
+/** An opaque speech ticket (base64url HMAC). */
+const SpeechTicketSchema = z.string().min(1).max(256);
+
 export const TurnReplySchema = z.strictObject({
   /** At most 2 short sentences (plan §11.2 point 10). */
   text: z.string().min(1).max(600),
   status: StatusFactsSchema.optional(),
   /** Inline cards, in the order the answer mentions them: each is validated on its own (one bad card never costs the answer). */
   cards: z.array(z.unknown()).max(4).optional(),
+  /** Set by the sim-api when Polly may speak this reply (F8d, #25, additive, approved in #25). */
+  speech: z.strictObject({ ticket: SpeechTicketSchema }).optional(),
 });
 export type TurnReply = z.infer<typeof TurnReplySchema>;
+
+/**
+ * POST /v1/speech (F8d, #25, approved in #25): the text of a reply and its ticket, an HMAC the sim-api made
+ * over that text for this token and voice, so only real replies are ever spoken (no free-text speech).
+ */
+export const SpeechRequestSchema = z.strictObject({
+  text: z.string().min(1).max(600),
+  ticket: SpeechTicketSchema,
+});
+export type SpeechRequest = z.infer<typeof SpeechRequestSchema>;
 
 /**
  * An expected turn failure, as the agent answers it on AgentCore (#17, G1c, approved in #17): HTTP 200

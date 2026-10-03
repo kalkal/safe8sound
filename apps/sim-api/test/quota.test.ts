@@ -2,7 +2,7 @@ import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import { createQuota, memoryQuotaStore, type QuotaLimits, type QuotaStore } from '../src/quota.js';
 
-const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, codeAttemptsPerIpPerHour: 2 };
+const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000 };
 // 2026-10-01 23:59:00 UTC: one minute to the daily reset.
 const NOW = Date.UTC(2026, 9, 1, 23, 59, 0);
 
@@ -114,5 +114,24 @@ describe('a slow or failing quota store (Copilot on #156)', () => {
       await expect(q.turn('judges')).rejects.toBe(error);
       await expect(q.codeAttempt('203.0.113.7')).rejects.toBe(error);
     }
+  });
+});
+
+describe('speech characters (F8d, #25, approved in #25): per code and overall per UTC day', () => {
+  const SPEECH: QuotaLimits = { ...LIMITS, speechCharsPerCodePerDay: 100, speechCharsGlobalPerDay: 150 };
+  const q = (store = memoryQuotaStore()) => createQuota({ store, limits: SPEECH, clock: fixedClock(NOW), ipSalt: SALT });
+
+  it('counts the characters of each spoken reply, up to the per-code cap', async () => {
+    const quota = q();
+    expect((await quota.speech('judges', 60)).ok).toBe(true);
+    expect((await quota.speech('judges', 40)).ok).toBe(true);
+    expect(await quota.speech('judges', 1)).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', retryAfterMs: 60_000 } });
+  });
+
+  it('enforces the overall cap across codes', async () => {
+    const quota = q();
+    expect((await quota.speech('a', 100)).ok).toBe(true);
+    expect((await quota.speech('b', 50)).ok).toBe(true);
+    expect((await quota.speech('c', 1)).ok).toBe(false);
   });
 });

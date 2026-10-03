@@ -3,6 +3,7 @@ import {
   ProblemDetailsSchema,
   SessionReplySchema,
   SessionRequestSchema,
+  SpeechRequestSchema,
   StatusFactsSchema,
   ToolCallReplySchema,
   ToolCallRequestSchema,
@@ -91,5 +92,23 @@ describe('TurnFailureSchema: an expected turn failure from the agent on AgentCor
   it('never matches a TurnReply, so the two answers cannot be confused', () => {
     expect(TurnFailureSchema.safeParse({ text: 'Your battery is at 45%.' }).success).toBe(false);
     expect(TurnReplySchema.safeParse({ failed: true, code: 'agent_timeout', category: 'dependency_unavailable', correlationId: ID }).success).toBe(false);
+  });
+});
+
+describe('speech wire (F8d, #25, approved in #25): a reply spoken by Polly only with its signed ticket', () => {
+  const TICKET = 'a'.repeat(43);
+
+  it('lets a turn reply carry the ticket of its own text, and stays valid without it', () => {
+    expect(TurnReplySchema.safeParse({ text: 'Your battery is at 64%.', speech: { ticket: TICKET } }).success).toBe(true);
+    expect(TurnReplySchema.safeParse({ text: 'Your battery is at 64%.' }).success).toBe(true);
+    expect(TurnReplySchema.safeParse({ text: 'Hi.', speech: { ticket: TICKET, voice: 'Matthew' } }).success).toBe(false);
+    expect(TurnReplySchema.safeParse({ text: 'Hi.', speech: { ticket: '' } }).success).toBe(false);
+  });
+
+  it('asks for speech with exactly the reply text and its ticket: nothing else, no free text beyond a reply', () => {
+    expect(SpeechRequestSchema.safeParse({ text: 'Your battery is at 64%.', ticket: TICKET }).success).toBe(true);
+    for (const bad of [{ text: '', ticket: TICKET }, { text: 'x'.repeat(601), ticket: TICKET }, { text: 'Hi.' }, { text: 'Hi.', ticket: TICKET, voice: 'Matthew' }, { text: 'Hi.', ticket: 'x'.repeat(257) }]) {
+      expect(SpeechRequestSchema.safeParse(bad).success).toBe(false);
+    }
   });
 });

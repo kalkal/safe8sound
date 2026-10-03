@@ -29,10 +29,10 @@ describe('dynamoCounter', () => {
         input: {
           TableName: 'ColdReserve-dev',
           Key: { PK: 'DEMO#TURNS#judges#2026-10-02', SK: 'COUNT' },
-          UpdateExpression: 'ADD #count :one SET #ttl = if_not_exists(#ttl, :ttl)',
-          ConditionExpression: 'attribute_not_exists(#count) OR #count < :limit',
+          UpdateExpression: 'ADD #count :amount SET #ttl = if_not_exists(#ttl, :ttl)',
+          ConditionExpression: 'attribute_not_exists(#count) OR #count <= :room',
           ExpressionAttributeNames: { '#count': 'count', '#ttl': 'ttl' },
-          ExpressionAttributeValues: { ':one': 1, ':limit': 20, ':ttl': END / 1000 },
+          ExpressionAttributeValues: { ':amount': 1, ':room': 19, ':ttl': END / 1000 },
         },
       },
     ]);
@@ -53,6 +53,20 @@ describe('dynamoCounter', () => {
     const { sent, counter } = stub({});
     await counter.consume('k', 1, END + 1500);
     expect((sent[0]?.input['ExpressionAttributeValues'] as Record<string, number>)[':ttl']).toBe(END / 1000 + 2);
+  });
+});
+
+describe('dynamoCounter: counting more than one at a time (speech characters, F8d #25)', () => {
+  it('adds the amount only if it still fits under the cap, in one conditional ADD', async () => {
+    const { sent, counter } = stub({});
+    expect(await counter.consume('SPEECH#judges#2026-10-03', 6000, END, 120)).toBe(true);
+    expect(sent[0]?.input).toMatchObject({ UpdateExpression: 'ADD #count :amount SET #ttl = if_not_exists(#ttl, :ttl)', ExpressionAttributeValues: { ':amount': 120, ':room': 5880 } });
+  });
+
+  it('refuses an amount larger than the whole cap without asking DynamoDB (a new item would take it)', async () => {
+    const { sent, counter } = stub({});
+    expect(await counter.consume('k', 100, END, 101)).toBe(false);
+    expect(sent).toEqual([]);
   });
 });
 

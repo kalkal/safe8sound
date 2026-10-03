@@ -19,8 +19,16 @@ describe('loadSimApiConfig (only hashes of codes and key ids reach logs; values 
       skewS: 30,
       allowedOrigins: ['http://127.0.0.1:5400'],
       demoEnabled: true,
-      limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10 },
+      limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000 },
+      speech: { enabled: false, engine: 'neural', voice: 'Joanna' },
     });
+  });
+
+  it('reads the Polly settings (F8d, #25): off unless switched on, one voice from config, true or false only', () => {
+    expect(loadSimApiConfig({ ...ENV, SIM_SPEECH_ENABLED: 'true', SIM_SPEECH_VOICE: 'Matthew' })).toMatchObject({ ok: true, value: { speech: { enabled: true, engine: 'neural', voice: 'Matthew' } } });
+    for (const bad of [{ SIM_SPEECH_ENABLED: 'yes' }, { SIM_SPEECH_VOICE: 'joanna; drop' }, { SIM_SPEECH_ENGINE: 'premium' }, { SIM_LIMIT_SPEECH_CHARS_PER_CODE: '0' }]) {
+      expect(loadSimApiConfig({ ...ENV, ...bad })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    }
   });
 
   it('takes only true or false for the kill switch (unset = on): a typo is invalid_config, never a silently open demo', () => {

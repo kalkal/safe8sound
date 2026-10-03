@@ -1,9 +1,9 @@
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { DocumentSender } from './document-client.js';
 
-/** A capped counter: `consume` counts one more under `key` if it is below `limit`; false at the cap. */
+/** A capped counter: `consume` adds `amount` (1 by default) under `key` if it still fits under `limit`; false at the cap. */
 export interface Counter {
-  consume(key: string, limit: number, expiresAtMs: number): Promise<boolean>;
+  consume(key: string, limit: number, expiresAtMs: number, amount?: number): Promise<boolean>;
   /** Gives one count back under `key`; nothing when there is nothing to give back. */
   release(key: string): Promise<void>;
 }
@@ -16,16 +16,18 @@ export interface Counter {
  */
 export function dynamoCounter(options: { tableName: string; sender: DocumentSender }): Counter {
   return {
-    async consume(key, limit, expiresAtMs) {
+    async consume(key, limit, expiresAtMs, amount = 1) {
+      // A new item would take any amount: one larger than the whole cap never fits.
+      if (amount > limit) return false;
       try {
         await options.sender.send(
           new UpdateCommand({
             TableName: options.tableName,
             Key: { PK: `DEMO#${key}`, SK: 'COUNT' },
-            UpdateExpression: 'ADD #count :one SET #ttl = if_not_exists(#ttl, :ttl)',
-            ConditionExpression: 'attribute_not_exists(#count) OR #count < :limit',
+            UpdateExpression: 'ADD #count :amount SET #ttl = if_not_exists(#ttl, :ttl)',
+            ConditionExpression: 'attribute_not_exists(#count) OR #count <= :room',
             ExpressionAttributeNames: { '#count': 'count', '#ttl': 'ttl' },
-            ExpressionAttributeValues: { ':one': 1, ':limit': limit, ':ttl': Math.ceil(expiresAtMs / 1000) },
+            ExpressionAttributeValues: { ':amount': amount, ':room': limit - amount, ':ttl': Math.ceil(expiresAtMs / 1000) },
           }),
         );
         return true;

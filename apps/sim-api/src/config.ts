@@ -14,10 +14,15 @@ export interface SimApiConfig {
   readonly limits: QuotaLimits;
   /** Kill switch (plan §13.2.4). */
   readonly demoEnabled: boolean;
+  /** Replies spoken by Polly (F8d, #25, approved in #25): off unless switched on; one voice. */
+  readonly speech: { readonly enabled: boolean; readonly engine: SpeechEngine; readonly voice: string };
   readonly maxBodyBytes: number;
 }
 
 const invalid = (message: string) => err(toolError('invalid_config', message));
+
+export const SPEECH_ENGINES = ['neural', 'generative', 'standard'] as const;
+export type SpeechEngine = (typeof SPEECH_ENGINES)[number];
 const ID = /^[a-z][a-z0-9-]{0,31}$/;
 
 const int = (min: number, max: number) =>
@@ -34,6 +39,8 @@ const NumbersSchema = z.object({
   turnsGlobalPerDay: int(1, 100_000),
   toolCallsPerCodePerDay: int(1, 10_000),
   codeAttemptsPerIpPerHour: int(1, 1000),
+  speechCharsPerCodePerDay: int(1, 1_000_000),
+  speechCharsGlobalPerDay: int(1, 10_000_000),
   maxBodyBytes: int(256, 1_048_576),
 });
 
@@ -65,6 +72,8 @@ export function loadPlainSimApiSettings(env: Readonly<Record<string, string | un
     turnsGlobalPerDay: env['SIM_LIMIT_TURNS_GLOBAL'] ?? '30',
     toolCallsPerCodePerDay: env['SIM_LIMIT_TOOL_CALLS_PER_CODE'] ?? '20',
     codeAttemptsPerIpPerHour: env['SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR'] ?? '10',
+    speechCharsPerCodePerDay: env['SIM_LIMIT_SPEECH_CHARS_PER_CODE'] ?? '6000',
+    speechCharsGlobalPerDay: env['SIM_LIMIT_SPEECH_CHARS_GLOBAL'] ?? '30000',
     maxBodyBytes: env['SIM_MAX_BODY_BYTES'] ?? '16384',
   });
   if (!numbers.success) return invalid(`A SIM_* number is not valid: ${numbers.error.issues.map((i) => i.path.join('.')).join(', ')}.`);
@@ -74,7 +83,14 @@ export function loadPlainSimApiSettings(env: Readonly<Record<string, string | un
   const enabled = env['SIM_DEMO_ENABLED']?.trim().toLowerCase();
   if (enabled !== undefined && enabled !== 'true' && enabled !== 'false') return invalid('SIM_DEMO_ENABLED must be true or false.');
 
-  return ok({ tokenTtlS, skewS, allowedOrigins, limits, demoEnabled: enabled !== 'false', maxBodyBytes });
+  const speechOn = env['SIM_SPEECH_ENABLED']?.trim().toLowerCase();
+  if (speechOn !== undefined && speechOn !== 'true' && speechOn !== 'false') return invalid('SIM_SPEECH_ENABLED must be true or false.');
+  const engine = env['SIM_SPEECH_ENGINE'] ?? 'neural';
+  if (!(SPEECH_ENGINES as readonly string[]).includes(engine)) return invalid(`SIM_SPEECH_ENGINE must be one of ${SPEECH_ENGINES.join(', ')}.`);
+  const voice = env['SIM_SPEECH_VOICE'] ?? 'Joanna';
+  if (!/^[A-Z][A-Za-z]{1,31}$/.test(voice)) return invalid('SIM_SPEECH_VOICE must be a Polly voice id, like Joanna.');
+
+  return ok({ tokenTtlS, skewS, allowedOrigins, limits, demoEnabled: enabled !== 'false', maxBodyBytes, speech: { enabled: speechOn === 'true', engine: engine as SpeechEngine, voice } });
 }
 
 /** Locally from .env; on Lambda the codes and keys come from SSM SecureStrings. Messages never echo values. */

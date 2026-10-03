@@ -5,7 +5,8 @@ import type { Clock } from '@cold-reserve/core';
 /** Atomic counters with a cap (DynamoDB `ADD count :1` with `count < :max`, TTL = expiresAtMs, plan §3.2). */
 export interface QuotaStore {
   /** Counts one more under `key` if it is below `limit`; false when the cap is reached. */
-  consume(key: string, limit: number, expiresAtMs: number): Promise<boolean>;
+  /** Adds `amount` (1 by default) under `key` if it still fits under `limit`; false when the cap is reached. */
+  consume(key: string, limit: number, expiresAtMs: number, amount?: number): Promise<boolean>;
   /** Gives one count back under `key` (a right demo code); nothing when there is nothing to give back. */
   release(key: string): Promise<void>;
 }
@@ -14,10 +15,10 @@ export interface QuotaStore {
 export function memoryQuotaStore(): QuotaStore {
   const counts = new Map<string, number>();
   return {
-    consume: (key, limit) => {
+    consume: (key, limit, _expiresAtMs, amount = 1) => {
       const n = counts.get(key) ?? 0;
-      if (n >= limit) return Promise.resolve(false);
-      counts.set(key, n + 1);
+      if (n + amount > limit) return Promise.resolve(false);
+      counts.set(key, n + amount);
       return Promise.resolve(true);
     },
     release: (key) => {
@@ -34,6 +35,9 @@ export interface QuotaLimits {
   readonly toolCallsPerCodePerDay: number;
   /** Wrong demo codes per client IP per hour (a right code gives its attempt back, review of #139). */
   readonly codeAttemptsPerIpPerHour: number;
+  /** Characters spoken by Polly per demo code and overall per UTC day; cache hits are free (approved in #25). */
+  readonly speechCharsPerCodePerDay: number;
+  readonly speechCharsGlobalPerDay: number;
 }
 
 export type Quota = ReturnType<typeof createQuota>;
@@ -63,6 +67,7 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
   };
   const over = (retryAfterMs: number, message: string): Result<never, ErrorEnvelope> => err(toolError('demo_quota_exceeded', message, { retryAfterMs }));
   const DAILY = 'The demo limit for today is reached. Come back after midnight UTC.';
+  const SPOKEN = 'The spoken replies for today are used up; the answers still come as text.';
   /**
    * A transient store failure is a retryable 503 `store_unavailable` (Copilot on #156), still fail closed:
    * nothing goes on without the count. Its error name goes to the log; anything else (a bug of ours, a
@@ -90,6 +95,16 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
       const overall = await counted(() => store.consume(`TURNS#GLOBAL#${day.id}`, limits.turnsGlobalPerDay, day.endMs));
       if (!overall.ok) return overall;
       return overall.value ? ok(undefined) : over(day.retryAfterMs, DAILY);
+    },
+    /** The characters of one reply Polly is about to speak: per code, then overall (F8d, #25). */
+    async speech(codeId: string, chars: number): Promise<Result<void, ErrorEnvelope>> {
+      const day = window(DAY_MS);
+      const perCode = await counted(() => store.consume(`SPEECH#${codeId}#${day.id}`, limits.speechCharsPerCodePerDay, day.endMs, chars));
+      if (!perCode.ok) return perCode;
+      if (!perCode.value) return over(day.retryAfterMs, SPOKEN);
+      const overall = await counted(() => store.consume(`SPEECH#GLOBAL#${day.id}`, limits.speechCharsGlobalPerDay, day.endMs, chars));
+      if (!overall.ok) return overall;
+      return overall.value ? ok(undefined) : over(day.retryAfterMs, SPOKEN);
     },
     async toolCall(codeId: string): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);
