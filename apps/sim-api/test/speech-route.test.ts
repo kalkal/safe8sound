@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { LogEntrySchema, ProblemDetailsSchema, SessionReplySchema, TurnReplySchema, err, ok, toolError, type LogEntry } from '@cold-reserve/contracts';
+import { LogEntrySchema, ProblemDetailsSchema, SessionReplySchema, TurnReplySchema, ok, toolError, type LogEntry, type TurnReply } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { loadSimApiConfig } from '../src/config.js';
-import { createSimApiHandler, type SpeechCachePort, type SpeechPort } from '../src/handler.js';
+import { createSimApiHandler, type SpeechCachePort, type SpeechPort, type SpeechResult } from '../src/handler.js';
 import { memoryQuotaStore } from '../src/quota.js';
 
 // F8d (#25, approved in #25): a turn reply carries a ticket for its own text; POST /v1/speech speaks only
@@ -15,8 +15,9 @@ const KEY = Buffer.alloc(32, 7);
 const NOW = Date.UTC(2026, 9, 3, 12, 0, 0);
 const REPLY = 'Your battery is at 64%.';
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 4]);
+const spokenMp3 = (): SpeechResult => ({ ok: true, value: MP3 });
 
-function setup(over: Record<string, string> = {}, fakes: { synth?: SpeechPort['synthesize']; cache?: Partial<SpeechCachePort>; noSpeech?: boolean } = {}) {
+function setup(over: Record<string, string> = {}, fakes: { synth?: SpeechPort['synthesize']; cache?: Partial<SpeechCachePort>; noSpeech?: boolean; agentReply?: TurnReply } = {}) {
   const config = loadSimApiConfig({
     SIM_DEMO_CODES: `judges:${createHash('sha256').update(CODE).digest('hex')}`,
     SIM_TOKEN_KEYS: `k1:${KEY.toString('base64url')}`,
@@ -39,7 +40,7 @@ function setup(over: Record<string, string> = {}, fakes: { synth?: SpeechPort['s
       }),
   };
   const handler = createSimApiHandler(config.value, {
-    agent: { ask: () => Promise.resolve(ok({ text: REPLY })) },
+    agent: { ask: () => Promise.resolve(ok(fakes.agentReply ?? { text: REPLY })) },
     tools: { call: () => Promise.reject(new Error('not used')) },
     quota: memoryQuotaStore(),
     clock: { now: () => NOW },
@@ -52,7 +53,7 @@ function setup(over: Record<string, string> = {}, fakes: { synth?: SpeechPort['s
             synth: {
               synthesize: fakes.synth ?? ((input) => {
                 spoken.push({ text: input.text, voice: input.voice, engine: input.engine });
-                return Promise.resolve(ok(MP3));
+                return Promise.resolve(spokenMp3());
               }),
             },
             cache,
@@ -141,12 +142,48 @@ describe('POST /v1/speech', () => {
   });
 
   it('passes a Polly failure on as 503 polly_unavailable, logged, nothing cached', async () => {
-    const { post, turn, store, logs } = setup({}, { synth: () => Promise.resolve(err(toolError('polly_unavailable', 'Polly did not answer.'))) });
+    const { post, turn, store, logs } = setup({}, { synth: () => Promise.resolve(({ ok: false as const, error: toolError('polly_unavailable', 'Polly did not answer.'), mayHaveBilled: false })) });
     const { token, reply } = await turn();
     const res = await post('/v1/speech', { text: REPLY, ticket: reply.speech?.ticket ?? '' }, token);
     expect(res.status).toBe(503);
     expect(store.size).toBe(0);
     expect(logs).toContainEqual(expect.objectContaining({ level: 'warn', code: 'polly_unavailable' }));
+  });
+
+  it('gives the characters back when Polly fails, so a failure never uses up the code (review of #180)', async () => {
+    let fail = true;
+    const { post, turn } = setup(
+      { SIM_LIMIT_SPEECH_CHARS_PER_CODE: String(REPLY.length) },
+      { synth: () => Promise.resolve(fail ? { ok: false as const, error: toolError('polly_unavailable', 'Polly did not answer.'), mayHaveBilled: false } : spokenMp3()) },
+    );
+    const { token, reply } = await turn();
+    const ticket = reply.speech?.ticket ?? '';
+    expect((await post('/v1/speech', { text: REPLY, ticket }, token)).status).toBe(503);
+    fail = false;
+    expect((await post('/v1/speech', { text: REPLY, ticket }, token)).status).toBe(200);
+  });
+
+  it('keeps the characters counted when Polly may have billed the call (a timeout, a cut connection: review of #195)', async () => {
+    let fail = true;
+    const { post, turn } = setup(
+      { SIM_LIMIT_SPEECH_CHARS_PER_CODE: String(REPLY.length) },
+      { synth: () => Promise.resolve(fail ? { ok: false as const, error: toolError('polly_unavailable', 'Polly timed out.'), mayHaveBilled: true } : spokenMp3()) },
+    );
+    const { token, reply } = await turn();
+    const ticket = reply.speech?.ticket ?? '';
+    expect((await post('/v1/speech', { text: REPLY, ticket }, token)).status).toBe(503);
+    fail = false;
+    expect((await post('/v1/speech', { text: REPLY, ticket }, token)).status).toBe(429);
+  });
+
+  it('never passes on a speech field the agent sent: the ticket is only ever ours (review of #180)', async () => {
+    const forged = { text: REPLY, speech: { ticket: 'k1.forged' } };
+    for (const enabled of ['true', 'false']) {
+      const s = setup({ SIM_SPEECH_ENABLED: enabled }, { agentReply: forged });
+      const { reply } = await s.turn();
+      expect(reply.speech?.ticket).not.toBe('k1.forged');
+      if (enabled === 'false') expect(reply.speech).toBeUndefined();
+    }
   });
 
   it('counts the characters Polly speaks per code and stops at the cap (429); cache hits stay free', async () => {

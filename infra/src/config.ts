@@ -91,6 +91,19 @@ export const SimApiConfigSchema = z
       turnsGlobalPerDay: z.number().int().min(1).max(100_000),
       toolCallsPerCodePerDay: z.number().int().min(1).max(10_000),
       codeAttemptsPerIpPerHour: z.number().int().min(1).max(1000),
+      /** Characters Polly may speak per demo code and overall per UTC day; cache hits are free (approved in #25). */
+      speechCharsPerCodePerDay: z.number().int().min(1).max(1_000_000),
+      speechCharsGlobalPerDay: z.number().int().min(1).max(10_000_000),
+    }),
+    /** The studio voice (F8d, #25, approved in #25): on per stage, one voice, the S3 cache of spoken replies. */
+    speech: z.strictObject({
+      enabled: z.strictObject({ dev: z.boolean(), demo: z.boolean() }),
+      engine: z.enum(['neural', 'generative', 'standard']),
+      /** One setting: the final voice is the owner's choice. */
+      voice: z.string().regex(/^[A-Z][A-Za-z]{1,31}$/),
+      pollyTimeoutMs: z.number().int().min(100).max(10_000),
+      cacheTimeoutMs: z.number().int().min(100).max(10_000),
+      cacheDays: z.number().int().min(1).max(365),
     }),
   })
   .refine((c) => c.agentTimeoutMs < c.timeoutSeconds * 1000, { message: 'The agent timeout must end before the function timeout.', path: ['agentTimeoutMs'] });
@@ -109,8 +122,12 @@ export const InfraConfigSchema = z.strictObject({
     // The sim-api worst case (Copilot on #156): the SSM reads at a cold start, two DynamoDB calls with every
     // attempt (a turn counts per code and overall), the agent or the MCP server, and 1 s for the SDK backoff.
     // It must end before the function does, so the caller gets our answer, never a raw 502.
-    const dynamo = 2 * c.state.maxAttempts * (c.state.connectTimeoutMs + c.state.requestTimeoutMs);
-    const worstMs = c.simApi.ssmTimeoutMs + dynamo + Math.max(c.simApi.agentTimeoutMs, c.simApi.mcpTimeoutMs) + 1000;
+    // A spoken reply (F8d, #25) adds its own path: the cache read and write, two counts and, when Polly fails,
+    // two refunds, then Polly.
+    const dynamoCallMs = c.state.maxAttempts * (c.state.connectTimeoutMs + c.state.requestTimeoutMs);
+    const turnMs = c.simApi.ssmTimeoutMs + 2 * dynamoCallMs + Math.max(c.simApi.agentTimeoutMs, c.simApi.mcpTimeoutMs) + 1000;
+    const speechMs = c.simApi.ssmTimeoutMs + 2 * c.simApi.speech.cacheTimeoutMs + 4 * dynamoCallMs + c.simApi.speech.pollyTimeoutMs + 1000;
+    const worstMs = Math.max(turnMs, speechMs);
     if (worstMs > c.simApi.timeoutSeconds * 1000) {
       ctx.addIssue({ code: 'custom', path: ['simApi', 'timeoutSeconds'], message: `The sim-api worst case is ${String(worstMs)} ms: raise timeoutSeconds, or lower the timeouts or the DynamoDB attempts.` });
     }

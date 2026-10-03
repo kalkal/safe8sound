@@ -125,3 +125,43 @@ describe('loadSimApiLambda', () => {
     if (!built.ok) expect(built.error.message).not.toContain('tiny');
   });
 });
+
+describe('loadSimApiLambda: the studio voice (F8d part 3, #25)', () => {
+  const speechDeps = () => {
+    const asked: { bucket: string; pollyTimeoutMs: number; cacheTimeoutMs: number }[] = [];
+    return {
+      asked,
+      speech: (s: { bucket: string; pollyTimeoutMs: number; cacheTimeoutMs: number }) => {
+        asked.push(s);
+        return { synth: { synthesize: () => Promise.resolve({ ok: true as const, value: new Uint8Array([1]) }) }, cache: { get: () => Promise.resolve(undefined), put: () => Promise.resolve() } };
+      },
+    };
+  };
+  const turn = (handler: (req: Request, meta: { clientIp: string }) => Promise<Response>) => session(handler, CODE);
+
+  it('wires Polly and the S3 cache with the bucket and timeouts from config when speech is on', async () => {
+    const { deps: d } = deps();
+    const s = speechDeps();
+    const built = await loadSimApiLambda({ ...ENV, SIM_SPEECH_ENABLED: 'true', SIM_SPEECH_BUCKET: 'cold-reserve-dev-speech', SIM_POLLY_TIMEOUT_MS: '2500', SIM_SPEECH_CACHE_TIMEOUT_MS: '800' }, { ...d, speech: s.speech });
+    expect(built.ok).toBe(true);
+    expect(s.asked).toEqual([{ bucket: 'cold-reserve-dev-speech', pollyTimeoutMs: 2500, cacheTimeoutMs: 800 }]);
+    if (built.ok) expect((await turn(built.value)).status).toBe(200);
+  });
+
+  it('builds no speech when it is off, whatever else is set', async () => {
+    const { deps: d } = deps();
+    const s = speechDeps();
+    expect((await loadSimApiLambda({ ...ENV, SIM_SPEECH_BUCKET: 'cold-reserve-dev-speech' }, { ...d, speech: s.speech })).ok).toBe(true);
+    expect(s.asked).toEqual([]);
+  });
+
+  it('refuses speech on without a valid bucket, before any SSM read', async () => {
+    for (const bucket of [undefined, 'Not_A_Bucket']) {
+      const { asked, deps: d } = deps();
+      const built = await loadSimApiLambda({ ...ENV, SIM_SPEECH_ENABLED: 'true', SIM_SPEECH_BUCKET: bucket }, { ...d, speech: speechDeps().speech });
+      expect(built).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+      expect(JSON.stringify(built)).toContain('SIM_SPEECH_BUCKET');
+      expect(asked).toEqual([]);
+    }
+  });
+});

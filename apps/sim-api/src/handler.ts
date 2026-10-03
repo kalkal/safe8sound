@@ -44,9 +44,15 @@ export type LogLine = LogEntry;
 /** The line of a refused or failed request (kept as a name for the adapters). */
 export type ErrorLine = LogEntry;
 
+/**
+ * The mp3 of one reply, or why not. `mayHaveBilled`: the call reached Polly and may have been charged (a
+ * timeout, a cut connection), so its characters stay counted (review of #195).
+ */
+export type SpeechResult = { ok: true; value: Uint8Array } | { ok: false; error: ErrorEnvelope; mayHaveBilled: boolean };
+
 /** Amazon Polly behind the sim-api (F8d, #25): the mp3 of one reply text, or polly_unavailable. */
 export interface SpeechPort {
-  synthesize(input: { text: string; engine: SpeechEngine; voice: string; correlationId: string }): Promise<Result<Uint8Array, ErrorEnvelope>>;
+  synthesize(input: { text: string; engine: SpeechEngine; voice: string; correlationId: string }): Promise<SpeechResult>;
 }
 
 /** The spoken replies already paid for (S3, approved in #25). Any failure is thrown: the caller logs it and goes on. */
@@ -150,7 +156,16 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         const allowed = await quota.speech(codeId, text.length);
         if (!allowed.ok) return fail(allowed.error, undefined, {}, codeId);
         const made = await deps.speech.synth.synthesize({ text, engine, voice, correlationId });
-        if (!made.ok) return fail(made.error, undefined, {}, codeId);
+        if (!made.ok) {
+          // Polly refused: the characters go back (review of #180), unless the call may have been billed (#195).
+          // A failed refund only costs the code some room.
+          try {
+            if (!made.mayHaveBilled) await quota.refundSpeech(codeId, text.length);
+          } catch (e) {
+            deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'warn', component: 'sim-api', message: 'speech_refund_failed', correlationId, errorName: nameOf(e), details: { codeId } });
+          }
+          return fail(made.error, undefined, {}, codeId);
+        }
         audio = made.value;
         try {
           await deps.speech.cache.put(key, audio);
@@ -231,8 +246,11 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         if (!reply.ok) return fail(reply.error, undefined, {}, codeId);
         info({ event: 'turn_answered', codeId });
         // The ticket of this very text, token and voice (approved in #25): only real replies are spoken.
-        const speech = speaking ? { speech: { ticket: signSpeechTicket({ jti, text: reply.value.text, engine, voice }, signingKey) } } : {};
-        return respond(200, { ...reply.value, ...speech });
+        // The ticket is only ever ours: a speech field the agent sent is dropped (review of #180).
+        const answer: TurnReply = { ...reply.value };
+        delete answer.speech;
+        const speech = speaking ? { speech: { ticket: signSpeechTicket({ jti, text: answer.text, engine, voice }, signingKey) } } : {};
+        return respond(200, { ...answer, ...speech });
       }
 
       const request = ToolCallRequestSchema.safeParse(body);

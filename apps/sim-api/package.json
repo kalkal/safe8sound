@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agentcore": "3.1142.0",
+    "@aws-sdk/client-polly": "3.1142.0",
+    "@aws-sdk/client-s3": "3.1142.0",
     "@cold-reserve/contracts": "workspace:*",
     "@cold-reserve/core": "workspace:*",
     "@cold-reserve/ssm-parameters": "workspace:*",

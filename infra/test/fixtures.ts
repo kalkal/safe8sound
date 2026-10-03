@@ -27,7 +27,7 @@ export const exampleConfig = (): InfraConfig => ({
     tokenKeysParameter: '/cold-reserve/{stage}/sim-api/token-keys',
     mcpTokenParameter: '/cold-reserve/{stage}/sim-api/mcp-token',
     memoryMb: 512,
-    timeoutSeconds: 25,
+    timeoutSeconds: 32,
     logRetentionDays: 14,
     p95AlarmMs: 9000,
     ssmTimeoutMs: 2000,
@@ -36,6 +36,7 @@ export const exampleConfig = (): InfraConfig => ({
     allowedOrigins: [],
     demoEnabled: { dev: true, demo: true },
     tokenTtlS: 3600,
-    limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10 },
+    limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000 },
+    speech: { enabled: { dev: false, demo: true }, engine: 'neural', voice: 'Joanna', pollyTimeoutMs: 2500, cacheTimeoutMs: 1000, cacheDays: 30 },
   },
 });

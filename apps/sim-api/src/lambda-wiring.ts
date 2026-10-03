@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { agentCoreTurnAgent, type AgentCoreClientLike } from './adapters/agentcore.js';
 import { mcpCardTools, streamableMcpCaller } from './adapters/mcp-cards.js';
 import { loadPlainSimApiSettings, loadSimApiConfig } from './config.js';
-import { createSimApiHandler, type SimApiHandler } from './handler.js';
+import { createSimApiHandler, type SimApiHandler, type SpeechCachePort, type SpeechPort } from './handler.js';
 import type { QuotaStore } from './quota.js';
 
 const SettingsSchema = z.object({
@@ -18,7 +18,17 @@ const SettingsSchema = z.object({
   SIM_AGENT_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(7500),
   SIM_MCP_URL: z.url(),
   SIM_MCP_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(3000),
+  /** The studio voice (F8d part 3, #25): the cache bucket, and timeouts for Polly and for each cache call. */
+  SIM_SPEECH_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/).optional(),
+  SIM_POLLY_TIMEOUT_MS: z.coerce.number().int().min(100).max(10_000).default(2500),
+  SIM_SPEECH_CACHE_TIMEOUT_MS: z.coerce.number().int().min(100).max(10_000).default(1000),
 });
+
+export interface SpeechSettings {
+  readonly bucket: string;
+  readonly pollyTimeoutMs: number;
+  readonly cacheTimeoutMs: number;
+}
 
 export interface SimApiLambdaDeps {
   /** Reads one SecureString (the Parameters and Secrets extension on Lambda). */
@@ -28,6 +38,8 @@ export interface SimApiLambdaDeps {
   readonly quotaFor: (table: { tableName: string; client: DynamoClientSettings }) => QuotaStore;
   readonly log: (entry: LogEntry) => void;
   readonly clock: Clock;
+  /** Polly and its S3 cache, built only when SIM_SPEECH_ENABLED is on. */
+  readonly speech?: (settings: SpeechSettings) => { synth: SpeechPort; cache: SpeechCachePort };
 }
 
 /**
@@ -44,6 +56,7 @@ export async function loadSimApiLambda(env: Readonly<Record<string, string | und
   // Origins, caps, TTL and the kill switch are checked before any secret is read (Copilot on #156).
   const plain = loadPlainSimApiSettings(env);
   if (!plain.ok) return plain;
+  if (plain.value.speech.enabled && s.SIM_SPEECH_BUCKET === undefined) return err(toolError('invalid_config', 'SIM_SPEECH_ENABLED needs SIM_SPEECH_BUCKET, the cache of spoken replies.'));
 
   const [demoCodes, tokenKeys, mcpToken] = await Promise.all([deps.read(s.SIM_DEMO_CODES_PARAMETER), deps.read(s.SIM_TOKEN_KEYS_PARAMETER), deps.read(s.SIM_MCP_TOKEN_PARAMETER)]);
   if (!demoCodes.ok) return demoCodes;
@@ -62,6 +75,9 @@ export async function loadSimApiLambda(env: Readonly<Record<string, string | und
       clock: deps.clock,
       randomHex: () => randomBytes(8).toString('hex'),
       logger: { log: deps.log },
+      ...(plain.value.speech.enabled && s.SIM_SPEECH_BUCKET !== undefined && deps.speech !== undefined
+        ? { speech: deps.speech({ bucket: s.SIM_SPEECH_BUCKET, pollyTimeoutMs: s.SIM_POLLY_TIMEOUT_MS, cacheTimeoutMs: s.SIM_SPEECH_CACHE_TIMEOUT_MS }) }
+        : {}),
     }),
   );
 }

@@ -5,6 +5,7 @@ import { ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Architecture, FunctionUrlAuthType, LoggingFormat, ParamsAndSecretsLayerVersion, ParamsAndSecretsVersions, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { BlockPublicAccess, Bucket, BucketEncryption, type CfnBucket } from 'aws-cdk-lib/aws-s3';
 import { FilterPattern, LogGroup, MetricFilter, type CfnLogGroup } from 'aws-cdk-lib/aws-logs';
 import type { Construct } from 'constructs';
 import type { SimApiConfig, StageName, StateConfig } from './config.js';
@@ -42,6 +43,22 @@ export class SimApiStack extends Stack {
     logGroup.grantWrite(role);
     // Invoking needs both the runtime and the endpoint (Service Authorization Reference); no qualifier = DEFAULT.
     role.addToPolicy(new PolicyStatement({ actions: ['bedrock-agentcore:InvokeAgentRuntime'], resources: [props.runtimeArn, `${props.runtimeArn}/runtime-endpoint/DEFAULT`] }));
+
+    // The studio voice (F8d, #25, approved in #25): the spoken replies already paid for, private, SSE-S3,
+    // TLS only, forgotten after the configured days. Kept on demo (what the judges hear), dropped with dev.
+    const speechCache = new Bucket(this, 'SpeechCache', {
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      encryption: BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      lifecycleRules: [{ prefix: 'speech/', expiration: Duration.days(simApi.speech.cacheDays) }],
+      removalPolicy: stage === 'demo' ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    });
+    role.addToPolicy(new PolicyStatement({ actions: ['s3:GetObject', 's3:PutObject'], resources: [speechCache.arnForObjects('speech/*')] }));
+    // Without ListBucket, S3 answers a missing object with 403 AccessDenied instead of 404 NoSuchKey, so every
+    // cache miss would look like a failure (review of #195). Listing is limited to the speech/ prefix.
+    role.addToPolicy(new PolicyStatement({ actions: ['s3:ListBucket'], resources: [speechCache.bucketArn], conditions: { StringLike: { 's3:prefix': ['speech/*'] } } }));
+    // SynthesizeSpeech has one optional resource type, a lexicon; we use none, so the resource is "*".
+    role.addToPolicy(new PolicyStatement({ actions: ['polly:SynthesizeSpeech'], resources: ['*'] }));
     // The caps only (decided in #17): one atomic UpdateItem per use, on DEMO# keys and nothing else.
     role.addToPolicy(
       new PolicyStatement({
@@ -88,6 +105,14 @@ export class SimApiStack extends Stack {
         SIM_LIMIT_TURNS_GLOBAL: String(simApi.limits.turnsGlobalPerDay),
         SIM_LIMIT_TOOL_CALLS_PER_CODE: String(simApi.limits.toolCallsPerCodePerDay),
         SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR: String(simApi.limits.codeAttemptsPerIpPerHour),
+        SIM_LIMIT_SPEECH_CHARS_PER_CODE: String(simApi.limits.speechCharsPerCodePerDay),
+        SIM_LIMIT_SPEECH_CHARS_GLOBAL: String(simApi.limits.speechCharsGlobalPerDay),
+        SIM_SPEECH_ENABLED: String(simApi.speech.enabled[stage]),
+        SIM_SPEECH_ENGINE: simApi.speech.engine,
+        SIM_SPEECH_VOICE: simApi.speech.voice,
+        SIM_SPEECH_BUCKET: speechCache.bucketName,
+        SIM_POLLY_TIMEOUT_MS: String(simApi.speech.pollyTimeoutMs),
+        SIM_SPEECH_CACHE_TIMEOUT_MS: String(simApi.speech.cacheTimeoutMs),
         STATE_TABLE_NAME: table.tableName,
         STATE_STORE_CONNECT_TIMEOUT_MS: String(state.connectTimeoutMs),
         STATE_STORE_REQUEST_TIMEOUT_MS: String(state.requestTimeoutMs),
@@ -150,9 +175,24 @@ export class SimApiStack extends Stack {
 
     // cdk-nag 3 findings are acknowledged through CDK Validations, each with its reason.
     const logGroupId = this.getLogicalId(logGroup.node.defaultChild as CfnLogGroup);
-    Validations.of(role).acknowledge({
-      id: `AwsSolutions-IAM5[Resource::<${logGroupId}.Arn>:*]`,
-      reason: "Log streams are created at runtime: the grant is scoped to this function's own log group (log-group:<name>:*).",
+    Validations.of(role).acknowledge(
+      {
+        id: `AwsSolutions-IAM5[Resource::<${logGroupId}.Arn>:*]`,
+        reason: "Log streams are created at runtime: the grant is scoped to this function's own log group (log-group:<name>:*).",
+      },
+      {
+        id: `AwsSolutions-IAM5[Resource::<${this.getLogicalId(speechCache.node.defaultChild as CfnBucket)}.Arn>/speech/*]`,
+        reason: 'The spoken replies are named by the sha256 of engine, voice and text at runtime: Get/Put only, on the speech/ prefix of this stack’s own bucket.',
+      },
+      {
+        id: 'AwsSolutions-IAM5[Resource::*]',
+        reason:
+          'polly:SynthesizeSpeech has a single optional resource type, a custom lexicon, and we use none, so the resource is "*" (https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazonpolly.html). Only that one action is granted.',
+      },
+    );
+    Validations.of(speechCache).acknowledge({
+      id: 'AwsSolutions-S1',
+      reason: 'A cache of spoken reply audio (no personal data, objects expire after cacheDays): every request already gets a JSON log line from the sim-api, so S3 access logs would only add cost.',
     });
     Validations.of(fn).acknowledge({
       id: 'AwsSolutions-L1',

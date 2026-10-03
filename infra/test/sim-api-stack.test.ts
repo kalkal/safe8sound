@@ -122,6 +122,44 @@ describe('sim-api stack (#17)', () => {
     t.hasResourceProperties('AWS::CloudWatch::Alarm', { MetricName: 'Duration', ExtendedStatistic: 'p95', Threshold: 9000, EvaluationPeriods: 3, DatapointsToAlarm: 2 });
   });
 
+  it('keeps the spoken replies in a private, encrypted, TLS-only bucket that forgets them after the configured days (F8d, #25)', () => {
+    t.hasResourceProperties('AWS::S3::Bucket', {
+      PublicAccessBlockConfiguration: { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true },
+      BucketEncryption: { ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: 'AES256' } }] },
+      LifecycleConfiguration: { Rules: [Match.objectLike({ Prefix: 'speech/', ExpirationInDays: 30, Status: 'Enabled' })] },
+    });
+    t.hasResourceProperties('AWS::S3::BucketPolicy', { PolicyDocument: { Statement: Match.arrayWith([Match.objectLike({ Effect: 'Deny', Condition: { Bool: { 'aws:SecureTransport': 'false' } } })]) } });
+  });
+
+  it('may call Polly SynthesizeSpeech only, and read and write only speech/ in its bucket', () => {
+    const polly = statementsOf(t).filter((s) => actions(s).some((a) => a.startsWith('polly:')));
+    expect(polly).toEqual([expect.objectContaining({ Action: 'polly:SynthesizeSpeech', Resource: '*' })]);
+    const s3 = statementsOf(t).filter((s) => actions(s).some((a) => a.startsWith('s3:')));
+    expect(s3.flatMap(actions).sort()).toEqual(['s3:GetObject', 's3:ListBucket', 's3:PutObject']);
+    const objects = s3.filter((s) => !actions(s).includes('s3:ListBucket'));
+    expect(JSON.stringify(objects.map((s) => s.Resource))).toContain('/speech/*"');
+  });
+
+  it('may list its bucket, only under speech/, so a missing object is a 404 miss and not a 403 (review of #195)', () => {
+    const list = statementsOf(t).filter((s) => actions(s).includes('s3:ListBucket'));
+    expect(list).toEqual([expect.objectContaining({ Action: 's3:ListBucket', Condition: { StringLike: { 's3:prefix': ['speech/*'] } } })]);
+    expect(JSON.stringify(list[0]?.Resource)).not.toContain('/speech');
+  });
+
+  it('passes the speech settings of the stage, the bucket and the character caps', () => {
+    const fn = Object.values(t.findResources('AWS::Lambda::Function'))[0] as { Properties: { Environment: { Variables: Record<string, unknown> } } };
+    expect(fn.Properties.Environment.Variables).toMatchObject({
+      SIM_SPEECH_ENABLED: 'false',
+      SIM_SPEECH_ENGINE: 'neural',
+      SIM_SPEECH_VOICE: 'Joanna',
+      SIM_POLLY_TIMEOUT_MS: '2500',
+      SIM_SPEECH_CACHE_TIMEOUT_MS: '1000',
+      SIM_LIMIT_SPEECH_CHARS_PER_CODE: '6000',
+      SIM_LIMIT_SPEECH_CHARS_GLOBAL: '30000',
+    });
+    expect(fn.Properties.Environment.Variables['SIM_SPEECH_BUCKET']).toEqual({ Ref: expect.stringMatching(/^SpeechCache/) as unknown });
+  });
+
   it('outputs the sim-api URL', () => {
     expect(Object.keys(t.findOutputs('SimApiUrl'))).toEqual(['SimApiUrl']);
   });
@@ -133,8 +171,13 @@ describe('the sim-api time budget (Copilot on #156): the caller never gets a raw
   const parse = (simApi: Partial<SimApiConfig>, state: Partial<ReturnType<typeof exampleConfig>['state']> = {}) =>
     InfraConfigSchema.safeParse({ ...exampleConfig(), simApi: { ...exampleConfig().simApi, ...simApi }, state: { ...exampleConfig().state, ...state } });
 
-  it('accepts the cdk.json values: 2 s SSM + 2 x 3 x (0.5 + 1.5) s DynamoDB + 9 s agent + 1 s margin = 24 s, within 25 s', () => {
+  it('accepts the cdk.json values: the turn needs 24 s; a spoken reply 2 s SSM + 2 x 1 s cache + 4 x 6 s DynamoDB + 2.5 s Polly + 1 s = 31.5 s, within 32 s', () => {
     expect(parse({}).success).toBe(true);
+  });
+
+  it('counts the spoken reply too (F8d part 3, #25): two counts and two refunds, the cache twice, Polly', () => {
+    expect(parse({ timeoutSeconds: 31 }).success).toBe(false);
+    expect(parse({ speech: { ...exampleConfig().simApi.speech, pollyTimeoutMs: 4000 } }).success).toBe(false);
   });
 
   it('refuses a function timeout that the worst case does not fit in, and names the setting', () => {
@@ -153,7 +196,7 @@ describe('SimApiConfigSchema', () => {
   });
 
   it('refuses an agent timeout that does not fit in the function timeout', () => {
-    expect(SimApiConfigSchema.safeParse({ ...exampleSimApi(), agentTimeoutMs: 25_000 }).success).toBe(false);
+    expect(SimApiConfigSchema.safeParse({ ...exampleSimApi(), timeoutSeconds: 20, agentTimeoutMs: 25_000 }).success).toBe(false);
   });
 
   it('refuses an origin with a path (CORS matches exact origins)', () => {

@@ -42,7 +42,7 @@
       "tokenKeysParameter": "/cold-reserve/{stage}/sim-api/token-keys",
       "mcpTokenParameter": "/cold-reserve/{stage}/sim-api/mcp-token",
       "memoryMb": 512,
-      "timeoutSeconds": 25,
+      "timeoutSeconds": 32,
       "logRetentionDays": 14,
       "p95AlarmMs": 9000,
       "ssmTimeoutMs": 2000,
@@ -58,7 +58,20 @@
         "turnsPerCodePerDay": 20,
         "turnsGlobalPerDay": 30,
         "toolCallsPerCodePerDay": 20,
-        "codeAttemptsPerIpPerHour": 10
+        "codeAttemptsPerIpPerHour": 10,
+        "speechCharsPerCodePerDay": 6000,
+        "speechCharsGlobalPerDay": 30000
+      },
+      "speech": {
+        "enabled": {
+          "dev": false,
+          "demo": true
+        },
+        "engine": "neural",
+        "voice": "Joanna",
+        "pollyTimeoutMs": 2500,
+        "cacheTimeoutMs": 1000,
+        "cacheDays": 30
       }
     }
   }

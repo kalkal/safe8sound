@@ -8,7 +8,7 @@ export interface QuotaStore {
   /** Adds `amount` (1 by default) under `key` if it still fits under `limit`; false when the cap is reached. */
   consume(key: string, limit: number, expiresAtMs: number, amount?: number): Promise<boolean>;
   /** Gives one count back under `key` (a right demo code); nothing when there is nothing to give back. */
-  release(key: string): Promise<void>;
+  release(key: string, amount?: number): Promise<void>;
 }
 
 /** Local store: keys carry their window (day or hour), so old windows are simply never read again. */
@@ -21,9 +21,9 @@ export function memoryQuotaStore(): QuotaStore {
       counts.set(key, n + amount);
       return Promise.resolve(true);
     },
-    release: (key) => {
+    release: (key, amount = 1) => {
       const n = counts.get(key) ?? 0;
-      if (n > 0) counts.set(key, n - 1);
+      if (n >= amount) counts.set(key, n - amount);
       return Promise.resolve();
     },
   };
@@ -104,7 +104,18 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
       if (!perCode.value) return over(day.retryAfterMs, SPOKEN);
       const overall = await counted(() => store.consume(`SPEECH#GLOBAL#${day.id}`, limits.speechCharsGlobalPerDay, day.endMs, chars));
       if (!overall.ok) return overall;
-      return overall.value ? ok(undefined) : over(day.retryAfterMs, SPOKEN);
+      if (overall.value) return ok(undefined);
+      // The overall cap refused: the per-code count goes back, so a refusal never uses up the code (review of #195).
+      // A transient failure to give it back only costs the code some room: the refusal is still the answer (a bug
+      // is rethrown by `counted` and reaches the handler's last resort, logged).
+      await counted(() => store.release(`SPEECH#${codeId}#${day.id}`, chars));
+      return over(day.retryAfterMs, SPOKEN);
+    },
+    /** Gives back the characters of a reply Polly did not speak (review of #180): a failure never uses up a code. Throws like the store. */
+    async refundSpeech(codeId: string, chars: number): Promise<void> {
+      const day = window(DAY_MS);
+      await store.release(`SPEECH#${codeId}#${day.id}`, chars);
+      await store.release(`SPEECH#GLOBAL#${day.id}`, chars);
     },
     async toolCall(codeId: string): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);

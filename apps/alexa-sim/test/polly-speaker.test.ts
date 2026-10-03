@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LogEvent } from '../src/log.js';
 import type { ConversationEvent } from '../src/machine.js';
 import { createPollySpeaker, type AudioLike, type Synthesize } from '../src/voice/polly-speaker.js';
@@ -55,6 +55,11 @@ function setup(synthesize: Synthesize, opts: { timeoutMs?: number } = {}) {
 
 const mp3 = () => Promise.resolve({ ok: true as const, value: new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/mpeg' }) });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+// Tests that need the timeout switch to fake timers; every test ends on the real clock.
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('createPollySpeaker', () => {
   it('plays the studio voice: started when the audio plays, ended when it ends, the object URL freed', async () => {
@@ -122,11 +127,13 @@ describe('createPollySpeaker', () => {
 
   it('ignores a studio voice that answers after its timeout: the browser voice already reads the reply', async () => {
     let late: (value: Awaited<ReturnType<Synthesize>>) => void = () => undefined;
+    // Fake timers: the timeout fires when the test says so, never by the wall clock (no race under load).
+    vi.useFakeTimers();
     const { speaker, audio, fallbackSaid, events } = setup(() => new Promise((resolve) => (late = resolve)), { timeoutMs: 10 });
     speaker.speak('Hello.');
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await vi.advanceTimersByTimeAsync(10);
     late({ ok: true, value: new Blob([new Uint8Array([1])]) });
-    await tick();
+    await vi.advanceTimersByTimeAsync(0);
     expect(fallbackSaid).toEqual(['Hello.']);
     expect(audio.src).toBe('');
     expect(events).toEqual([]);
@@ -149,9 +156,12 @@ describe('createPollySpeaker', () => {
           reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
         });
       });
+    vi.useFakeTimers();
     const { speaker, fallbackSaid, logs } = setup(slow, { timeoutMs: 20 });
     speaker.speak('Hello.');
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    await vi.advanceTimersByTimeAsync(19);
+    expect(fallbackSaid).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
     expect(aborted).toBe(true);
     expect(fallbackSaid).toEqual(['Hello.']);
     expect(logs[0]).toMatchObject({ code: 'speech_timeout' });

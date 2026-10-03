@@ -44,6 +44,8 @@ The function has its own role, with no managed policies:
 - `bedrock-agentcore:InvokeAgentRuntime` on the agent runtime of the same stage and its `DEFAULT` endpoint, and nothing else (the action needs both resource types);
 - `dynamodb:UpdateItem` on the state table, only for partition keys starting with `DEMO#` (`dynamodb:LeadingKeys`);
 - `ssm:GetParameter` on the three parameters above;
+- `polly:SynthesizeSpeech` (its only resource type is a custom lexicon; we use none, so the resource is `*`);
+- `s3:GetObject` and `s3:PutObject` on `speech/*` in its own cache bucket, and nothing else in S3;
 - writing to its own log group.
 
 ## The browser side
@@ -56,9 +58,11 @@ The function has its own role, with no managed policies:
 The answers can be read aloud in a studio voice (Amazon Polly, neural, en-US; the voice id is one setting, `SIM_SPEECH_VOICE`, default `Joanna`). The design was approved in #25:
 
 - **Only real replies are spoken.** When speech is on, a turn reply carries `speech.ticket`: an HMAC-SHA256, with the token signing key, over the token's `jti`, the engine, the voice and the reply text. `POST /v1/speech {text, ticket}` speaks that exact text only; any other text, token or voice is `invalid_input`. The ticket needs no storage and expires with the token.
-- **Cache first.** The audio of a text is kept in S3 under `sha256(engine|voice|mp3|text)`, so a phrase is synthesized once (the scripted demo phrases cost nothing after the first time). A failed cache read or write is logged (`speech_cache_failed`) and the reply is still spoken.
+- **Cache first.** The audio of a text is kept in the stage's S3 bucket under `speech/<sha256(engine|voice|mp3|text)>.mp3`, so a phrase is synthesized once (the scripted demo phrases cost nothing after the first time). The bucket is private (all public access blocked), encrypted with S3-managed keys, TLS only, and forgets each object after `cacheDays` (30). It is kept on `demo` and dropped with `dev`. A failed cache read or write is logged (`speech_cache_failed`) and the reply is still spoken.
+- **Polly.** One `SynthesizeSpeech` per text: plain text only (`TextType: text`, never SSML from a reply), mp3, one attempt with its own timeout (`pollyTimeoutMs`, 2.5 s). Throttling, a Polly fault or the network is 503 `polly_unavailable`; a denied call or an unknown voice is our setup, so it is 500 `unexpected_error` and the internal-errors alarm fires. When Polly fails, the characters go back to the code.
 - **Caps.** Characters sent to Polly are counted per demo code and overall per UTC day, on the same atomic `DEMO#` counters (`DEMO#SPEECH#<codeId>#<day>`, `DEMO#SPEECH#GLOBAL#<day>`; defaults 6,000 and 30,000). Cache hits are free.
-- **Kill switch.** `SIM_SPEECH_ENABLED` (true or false, off by default): when off, replies carry no ticket and `/v1/speech` answers 503 `polly_unavailable`.
+- **Kill switch.** `SIM_SPEECH_ENABLED` (true or false, off by default; in the CDK config, `speech.enabled` is off on `dev` and on for `demo`): when off, replies carry no ticket and `/v1/speech` answers 503 `polly_unavailable`.
+- **Time budget.** A spoken reply's worst case (SSM at a cold start, the cache twice, two counts and two refunds, Polly) must fit in the function timeout like a turn does, so the timeout is 32 s; the config refuses values that would not fit.
 - **Failures.** Polly down, slow or refusing is 503 `polly_unavailable`. The browser then reads that reply with its own voice and says so once; the answer is never lost.
 - **Privacy.** Only the reply text goes to Polly, never a question, a log line or personal data. Logs carry the demo code id, the number of characters and whether it came from the cache, never the text. Opting out of Polly using the texts to improve Amazon's AI services (AWS Organizations) is the owner's step before the demo deploy.
 

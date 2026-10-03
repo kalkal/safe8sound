@@ -16,7 +16,16 @@ export interface FunctionUrlResult {
   statusCode: number;
   headers: Record<string, string>;
   body: string;
-  isBase64Encoded: false;
+  isBase64Encoded: boolean;
+}
+
+/** JSON, Problem Details and text travel as text; anything else (the spoken reply's mp3) as base64 (review of #180). */
+const isText = (contentType: string | null) => contentType === null || /^(text\/|application\/(problem\+)?json)/i.test(contentType);
+
+async function toResult(response: Response): Promise<FunctionUrlResult> {
+  const headers = Object.fromEntries(response.headers);
+  if (isText(response.headers.get('content-type'))) return { statusCode: response.status, headers, body: await response.text(), isBase64Encoded: false };
+  return { statusCode: response.status, headers, body: Buffer.from(await response.arrayBuffer()).toString('base64'), isBase64Encoded: true };
 }
 
 function toRequest(event: FunctionUrlEvent): Request {
@@ -82,7 +91,7 @@ export function createSimApiLambda(
     }
     try {
       const response = await built.value(toRequest(event), { clientIp: event.requestContext.http.sourceIp });
-      return { statusCode: response.status, headers: Object.fromEntries(response.headers), body: await response.text(), isBase64Encoded: false };
+      return await toResult(response);
     } catch (e) {
       return unexpected(e, correlationId);
     }

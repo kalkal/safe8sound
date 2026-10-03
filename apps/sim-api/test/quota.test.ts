@@ -128,6 +128,17 @@ describe('speech characters (F8d, #25, approved in #25): per code and overall pe
     expect(await quota.speech('judges', 1)).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', retryAfterMs: 60_000 } });
   });
 
+  it('gives the per-code count back when the overall cap refuses, so a refusal never uses up the code (review of #195)', async () => {
+    const store = memoryQuotaStore();
+    const quota = q(store);
+    expect((await quota.speech('a', 100)).ok).toBe(true);
+    expect((await quota.speech('b', 50)).ok).toBe(true);
+    expect((await quota.speech('c', 60)).ok).toBe(false); // overall: 150 + 60 > 150
+    // Same counters, a larger overall cap: c still has its whole per-code room (100) only if the 60 came back.
+    const roomier = createQuota({ store, limits: { ...SPEECH, speechCharsGlobalPerDay: 1000 }, clock: fixedClock(NOW), ipSalt: SALT });
+    expect((await roomier.speech('c', 100)).ok).toBe(true);
+  });
+
   it('enforces the overall cap across codes', async () => {
     const quota = q();
     expect((await quota.speech('a', 100)).ok).toBe(true);

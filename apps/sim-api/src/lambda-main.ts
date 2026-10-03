@@ -1,8 +1,12 @@
 import { BedrockAgentCoreClient } from '@aws-sdk/client-bedrock-agentcore';
+import { PollyClient } from '@aws-sdk/client-polly';
+import { S3Client } from '@aws-sdk/client-s3';
 import { err, toolError, type LogEntry } from '@cold-reserve/contracts';
 import { jsonLineSink, loggerTo } from '@cold-reserve/core';
 import { extensionReader } from '@cold-reserve/ssm-parameters';
 import { dynamoCounter, sdkDocumentSender } from '@cold-reserve/store-dynamodb';
+import { pollySpeech } from './adapters/polly.js';
+import { s3SpeechCache } from './adapters/speech-cache-s3.js';
 import { createSimApiLambda } from './lambda.js';
 import { loadSimApiLambda } from './lambda-wiring.js';
 
@@ -29,6 +33,12 @@ export const handler = createSimApiLambda(
       quotaFor: (table) => dynamoCounter({ tableName: table.tableName, sender: sdkDocumentSender(table.client) }),
       log,
       clock: { now: Date.now },
+      // The studio voice (F8d, #25): one attempt each, the adapters have their own timeouts and the browser
+      // voice reads the reply meanwhile.
+      speech: (settings) => ({
+        synth: pollySpeech({ client: new PollyClient({ maxAttempts: 1 }), timeoutMs: settings.pollyTimeoutMs, log }),
+        cache: s3SpeechCache({ client: new S3Client({ maxAttempts: 1 }), bucket: settings.bucket, timeoutMs: settings.cacheTimeoutMs }),
+      }),
     });
   },
   { log },

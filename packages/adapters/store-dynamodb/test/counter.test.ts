@@ -70,6 +70,15 @@ describe('dynamoCounter: counting more than one at a time (speech characters, F8
   });
 });
 
+describe('dynamoCounter: amounts are positive integers (review of #180)', () => {
+  it.each([0, -1, 1.5, Number.NaN])('refuses %s as a bug of ours, without asking DynamoDB', async (amount) => {
+    const { sent, counter } = stub({});
+    await expect(counter.consume('k', 10, END, amount)).rejects.toBeInstanceOf(RangeError);
+    await expect(counter.release('k', amount)).rejects.toBeInstanceOf(RangeError);
+    expect(sent).toEqual([]);
+  });
+});
+
 describe('dynamoCounter.release', () => {
   it('gives one count back with one conditional ADD of -1 (never below zero, never creates an item)', async () => {
     const { sent, counter } = stub({});
@@ -80,13 +89,19 @@ describe('dynamoCounter.release', () => {
         input: {
           TableName: 'ColdReserve-dev',
           Key: { PK: 'DEMO#ATTEMPT#abc#2026-10-02T12', SK: 'COUNT' },
-          UpdateExpression: 'ADD #count :minusOne',
-          ConditionExpression: '#count > :zero',
+          UpdateExpression: 'ADD #count :minus',
+          ConditionExpression: '#count >= :amount',
           ExpressionAttributeNames: { '#count': 'count' },
-          ExpressionAttributeValues: { ':minusOne': -1, ':zero': 0 },
+          ExpressionAttributeValues: { ':minus': -1, ':amount': 1 },
         },
       },
     ]);
+  });
+
+  it('gives back an amount (speech characters Polly never spoke, review of #180), never below zero', async () => {
+    const { sent, counter } = stub({});
+    await counter.release('SPEECH#judges#2026-10-03', 120);
+    expect(sent[0]?.input).toMatchObject({ UpdateExpression: 'ADD #count :minus', ConditionExpression: '#count >= :amount', ExpressionAttributeValues: { ':minus': -120, ':amount': 120 } });
   });
 
   it('does nothing when there is nothing to give back (the condition failed)', async () => {

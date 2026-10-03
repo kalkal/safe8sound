@@ -93,3 +93,20 @@ describe('createSimApiLambda: the wait time of a transient startup failure (Copi
     expect(failed.body).not.toContain('/x');
   });
 });
+
+describe('createSimApiLambda: binary answers (review of #180)', () => {
+  it('sends a non-text body (the spoken reply) base64 encoded, and its bytes come back identical', async () => {
+    const audio = new Uint8Array([0xff, 0xfb, 0x90, 0x00, 0x80, 0xc3, 0x28]); // not valid UTF-8 on purpose
+    const handler: SimApiHandler = () => Promise.resolve(new Response(audio, { headers: { 'content-type': 'audio/mpeg' } }));
+    const result = await createSimApiLambda(() => Promise.resolve(ok(handler)), capture())(event());
+    expect(result.isBase64Encoded).toBe(true);
+    expect(new Uint8Array(Buffer.from(result.body, 'base64'))).toEqual(audio);
+    expect(result.headers['content-type']).toBe('audio/mpeg');
+  });
+
+  it('keeps JSON and Problem Details as plain text', async () => {
+    const handler: SimApiHandler = () => Promise.resolve(new Response('{"text":"ok"}', { headers: { 'content-type': 'application/json' } }));
+    const result = await createSimApiLambda(() => Promise.resolve(ok(handler)), capture())(event());
+    expect(result).toMatchObject({ isBase64Encoded: false, body: '{"text":"ok"}' });
+  });
+});

@@ -235,7 +235,7 @@ importers:
         version: 1.9.0
       '@strands-agents/sdk':
         specifier: 1.19.0
-        version: 1.19.0(@modelcontextprotocol/sdk@1.30.1(supports-color@10.2.2)(zod@4.6.5))(@opentelemetry/api@1.9.0)(@smithy/types@4.19.0)(express@5.2.1(supports-color@10.2.2))(zod@4.6.5)
+        version: 1.19.0(@aws-sdk/client-s3@3.1142.0)(@modelcontextprotocol/sdk@1.30.1(supports-color@10.2.2)(zod@4.6.5))(@opentelemetry/api@1.9.0)(@smithy/types@4.19.0)(express@5.2.1(supports-color@10.2.2))(zod@4.6.5)
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -384,6 +384,12 @@ importers:
   apps/sim-api:
     dependencies:
       '@aws-sdk/client-bedrock-agentcore':
+        specifier: 3.1142.0
+        version: 3.1142.0
+      '@aws-sdk/client-polly':
+        specifier: 3.1142.0
+        version: 3.1142.0
+      '@aws-sdk/client-s3':
         specifier: 3.1142.0
         version: 3.1142.0
       '@cold-reserve/contracts':
@@ -695,6 +701,10 @@ packages:
       - jsonschema
       - semver
 
+  '@aws-sdk/checksums@3.1001.1':
+    resolution: {integrity: sha512-x12Q17KYlJAd3nKf8LV5LV0vt8sh8/6YfQLGPtrGnQf/tW4jqxPGq5GPpuVitpQYM3eUR4XB7CbxZf751NMbLw==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/client-bedrock-agentcore@3.1142.0':
     resolution: {integrity: sha512-z2g7lpWMuDfEOIPERGv4Fx5WSyQgzX+q6rN48R0Db7X44XvdAqtaq4fm/g8WIyEpnrwsZvb6MB63sKyy86vsVw==}
     engines: {node: '>=20.0.0'}
@@ -705,6 +715,14 @@ packages:
 
   '@aws-sdk/client-dynamodb@3.1141.0':
     resolution: {integrity: sha512-R36EN5Ti01NtoJrgR5ryM+3msAmxob4s+xHKsJRbTwQUO5xQf1Hs8lKQ/QEuiQOG445UCwZbTjBUhekSmk1cyg==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-polly@3.1142.0':
+    resolution: {integrity: sha512-onVS7L6dZXo+67HHU6EJ8Fv0kBJlNWCBznd+jI4hS9b76PsWfo8rUFf0e9SwZaeqOKIGH/ujihn8a3Q/WdJsOg==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-s3@3.1142.0':
+    resolution: {integrity: sha512-OC9AcGMFOsBc95YSPWH3O7DE6RUTy7jqeOpVvzO2Dv3rw3w4vQRK+YdLXIbO2yXfmx3N59Y55yAJdDRJFMQK3Q==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-ssm@3.1142.0':
@@ -771,6 +789,10 @@ packages:
 
   '@aws-sdk/middleware-eventstream@3.972.30':
     resolution: {integrity: sha512-B6gvZlcnRBNWraKgyEjKsbhv+VjtbyHmpU7hmtTHzXpDSxHPpCJnYLpglEOOsF+SFne20DbZC5IVC1aNr2Pb4A==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/middleware-sdk-s3@3.972.77':
+    resolution: {integrity: sha512-E7W2UOeUoc+lg3uIfR/dM7ZwusHwhBQrKMnlkRv4EXRR+C0YtV1pg25xC7GdZIhXH+NAMgZPCbE7o5to2cjFiw==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/middleware-websocket@3.972.54':
@@ -4553,6 +4575,14 @@ snapshots:
 
   '@aws-cdk/cloud-assembly-schema@54.25.0': {}
 
+  '@aws-sdk/checksums@3.1001.1':
+    dependencies:
+      '@aws-sdk/core': 3.978.1
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.35.0
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
   '@aws-sdk/client-bedrock-agentcore@3.1142.0':
     dependencies:
       '@aws-sdk/core': 3.978.1
@@ -4585,6 +4615,33 @@ snapshots:
       '@aws-sdk/credential-provider-node': 3.972.84
       '@aws-sdk/dynamodb-codec': 3.973.46
       '@aws-sdk/middleware-endpoint-discovery': 3.972.31
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.35.0
+      '@smithy/fetch-http-handler': 5.8.0
+      '@smithy/node-http-handler': 4.12.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@aws-sdk/client-polly@3.1142.0':
+    dependencies:
+      '@aws-sdk/core': 3.978.1
+      '@aws-sdk/credential-provider-node': 3.972.84
+      '@aws-sdk/eventstream-handler-node': 3.972.35
+      '@aws-sdk/middleware-eventstream': 3.972.30
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.35.0
+      '@smithy/fetch-http-handler': 5.8.0
+      '@smithy/node-http-handler': 4.12.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@aws-sdk/client-s3@3.1142.0':
+    dependencies:
+      '@aws-sdk/checksums': 3.1001.1
+      '@aws-sdk/core': 3.978.1
+      '@aws-sdk/credential-provider-node': 3.972.84
+      '@aws-sdk/middleware-sdk-s3': 3.972.77
+      '@aws-sdk/signature-v4-multi-region': 3.996.47
       '@aws-sdk/types': 3.974.6
       '@smithy/core': 3.35.0
       '@smithy/fetch-http-handler': 5.8.0
@@ -4736,6 +4793,15 @@ snapshots:
 
   '@aws-sdk/middleware-eventstream@3.972.30':
     dependencies:
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.35.0
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@aws-sdk/middleware-sdk-s3@3.972.77':
+    dependencies:
+      '@aws-sdk/core': 3.978.1
+      '@aws-sdk/signature-v4-multi-region': 3.996.47
       '@aws-sdk/types': 3.974.6
       '@smithy/core': 3.35.0
       '@smithy/types': 4.19.0
@@ -5799,7 +5865,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@strands-agents/sdk@1.19.0(@modelcontextprotocol/sdk@1.30.1(supports-color@10.2.2)(zod@4.6.5))(@opentelemetry/api@1.9.0)(@smithy/types@4.19.0)(express@5.2.1(supports-color@10.2.2))(zod@4.6.5)':
+  '@strands-agents/sdk@1.19.0(@aws-sdk/client-s3@3.1142.0)(@modelcontextprotocol/sdk@1.30.1(supports-color@10.2.2)(zod@4.6.5))(@opentelemetry/api@1.9.0)(@smithy/types@4.19.0)(express@5.2.1(supports-color@10.2.2))(zod@4.6.5)':
     dependencies:
       '@aws-sdk/client-bedrock-runtime': 3.1142.0
       '@modelcontextprotocol/sdk': 1.30.1(supports-color@10.2.2)(zod@4.6.5)
@@ -5810,6 +5876,7 @@ snapshots:
       yaml: 2.9.1
       zod: 4.6.5
     optionalDependencies:
+      '@aws-sdk/client-s3': 3.1142.0
       '@smithy/types': 4.19.0
       express: 5.2.1(supports-color@10.2.2)
 

@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ConversationEvent } from '../../src/machine.js';
 import { createPollySpeaker, type AudioLike } from '../../src/voice/polly-speaker.js';
 import type { Speaker } from '../../src/voice/speech.js';
@@ -47,7 +47,9 @@ afterAll(async () => {
 
 const REPLY = 'Your battery is at 64%.';
 
-function page(baseUrl = base) {
+// A generous studio-voice timeout everywhere except the hang case: a loaded CI runner must never turn a
+// working studio voice into a fallback. Assertions wait for the condition (vi.waitFor), never a fixed delay.
+function page(baseUrl = base, timeoutMs = 5000) {
   const tickets = createSpeechTickets();
   tickets.remember(REPLY, 'k1.ticket');
   const events: ConversationEvent['type'][] = [];
@@ -74,7 +76,7 @@ function page(baseUrl = base) {
   const browser: Speaker = { speak: (text) => browserSaid.push(text), cancel: () => undefined };
   const speaker = createPollySpeaker({
     synthesize: createRemoteSynthesize({ baseUrl, session: { token: () => 'demo-token' }, tickets }),
-    timeoutMs: 300,
+    timeoutMs,
     audio: () => audio,
     objectUrl: { create: () => 'blob:e2e/1', revoke: () => undefined },
     fallback: browser,
@@ -85,16 +87,17 @@ function page(baseUrl = base) {
   return { speaker, events, browserSaid, notices, audio };
 }
 
-const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const eventually = (check: () => void) => vi.waitFor(check, { timeout: 10_000, interval: 20 });
 
 describe('studio voice, page side, against a local /v1/speech', () => {
   it('plays the studio voice for a reply with its ticket and the demo token', async () => {
     mode = 'ok';
     const p = page();
     p.speaker.speak(REPLY);
-    await settle(100);
+    await eventually(() => {
+      expect(p.events).toEqual(['SPEAKING_STARTED', 'SPEAKING_ENDED']);
+    });
     expect(seen.at(-1)).toEqual({ auth: 'Bearer demo-token', body: { text: REPLY, ticket: 'k1.ticket' } });
-    expect(p.events).toEqual(['SPEAKING_STARTED', 'SPEAKING_ENDED']);
     expect(p.browserSaid).toEqual([]);
   });
 
@@ -102,26 +105,28 @@ describe('studio voice, page side, against a local /v1/speech', () => {
     mode = 'unavailable';
     const p = page();
     p.speaker.speak(REPLY);
-    await settle(100);
-    expect(p.browserSaid).toEqual([REPLY]);
+    await eventually(() => {
+      expect(p.browserSaid).toEqual([REPLY]);
+    });
     expect(p.notices).toEqual(['voice.browserVoice']);
   });
 
   it('does not wait for a studio voice that hangs: the browser voice reads the reply after the timeout', async () => {
     mode = 'hang';
-    const p = page();
+    // The stand-in never answers: only the speaker's own timeout can end this (its exact timing is a unit test).
+    const p = page(base, 200);
     p.speaker.speak(REPLY);
-    await settle(50);
-    expect(p.browserSaid).toEqual([]);
-    await settle(400);
-    expect(p.browserSaid).toEqual([REPLY]);
+    await eventually(() => {
+      expect(p.browserSaid).toEqual([REPLY]);
+    });
   });
 
   it('reads the reply with the browser voice when the sim-api cannot be reached at all', async () => {
     const p = page('http://127.0.0.1:39999');
     p.speaker.speak(REPLY);
-    await settle(400);
-    expect(p.browserSaid).toEqual([REPLY]);
+    await eventually(() => {
+      expect(p.browserSaid).toEqual([REPLY]);
+    });
     expect(p.notices).toEqual(['voice.browserVoice']);
   });
 });
