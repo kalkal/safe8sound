@@ -1,26 +1,31 @@
-import type { Forecast, HomeProfile, Preferences, Snapshot } from '@cold-reserve/contracts';
+import { pct, type Forecast, type HomeProfile, type Preferences, type Snapshot } from '@cold-reserve/contracts';
+import { holdSafeRoom } from '@cold-reserve/guard';
+import { defaultSimParams } from '@cold-reserve/source-simulator';
+import { loadComfortPlanConfig } from '../../src/comfort-plan-config.js';
+import { guardFrame } from '../../src/modules/comfort-plan/plan-comfort.js';
 import type { StormModeConfig } from '../../src/modules/storm-mode/config.js';
 
+const H = 3_600_000;
+
 /**
- * The acceptance formula of #23 written out by hand, independently of core: (SOC - hardware floor) x
- * capacity x round-trip efficiency / (split power that holds the cooling threshold + EPS base load).
+ * The acceptance rule of #23 on one physics (Q7-A of #24): the guard's hold of the safe room on battery alone,
+ * down to the hardware floor, at the limit in force (the night-recovery limit at night), dry or cool by humidity,
+ * capped at `capHours`. The same engine and the same limit as the last-resort plan.
  */
-export function expectedSafeHours(input: { snapshot: Snapshot; forecast: Forecast; profile: HomeProfile; preferences: Preferences; config: StormModeConfig }): number {
+export function expectedHold(input: { snapshot: Snapshot; forecast: Forecast; profile: HomeProfile; preferences: Preferences; config: StormModeConfig }): { hours: number; untilMs: number } {
   const { snapshot, forecast, profile, preferences, config } = input;
-  const b = profile.battery;
-  const capacityWh = b.usableWh / ((100 - b.minSocHwPct) / 100);
-  const energyWh = ((snapshot.batterySocPct - b.minSocHwPct) / 100) * capacityWh * b.roundTripEff;
-
-  const room = profile.rooms.find((r) => r.id === preferences.safeRoomId);
-  const unit = room?.hvacUnits[0];
-  const reading = snapshot.rooms.find((r) => r.id === preferences.safeRoomId);
-  const now = Date.parse(snapshot.ts);
-  const hour = [...forecast.hourly].reverse().find((h) => Date.parse(h.ts) <= now) ?? forecast.hourly[0];
-  if (!room || !unit || !reading || !hour) throw new Error('the scenario has no safe room or no weather');
-
-  const gainW = (Math.max(0, hour.tempOutC - preferences.safety.cooling.maxC) * 1000) / room.thermal.rKPerKw + reading.occupants.length * config.occupantGainW;
-  const cop = unit.coolingKw / unit.inputKw.nominal;
-  const holdW = gainW <= 0 ? 0 : Math.min(Math.max(gainW / cop, unit.inputKw.min * 1000), unit.inputKw.max * 1000);
-  if (profile.epsBaseLoadW === undefined) throw new Error('the demo home declares its EPS load');
-  return Math.min(energyWh / (holdW + profile.epsBaseLoadW), config.capHours);
+  const loaded = loadComfortPlanConfig();
+  if (!loaded.ok) throw new Error(loaded.error.message);
+  const { comfort, guard } = loaded.value;
+  const nowMs = Date.parse(snapshot.ts);
+  const toMs = nowMs + config.capHours * H;
+  const held = holdSafeRoom(
+    { snapshot: { ...snapshot, gridAvailable: false }, forecast, profile, preferences, ...guardFrame({ config: comfort }, 'auto', { snapshot, forecast, preferences }), model: defaultSimParams(), config: guard },
+    { toMs, dischargeFloorPct: pct(profile.battery.minSocHwPct), humidityBand: comfort.planner.humidityBand, marginK: comfort.planner.essentialMarginK },
+  );
+  if (!held.ok) throw new Error(held.error.message);
+  const untilMs = held.value.safeUntil?.ms ?? toMs;
+  return { hours: Math.round(((untilMs - nowMs) / H) * 100) / 100, untilMs };
 }
+
+export const expectedSafeHours = (input: Parameters<typeof expectedHold>[0]): number => expectedHold(input).hours;

@@ -54,6 +54,10 @@ export function holdSafeRoom(input: HoldSafeRoomInput, opts: HoldSafeRoomOptions
     // Never "safe for the whole horizon" for a room nobody reads.
     return err(toolError('unknown_room', `No reading from the safe room ${roomId}.`, { details: { field: 'safeRoomId', roomId } }));
   }
+  if (!input.profile.rooms.some((r) => r.id === roomId)) {
+    // The projection drops a room the profile does not describe: no breach would ever be found.
+    return err(toolError('unknown_room', `The safe room ${roomId} is not in the home profile.`, { details: { field: 'safeRoomId', roomId } }));
+  }
   const limitAt = safeRoomLimitAt(input);
   const stepMs = input.config.projection.stepMinutes * 60_000;
   const heating = input.season === 'heating';

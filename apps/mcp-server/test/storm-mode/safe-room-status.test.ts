@@ -2,7 +2,7 @@ import { HomeProfileSchema, SafeRoomStatusSchema, type HomeProfile } from '@cold
 import { describe, expect, it } from 'vitest';
 import { runStormDetector } from '../../src/modules/storm-mode/observe.js';
 import { safeRoomStatus, startStormMode } from '../../src/modules/storm-mode/tools.js';
-import { expectedSafeHours } from './expected.js';
+import { expectedHold, expectedSafeHours } from './expected.js';
 import { MIN, preferences, stormConfig, world } from './support.js';
 
 // get_safe_room_status is read-only: it reports the safe room, its hours and the stored storm, and never
@@ -36,12 +36,13 @@ describe('get_safe_room_status', () => {
     expect(!out.ok && out.error).toMatchObject({ code: 'missing_eps_load', category: 'internal' });
   });
 
-  it('gives the time in the home time zone, with its offset', async () => {
+  it('gives the time in the home time zone, with its offset, counted from the home\'s reading', async () => {
     const w = world(1);
     const out = await safeRoomStatus(w.deps, w.ctx);
     if (!out.ok) throw new Error(out.error.message);
     expect(out.value.safeUntil).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+02:00$/); // Europe/Rome, summer time
-    expect(Date.parse(out.value.safeUntil)).toBeCloseTo(w.clock.now() + out.value.safeHours * 3_600_000, -3);
+    const held = expectedHold({ snapshot: w.snapshot(), forecast: w.forecast(), profile: w.profile, preferences, config: stormConfig() });
+    expect(Date.parse(out.value.safeUntil)).toBeCloseTo(held.untilMs, -3);
   });
 
   it('is read-only: with the grid down it writes no session and sends no message', async () => {

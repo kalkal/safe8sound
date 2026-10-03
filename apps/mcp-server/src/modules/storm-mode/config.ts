@@ -11,7 +11,6 @@ export const StormModeConfigSchema = z.strictObject({
   capHours: z.number().positive().max(72),
   stableGridMinutes: positiveInt(120),
   minIntervalMinutes: positiveInt(24 * 60),
-  occupantGainW: z.number().nonnegative().max(300),
   inApp: z.strictObject({ maxPerHome: positiveInt(INBOX_MAX_MESSAGES) }),
 });
 export type StormModeConfig = z.infer<typeof StormModeConfigSchema>;

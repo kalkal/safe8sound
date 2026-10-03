@@ -20,13 +20,12 @@ import type { StormModeDeps } from './deps.js';
 import { localIso } from '../../time.js';
 import { deliver, detect, levelOf, localeOf, messageFields, readHome, readingEvent, type Observed } from './observe.js';
 
-const HOUR_MS = 3_600_000;
 
 /** Never called: prepareDevices does not touch the adapter on a read-only home. */
 const noAdapter = { secure: () => Promise.reject(new Error('the read-only home calls no device')) };
 
 /** Until when the safe room is covered, in the home's time zone. */
-const safeUntilOf = (o: Observed) => localIso(o.nowMs + o.safeHours * HOUR_MS, o.home.profile.location.tz);
+const safeUntilOf = (o: Observed) => localIso(o.safeUntilMs, o.home.profile.location.tz);
 
 type StartStormModeInput = z.output<typeof StartStormModeInputSchema>;
 type StartStormModeOutput = z.output<typeof StartStormModeOutputSchema>;

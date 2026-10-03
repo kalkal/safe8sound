@@ -1,6 +1,5 @@
 import { ErrorEnvelopeSchema, HomeIdSchema, NotifyFamilyOutputSchema, SafeRoomStatusSchema, StartStormModeOutputSchema } from '@cold-reserve/contracts';
-import { fixedClock } from '@cold-reserve/core';
-import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile } from '@cold-reserve/source-simulator';
+import { demoProfile } from '@cold-reserve/source-simulator';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -12,7 +11,6 @@ import { loadPreferencesConfig, preferencesConfigFile } from '../../src/preferen
 import { stormModeWiring } from '../../src/storm-mode-config.js';
 import { settableClock } from '../comfort-plan/support.js';
 import { TOKEN } from '../helpers.js';
-import { expectedSafeHours } from '../storm-mode/expected.js';
 import { preferences } from '../storm-mode/support.js';
 
 // The storm-blackout scenario end to end (#23 acceptance): the official SDK client over real HTTP,
@@ -26,7 +24,7 @@ const textOf = (r: Record<string, unknown>): string => (r['content'] as { type: 
 const clock = (ms: number) => new Intl.DateTimeFormat('en-US', { timeZone: demoProfile().location.tz, hour: 'numeric', minute: '2-digit' }).format(ms);
 
 describe('storm blackout (seeded): prepare, the grid drops, the family is told, power comes back', () => {
-  it('runs the whole flow through MCP, with safe hours within 5 % of the formula', async () => {
+  it('runs the whole flow through MCP, with the safe hours of the guard hold of the safe room', async () => {
     const wall = settableClock(Date.parse('2026-09-30T10:00:00Z'));
     const startH = 2;
     const loaded = loadPreferencesConfig(preferencesConfigFile());
@@ -85,10 +83,10 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       expect(JSON.stringify(status)).not.toMatch(/Giulia|phone-/);
       const s = SafeRoomStatusSchema.parse(status.structuredContent);
       expect(s).toMatchObject({ safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], level: 'essential', levelReason: 'storm', stormPhase: 'active' });
-      const scenario = builtInScenario('storm-blackout');
-      const sim = new SimulatorSource({ profile: demoProfile(), scenario, params: defaultSimParams(), clock: fixedClock(Date.parse(scenario.startAt) + 3.5 * H) });
-      const expected = expectedSafeHours({ snapshot: sim.snapshotAt(Date.parse(scenario.startAt) + 3.5 * H), forecast: sim.forecast(), profile: demoProfile(), preferences, config: stormMode.value.config });
-      expect(Math.abs(s.safeHours - expected) / expected).toBeLessThanOrEqual(0.05);
+      // #23 acceptance on one physics (Q7-A of #24): the guard's hold of the safe room, pinned as numbers.
+      // 15:30 with a full battery: grandpa's room holds until 22:00, when the elderly night limit (24 °C) starts.
+      expect(s.safeHours).toBe(6.5);
+      expect(s.safeUntil).toMatch(/T22:00:00\+02:00$/);
       expect(textOf(status)).toContain(`Safe for about ${s.safeHours.toFixed(1)} hours`);
       expect((await inbox()).map((m) => `${m.transition}:${m.role}`)).toEqual(['storm_started:daughter']);
       expect((await inbox())[0]?.text).toContain('Bedroom is at');

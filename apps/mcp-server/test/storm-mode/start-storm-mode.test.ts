@@ -1,7 +1,7 @@
 import { HomeIdSchema, StartStormModeOutputSchema, err, toolError } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { startStormMode } from '../../src/modules/storm-mode/tools.js';
-import { expectedSafeHours } from './expected.js';
+import { expectedHold } from './expected.js';
 import { preferences, stormConfig, world } from './support.js';
 
 // start_storm_mode (plan §4, §9.4): "active" unlocks the reserve only with the grid measured down.
@@ -44,14 +44,14 @@ describe('start_storm_mode', () => {
     expect((await w.inbox())).toHaveLength(1);
   });
 
-  it('quotes the safe hours of the #23 formula, until when, and keeps them as hoursAtEssential', async () => {
+  it('quotes the safe hours of the guard\'s hold (#23 on one physics), until when, and keeps them as hoursAtEssential', async () => {
     const w = world(4);
     const out = await startStormMode(w.deps, { mode: 'active' }, w.ctx);
     if (!out.ok) throw new Error(out.error.message);
-    const expected = expectedSafeHours({ snapshot: w.snapshot(), forecast: w.forecast(), profile: w.profile, preferences, config: stormConfig() });
-    expect(out.value.safeHours).toBeCloseTo(expected, 6);
-    expect(out.value.session.hoursAtEssential).toBeCloseTo(expected, 6);
-    expect(Date.parse(out.value.safeUntil)).toBeCloseTo(w.clock.now() + expected * 3_600_000, -3);
+    const expected = expectedHold({ snapshot: w.snapshot(), forecast: w.forecast(), profile: w.profile, preferences, config: stormConfig() });
+    expect(out.value.safeHours).toBeCloseTo(expected.hours, 6);
+    expect(out.value.session.hoursAtEssential).toBeCloseTo(expected.hours, 6);
+    expect(Date.parse(out.value.safeUntil)).toBeCloseTo(expected.untilMs, -3);
   });
 
   it('runs the detector first: after a storm, with the grid back and stable, it ends the storm with "power is back"', async () => {

@@ -1,5 +1,7 @@
 import type { ErrorEnvelope, HomeId, HomeProfile, Preferences, Result, StormId } from '@cold-reserve/contracts';
-import type { Clock, DeviceAdapter, Logger, Notifier, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, DeviceAdapter, Logger, Notifier, SimParams, StateStoreFactory } from '@cold-reserve/core';
+import type { GuardConfig } from '@cold-reserve/guard';
+import type { ComfortPlanConfig } from '../comfort-plan/config.js';
 import type { ComfortHome } from '../comfort-plan/deps.js';
 import type { StormModeConfig } from './config.js';
 
@@ -19,6 +21,13 @@ export interface StormModeDeps {
   /** Where family messages go: the simulated in-app phone during the hackathon. */
   readonly notifier: Notifier;
   readonly newStormId: () => StormId;
+  /**
+   * The safe hours are the guard's hold of the safe room (Q7-A of #24): the same physics, guard config and
+   * planner settings (humidity band, margin, elderly roles) as the last-resort plan.
+   */
+  readonly model: SimParams;
+  readonly guard: GuardConfig;
+  readonly comfortConfig: ComfortPlanConfig;
   /** The devices made safe on entering a storm (queue item 7): the simulated adapter only; absent = none. */
   readonly devices?: DeviceAdapter;
   /** Where the module's warn lines go (a device that did not answer); the server's logger. */

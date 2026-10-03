@@ -1,96 +1,12 @@
-import { HvacUnitSchema, HomeProfileSchema, pct, type Level, type PacingState } from '@cold-reserve/contracts';
+import { HomeProfileSchema, pct, type Level, type PacingState } from '@cold-reserve/contracts';
 import { exampleHomeProfile } from '@cold-reserve/contracts/fixtures';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { batteryCapacityWh } from '../src/energy.js';
-import { effectiveStormMode, holdPowerW, safeHours, safeUntil, stormBudget, stormStepDown } from '../src/storm.js';
+import { effectiveStormMode, stormBudget, stormStepDown } from '../src/storm.js';
 
 const profile = HomeProfileSchema.parse(exampleHomeProfile());
 const battery = profile.battery;
-const unit = HvacUnitSchema.parse({
-  id: 'split-bedroom-1',
-  model: 'Hisense Easy Smart 12000 BTU',
-  coolingKw: 3.2,
-  inputKw: { min: 0.19, nominal: 0.97, max: 1.6 },
-  modes: ['cool', 'dry', 'off'],
-  controlPath: 'cloud',
-});
-const thermal = { rKPerKw: 10, cKwhPerK: 2 };
-/** Longest horizon the safe hours are quoted for (config). */
-const CAP_HOURS = 48;
-
-describe('safeHours (plan §3.1): (SOC - floor) x capacity x efficiency / (split hold power + EPS base load)', () => {
-  it('matches the formula written out by hand', () => {
-    const expected = (((85 - 10) / 100) * batteryCapacityWh(battery) * battery.roundTripEff) / (400 + 150);
-    expect(safeHours({ capHours: CAP_HOURS, battery, socPct: pct(85), holdW: 400, baseLoadW: 150 })).toBeCloseTo(expected, 9);
-  });
-
-  it('is zero at or below the floor', () => {
-    expect(safeHours({ capHours: CAP_HOURS, battery, socPct: pct(10), holdW: 400, baseLoadW: 150 })).toBe(0);
-    expect(safeHours({ capHours: CAP_HOURS, battery, socPct: pct(5), holdW: 400, baseLoadW: 150 })).toBe(0);
-  });
-
-  it('never decreases when the SOC rises, never increases when the load rises (property)', () => {
-    fc.assert(
-      fc.property(
-        fc.double({ min: 0, max: 100, noNaN: true }),
-        fc.double({ min: 0, max: 100, noNaN: true }),
-        fc.double({ min: 0, max: 3000, noNaN: true }),
-        fc.double({ min: 0, max: 3000, noNaN: true }),
-        (a, b, hold, base) => {
-          const [low, high] = a <= b ? [a, b] : [b, a];
-          const h = safeHours({ capHours: CAP_HOURS, battery, socPct: pct(low), holdW: hold, baseLoadW: base });
-          expect(h).toBeGreaterThanOrEqual(0);
-          expect(h).toBeLessThanOrEqual(CAP_HOURS);
-          expect(safeHours({ capHours: CAP_HOURS, battery, socPct: pct(high), holdW: hold, baseLoadW: base })).toBeGreaterThanOrEqual(
-            safeHours({ capHours: CAP_HOURS, battery, socPct: pct(low), holdW: hold, baseLoadW: base }),
-          );
-          expect(safeHours({ capHours: CAP_HOURS, battery, socPct: pct(high), holdW: hold + 100, baseLoadW: base })).toBeLessThanOrEqual(
-            safeHours({ capHours: CAP_HOURS, battery, socPct: pct(high), holdW: hold, baseLoadW: base }),
-          );
-        },
-      ),
-    );
-  });
-
-  it('with no load at all (cool outside, nothing on), is the configured cap, never an error', () => {
-    expect(safeHours({ capHours: CAP_HOURS, battery, socPct: pct(80), holdW: 0, baseLoadW: 0 })).toBe(CAP_HOURS);
-  });
-
-  it('never quotes more than the configured cap', () => {
-    expect(safeHours({ capHours: CAP_HOURS, battery, socPct: pct(100), holdW: 0, baseLoadW: 1 })).toBe(CAP_HOURS);
-  });
-
-  it('turns hours into the time the safe room is covered until', () => {
-    expect(safeUntil(Date.parse('2026-07-17T15:00:00Z'), 7.5)).toBe('2026-07-17T22:30:00.000Z');
-  });
-});
-
-describe('holdPowerW: split power that keeps the safe room at its threshold', () => {
-  it('is zero when outside is not warmer than the threshold', () => {
-    expect(holdPowerW({ unit, thermal, outC: 26, thresholdC: 27, gainsW: 0 })).toEqual({ holdW: 0, canHold: true });
-  });
-
-  it('is the steady heat gain divided by the unit COP, at least the modulation minimum', () => {
-    // gain = (31 - 27) K / 10 K/kW = 0.4 kW of heat; COP = 3.2 / 0.97; input = 0.4 / COP kW
-    const expected = (0.4 / (3.2 / 0.97)) * 1000;
-    expect(holdPowerW({ unit, thermal, outC: 31, thresholdC: 27, gainsW: 0 })).toEqual({ holdW: Math.max(expected, 190), canHold: true });
-    const withGains = holdPowerW({ unit, thermal, outC: 31, thresholdC: 27, gainsW: 600 });
-    expect(withGains.holdW).toBeCloseTo((1.0 / (3.2 / 0.97)) * 1000, 6);
-  });
-
-  it('can still hold at exactly the maximum input', () => {
-    const cop = 3200 / 970;
-    const atMax = holdPowerW({ unit, thermal, outC: 27, thresholdC: 27, gainsW: 1600 * cop });
-    expect(atMax.canHold).toBe(true);
-    expect(atMax.holdW).toBeCloseTo(1600, 6);
-  });
-
-  it('says when the unit cannot hold the threshold, at its maximum input', () => {
-    expect(holdPowerW({ unit, thermal, outC: 60, thresholdC: 27, gainsW: 2000 })).toEqual({ holdW: 1600, canHold: false });
-  });
-});
-
 describe('stormBudget: the reserve becomes the budget only when the grid is measured down (plan §1 principle 2)', () => {
   const reserveFloorPct = pct(50);
 

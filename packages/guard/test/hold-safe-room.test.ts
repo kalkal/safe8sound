@@ -67,6 +67,12 @@ describe('holdSafeRoom', () => {
     expect(!r.ok && r.error).toMatchObject({ code: 'unknown_room', details: { roomId: 'bedroom-1' } });
   });
 
+  it('a safe room missing from the home profile is an error, never "safe for the whole horizon" (#179 review)', () => {
+    // The projection drops a room the profile does not describe: the hold would find no breach at all.
+    const r = holdSafeRoom(input({ profile: { ...profile, rooms: profile.rooms.filter((x) => x.id !== 'bedroom-1') } }), opts);
+    expect(!r.ok && r.error).toMatchObject({ code: 'unknown_room', details: { field: 'safeRoomId', roomId: 'bedroom-1' } });
+  });
+
   it("dries a humid room and cools a dry one, with the band narrowed inside the person's limits", () => {
     expect(safeMode(held(input({ snapshot: humid(70) })), T0)).toBe('dry');
     expect(safeMode(held(input({ snapshot: humid(40) })), T0)).toBe('cool');

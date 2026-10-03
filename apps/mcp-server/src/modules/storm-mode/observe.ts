@@ -3,6 +3,7 @@ import {
   categoryOf,
   err,
   ok,
+  pct,
   toolError,
   type ErrorEnvelope,
   type Forecast,
@@ -17,10 +18,12 @@ import {
   type StormNotification,
   type StormSession,
 } from '@cold-reserve/contracts';
-import { epsBaseLoadW, holdPowerW, planNotifications, prepareDevices, safeHours, stormReduce, type DeviceFailure, type NotificationPlan, type StateStore, type StormContext, type StormEvent } from '@cold-reserve/core';
+import { epsBaseLoadW, planNotifications, prepareDevices, stormReduce, type DeviceFailure, type NotificationPlan, type StateStore, type StormContext, type StormEvent } from '@cold-reserve/core';
+import { holdSafeRoom } from '@cold-reserve/guard';
 import { LOCALES, stormMessage, type Locale, type StormMessageFields } from '@cold-reserve/i18n';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
+import { guardFrame } from '../comfort-plan/plan-comfort.js';
 import type { StormHome, StormModeDeps } from './deps.js';
 
 // What the storm tools share (plan §9.2): reading the home and counting the safe hours (no side
@@ -40,6 +43,8 @@ export interface Observed {
   readonly safeRoom: RoomReading;
   readonly nowMs: number;
   readonly safeHours: number;
+  /** When the hold ends (or the cap): the projection's own time, from the home's reading. */
+  readonly safeUntilMs: number;
   readonly session: StormSession | undefined;
   /** Who asked: the correlation id and the home of the log lines. */
   readonly ctx: ToolContext;
@@ -49,27 +54,29 @@ export interface Observed {
 export const levelOf = (session: StormSession | undefined): { level: Level; levelReason: LevelReason } =>
   session?.phase === 'active' ? { level: 'essential', levelReason: 'storm' } : { level: 'comfort', levelReason: 'user_choice' };
 
-/** The forecast hour the reading falls in (the last one that started), or the first one. */
-function outsideC(forecast: Forecast, atMs: number): number | undefined {
-  const hour = [...forecast.hourly].reverse().find((h) => Date.parse(h.ts) <= atMs) ?? forecast.hourly[0];
-  return hour?.tempOutC;
-}
-
 /**
- * Safe hours of #23: the battery down to the hardware floor, over the split power that holds the
- * cooling threshold of the safe room plus the EPS base load. TODO(#97): the heating season holds `heating.minC`.
+ * Safe hours of #23 on one physics (Q7-A of #24): the guard's hold of the safe room (holdSafeRoom), the same
+ * projection as the last-resort plan. The safe room's split holds the limit in force (at night the
+ * night-recovery limit, elderly when an elderly role sleeps there), dry or cool by humidity, every other room
+ * off; on battery alone, down to the hardware floor, also while preparing with the grid still up (what the
+ * storm will have). Capped at `capHours`; counted from the home's reading.
  */
-function countSafeHours(deps: StormModeDeps, profile: HomeProfile, snapshot: Snapshot, forecast: Forecast, preferences: Preferences, reading: RoomReading): Result<number, ErrorEnvelope> {
-  const room = profile.rooms.find((r) => r.id === preferences.safeRoomId);
-  if (!room) return err(toolError('invalid_config', `The safe room ${preferences.safeRoomId} is not in the home profile.`, { details: { roomId: preferences.safeRoomId } }));
-  const outC = outsideC(forecast, Date.parse(snapshot.ts));
-  if (outC === undefined) return err(toolError('forecast_unavailable', 'No weather hour to count the safe hours with.'));
-  const unit = room.hvacUnits[0];
-  const gainsW = reading.occupants.length * deps.config.occupantGainW;
-  const hold = unit ? holdPowerW({ unit, thermal: room.thermal, outC, thresholdC: preferences.safety.cooling.maxC, gainsW }) : { holdW: 0 };
+function holdHours(deps: StormModeDeps, profile: HomeProfile, snapshot: Snapshot, forecast: Forecast, preferences: Preferences): Result<{ hours: number; untilMs: number }, ErrorEnvelope> {
+  // Never assume an EPS load (#107): the projection would quietly count none.
   const eps = epsBaseLoadW(profile);
   if (!eps.ok) return eps;
-  return ok(safeHours({ battery: profile.battery, socPct: snapshot.batterySocPct, holdW: hold.holdW, baseLoadW: eps.value, capHours: deps.config.capHours }));
+  // No weather, no projection: said as the missing forecast, never thrown.
+  if (forecast.hourly.length === 0) return err(toolError('forecast_unavailable', 'No weather hour to count the safe hours with.'));
+  const nowMs = Date.parse(snapshot.ts);
+  const toMs = nowMs + deps.config.capHours * HOUR_MS;
+  const frame = guardFrame({ config: deps.comfortConfig }, 'auto', { snapshot, forecast, preferences });
+  const held = holdSafeRoom(
+    { snapshot: { ...snapshot, gridAvailable: false }, forecast, profile, preferences, ...frame, model: deps.model, config: deps.guard },
+    { toMs, dischargeFloorPct: pct(profile.battery.minSocHwPct), humidityBand: deps.comfortConfig.planner.humidityBand, marginK: deps.comfortConfig.planner.essentialMarginK },
+  );
+  if (!held.ok) return held;
+  const untilMs = held.value.safeUntil?.ms ?? toMs;
+  return ok({ hours: Math.round(((untilMs - nowMs) / HOUR_MS) * 100) / 100, untilMs });
 }
 
 export function messageFields(o: Observed, session: StormSession | undefined): StormMessageFields {
@@ -78,7 +85,7 @@ export function messageFields(o: Observed, session: StormSession | undefined): S
     roomName: room?.name ?? o.safeRoom.id,
     tempC: o.safeRoom.tempC,
     atMs: o.nowMs,
-    safeUntilMs: o.nowMs + o.safeHours * HOUR_MS,
+    safeUntilMs: o.safeUntilMs,
     ...(session?.gridBackAt === undefined ? {} : { powerBackAtMs: Date.parse(session.gridBackAt) }),
     timeZone: o.home.profile.location.tz,
   };
@@ -137,12 +144,12 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext): Promise<R
   const safeRoomId = preferences.value.safeRoomId;
   const safeRoom = snapshot.value.rooms.find((r) => r.id === safeRoomId);
   if (!safeRoom) return err(toolError('home_data_stale', `No reading from the safe room ${safeRoomId}.`, { details: { roomId: safeRoomId } }));
-  const hours = countSafeHours(deps, home.profile, snapshot.value, home.forecast(), preferences.value, safeRoom);
+  const hours = holdHours(deps, home.profile, snapshot.value, home.forecast(), preferences.value);
   if (!hours.ok) return hours;
   const store = deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId });
   const latest = await store.getLatestStormSession();
   if (!latest.ok) return latest;
-  return ok({ home, store, preferences: preferences.value, snapshot: snapshot.value, safeRoom, nowMs: deps.clock.now(), safeHours: hours.value, session: latest.value, ctx });
+  return ok({ home, store, preferences: preferences.value, snapshot: snapshot.value, safeRoom, nowMs: deps.clock.now(), safeHours: hours.value.hours, safeUntilMs: hours.value.untilMs, session: latest.value, ctx });
 }
 
 /** The reading as a detector event: the grid state is measured; the level follows the session. */

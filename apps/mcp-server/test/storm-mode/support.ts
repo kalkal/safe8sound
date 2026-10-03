@@ -4,6 +4,7 @@ import { createInAppNotifier } from '@cold-reserve/notifier-inapp';
 import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import rawStormConfig from '../../config/storm-mode.json' with { type: 'json' };
+import { loadComfortPlanConfig } from '../../src/comfort-plan-config.js';
 import { parseStormModeConfig } from '../../src/modules/storm-mode/config.js';
 import type { StormModeDeps } from '../../src/modules/storm-mode/deps.js';
 import type { ToolContext } from '../../src/tool.js';
@@ -15,6 +16,13 @@ import { DEMO, H, MIN, settableClock } from '../comfort-plan/support.js';
 export { DEMO, H, MIN };
 
 export const WALL_START = Date.parse('2026-09-30T10:00:00Z');
+
+/** The guard and planner settings the safe-room hold reads: the shipped files, as in production. */
+export function comfortConfigs() {
+  const c = loadComfortPlanConfig();
+  if (!c.ok) throw new Error(c.error.message);
+  return c.value;
+}
 
 export function stormConfig() {
   const c = parseStormModeConfig(rawStormConfig);
@@ -71,6 +79,9 @@ export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'st
     notifier: over.notifier ?? phone.value.notifier,
     newStormId: () => StormIdSchema.parse(`storm_test${String(++n).padStart(8, '0')}`),
     logger,
+    model: defaultSimParams(),
+    guard: comfortConfigs().guard,
+    comfortConfig: comfortConfigs().comfort,
   };
   const ctx: ToolContext = { correlationId: 'test-correlation', clientId: 'test', homeId: DEMO };
   /** Moves the scenario to hour `h` and the wall clock by the same amount. */

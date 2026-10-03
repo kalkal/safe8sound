@@ -3,7 +3,10 @@ import { StormIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, t
 import type { Clock, DeviceAdapter, StateStoreFactory } from '@cold-reserve/core';
 import { createInAppNotifier, type InAppNotifier } from '@cold-reserve/notifier-inapp';
 import { createSimulatedDevices } from '@cold-reserve/source-simulator';
+import type { GuardConfig } from '@cold-reserve/guard';
 import file from '../config/storm-mode.json' with { type: 'json' };
+import { loadComfortPlanConfig } from './comfort-plan-config.js';
+import type { ComfortPlanConfig } from './modules/comfort-plan/config.js';
 import { parseStormModeConfig, type StormModeConfig } from './modules/storm-mode/index.js';
 import { defaultPreferencesFor, type PreferencesConfig } from './preferences-config.js';
 
@@ -25,6 +28,9 @@ export interface StormModeWiring {
    * The read-only real home never calls it: storm-mode only gives advice there (plan §13.2 p.1).
    */
   readonly devices: DeviceAdapter;
+  /** The guard and planner settings of the safe-room hold: the same files as comfort-plan (one physics). */
+  readonly guard: GuardConfig;
+  readonly comfortConfig: ComfortPlanConfig;
 }
 
 /** 20 random letters and digits after `storm_`: inside StormIdSchema. */
@@ -33,6 +39,8 @@ const newStormId = (): StormId => StormIdSchema.parse(`storm_${randomBytes(15).t
 export function stormModeWiring(opts: { storeFor: StateStoreFactory; preferences: PreferencesConfig; clock: Clock }): Result<StormModeWiring, ErrorEnvelope> {
   const config = parseStormModeConfig(structuredClone(file));
   if (!config.ok) return config;
+  const hold = loadComfortPlanConfig();
+  if (!hold.ok) return hold;
   const phone = createInAppNotifier({ storeFor: opts.storeFor, maxPerHome: config.value.inApp.maxPerHome });
   if (!phone.ok) return phone;
   return ok({
@@ -48,5 +56,7 @@ export function stormModeWiring(opts: { storeFor: StateStoreFactory; preferences
     inbox: phone.value.inbox,
     newStormId,
     devices: createSimulatedDevices().adapter,
+    guard: hold.value.guard,
+    comfortConfig: hold.value.comfort,
   });
 }
