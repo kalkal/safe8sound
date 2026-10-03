@@ -102,6 +102,18 @@ describe('createAgent on the Strands loop with the fake model', () => {
     expect(JSON.stringify(turn)).not.toContain('/secret/path');
   });
 
+  it('logs the AWS cause a ModelError wraps: its name and HTTP status, not its text (#199)', async () => {
+    const logs: { details?: unknown }[] = [];
+    const cause = Object.assign(new Error('User arn:aws:iam::123456789012:user/x is not authorized'), { name: 'AccessDeniedException', $metadata: { httpStatusCode: 403 } });
+    const model = new FakeModel(() => {
+      throw new ModelError('model call failed', { cause });
+    });
+    const turn = await createAgent({ config: CONFIG, model, tools: [], log: (e) => logs.push(e) }).ask('Hi', { correlationId: 'turn-1' });
+    expect(turn).toMatchObject({ ok: false, error: { code: 'agent_unavailable' } });
+    expect(logs).toMatchObject([{ errorName: 'ModelError', details: { causeName: 'AccessDeniedException', httpStatus: 403 } }]);
+    expect(JSON.stringify(logs)).not.toContain('arn:aws');
+  });
+
   it('logs a failed turn in the shared shape, with the correlation id of the turn', async () => {
     const logs: unknown[] = [];
     const model = new FakeModel(() => {

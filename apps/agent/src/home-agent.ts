@@ -65,7 +65,7 @@ export function createHomeAgent(deps: {
       ready = undefined; // the next turn tries to connect again
       const failure = classifyFailure(e);
       if (failure.kind === 'bug') throw failure.error;
-      deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId }));
+      deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId, cause: e instanceof Error ? e.cause : undefined }));
       return err(failure.error);
     } finally {
       clearTimeout(timer);

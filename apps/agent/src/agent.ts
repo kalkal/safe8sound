@@ -84,7 +84,7 @@ export function createAgent(deps: { config: AgentConfig; model: Model; tools: To
         // The model or the MCP server failed: the caller degrades (scripted answer, plan §9.2).
         const failure = classifyFailure(e);
         if (failure.kind === 'bug') throw failure.error;
-        deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId, httpStatus: failure.httpStatus }));
+        deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId, httpStatus: failure.httpStatus, cause: e instanceof Error ? e.cause : undefined }));
         return err(failure.error);
       } finally {
         clearTimeout(timer);

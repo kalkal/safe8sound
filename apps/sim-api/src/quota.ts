@@ -97,7 +97,7 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
       return overall.value ? ok(undefined) : over(day.retryAfterMs, DAILY);
     },
     /** The characters of one reply Polly is about to speak: per code, then overall (F8d, #25). */
-    async speech(codeId: string, chars: number): Promise<Result<void, ErrorEnvelope>> {
+    async speech(codeId: string, chars: number, onGiveBackFailed?: (errorName: string) => void): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);
       const perCode = await counted(() => store.consume(`SPEECH#${codeId}#${day.id}`, limits.speechCharsPerCodePerDay, day.endMs, chars));
       if (!perCode.ok) return perCode;
@@ -106,9 +106,10 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
       if (!overall.ok) return overall;
       if (overall.value) return ok(undefined);
       // The overall cap refused: the per-code count goes back, so a refusal never uses up the code (review of #195).
-      // A transient failure to give it back only costs the code some room: the refusal is still the answer (a bug
-      // is rethrown by `counted` and reaches the handler's last resort, logged).
-      await counted(() => store.release(`SPEECH#${codeId}#${day.id}`, chars));
+      // A transient failure to give it back only costs the code some room: the refusal is still the answer, and the
+      // caller logs the failure (a bug is rethrown by `counted` and reaches the handler's last resort, logged).
+      const back = await counted(() => store.release(`SPEECH#${codeId}#${day.id}`, chars));
+      if (!back.ok) onGiveBackFailed?.(causes.get(back.error) ?? 'unknown');
       return over(day.retryAfterMs, SPOKEN);
     },
     /** Gives back the characters of a reply Polly did not speak (review of #180): a failure never uses up a code. Throws like the store. */

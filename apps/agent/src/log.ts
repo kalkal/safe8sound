@@ -6,7 +6,24 @@ import type { ErrorEnvelope, LogEntry } from '@cold-reserve/contracts';
  */
 export type AgentLogEntry = LogEntry;
 
-export function logLine(error: ErrorEnvelope, errorName: string, extra: { correlationId?: string | undefined; httpStatus?: number | undefined } = {}): AgentLogEntry {
+/**
+ * What a log line may say about the error behind a failure (#199): its name and the HTTP status the AWS SDK
+ * reports (`$metadata.httpStatusCode`). Never its message, ARNs, account or request ids: names and codes only.
+ */
+function causeDetails(cause: unknown): { causeName?: string; httpStatus?: number } {
+  if (!(cause instanceof Error)) return {};
+  const status = (cause as { $metadata?: { httpStatusCode?: unknown } }).$metadata?.httpStatusCode;
+  return { causeName: cause.name, ...(typeof status === 'number' ? { httpStatus: status } : {}) };
+}
+
+export function logLine(
+  error: ErrorEnvelope,
+  errorName: string,
+  extra: { correlationId?: string | undefined; httpStatus?: number | undefined; cause?: unknown } = {},
+): AgentLogEntry {
+  const cause = causeDetails(extra.cause);
+  const httpStatus = extra.httpStatus ?? cause.httpStatus;
+  const details = { ...(httpStatus === undefined ? {} : { httpStatus }), ...(cause.causeName === undefined ? {} : { causeName: cause.causeName }) };
   return {
     ts: new Date().toISOString(),
     level: error.category === 'internal' ? 'error' : 'warn',
@@ -17,7 +34,8 @@ export function logLine(error: ErrorEnvelope, errorName: string, extra: { correl
     code: error.code,
     category: error.category,
     errorName,
-    // HTTP status when the MCP server answered with one (401, 503, ...).
-    ...(extra.httpStatus === undefined ? {} : { details: { httpStatus: extra.httpStatus } }),
+    // HTTP status when the MCP server or the AWS SDK answered with one (401, 503, ...), and the name of the
+    // error a wrapper (Strands' ModelError) hides: enough to diagnose from the logs alone (#199).
+    ...(Object.keys(details).length === 0 ? {} : { details }),
   };
 }

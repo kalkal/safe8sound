@@ -153,7 +153,9 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       }
       const cached = audio !== undefined;
       if (audio === undefined) {
-        const allowed = await quota.speech(codeId, text.length);
+        const allowed = await quota.speech(codeId, text.length, (errorName) => {
+          deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'warn', component: 'sim-api', message: 'speech_refund_failed', correlationId, errorName, details: { codeId } });
+        });
         if (!allowed.ok) return fail(allowed.error, undefined, {}, codeId);
         const made = await deps.speech.synth.synthesize({ text, engine, voice, correlationId });
         if (!made.ok) {

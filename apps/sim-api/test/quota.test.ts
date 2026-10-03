@@ -146,3 +146,19 @@ describe('speech characters (F8d, #25, approved in #25): per code and overall pe
     expect((await quota.speech('c', 1)).ok).toBe(false);
   });
 });
+
+describe('a failed give-back after the overall speech cap refused (review of #195)', () => {
+  it('still answers the refusal, and reports the error name so the handler can log it', async () => {
+    const inner = memoryQuotaStore();
+    const store: QuotaStore = {
+      consume: (k, l, e, a) => inner.consume(k, l, e, a),
+      release: () => Promise.reject(Object.assign(new Error('slow'), { name: 'ThrottlingException' })),
+    };
+    const limits: QuotaLimits = { ...LIMITS, speechCharsPerCodePerDay: 100, speechCharsGlobalPerDay: 50 };
+    const quota = createQuota({ store, limits, clock: fixedClock(NOW), ipSalt: SALT });
+    const failed: string[] = [];
+    expect(await quota.speech('c', 60, (name) => failed.push(name))).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded' } });
+    expect(failed).toEqual(['ThrottlingException']);
+  });
+});
+
