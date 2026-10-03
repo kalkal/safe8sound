@@ -34,6 +34,7 @@ import { listTool, type ToolContext, type ToolDefinition } from './tool.js';
 export type { LogEntry } from '@cold-reserve/contracts';
 export type { Logger } from '@cold-reserve/core';
 import type { Logger } from '@cold-reserve/core';
+import { homeDetail, isSandbox } from './sandbox-log.js';
 
 export interface HandlerDeps {
   readonly registry: ModuleRegistry;
@@ -74,9 +75,6 @@ function protectedResourceMetadata(req: Request, correlationId: string, pr: NonN
 
 export type ToolCallOutcome = 'ok' | 'error';
 
-/** A visitor's sandbox id never reaches a log line (#134, #139): it is said as "sandbox". */
-const isSandbox = (homeId: string): boolean => SandboxHomeIdSchema.safeParse(homeId).success;
-const homeDetail = (homeId: string | undefined): { home?: 'sandbox' } => (homeId !== undefined && isSandbox(homeId) ? { home: 'sandbox' } : {});
 
 /**
  * One latency sample in CloudWatch Embedded Metric Format: a JSON line of its own, because EMF needs its

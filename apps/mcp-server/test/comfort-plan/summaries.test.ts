@@ -211,6 +211,24 @@ describe('what the model reads', () => {
     expect(applySummary({ ...r.value, alreadyApplied: true })).toContain('was already applied');
   });
 
+  it('apply_plan, first yes to a last resort: nothing applied, the risk to read, the family alert, and the second call only after a second yes (#160)', async () => {
+    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(30) }) });
+    const p = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!p.ok) throw new Error(p.error.message);
+    const r = await applyPlan(w.deps, { planId: p.value.id }, w.ctx);
+    if (!r.ok || r.value.confirmation === undefined) throw new Error('no confirmation');
+    const text = applySummary(r.value);
+    const warning = p.value.warnings?.find((x) => x.code === 'last_resort_plan')?.message ?? 'missing';
+    expect(text).toMatch(/^Not applied yet: this is a last resort\. /);
+    expect(text).toContain(warning);
+    // The family alert is promised only where it is sent (#160 part d).
+    expect(text).not.toContain('family');
+    expect(text).toContain(
+      `Only if the person says yes again, call apply_plan with planId ${p.value.id} and lastResortToken ${r.value.confirmation.token} (valid until ${localTimeText(r.value.confirmation.expiresAt)}).`,
+    );
+    expect(text).not.toContain('applied as advice');
+  });
+
   it('get_reserve_outlook: the level and the three hour counts', async () => {
     const w = world('heatwave', 14);
     const r = await reserveOutlook(w.deps, {}, w.ctx);

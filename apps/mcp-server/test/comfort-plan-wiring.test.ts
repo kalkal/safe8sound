@@ -6,6 +6,7 @@ import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/stor
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { comfortPlanWiring, loadComfortPlanConfig } from '../src/comfort-plan-config.js';
+import { parseComfortPlanConfig } from '../src/modules/comfort-plan/config.js';
 import { loadPreferencesConfig, preferencesConfigFile } from '../src/preferences-config.js';
 import { TOKEN } from './helpers.js';
 
@@ -20,7 +21,16 @@ describe('comfort-plan wiring', () => {
   it('loads the shipped configs (comfort plan and guard)', () => {
     const c = loadComfortPlanConfig();
     expect(c.ok && c.value.comfort.planTtlMinutes).toBe(10);
+    expect(c.ok && c.value.comfort.lastResortConfirmMinutes).toBe(10);
     expect(c.ok && c.value.guard.reserve.essentialLoadW).toBeGreaterThan(0);
+  });
+
+  it('caps the window for the second yes to a last resort at 10 whole minutes', () => {
+    const c = loadComfortPlanConfig();
+    if (!c.ok) throw new Error(c.error.message);
+    const raw = { ...c.value.comfort };
+    for (const bad of [11, 0, 2.5]) expect(parseComfortPlanConfig({ ...raw, lastResortConfirmMinutes: bad }).ok).toBe(false);
+    expect(parseComfortPlanConfig({ ...raw, lastResortConfirmMinutes: 1 }).ok).toBe(true);
   });
 
   it('uses the saved preferences, or the config defaults for the home', async () => {

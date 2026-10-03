@@ -20,6 +20,7 @@ import {
 } from '@cold-reserve/contracts';
 import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, seasonFor, withTargets, type HumidityMode } from '@cold-reserve/core';
 import { buildContext, counterfactualOf, currentControls, nightCoolingLimit, projectFrom, rejectionOf, reserveOf, runGuard, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
+import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
 import { localIso, localTimeText } from '../../time.js';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
@@ -183,14 +184,21 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
       component: 'mcp-server',
       message: `Last-resort plan proposed: safe until ${safest.lastResort.safeUntil}, limited by ${safest.lastResort.limitedBy}.`,
       correlationId: ctx.correlationId,
-      homeId: ctx.homeId,
-      details: { planId: parsed.data.id, failed: safest.attempt.verdict.guarantees.filter((g) => !g.ok).map((g) => g.id) },
+      // A visitor's sandbox id never reaches a log line (#134): it is said as "sandbox".
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      details: {
+        event: 'last_resort_proposed',
+        planId: parsed.data.id,
+        failed: safest.attempt.verdict.guarantees.filter((g) => !g.ok).map((g) => g.id),
+        ...homeDetail(ctx.homeId),
+      },
     });
   }
   return ok(parsed.data);
 }
 
-const HARD_LIMITS: readonly GuaranteeId[] = ['storm_reserve', 'inverter_limit', 'battery_power'];
+/** The guarantees a last resort may never break: only the comfort ones are relaxed (#160). */
+export const HARD_LIMITS: readonly GuaranteeId[] = ['storm_reserve', 'inverter_limit', 'battery_power'];
 
 interface LastResort {
   readonly attempt: Attempt;

@@ -122,6 +122,14 @@ function nightText(n: NonNullable<Plan['nightRecovery']>, opts: PlanSummaryOptio
 }
 
 export function applySummary(o: ApplyPlanOutput): string {
+  // The first yes to a last resort (#160): nothing applied; the model reads the risk and asks a second yes.
+  if (o.confirmation !== undefined) {
+    const risk = o.plan.warnings?.find((w) => w.code === 'last_resort_plan')?.message ?? 'Not every guarantee holds.';
+    return (
+      `Not applied yet: this is a last resort. Read the person the risk: ${risk} ` +
+      `Only if the person says yes again, call apply_plan with planId ${o.plan.id} and lastResortToken ${o.confirmation.token} (valid until ${localTimeText(o.confirmation.expiresAt)}).`
+    );
+  }
   const head = o.alreadyApplied ? `Plan ${o.plan.id} was already applied.` : `Plan ${o.plan.id} applied${o.advisoryOnly ? ' as advice' : ''}.`;
   if (!o.advisoryOnly) return head;
   const steps = o.manualInstructions.map((m) => m.text).join('; ');

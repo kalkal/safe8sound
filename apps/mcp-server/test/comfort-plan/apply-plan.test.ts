@@ -2,6 +2,7 @@ import { ApplyPlanOutputSchema, PlanIdSchema, celsius, pct, type Forecast, type 
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
+import { sha256Hex } from '../../src/modules/comfort-plan/confirm-token.js';
 import { planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { MIN, REAL, world } from './support.js';
 
@@ -130,4 +131,175 @@ describe('apply_plan (two-phase: confirm)', () => {
     );
     expect(rejected).toBeGreaterThan(0);
   }, 120_000);
+});
+
+describe('a last-resort plan: two explicit yeses, the second bound to the plan by a token (#160)', () => {
+  const live = { energy: 'live', rooms: 'live', weather: 'live' } as const;
+  const stormAt = (soc: number, over: Parameters<typeof world>[2] = {}) =>
+    world('storm-blackout', 3, { ...over, snapshot: (s) => ({ ...(over.snapshot ? over.snapshot(s) : s), batterySocPct: pct(soc) }) });
+  const lastResort = async (w: ReturnType<typeof world>) => {
+    const plan = await proposed(w);
+    if (plan.lastResort === undefined) throw new Error('no last resort');
+    return plan;
+  };
+  const firstYes = async (w: ReturnType<typeof world>, plan: Plan) => {
+    const r = await applyPlan(w.deps, { planId: plan.id }, w.ctx);
+    if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
+    if (r.value.confirmation === undefined) throw new Error('no confirmation');
+    return { out: r.value, token: r.value.confirmation.token };
+  };
+
+  it('the first yes applies nothing: the plan stays proposed and a token comes back, valid at most 10 minutes and never past the plan', async () => {
+    const w = stormAt(30);
+    const plan = await lastResort(w);
+    const { out } = await firstYes(w, plan);
+    expect(ApplyPlanOutputSchema.parse(out)).toMatchObject({ alreadyApplied: false, plan: { id: plan.id, status: 'proposed' } });
+    expect(out.confirmation?.token).toMatch(/^lr_[A-Za-z0-9_-]{22,64}$/);
+    const expiresMs = Date.parse(out.confirmation?.expiresAt ?? '');
+    expect(expiresMs).toBeLessThanOrEqual(Date.parse(plan.expiresAt));
+    expect(expiresMs).toBeLessThanOrEqual(w.clock.now() + w.deps.config.lastResortConfirmMinutes * MIN);
+    expect(await statusOf(w, plan)).toBe('proposed');
+  });
+
+  it('the second yes with that token applies it, once', async () => {
+    const w = stormAt(30);
+    const plan = await lastResort(w);
+    const { token } = await firstYes(w, plan);
+    const r = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+    expect(r.ok && ApplyPlanOutputSchema.parse(r.value)).toMatchObject({ alreadyApplied: false, plan: { status: 'applied' } });
+    expect(r.ok && r.value.confirmation).toBeUndefined();
+    expect(await statusOf(w, plan)).toBe('applied');
+    const again = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+    expect(again.ok && again.value.alreadyApplied).toBe(true);
+  });
+
+  it('a plain yes twice is never the second yes: each one only issues a new token', async () => {
+    const w = stormAt(30);
+    const plan = await lastResort(w);
+    await firstYes(w, plan);
+    const second = await firstYes(w, plan);
+    expect(second.out.plan.status).toBe('proposed');
+    expect(await statusOf(w, plan)).toBe('proposed');
+  });
+
+  it('refuses a wrong token, a replaced one and an expired one, applying nothing', async () => {
+    const w = stormAt(30);
+    const plan = await lastResort(w);
+    const wrong = await applyPlan(w.deps, { planId: plan.id, lastResortToken: `lr_${'x'.repeat(32)}` }, w.ctx);
+    expect(!wrong.ok && wrong.error).toMatchObject({ code: 'last_resort_token_invalid', category: 'validation' });
+    const first = await firstYes(w, plan);
+    await firstYes(w, plan);
+    const replaced = await applyPlan(w.deps, { planId: plan.id, lastResortToken: first.token }, w.ctx);
+    expect(!replaced.ok && replaced.error.code).toBe('last_resort_token_invalid');
+    const shortLived = { ...w.deps, config: { ...w.deps.config, lastResortConfirmMinutes: 2 } };
+    const late = await applyPlan(shortLived, { planId: plan.id }, w.ctx);
+    if (!late.ok || late.value.confirmation === undefined) throw new Error('no confirmation');
+    w.clock.set(w.clock.now() + 2 * MIN);
+    const expired = await applyPlan(shortLived, { planId: plan.id, lastResortToken: late.value.confirmation.token }, w.ctx);
+    expect(!expired.ok && expired.error.code).toBe('last_resort_token_invalid');
+    expect(await statusOf(w, plan)).toBe('proposed');
+  });
+
+  it('refuses a token whose confirmation was issued for another version of the plan: the token is burnt, nothing applied (#167 review)', async () => {
+    const w = stormAt(30);
+    const plan = await lastResort(w);
+    const token = `lr_${'y'.repeat(32)}`;
+    const saved = await w.store.saveLastResortConfirmation({ planId: plan.id, tokenHash: sha256Hex(token), planHash: 'f'.repeat(64), expiresAt: new Date(w.clock.now() + 5 * MIN).toISOString() });
+    expect(saved.ok).toBe(true);
+    const r = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+    expect(!r.ok && r.error.code).toBe('last_resort_token_invalid');
+    expect(await w.store.consumeLastResortConfirmation(plan.id, sha256Hex(token))).toMatchObject({ ok: false });
+    expect(await statusOf(w, plan)).toBe('proposed');
+  });
+
+  it('never lets the token outlive the plan, nor the configured minutes', async () => {
+    const long = stormAt(30);
+    const longDeps = { ...long.deps, config: { ...long.deps.config, planTtlMinutes: 60, lastResortConfirmMinutes: 10 } };
+    const p1 = await planComfort(longDeps, { goal: 'cool' }, long.ctx);
+    if (!p1.ok) throw new Error(p1.error.message);
+    const a1 = await applyPlan(longDeps, { planId: p1.value.id }, long.ctx);
+    expect(a1.ok && Date.parse(a1.value.confirmation?.expiresAt ?? '')).toBe(long.clock.now() + 10 * MIN);
+    const short = stormAt(30);
+    const shortDeps = { ...short.deps, config: { ...short.deps.config, planTtlMinutes: 10, lastResortConfirmMinutes: 30 } };
+    const p2 = await planComfort(shortDeps, { goal: 'cool' }, short.ctx);
+    if (!p2.ok) throw new Error(p2.error.message);
+    short.clock.set(short.clock.now() + 4 * MIN);
+    const a2 = await applyPlan(shortDeps, { planId: p2.value.id }, short.ctx);
+    expect(a2.ok && Date.parse(a2.value.confirmation?.expiresAt ?? '')).toBe(Date.parse(p2.value.expiresAt));
+  });
+
+  it('a first yes at a whole second + 500 ms: the time told is the time stored, and the token works until just before it', async () => {
+    const w = stormAt(30);
+    const deps = { ...w.deps, config: { ...w.deps.config, planTtlMinutes: 60, lastResortConfirmMinutes: 10 } };
+    const p = await planComfort(deps, { goal: 'cool' }, w.ctx);
+    if (!p.ok) throw new Error(p.error.message);
+    const start = w.clock.now() + 500;
+    w.clock.set(start);
+    const first = await applyPlan(deps, { planId: p.value.id }, w.ctx);
+    if (!first.ok || first.value.confirmation === undefined) throw new Error('no confirmation');
+    const told = Date.parse(first.value.confirmation.expiresAt);
+    expect(told).toBe(start - 500 + 10 * MIN);
+    w.clock.set(told);
+    const late = await applyPlan(deps, { planId: p.value.id, lastResortToken: first.value.confirmation.token }, w.ctx);
+    expect(!late.ok && late.error.code).toBe('last_resort_token_invalid');
+    const second = await applyPlan(deps, { planId: p.value.id }, w.ctx);
+    if (!second.ok || second.value.confirmation === undefined) throw new Error('no confirmation');
+    w.clock.set(Date.parse(second.value.confirmation.expiresAt) - 1);
+    const inTime = await applyPlan(deps, { planId: p.value.id, lastResortToken: second.value.confirmation.token }, w.ctx);
+    expect(inTime.ok && inTime.value.plan.status).toBe('applied');
+  });
+
+  it('a token already used, on a plan applied meanwhile (a stale read, a retry), returns the applied plan (#168 review)', async () => {
+    const w = stormAt(30);
+    const plan = await lastResort(w);
+    const { token } = await firstYes(w, plan);
+    expect((await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx)).ok).toBe(true);
+    // The retry reads the plan as it was before the first call applied it.
+    let stale = true;
+    const storeFor: typeof w.deps.storeFor = (h, scope) => {
+      const store = w.deps.storeFor(h, scope);
+      return new Proxy(store, {
+        get: (target, key) => {
+          if (key === 'getPlan' && stale) {
+            stale = false;
+            return () => Promise.resolve({ ok: true as const, value: plan });
+          }
+          const value: unknown = Reflect.get(target, key);
+          return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+        },
+      });
+    };
+    const retry = await applyPlan({ ...w.deps, storeFor }, { planId: plan.id, lastResortToken: token }, w.ctx);
+    expect(retry.ok && retry.value).toMatchObject({ alreadyApplied: true, plan: { status: 'applied' } });
+  });
+
+  it('refuses a token on a plan that is not a last resort', async () => {
+    const w = world('heatwave', 14);
+    const plan = await proposed(w);
+    const r = await applyPlan(w.deps, { planId: plan.id, lastResortToken: `lr_${'x'.repeat(32)}` }, w.ctx);
+    expect(!r.ok && r.error.code).toBe('last_resort_token_invalid');
+    expect(await statusOf(w, plan)).toBe('proposed');
+  });
+
+  it('logs that a token was issued and used, never the token itself', async () => {
+    const w = stormAt(30);
+    const plan = await lastResort(w);
+    const { token } = await firstYes(w, plan);
+    await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+    const text = JSON.stringify(w.logger.lines);
+    expect(text).not.toContain('lr_');
+    expect(text).not.toContain(token.slice(3));
+    const events = w.logger.lines.map((l) => l.details?.['event']).filter((e) => e !== undefined);
+    expect(events).toEqual(expect.arrayContaining(['last_resort_confirmation_issued', 'last_resort_confirmed', 'last_resort_applied']));
+    expect(w.logger.lines.every((l) => l.correlationId === 'test-correlation')).toBe(true);
+  });
+
+  it('on the real home the last resort stays advice: manual steps at once, no token', async () => {
+    const w = stormAt(30, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, origin: live }) });
+    const plan = await lastResort(w);
+    const r = await applyPlan(w.deps, { planId: plan.id }, w.ctx);
+    expect(r.ok && ApplyPlanOutputSchema.parse(r.value)).toMatchObject({ advisoryOnly: true, plan: { status: 'applied' } });
+    expect(r.ok && r.value.confirmation).toBeUndefined();
+    expect(r.ok && r.value.manualInstructions.length).toBeGreaterThan(0);
+  });
 });

@@ -28,6 +28,20 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_7Hq2mX9vK3' });
   });
 
+  it('the first yes to a last resort is not an applied plan: the card says to say yes again, never the token (#168 review)', () => {
+    const plan = {
+      ...hotDayPlan(),
+      guarantees: hotDayPlan().guarantees.map((g) => (g.id === 'safe_room_comfort' ? { ...g, ok: false, reason: 'Above 24 °C from 10 PM.' } : g)),
+      lastResort: { safeUntil: '2026-07-15T22:00:00+02:00', safeHours: 7, limitedBy: 'temperature' as const },
+      warnings: [{ code: 'last_resort_plan' as const, message: 'Safe until 10 PM.' }],
+    };
+    const token = `lr_${'Q'.repeat(32)}`;
+    show({ kind: 'applied', data: { plan, alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } } });
+    expect(screen.getByRole('status').textContent).toBe('Not applied yet: this is a last resort. Say yes again to apply it.');
+    expect(document.body.textContent).not.toContain('Plan applied.');
+    expect(document.body.textContent).not.toContain(token);
+  });
+
   it('shows an applied plan, with the manual instructions when it is advice only', () => {
     const plan = { ...advisoryPlan(), status: 'applied' as const };
     show({ kind: 'applied', data: { plan, alreadyApplied: false, advisoryOnly: true, manualInstructions: [{ roomId: 'bedroom-1', text: 'Bedroom: dry at 26.5 °C' }] } });

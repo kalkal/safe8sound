@@ -25,6 +25,11 @@ describe('readToolCall: each card bound to its own action', () => {
     expect(readToolCall({ name: 'set_preferences', arguments: { comfortC: { cooling: 24 }, confirmed: true } }, planCard)).toMatchObject({ ok: false });
   });
 
+  it('a card button is never the second yes to a last resort: it may not send a confirmation token (#160)', () => {
+    const args = { planId: 'plan_7Hq2mX9vK3', lastResortToken: `lr_${'A'.repeat(32)}` };
+    expect(readToolCall({ name: 'apply_plan', arguments: args }, planCard)).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+  });
+
   it('lets the preferences card save a confirmed change only', () => {
     expect(readToolCall({ name: 'set_preferences', arguments: { comfortC: { cooling: 24 }, confirmed: true } }, preferencesCard)).toMatchObject({ ok: true, value: { name: 'set_preferences' } });
     expect(readToolCall({ name: 'set_preferences', arguments: { comfortC: { cooling: 24 } } }, preferencesCard)).toMatchObject({ ok: false, error: { code: 'invalid_input' } });

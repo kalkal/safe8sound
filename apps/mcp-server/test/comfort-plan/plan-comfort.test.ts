@@ -262,12 +262,13 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(!r.ok && r.error.code).toBe('missing_eps_load');
   });
 
-  it('is not applied: apply_plan still refuses a plan whose guarantees do not all hold, until that is decided', async () => {
+  it('is not applied by a plain apply_plan: the first yes only returns a token (#160)', async () => {
     const w = stormAt(35);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const applied = await applyPlan(w.deps, { planId: r.value.id }, w.ctx);
-    expect(!applied.ok && applied.error.category).toBe('guard_rejection');
+    expect(applied.ok && applied.value.confirmation?.token).toMatch(/^lr_/);
+    expect(applied.ok && applied.value.plan.status).toBe('proposed');
   });
 
   it('property: in a storm, whatever the battery, there is always a plan, or a refusal on a hard limit', async () => {

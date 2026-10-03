@@ -1,9 +1,24 @@
-import { err, isFullyLive, ok, toolError, type ApplyPlanInput, type ApplyPlanOutput, type ErrorEnvelope, type HomeProfile, type Plan, type Result } from '@cold-reserve/contracts';
-import { epsBaseLoadW } from '@cold-reserve/core';
-import { rejectionOf, runGuard } from '@cold-reserve/guard';
+import {
+  epochMs,
+  err,
+  isFullyLive,
+  ok,
+  toolError,
+  type ApplyPlanInput,
+  type ApplyPlanOutput,
+  type ErrorEnvelope,
+  type HomeProfile,
+  type Plan,
+  type Result,
+} from '@cold-reserve/contracts';
+import { epsBaseLoadW, invalidLastResortToken, type StateStore } from '@cold-reserve/core';
+import { rejectionOf, runGuard, type GuardVerdict } from '@cold-reserve/guard';
+import { homeDetail, isSandbox } from '../../sandbox-log.js';
+import { localIso } from '../../time.js';
 import type { ToolContext } from '../../tool.js';
+import { newLastResortToken, planHash, sha256Hex } from './confirm-token.js';
 import type { ComfortPlanDeps } from './deps.js';
-import { guardFrame, loadInputs } from './plan-comfort.js';
+import { HARD_LIMITS, guardFrame, loadInputs } from './plan-comfort.js';
 import { recordRejection } from './rejections.js';
 
 // apply_plan, the second phase (plan §9.2, §9.4):
@@ -12,6 +27,10 @@ import { recordRejection } from './rejections.js';
 // 3. the guard revalidates the plan on the current state: a refusal writes nothing but the refusal log;
 // 4. F5's conditional write (`status = proposed AND now < expiresAt`) applies it exactly once.
 // During the hackathon the real home is read-only: the plan is stored as advice with manual instructions.
+//
+// A last resort (#160) holds the hard limits but not every comfort guarantee. On a home that is commanded it
+// takes two explicit yeses: a plain apply only returns a token bound to the plan, and only the call that brings
+// that token back applies it. On the real home it stays advice, so its manual steps come at once.
 
 export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ctx: ToolContext): Promise<Result<ApplyPlanOutput, ErrorEnvelope>> {
   const home = deps.homes(ctx.homeId);
@@ -20,6 +39,8 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
   const stored = await store.getPlan(input.planId);
   if (!stored.ok) return stored;
   if (stored.value.status === 'applied') return ok(outcome(stored.value, true, home.profile));
+  const lastResort = stored.value.lastResort !== undefined;
+  if (input.lastResortToken !== undefined && !lastResort) return err(invalidLastResortToken());
 
   if (home.readOnly && !isFullyLive(stored.value.sourceOrigin)) {
     return err(
@@ -46,14 +67,61 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
     model: deps.model,
     config: deps.guard,
   });
-  if (!verdict.ok) {
+  if (!verdict.ok && !(lastResort && holdsHardLimits(verdict))) {
     await recordRejection(store, verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId }, input.planId);
     return err(rejectionOf(verdict) ?? toolError('unexpected_error', 'The guard refused the plan without a reason.'));
   }
 
+  if (lastResort && !home.readOnly) {
+    if (input.lastResortToken === undefined) return issueConfirmation(deps, store, stored.value, profile, ctx);
+    const used = await store.consumeLastResortConfirmation(stored.value.id, sha256Hex(input.lastResortToken));
+    if (!used.ok) {
+      // A used token on a plan applied meanwhile (a retry, a concurrent second yes): the idempotent outcome.
+      const now = await store.getPlan(stored.value.id);
+      return now.ok && now.value.status === 'applied' ? ok(outcome(now.value, true, profile)) : used;
+    }
+    if (used.value.planHash !== planHash(stored.value)) return err(invalidLastResortToken());
+    logLastResort(deps, ctx, stored.value, 'last_resort_confirmed', 'Last-resort plan confirmed by a second yes.');
+  }
+
   const applied = await store.applyPlan(input.planId);
   if (!applied.ok) return applied;
+  if (lastResort && !applied.value.alreadyApplied) logLastResort(deps, ctx, applied.value.plan, 'last_resort_applied', 'Last-resort plan applied.');
   return ok(outcome(applied.value.plan, applied.value.alreadyApplied, profile));
+}
+
+/** A last resort fails a comfort guarantee by definition; it is applied only while the hard limits hold. */
+const holdsHardLimits = (verdict: GuardVerdict): boolean => verdict.guarantees.every((g) => g.ok || !HARD_LIMITS.includes(g.id));
+
+/**
+ * The first yes to a last resort: nothing is applied. A fresh token, of which only the hash is stored with
+ * the plan's hash, valid for the configured minutes and never past the plan; a new one replaces the earlier.
+ */
+async function issueConfirmation(deps: ComfortPlanDeps, store: StateStore, plan: Plan, profile: HomeProfile, ctx: ToolContext): Promise<Result<ApplyPlanOutput, ErrorEnvelope>> {
+  const nowMs = deps.clock.now();
+  // Down to the whole second: the time told (localIso has no milliseconds) is exactly the time stored.
+  const expiresAtMs = Math.floor(Math.min(epochMs(plan.expiresAt), nowMs + deps.config.lastResortConfirmMinutes * 60_000) / 1000) * 1000;
+  if (expiresAtMs <= nowMs) return err(toolError('plan_expired', 'This plan has expired; ask for a new one.', { details: { planId: plan.id } }));
+  const token = newLastResortToken();
+  const saved = await store.saveLastResortConfirmation({ planId: plan.id, tokenHash: sha256Hex(token), planHash: planHash(plan), expiresAt: new Date(expiresAtMs).toISOString() });
+  if (!saved.ok) return saved;
+  logLastResort(deps, ctx, plan, 'last_resort_confirmation_issued', 'Last-resort plan: first yes, confirmation issued.');
+  return ok({ plan, alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: localIso(expiresAtMs, profile.location.tz) } });
+}
+
+type LastResortEvent = 'last_resort_confirmation_issued' | 'last_resort_confirmed' | 'last_resort_applied';
+
+/** One info line per step of a last resort (#160): the plan id and the step, never the token. */
+function logLastResort(deps: ComfortPlanDeps, ctx: ToolContext, plan: Plan, event: LastResortEvent, message: string): void {
+  deps.logger.log({
+    ts: new Date(deps.clock.now()).toISOString(),
+    level: 'info',
+    component: 'mcp-server',
+    message,
+    correlationId: ctx.correlationId,
+    ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+    details: { event, planId: plan.id, ...homeDetail(ctx.homeId) },
+  });
 }
 
 function outcome(plan: Plan, alreadyApplied: boolean, profile: HomeProfile): ApplyPlanOutput {

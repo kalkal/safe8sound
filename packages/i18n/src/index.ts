@@ -104,6 +104,8 @@ const enUS = {
   'plan.dismissUtterance': 'Not now',
   'plan.applied': 'Plan applied.',
   'plan.alreadyApplied': 'The plan was already applied.',
+  // The first yes to a last resort (#160): nothing is applied until the person says yes again.
+  'plan.notYetApplied': 'Not applied yet: this is a last resort. Say yes again to apply it.',
   'plan.manual': 'Do this by hand',
   'receipt.heading': 'Guard check',
   'receipt.simulatedCaveat': 'Checked on simulated data, not on the live readings of your home.',

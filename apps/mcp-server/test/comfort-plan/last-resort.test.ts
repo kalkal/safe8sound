@@ -86,6 +86,13 @@ describe('loweredLimit: the safe hours end because the limit came down, not beca
     expect(loweredLimit(points([23, 23, 23.5]), { ...at, untilMs: T0 + 2 * H })).toBeUndefined();
   });
 
+  it('the limit changes between two grid points: the first point after the change is the one that sees it', () => {
+    // The limit comes down at T0 + 1.5 h; the points are on the hour.
+    const between = { ...at, limitAt: (ms: number) => (ms >= T0 + 1.5 * H ? 24 : 27) };
+    expect(loweredLimit(points([26, 26, 25]), { ...between, untilMs: T0 + 2 * H })).toBe(24);
+    expect(loweredLimit(points([26, 26, 25]), { ...between, untilMs: T0 + H })).toBeUndefined();
+  });
+
   it('not without both points of the safe room', () => {
     expect(loweredLimit(points([26, 26, 25]), { ...at, untilMs: T0 })).toBeUndefined();
     expect(loweredLimit(points([26, 26, 25]), { ...at, roomId: 'attic', untilMs: T0 + 2 * H })).toBeUndefined();

@@ -9,6 +9,8 @@ const minutes = z.number().int().positive().max(24 * 60);
 export const ComfortPlanConfigSchema = z.strictObject({
   schemaVersion: z.literal(1),
   planTtlMinutes: minutes,
+  /** How long the second yes to a last-resort plan may come after the first (#160): at most 10 whole minutes, never past the plan. */
+  lastResortConfirmMinutes: z.number().int().positive().max(10),
   /** Occupant roles that switch the night recovery to its elderly threshold (24 °C). */
   elderlyRoles: z.array(z.string().regex(/^[a-z][a-z_-]{0,31}$/)).max(10),
   planner: z.strictObject({

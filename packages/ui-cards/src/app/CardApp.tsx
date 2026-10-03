@@ -87,11 +87,13 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
 }
 
 function AppliedPlan({ result, timeZone }: { result: ApplyPlanOutput; timeZone: string }) {
-  const { plan, alreadyApplied, advisoryOnly, manualInstructions } = result;
+  const { plan, alreadyApplied, advisoryOnly, manualInstructions, confirmation } = result;
+  // The first yes to a last resort applies nothing (#160): the card must not say "applied".
+  const notice = confirmation !== undefined ? 'plan.notYetApplied' : alreadyApplied ? 'plan.alreadyApplied' : 'plan.applied';
   return (
     <>
       <p className="notice" role="status">
-        {t(alreadyApplied ? 'plan.alreadyApplied' : 'plan.applied')}
+        {t(notice)}
       </p>
       {advisoryOnly && manualInstructions.length > 0 && (
         <ul className="manual" aria-label={t('plan.manual')}>

@@ -17,8 +17,9 @@ export function readToolCall(params: { name: string; arguments?: Record<string, 
   const args = params.arguments ?? {};
   if (card.tool === 'plan_comfort' && params.name === 'apply_plan') {
     const parsed = ApplyPlanInputSchema.safeParse(args);
-    // The plan card applies its own plan, never another one.
+    // The plan card applies its own plan, never another one, and is never the second yes to a last resort (#160).
     if (!parsed.success || parsed.data.planId !== card.result.id) return refuse('This card may only apply its own plan.');
+    if (parsed.data.lastResortToken !== undefined) return refuse('A card cannot confirm a last-resort plan: the person says yes again.');
     return ok({ name: 'apply_plan', args: parsed.data });
   }
   if (card.tool === 'get_preferences' && params.name === 'set_preferences') {

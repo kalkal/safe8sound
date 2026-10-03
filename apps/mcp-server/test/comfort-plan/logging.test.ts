@@ -1,4 +1,4 @@
-import { celsius, pct, type PlanComfortInput } from '@cold-reserve/contracts';
+import { HomeIdSchema, celsius, pct, type PlanComfortInput } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
@@ -39,6 +39,20 @@ describe('comfort-plan logging', () => {
     expect(logged.ok && logged.value.length).toBeGreaterThan(0);
     const info = w.logger.lines.find((l) => l.level === 'info' && l.details?.['planId'] === r.value.id);
     expect(info?.correlationId).toBe('test-correlation');
+  });
+
+  it('a visitor sandbox never reaches the last-resort lines: it is said as "sandbox" (#168 review)', async () => {
+    const sandbox = HomeIdSchema.parse('demo#0123456789abcdef');
+    const w = world('storm-blackout', 3, { homeId: sandbox, snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const first = await applyPlan(w.deps, { planId: r.value.id }, w.ctx);
+    if (!first.ok || first.value.confirmation === undefined) throw new Error('no confirmation');
+    await applyPlan(w.deps, { planId: r.value.id, lastResortToken: first.value.confirmation.token }, w.ctx);
+    const lines = w.logger.lines.filter((l) => typeof l.details?.['event'] === 'string');
+    expect(lines.map((l) => l.details?.['event'])).toEqual(['last_resort_proposed', 'last_resort_confirmation_issued', 'last_resort_confirmed', 'last_resort_applied']);
+    expect(JSON.stringify(w.logger.lines)).not.toContain('0123456789abcdef');
+    expect(lines.every((l) => l.details?.['home'] === 'sandbox' && l.homeId === undefined)).toBe(true);
   });
 
   it('every store the module opens knows the correlation id of the request', async () => {

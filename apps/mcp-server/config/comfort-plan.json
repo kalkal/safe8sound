@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "planTtlMinutes": 10,
+  "lastResortConfirmMinutes": 10,
   "elderlyRoles": [
     "grandpa",
     "grandma"
