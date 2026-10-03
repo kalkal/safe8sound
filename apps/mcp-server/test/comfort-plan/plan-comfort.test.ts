@@ -184,7 +184,7 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(p.lastResort?.safeHours).toBeGreaterThan(0);
     // The time as the person says it, in the home's zone (the guard's reasons use local time too).
     expect(p.warnings?.find((x) => x.code === 'last_resort_plan')?.message).toMatch(
-      /^No plan keeps the Bedroom within its limits until the next recharge: safe for about [\d.]+ hours, until \d{1,2}:\d\d (AM|PM) \(2026-07-1[78]T\d\d:\d\d:\d\d\+02:00\); then /,
+      /^No plan keeps the Bedroom within its limits until the next recharge: safe for about [\d.]+ hours, until \d{1,2}:\d\d (AM|PM); then /,
     );
     expect(p.lastResort?.safeUntil).toMatch(/\+02:00$/);
     // A last resort names a real limit inside the horizon, never a battery that does not run out.

@@ -2,6 +2,7 @@ import { HomeStatusSchema, err, ok, toolError, type HomeId, type HomeProfile, ty
 import type { HomeDataSource } from '@cold-reserve/core';
 import { z } from 'zod';
 import type { CapabilityModule } from '../../registry.js';
+import { localIso, localTimeText } from '../../time.js';
 import { defineTool } from '../../tool.js';
 import type { StatusDeriver } from './status-deriver.js';
 
@@ -20,10 +21,12 @@ export interface EnergyStatusDeps {
   readonly deriver: StatusDeriver;
 }
 
-function summarize(s: HomeStatus): string {
+/** The text of get_home_status; the last live reading as the home's clock time, never an ISO stamp (#177). */
+export function homeStatusSummary(s: HomeStatus, timeZone: string): string {
   const served = s.rooms.filter((r) => r.state === 'served').length;
   const data = s.origin.energy === 'simulated' ? 'simulated data' : 'live data';
-  const link = s.homeLink === 'ok' ? '' : ` Home link ${s.homeLink}${s.lastLiveAt ? `, last live reading at ${s.lastLiveAt}` : ''}.`;
+  const lastLive = s.lastLiveAt === undefined ? '' : `, last live reading at ${localTimeText(localIso(Date.parse(s.lastLiveAt), timeZone))}`;
+  const link = s.homeLink === 'ok' ? '' : ` Home link ${s.homeLink}${lastLive}.`;
   return `Battery at ${s.batterySocPct}%, ${s.level} level; ${served} of ${s.rooms.length} rooms served (${data}).${link}`;
 }
 
@@ -40,7 +43,7 @@ export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         input: z.strictObject({}),
         output: HomeStatusSchema,
-        summarize,
+        summarize: (s) => homeStatusSummary(s, deps.homes(s.homeId)?.profile.location.tz ?? 'UTC'),
         handler: async (_args, ctx) => {
           const home = deps.homes(ctx.homeId);
           if (!home) return err(toolError('home_not_found', 'This client is not linked to a configured home.'));

@@ -17,7 +17,9 @@ describe('what the model reads', () => {
     const text = startSummary(out.value);
     expect(text).toContain('Storm mode is prepared: the grid is still up, so the storm reserve stays locked.');
     expect(text).toContain(`about ${one(out.value.safeHours)} hours, until ${localTimeText(out.value.safeUntil)}`);
-    expect(text).toMatch(/until \d{1,2}:\d\d [AP]M \(\S+\+02:00\)/);
+    expect(text).toMatch(/until \d{1,2}:\d\d [AP]M/);
+    // The person hears the clock time only, never an ISO stamp (#160 acceptance test).
+    expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
     expect(text).not.toMatch(/Giulia|phone-/);
     expect(text).toContain('No family message was sent.');
   });
@@ -60,9 +62,9 @@ describe('what the model reads', () => {
   });
 
   it('says the local clock time the way the family message does, then the exact time', () => {
-    expect(localTimeText('2026-07-17T21:05:00+02:00')).toBe('9:05 PM (2026-07-17T21:05:00+02:00)');
-    expect(localTimeText('2026-07-18T00:30:00+02:00')).toBe('12:30 AM (2026-07-18T00:30:00+02:00)');
-    expect(localTimeText('2026-07-18T12:00:00+02:00')).toBe('12:00 PM (2026-07-18T12:00:00+02:00)');
+    expect(localTimeText('2026-07-17T21:05:00+02:00')).toBe('9:05 PM');
+    expect(localTimeText('2026-07-18T00:30:00+02:00')).toBe('12:30 AM');
+    expect(localTimeText('2026-07-18T12:00:00+02:00')).toBe('12:00 PM');
   });
 
   it('notify_family inside the interval says nothing was sent and why', () => {

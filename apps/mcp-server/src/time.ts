@@ -20,10 +20,10 @@ export function localIso(ms: number, timeZone: string): string {
 }
 
 /**
- * "9:30 PM (2026-07-17T21:30:00+02:00)": the clock time as the family message says it, from a time
- * already in the home's zone (localIso), then the exact time.
+ * "9:30 PM": the clock time as the family message says it, from a time already in the home's zone (localIso).
+ * The text the model may read aloud carries the clock time only; the exact time is in the structured result.
  */
 export function localTimeText(iso: string): string {
   const hour = Number(iso.slice(11, 13));
-  return `${String(hour % 12 || 12)}:${iso.slice(14, 16)} ${hour < 12 ? 'AM' : 'PM'} (${iso})`;
+  return `${String(hour % 12 || 12)}:${iso.slice(14, 16)} ${hour < 12 ? 'AM' : 'PM'}`;
 }

@@ -1,9 +1,10 @@
-import { HomeStatusSchema, ErrorEnvelopeSchema, LogEntrySchema, err, toolError } from '@cold-reserve/contracts';
+import { HomeStatusSchema, ErrorEnvelopeSchema, LogEntrySchema, err, toolError, type HomeStatus } from '@cold-reserve/contracts';
 import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import type { SourceEvent } from '@cold-reserve/source-fallback';
 import { createApp, logSourceEvent, type AppOptions } from '../src/app.js';
 import type { LogEntry } from '../src/handler.js';
+import { homeStatusSummary } from '../src/modules/energy-status/index.js';
 import { HOME_TOKEN, TOKEN, callTool, homeId, post, toolResult, toolsList } from './helpers.js';
 
 const WALL = Date.UTC(2026, 8, 29, 7, 0, 0);
@@ -55,6 +56,15 @@ describe('get_home_status on a visitor sandbox (#101)', () => {
     const ask = (home: string) => post(handler, callTool('get_home_status', {}), { authorization: `Bearer ${SANDBOX_TOKEN}`, 'x-cold-reserve-home': home });
     expect((await ask('demo#0123456789abcdef')).status).toBe(200);
     expect((await ask('demo#fedcba9876543210')).status).toBe(429);
+  });
+});
+
+describe('the get_home_status text', () => {
+  it('says the last live reading as the clock time of the home, never an ISO stamp (#177 review)', () => {
+    const s = { batterySocPct: 40, level: 'essential', rooms: [], origin: { energy: 'simulated' }, homeLink: 'lost', lastLiveAt: '2026-07-17T19:30:00.000Z' } as unknown as HomeStatus;
+    const text = homeStatusSummary(s, 'Europe/Rome');
+    expect(text).toContain('Home link lost, last live reading at 9:30 PM.');
+    expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
   });
 });
 

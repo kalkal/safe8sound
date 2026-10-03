@@ -6,7 +6,7 @@ import { applySummary, outlookSummary, planSummary } from '../../src/modules/com
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { reserveOutlook } from '../../src/modules/comfort-plan/reserve-outlook.js';
-import { localTimeText } from '../../src/time.js';
+import { localIso, localTimeText } from '../../src/time.js';
 import { REAL, guardConfig, world } from './support.js';
 
 // The agent (Strands) reads only the text content of a tool result, not structuredContent (F7): every
@@ -14,7 +14,7 @@ import { REAL, guardConfig, world } from './support.js';
 
 const one = (x: number) => x.toFixed(1);
 const night = guardConfig().nightRecovery;
-const NIGHT = { nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour), nightStartHour: night.windowStartHour, nightEndHour: night.windowEndHour };
+const NIGHT = { nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour), nightStartHour: night.windowStartHour, nightEndHour: night.windowEndHour, timeZone: 'Europe/Rome' };
 
 describe('what the model reads', () => {
   it('plan_comfort: plan id, level, horizon, every guarantee with its reason, the reserve, the night and the counterfactual', async () => {
@@ -25,7 +25,9 @@ describe('what the model reads', () => {
     const text = planSummary(p, NIGHT);
     expect(text).toContain(p.id);
     expect(text).toContain(`${p.steps[0]?.level ?? ''} level`);
-    expect(text).toContain(p.horizonAt);
+    expect(text).toContain(`until ${localTimeText(p.horizonAt)}`);
+    // Every time in the text as a clock time in the home's zone, never an ISO stamp (#160 acceptance test).
+    expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
     for (const g of p.guarantees) expect(text).toContain(`${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`);
     expect(text).toContain(`${one(p.reserveWh / 1000)} kWh`);
     expect(text).toContain(`${one(p.reserveFloorSocPct ?? -1)} %`);
@@ -37,9 +39,11 @@ describe('what the model reads', () => {
     for (const wn of p.warnings ?? []) expect(text).toContain(wn.message);
     const c = p.counterfactual;
     expect(c).toBeDefined();
-    expect(text).toContain(`Without the plan the safe room (${c?.roomId ?? ''}) would peak at ${String(c?.scenarios.noPlan.peakTempC)} °C at ${c?.scenarios.noPlan.peakAt ?? ''}`);
+    // The peak as the home's clock time, with the offset of the plan's own local times.
+    const clock = (iso: string) => localTimeText(localIso(Date.parse(iso), w.profile.location.tz));
+    expect(text).toContain(`Without the plan the safe room (${c?.roomId ?? ''}) would peak at ${String(c?.scenarios.noPlan.peakTempC)} °C at ${clock(c?.scenarios.noPlan.peakAt ?? '')}`);
     for (const line of Object.values(c?.scenarios ?? {})) {
-      expect(text).toContain(`${String(line.peakTempC)} °C at ${line.peakAt}`);
+      expect(text).toContain(`${String(line.peakTempC)} °C at ${clock(line.peakAt)}`);
       expect(text).toContain(`${one(line.heatIndexDegreeHours)} heat-index degree-hours, ${one(line.hoursAtOrBelowThreshold)} night hours at or below the threshold`);
     }
     expect(text).toContain('apply_plan');
@@ -89,15 +93,17 @@ describe('what the model reads', () => {
     expect(text).not.toContain('while the grid is up');
   });
 
-  it('plan_comfort: a last resort says until when the room is safe and why, and does not invite to apply it', async () => {
+  it('plan_comfort: a last resort says until when the room is safe and why, and that it takes two explicit yeses', async () => {
     const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(35) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const text = planSummary(r.value, NIGHT);
     expect(r.value.lastResort).toBeDefined();
     expect(text).toContain(r.value.warnings?.find((x) => x.code === 'last_resort_plan')?.message ?? 'missing');
-    expect(text).toMatch(/Last resort: the safest plan there is, but not every guarantee holds, so it cannot be applied\. Tell the person the safe room is safe until \d{1,2}:\d\d (AM|PM) \(2026-07-1[78]T[\d:]+\+02:00\)\./);
-    expect(text).not.toContain('call apply_plan');
+    // It can be applied, only with two explicit yeses (#168): the text must not make the model refuse.
+    expect(text).toMatch(/Last resort: the safest plan there is, but not every guarantee holds\. It can be applied only with two explicit yeses: read the person the risk and until when the safe room is safe \(\d{1,2}:\d\d (AM|PM)\), ask; if they say yes, call apply_plan with planId \S+ and ask again with what it returns\./);
+    expect(text).not.toContain('cannot be applied');
+    expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
   });
 
   it('plan_comfort: when the battery ends it, says until when the battery lasts and how far the room then goes, every number (#160)', async () => {
@@ -146,6 +152,33 @@ describe('what the model reads', () => {
     const text = planSummary({ ...examplePlan(), lastResort: lr } as Plan, NIGHT);
     expect(text).not.toContain('the limit is');
     expect(text).toContain(`Safe until ${localTimeText(at)}; the safe room then goes up to 26.5 °C by ${localTimeText(lr.worstAt)}, past its 26 °C night limit.`);
+  });
+
+  it('when the battery ends the safe hours, says honestly what the room does then: warmer and more humid when cooling (#160 acceptance test)', () => {
+    const lr = { safeUntil: '2026-07-17T23:40:00+02:00', safeHours: 1.67, limitedBy: 'battery' as const };
+    const text = planSummary({ ...examplePlan(), lastResort: lr } as Plan, NIGHT);
+    expect(text).toContain('Once the battery runs out the split stops: the safe room gets warmer and more humid.');
+    expect(text).not.toContain('as the guarantees above say');
+    expect(planSummary({ ...examplePlan(), lastResort: { ...lr, limitedBy: 'temperature' as const } } as Plan, NIGHT)).not.toContain('Once the battery runs out');
+  });
+
+  it('in the heating season the room gets colder once the battery runs out, never "warmer" (#177 review)', () => {
+    const lr = { safeUntil: '2026-01-18T03:00:00+01:00', safeHours: 5, limitedBy: 'battery' as const };
+    const heated = { ...examplePlan(), goal: 'heat', steps: examplePlan().steps.map((s) => ({ ...s, hvacMode: 'heat' })), lastResort: lr } as Plan;
+    const text = planSummary(heated, NIGHT);
+    expect(text).toContain('Once the battery runs out the split stops: the safe room gets colder.');
+    expect(text).not.toContain('warmer');
+  });
+
+  it('peak times in the home zone at their own date, across a daylight-saving change (#177 review)', () => {
+    const line = (peakAt: string) => ({ peakTempC: 30, peakAt, heatIndexDegreeHours: 1, hoursAtOrBelowThreshold: 0 });
+    // The horizon is before the change (+01:00); the peak is after it (+02:00 in Rome): 10:00Z is 12:00 PM.
+    const p = {
+      ...examplePlan(),
+      horizonAt: '2026-03-29T01:00:00+01:00',
+      counterfactual: { roomId: 'bedroom-1', scenarios: { noPlan: line('2026-03-29T10:00:00.000Z'), naive: line('2026-03-29T10:00:00.000Z'), plan: line('2026-03-29T10:00:00.000Z') } },
+    } as Plan;
+    expect(planSummary(p, NIGHT)).toContain('would peak at 30 °C at 12:00 PM (');
   });
 
   it('when the worst point is at safeUntil, says "at" that time, never "up to … by" it', () => {

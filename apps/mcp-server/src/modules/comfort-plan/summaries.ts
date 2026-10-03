@@ -1,5 +1,5 @@
 import { DATA_GROUPS, epochMs, isFullyLive, type ApplyPlanOutput, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
-import { localTimeText } from '../../time.js';
+import { localIso, localTimeText } from '../../time.js';
 
 // The text content of each tool result. The agent (Strands) reads only this text, not structuredContent
 // (F7 finding): every number and fact the model may say is here. The JSON is for the cards and clients.
@@ -29,8 +29,8 @@ function rungText(r: LevelStep): string {
   return `${r.level}: setpoint ${offset}, ${r.preferredModes.join(' or ')}, fans ${r.fansOn ? 'on' : 'off'}, ${rooms}`;
 }
 
-function lineText(l: CounterfactualLine): string {
-  return `${String(l.peakTempC)} °C at ${l.peakAt} (${one(l.heatIndexDegreeHours)} heat-index degree-hours, ${one(l.hoursAtOrBelowThreshold)} night hours at or below the threshold)`;
+function lineText(l: CounterfactualLine, timeZone: string): string {
+  return `${String(l.peakTempC)} °C at ${localTimeText(localIso(Date.parse(l.peakAt), timeZone))} (${one(l.heatIndexDegreeHours)} heat-index degree-hours, ${one(l.hoursAtOrBelowThreshold)} night hours at or below the threshold)`;
 }
 
 /** What the plan text needs besides the plan: the night window (guard config). */
@@ -39,6 +39,8 @@ export interface PlanSummaryOptions {
   /** Wall-clock hours of the night window, to name the night limit of a last resort (#160). */
   readonly nightStartHour: number;
   readonly nightEndHour: number;
+  /** The home's time zone: every time in the text is its clock time, at its own date (daylight saving). */
+  readonly timeZone: string;
 }
 
 /** The wall-clock hour of a time already in the home's zone (localIso), read from the text itself. */
@@ -88,18 +90,26 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   if (c !== undefined) {
     const { noPlan, naive, plan } = c.scenarios;
     parts.push(
-      `Without the plan the safe room (${c.roomId}) would peak at ${lineText(noPlan)}; ` +
-        `with the naive plan (air conditioning until the battery dies) at ${lineText(naive)}; ` +
-        `with this plan at ${lineText(plan)}.`,
+      `Without the plan the safe room (${c.roomId}) would peak at ${lineText(noPlan, opts.timeZone)}; ` +
+        `with the naive plan (air conditioning until the battery dies) at ${lineText(naive, opts.timeZone)}; ` +
+        `with this plan at ${lineText(plan, opts.timeZone)}.`,
     );
   }
   const window = p.lastResort === undefined ? undefined : windowText(p.lastResort, opts);
   if (window !== undefined) parts.push(window);
-  // A last resort cannot be applied yet (the two-step confirmation comes next, #160): say until when, do not offer it.
+  // What the room does once the battery is empty, said not hidden (#160 acceptance test: up to ~100 % RH on a
+  // humid night). The plan's own steps say the season: a heated room gets colder, never warmer.
+  if (p.lastResort?.limitedBy === 'battery') {
+    const heating = p.goal === 'heat' || p.steps.some((s) => s.hvacMode === 'heat');
+    parts.push(`Once the battery runs out the split stops: the safe room gets ${heating ? 'colder' : 'warmer and more humid'}.`);
+  }
+  // A last resort is applied only with two explicit yeses (#168): the first apply_plan returns what the second needs.
   parts.push(
     p.lastResort === undefined
       ? `Say it to the person and ask to confirm; then call apply_plan with planId ${p.id}.`
-      : `Last resort: the safest plan there is, but not every guarantee holds, so it cannot be applied. Tell the person the safe room is safe until ${localTimeText(p.lastResort.safeUntil)}.`,
+      : `Last resort: the safest plan there is, but not every guarantee holds. It can be applied only with two explicit yeses: ` +
+          `read the person the risk and until when the safe room is safe (${localTimeText(p.lastResort.safeUntil)}), ask; ` +
+          `if they say yes, call apply_plan with planId ${p.id} and ask again with what it returns.`,
   );
   return parts.join(' ');
 }

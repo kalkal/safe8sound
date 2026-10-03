@@ -36,7 +36,7 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         input: PlanComfortInputSchema,
         output: PlanSchema,
-        summarize: (plan) => planSummary(plan, summaryOptions),
+        summarize: (plan) => planSummary(plan, { ...summaryOptions, timeZone: deps.homes(plan.homeId)?.profile.location.tz ?? 'UTC' }),
         handler: (args, ctx) => planComfort(deps, args, ctx),
       }),
       defineTool({
