@@ -27,6 +27,24 @@ export function localStartSocPct(env: Readonly<Record<string, string | undefined
   return ok(value);
 }
 
+/**
+ * CE-20: the domain runs on the scenario clock, but log lines line up with the sim-api's and the agent's on the
+ * wall clock. Each line's `ts` becomes the wall time; the domain's own time, when it differs, moves to
+ * `details.scenarioTs`. Best effort, like every logger: a sink that throws never breaks the caller.
+ */
+export function wallStamped(logger: Logger, wallClock: Clock): Logger {
+  return {
+    log: (entry) => {
+      try {
+        const ts = new Date(wallClock.now()).toISOString();
+        logger.log(entry.ts === ts ? entry : { ...entry, ts, details: { ...entry.details, scenarioTs: entry.ts } });
+      } catch {
+        // Nowhere left to report it: the line is lost, the request goes on.
+      }
+    },
+  };
+}
+
 export function createLocalApp(
   env: Readonly<Record<string, string | undefined>>,
   opts: { readonly wallClock: Clock; readonly logger: Logger; readonly cardDocuments?: CardDocuments },
@@ -47,7 +65,7 @@ export function createLocalApp(
   const app = createApp(env, {
     wallClock: opts.wallClock,
     scenarioClock: clock.value,
-    logger: opts.logger,
+    logger: wallStamped(opts.logger, opts.wallClock),
     modules: modules.value,
     comfortPlan: comfortPlan.value,
     stormMode: stormMode.value,

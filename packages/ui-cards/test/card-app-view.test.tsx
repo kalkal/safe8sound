@@ -45,6 +45,10 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     });
     const notice = screen.getByRole('status');
     expect(notice.textContent).toBe('Not applied yet: this is a last resort. Say yes again, or tap "Yes, apply it now", before 15:10.');
+    // CE-22: the notice and its button sit in a card, and the receipt stays: the person still sees what fails.
+    expect(notice.closest('.card')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Yes, apply it now' }).closest('.card')).toBe(notice.closest('.card'));
+    expect(screen.getByRole('region', { name: 'Guard check' })).toBeTruthy();
     // The person hears and sees where they are: focus moves to the notice.
     expect(document.activeElement).toBe(notice);
     expect(document.body.textContent).not.toContain('Plan applied.');
@@ -65,6 +69,8 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(screen.getByRole('status').textContent).toBe('Not applied yet: this is a last resort. Say yes again to apply it, before 15:10.');
     expect(screen.queryByRole('button', { name: 'Yes, apply it now' })).toBeNull();
     expect(document.body.innerHTML).not.toContain(token);
+    // A voice turn's card never takes the focus from the Ask box (#176 re-review).
+    expect(document.activeElement).not.toBe(screen.getByRole('status'));
   });
 
   it('without card actions, the second step is said by voice only', () => {

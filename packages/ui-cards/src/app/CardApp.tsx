@@ -72,6 +72,7 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
         <AppliedPlan
           result={state.data}
           timeZone={timeZone}
+          fromThisFrame={state.fromThisFrame === true}
           canConfirm={canAct && state.fromThisFrame === true}
           onConfirm={(args) => {
             onCallTool('apply_plan', args);
@@ -104,19 +105,22 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
 interface AppliedPlanProps {
   result: ApplyPlanOutput;
   timeZone: string;
+  /** The answer to this frame's own tap (not a voice turn's card). */
+  fromThisFrame: boolean;
   /** The host can run card actions and this frame made the first step itself. */
   canConfirm: boolean;
   /** The second step of a last resort: apply_plan with the token the first step returned. */
   onConfirm: (args: { planId: string; lastResortToken: string }) => void;
 }
 
-function AppliedPlan({ result, timeZone, canConfirm, onConfirm }: AppliedPlanProps) {
+function AppliedPlan({ result, timeZone, fromThisFrame, canConfirm, onConfirm }: AppliedPlanProps) {
   const [sending, setSending] = useState(false);
   const noticeRef = useRef<HTMLParagraphElement>(null);
-  // The answer replaces the button the person tapped: focus goes to what it says.
+  // The answer replaces the button the person tapped: focus goes to what it says. A voice turn's card never
+  // takes the focus from the Ask box.
   useEffect(() => {
-    noticeRef.current?.focus();
-  }, []);
+    if (fromThisFrame) noticeRef.current?.focus();
+  }, [fromThisFrame]);
   const { plan, alreadyApplied, advisoryOnly, manualInstructions, confirmation, familyAlert } = result;
   // The first yes to a last resort applies nothing (#160): the card must not say "applied".
   // Advice is never "applied": nothing changes in the home, the person does it (plan §11.6).
@@ -129,6 +133,8 @@ function AppliedPlan({ result, timeZone, canConfirm, onConfirm }: AppliedPlanPro
   }
   return (
     <>
+      {/* CE-22: the notice, the second step and the family alert in one card. */}
+      <div className="card">
       <p className="notice" role="status" tabIndex={-1} ref={noticeRef}>
         {notice}
       </p>
@@ -149,9 +155,12 @@ function AppliedPlan({ result, timeZone, canConfirm, onConfirm }: AppliedPlanPro
         </div>
       )}
       {familyAlert !== undefined && <FamilyAlert sent={familyAlert.sent} failed={familyAlert.failed} />}
+      </div>
       {/* The real home is read-only during the hackathon: the splits are set by hand (plan §11.6). */}
       {advisoryOnly && manualInstructions.length > 0 && <ManualControlCard instructions={manualInstructions} reason="read_only" />}
       <PlanCard plan={plan} timeZone={timeZone} />
+      {/* A last resort keeps its receipt after the first yes (CE-22): what does not hold stays in sight. */}
+      {plan.lastResort !== undefined && <GuardReceipt plan={plan} />}
     </>
   );
 }
