@@ -31,7 +31,11 @@ export const GuardConfigSchema = z.strictObject({
     .strictObject({
       windowStartHour: hour,
       windowEndHour: hour,
-      thresholdC: z.strictObject({ standard: z.number().min(18).max(30), elderly: z.number().min(18).max(30) }),
+      /**
+       * Health rules, not preferences: config may lower them, never raise them (26 °C at night, 24 °C with an
+       * elderly person; sources in packages/contracts/src/night-recovery.ts).
+       */
+      thresholdC: z.strictObject({ standard: z.number().min(18).max(26), elderly: z.number().min(18).max(24) }),
       requiredHours: nonNegative.max(24),
       /** 26.7 °C (80 °F): where the NOAA heat index is defined, a definition, not a tunable. */
       heatIndexBaseC: z.literal(26.7),

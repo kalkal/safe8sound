@@ -26,9 +26,16 @@ describe('guard config errors', () => {
   });
 
   it('names the elderly night threshold when it is above the standard one, and accepts them equal (boundary)', () => {
-    const c = parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, thresholdC: { standard: 26, elderly: 27 } } });
+    const c = parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, thresholdC: { standard: 22, elderly: 23 } } });
     expect(!c.ok && c.error).toMatchObject({ details: { issues: [{ path: 'nightRecovery.thresholdC.elderly', message: 'The elderly threshold is at most the standard one' }] } });
-    expect(parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, thresholdC: { standard: 26, elderly: 26 } } }).ok).toBe(true);
+    expect(parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, thresholdC: { standard: 24, elderly: 24 } } }).ok).toBe(true);
+  });
+
+  it('never lets config raise the night health thresholds: at most 26 °C, and 24 °C with an elderly person (the health rules)', () => {
+    const at = (standard: number, elderly: number) => parseGuardConfig({ ...rawConfig, nightRecovery: { ...rawConfig.nightRecovery, thresholdC: { standard, elderly } } });
+    expect(at(26, 24).ok).toBe(true);
+    expect(at(26.1, 24)).toMatchObject({ ok: false, error: { details: { issues: [{ path: 'nightRecovery.thresholdC.standard' }] } } });
+    expect(at(26, 24.1)).toMatchObject({ ok: false, error: { details: { issues: [{ path: 'nightRecovery.thresholdC.elderly' }] } } });
   });
 
   it('keeps the heat-index base at its definition (26.7 °C) and refuses an empty night window', () => {

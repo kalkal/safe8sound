@@ -9,7 +9,7 @@ import { startNodeServer } from '../../src/node-server.js';
 import { settableClock } from '../comfort-plan/support.js';
 import { TOKEN } from '../helpers.js';
 
-// The local entry on one clock (#160, the E2E collaudo): the real time is October, the scenario is a July
+// The local entry on one clock (#160, the end-to-end acceptance test): the real time is October, the scenario is a July
 // day. The simulator, the plans, the storm sessions and the store all run on the scenario clock, so a plan is
 // made "now" in the scenario, expires ten scenario minutes later, and the safe hours count from scenario time.
 
@@ -70,6 +70,19 @@ describe('local entry: one scenario clock for everything', () => {
     } finally {
       await client.close();
       await server.close();
+    }
+    // The control case: the scenario's own 85 % at the start gives an ordinary plan, no last resort.
+    const normal = createLocalApp({ ...env, MCP_SCENARIO_START_SOC_PCT: '' }, { wallClock: wall, logger: { log: () => undefined } });
+    if (!normal.ok) throw new Error(normal.error.message);
+    const s2 = await startNodeServer(normal.value.app.handler, { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: normal.value.app.config.maxBodyBytes });
+    const c2 = new Client({ name: 'e2e-local-soc-85', version: '0.0.0' });
+    await c2.connect(new StreamableHTTPClientTransport(new URL(s2.url), { requestInit: { headers: { authorization: `Bearer ${TOKEN}` } } }) as unknown as Transport);
+    try {
+      const plan = PlanSchema.parse((await c2.callTool({ name: 'plan_comfort', arguments: { goal: 'cool' } })).structuredContent);
+      expect(plan.lastResort).toBeUndefined();
+    } finally {
+      await c2.close();
+      await s2.close();
     }
     for (const bad of ['abc', '101', '1']) {
       expect(createLocalApp({ ...env, MCP_SCENARIO_START_SOC_PCT: bad }, { wallClock: wall, logger: { log: () => undefined } })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });

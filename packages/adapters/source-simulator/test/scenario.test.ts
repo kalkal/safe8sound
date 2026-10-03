@@ -79,6 +79,9 @@ describe('parseScenario errors (invalid_config)', () => {
   });
 
   it('rejects invalid simulator parameters', () => {
+    // A fan never counts above 35 °C of air (UKHSA, WHO, Lancet Planet Health 2024): config cannot raise it.
+    expect(parseSimParams({ ...defaultSimParams(), comfort: { ...defaultSimParams().comfort, fanMaxAirC: 35 } }).ok).toBe(true);
+    expect(parseSimParams({ ...defaultSimParams(), comfort: { ...defaultSimParams().comfort, fanMaxAirC: 35.5 } }).ok).toBe(false);
     const r = parseSimParams({ ...defaultSimParams(), pv: { lossRatio: 2 } });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe('invalid_config');

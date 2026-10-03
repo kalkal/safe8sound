@@ -32,7 +32,8 @@ export const SimulatorParamsSchema = z.strictObject({
    * Feels-like effect of a running fan, used by the comfort levels only, and the air temperature from which
    * a fan no longer helps (35 °C: UKHSA heat guidance; Lancet Planet Health 2024).
    */
-  comfort: z.strictObject({ fanEffectC: nonNegative, fanMaxAirC: z.number().min(25).max(45) }),
+  /** A fan never counts from 35 °C of air on: config may lower that limit, never raise it (health rule). */
+  comfort: z.strictObject({ fanEffectC: nonNegative, fanMaxAirC: z.number().min(25).max(35) }),
 });
 export type SimulatorParams = z.infer<typeof SimulatorParamsSchema>;
 

@@ -1,7 +1,7 @@
 import type { ErrorEnvelope, Result } from '@cold-reserve/contracts';
 import { cardDocumentsFromFiles, workspaceCardFiles } from './cards.js';
 import { forLocalEntry } from './config.js';
-import { createLocalApp } from './local-app.js';
+import { createLocalApp, localStartSocPct } from './local-app.js';
 import { startNodeServer } from './node-server.js';
 import { createLocalHandler, createPhoneInboxHandler } from './phone-inbox.js';
 
@@ -21,9 +21,9 @@ function orExit<T>(result: Result<T, ErrorEnvelope>): T {
 const wallClock = { now: Date.now };
 const local = orExit(createLocalApp(process.env, { wallClock, logger: { log }, cardDocuments: cardDocumentsFromFiles(workspaceCardFiles()) }));
 const { app, stormMode } = local;
-if (process.env['MCP_SCENARIO_START_SOC_PCT'] !== undefined) {
-  log({ level: 'info', message: `Local lever: the scenario starts with the battery at ${process.env['MCP_SCENARIO_START_SOC_PCT']}%.`, correlationId: 'startup' });
-}
+// The validated value: an empty MCP_SCENARIO_START_SOC_PCT means the lever is off.
+const startSoc = orExit(localStartSocPct(process.env));
+if (startSoc !== undefined) log({ level: 'info', message: `Local lever: the scenario starts with the battery at ${String(startSoc)}%.`, correlationId: 'startup' });
 // MCP_RESOURCE_URL=auto is for Lambda only (#149): locally the canonical URL has no trustworthy source.
 orExit(forLocalEntry(app.config));
 

@@ -1,7 +1,7 @@
 import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
 import { epsBaseLoadW, scenarioClock, utcDayStart, type Clock, type HomeDataSource } from '@cold-reserve/core';
 import { FallbackSource, type SourceEvent } from '@cold-reserve/source-fallback';
-import { SCENARIO_IDS, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
+import { SCENARIO_IDS, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
 import { withCardResources, type CardDocuments } from './cards.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
@@ -44,18 +44,25 @@ export interface AppOptions {
  * sessions and the local store agree on "now".
  */
 export function scenarioClockFor(env: Readonly<Record<string, string | undefined>>, wall: Clock): Result<Clock, ErrorEnvelope> {
+  const start = scenarioStartFor(env);
+  if (!start.ok) return start;
+  const speed = number(env, 'MCP_SCENARIO_SPEED', 1);
+  if (!speed.ok) return speed;
+  const anchor = scenarioAnchor(env['MCP_SCENARIO_ANCHOR'], wall.now(), start.value.scenario.startAt);
+  if (!anchor.ok) return anchor;
+  return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: start.value.startMs, speed: speed.value }));
+}
+
+/** The scenario and the instant the server starts in it (its start plus MCP_SCENARIO_START_H): one definition. */
+function scenarioStartFor(env: Readonly<Record<string, string | undefined>>): Result<{ scenario: Scenario; startMs: number }, ErrorEnvelope> {
   const scenarioId = env['MCP_SCENARIO'] ?? 'clear-day';
   if (!(SCENARIO_IDS as readonly string[]).includes(scenarioId)) {
     return err(toolError('invalid_config', `MCP_SCENARIO must be one of ${SCENARIO_IDS.join(', ')}.`));
   }
   const startH = number(env, 'MCP_SCENARIO_START_H', 0);
   if (!startH.ok) return startH;
-  const speed = number(env, 'MCP_SCENARIO_SPEED', 1);
-  if (!speed.ok) return speed;
   const scenario = builtInScenario(scenarioId as ScenarioId);
-  const anchor = scenarioAnchor(env['MCP_SCENARIO_ANCHOR'], wall.now(), scenario.startAt);
-  if (!anchor.ok) return anchor;
-  return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: Date.parse(scenario.startAt) + startH.value * HOUR_MS, speed: speed.value }));
+  return ok({ scenario, startMs: Date.parse(scenario.startAt) + startH.value * HOUR_MS });
 }
 
 export interface App {
@@ -98,7 +105,8 @@ function utcOffsetMs(iso: string): number {
  * `start` (default) = when this server starts, fine for one local process; `daily` = midnight in the
  * scenario's own UTC offset (its `startAt`, e.g. +02:00), so the scenario clock reads the same hour as
  * the home and every Lambda container agrees; or a fixed ISO instant. With a fixed instant (or a speed
- * above 1) the simulator stops at the end of the scenario.
+ * above 1) the simulator stops at the end of the scenario. With `daily` the scenario jumps back 24 h at
+ * midnight: a long-running local server replays the day again from its start.
  */
 function scenarioAnchor(raw: string | undefined, startedAtMs: number, scenarioStartAt: string): Result<number | ((wallMs: number) => number), ErrorEnvelope> {
   if (raw === undefined || raw === 'start') return ok(startedAtMs);
@@ -181,24 +189,20 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const config = loadConfig(env);
   if (!config.ok) return config;
 
-  const scenarioId = env['MCP_SCENARIO'] ?? 'clear-day';
-  if (!(SCENARIO_IDS as readonly string[]).includes(scenarioId)) {
-    return err(toolError('invalid_config', `MCP_SCENARIO must be one of ${SCENARIO_IDS.join(', ')}.`));
-  }
-  const startH = number(env, 'MCP_SCENARIO_START_H', 0);
+  const start = scenarioStartFor(env);
+  if (!start.ok) return start;
   const sandboxTtlH = number(env, 'MCP_SANDBOX_TTL_H', 24);
   const sandboxMaxNew = number(env, 'MCP_SANDBOX_MAX_NEW_PER_DAY', 100);
   if (!sandboxTtlH.ok) return sandboxTtlH;
   if (!sandboxMaxNew.ok) return sandboxMaxNew;
-  if (!startH.ok) return startH;
 
-  const builtIn = builtInScenario(scenarioId as ScenarioId);
+  const builtIn = start.value.scenario;
   const startSoc = opts.scenarioStartSocPct;
   if (startSoc !== undefined && startSoc < demoProfile().battery.minSocHwPct) {
     return err(toolError('invalid_config', `MCP_SCENARIO_START_SOC_PCT is below the hardware floor of ${String(demoProfile().battery.minSocHwPct)}%.`));
   }
   const scenario = startSoc === undefined ? builtIn : { ...builtIn, initial: { ...builtIn.initial, batterySocPct: pct(startSoc) } };
-  const scenarioStartMs = Date.parse(scenario.startAt) + startH.value * HOUR_MS;
+  const scenarioStartMs = start.value.startMs;
   const derived = opts.scenarioClock === undefined ? scenarioClockFor(env, opts.wallClock) : ok(opts.scenarioClock);
   if (!derived.ok) return derived;
   const clock = derived.value;

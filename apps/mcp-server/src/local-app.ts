@@ -8,7 +8,7 @@ import { composeModules } from './compose.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 import { stormModeWiring, type StormModeWiring } from './storm-mode-config.js';
 
-// The local entry's composition (#160, the E2E collaudo): the simulator, the plans, the storm sessions, the
+// The local entry's composition (#160, the end-to-end acceptance test): the simulator, the plans, the storm sessions, the
 // preferences log and the in-memory store all run on ONE scenario clock, so "now" is the same everywhere and a
 // plan made now expires ten scenario minutes later. (On Lambda the store keeps the wall clock, which DynamoDB's
 // TTL needs: domain times in scenario time there are a follow-up.)
