@@ -46,6 +46,7 @@ export const GROUPS = [
     mutate: ['packages/guard/src/safe-until.ts', 'packages/guard/src/dry-air.ts'],
     tests: ['packages/guard/test/safe-until.test.ts', 'packages/guard/test/constraints.test.ts', 'packages/guard/test/guard.test.ts'],
   },
+  { name: 'guard-hold-safe-room', mutate: ['packages/guard/src/hold-safe-room.ts'], tests: ['packages/guard/test/hold-safe-room.test.ts'] },
 ];
 
 /** @type {Readonly<Record<string, Counted>>} */

@@ -8,4 +8,5 @@ export { buildContext, currentControls, projectFrom, reserveOf, type CandidatePl
 export { runGuard, type GuardVerdict } from './guard.js';
 export { evaluateNight, nightWindowHours } from './night.js';
 export { rejectionOf } from './rejection.js';
+export { holdSafeRoom, safeRoomLimitAt, type HeldSafeRoom, type HoldSafeRoomInput, type HoldSafeRoomOptions } from './hold-safe-room.js';
 export { nightCoolingLimit, safeUntil, type SafeLimit } from './safe-until.js';
