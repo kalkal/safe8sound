@@ -6,7 +6,7 @@ import { log } from '../log.js';
 import { t } from '../ui/text.js';
 import { useCardHost } from './card-host.js';
 import { FrameTransport } from './frame-guard.js';
-import { answerCardCall } from './tool-calls.js';
+import { answerCardCall, createFrameConfirmation } from './tool-calls.js';
 
 // One MCP Apps card (plan §9.3–9.4): a sandboxed srcdoc iframe without allow-same-origin, the host's
 // own CSP, every inbound message checked (FrameTransport), card tool calls checked (readToolCall) and
@@ -57,7 +57,9 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
     bridge.addEventListener('sizechange', ({ height: h }) => {
       if (typeof h === 'number' && h > 0) setHeight(Math.ceil(h));
     });
-    bridge.oncalltool = ({ name, arguments: args }) => answerCardCall({ name, arguments: args }, card, { agent, turnId, log });
+    // Each frame keeps its own last-resort confirmation: a token never crosses frames.
+    const confirmation = createFrameConfirmation();
+    bridge.oncalltool = ({ name, arguments: args }) => answerCardCall({ name, arguments: args }, card, { agent, turnId, log, confirmation });
     const transport = new FrameTransport(frame, window, (reason) => {
       log({ level: 'warn', code: 'frame_message_rejected', correlationId: turnId, details: { reason, card: card.tool } });
     });

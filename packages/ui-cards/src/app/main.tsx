@@ -55,7 +55,10 @@ function Card({ kind }: { kind: CardKind }) {
           ?.callServerTool({ name, arguments: args })
           .then((result) => {
             // Apply turns this frame into the applied plan; Save says whether it worked and shows the new values.
-            if (name === 'apply_plan') setState(parseCardResult('applied', result));
+            if (name === 'apply_plan') {
+              const next = parseCardResult('applied', result);
+              setState(next.kind === 'applied' ? { ...next, fromThisFrame: true } : next);
+            }
             if (name === 'set_preferences') {
               const saved = parseSaveResult(result);
               setNotice(saved.ok ? { ok: true, text: t('prefs.saved') } : { ok: false, text: saved.error });

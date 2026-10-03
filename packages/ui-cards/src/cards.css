@@ -1,6 +1,13 @@
 /* ui:// cards (Signature mockup). Semantic and component tokens only; light/dark from the card theme. */
 @layer reset, tokens, base, components, surfaces, overrides;
 
+@layer base {
+  /* What a card frame says outside a card (the applied notice, a second-step button) reads in the card font. */
+  body {
+    font-family: var(--font-body);
+  }
+}
+
 @layer components {
   .card {
     container-type: inline-size;

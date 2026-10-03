@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CardApp } from '../src/app/CardApp.js';
 import type { CardState } from '../src/app/card-kinds.js';
-import { advisoryPlan, hotDayPlan, safeRoomInStorm } from '../src/fixtures.js';
+import { advisoryPlan, hotDayPlan, lastResortPlan, safeRoomInStorm } from '../src/fixtures.js';
 import { homeInStorm } from '../src/home-fixtures.js';
 
 afterEach(cleanup);
@@ -29,18 +29,70 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_7Hq2mX9vK3' });
   });
 
-  it('the first yes to a last resort is not an applied plan: the card says to say yes again, never the token (#168 review)', () => {
-    const plan = {
-      ...hotDayPlan(),
-      guarantees: hotDayPlan().guarantees.map((g) => (g.id === 'safe_room_comfort' ? { ...g, ok: false, reason: 'Above 24 °C from 10 PM.' } : g)),
-      lastResort: { safeUntil: '2026-07-15T22:00:00+02:00', safeHours: 7, limitedBy: 'temperature' as const },
-      warnings: [{ code: 'last_resort_plan' as const, message: 'Safe until 10 PM.' }],
-    };
+  it('a last-resort plan is applied by touch in two steps: the first tap asks, with no token (#160)', () => {
+    const onCallTool = show({ kind: 'plan', data: lastResortPlan() });
+    expect(screen.getByRole('region', { name: 'Guard check' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Apply the last-resort plan' }));
+    expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_LastResort01' });
+  });
+
+  it('the first yes by touch is not an applied plan: this frame asks for the second yes, never shows the token (#168 review)', () => {
     const token = `lr_${'Q'.repeat(32)}`;
-    show({ kind: 'applied', data: { plan, alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } } });
-    expect(screen.getByRole('status').textContent).toBe('Not applied yet: this is a last resort. Say yes again to apply it.');
+    const onCallTool = show({
+      kind: 'applied',
+      data: { plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } },
+      fromThisFrame: true,
+    });
+    const notice = screen.getByRole('status');
+    expect(notice.textContent).toBe('Not applied yet: this is a last resort. Say yes again, or tap "Yes, apply it now", before 15:10.');
+    // The person hears and sees where they are: focus moves to the notice.
+    expect(document.activeElement).toBe(notice);
     expect(document.body.textContent).not.toContain('Plan applied.');
-    expect(document.body.textContent).not.toContain(token);
+    expect(document.body.innerHTML).not.toContain(token);
+    expect(screen.queryByRole('button', { name: 'Apply the last-resort plan' })).toBeNull();
+    const yes = screen.getByRole('button', { name: 'Yes, apply it now' });
+    fireEvent.click(yes);
+    expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_LastResort01', lastResortToken: token });
+    // One tap, one call: the button waits for the answer.
+    expect((yes as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(yes);
+    expect(onCallTool).toHaveBeenCalledTimes(1);
+  });
+
+  it('a confirmation from a voice turn has no button: the host would refuse it, so the card says to say yes again (#176 review)', () => {
+    const token = `lr_${'Q'.repeat(32)}`;
+    show({ kind: 'applied', data: { plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } } });
+    expect(screen.getByRole('status').textContent).toBe('Not applied yet: this is a last resort. Say yes again to apply it, before 15:10.');
+    expect(screen.queryByRole('button', { name: 'Yes, apply it now' })).toBeNull();
+    expect(document.body.innerHTML).not.toContain(token);
+  });
+
+  it('without card actions, the second step is said by voice only', () => {
+    const token = `lr_${'Q'.repeat(32)}`;
+    show(
+      { kind: 'applied', data: { plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } }, fromThisFrame: true },
+      undefined,
+      false,
+    );
+    expect(screen.getByRole('status').textContent).toBe('Not applied yet: this is a last resort. Say yes again to apply it, before 15:10.');
+    expect(screen.queryByRole('button', { name: 'Yes, apply it now' })).toBeNull();
+  });
+
+  it('says how the family alert of an applied last resort went, in the words the voice uses (#170)', () => {
+    const plan = { ...lastResortPlan(), status: 'applied' as const };
+    const alerted = (familyAlert: { sent: number; failed: number }) => {
+      cleanup();
+      show({ kind: 'applied', data: { plan, alreadyApplied: false, advisoryOnly: false, manualInstructions: [], familyAlert } });
+    };
+    alerted({ sent: 2, failed: 0 });
+    expect(screen.getByText('2 registered family contacts were alerted.')).toBeTruthy();
+    alerted({ sent: 1, failed: 0 });
+    expect(screen.getByText('1 registered family contact was alerted.')).toBeTruthy();
+    alerted({ sent: 0, failed: 0 });
+    expect(screen.getByText('No family contact is registered, so nobody was alerted.')).toBeTruthy();
+    alerted({ sent: 1, failed: 1 });
+    // A failed alert is urgent: said assertively, with what to do now.
+    expect(screen.getByRole('alert').textContent).toBe('The family alert could not be sent to 1 of 2 contacts: call them now.');
   });
 
   it('shows an applied plan, with the manual-control card when it is advice only (plan §11.6)', () => {

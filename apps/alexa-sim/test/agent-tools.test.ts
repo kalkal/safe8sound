@@ -22,6 +22,17 @@ describe('ScriptedAgent.callTool: simulated actions on the scripted home', () =>
     expect(ApplyPlanOutputSchema.parse(result.structuredContent).plan.status).toBe('applied');
   });
 
+  it('applies the scripted last resort in two steps, as the tool does (#160)', async () => {
+    const first = ApplyPlanOutputSchema.parse((await scripted().callTool('apply_plan', { planId: 'plan_LastResort01' }, ctx)).structuredContent);
+    expect(first.plan.status).toBe('proposed');
+    const token = first.confirmation?.token;
+    expect(token).toBeDefined();
+    const wrong = await scripted().callTool('apply_plan', { planId: 'plan_LastResort01', lastResortToken: `lr_${'W'.repeat(32)}` }, ctx);
+    expect(wrong).toMatchObject({ isError: true, structuredContent: { code: 'last_resort_token_invalid' } });
+    const second = ApplyPlanOutputSchema.parse((await scripted().callTool('apply_plan', { planId: 'plan_LastResort01', lastResortToken: token }, ctx)).structuredContent);
+    expect(second).toMatchObject({ plan: { status: 'applied' }, familyAlert: { sent: 1, failed: 0 } });
+  });
+
   it('refuses a plan it does not know, as the tool would', async () => {
     const result = await scripted().callTool('apply_plan', { planId: 'plan_unknown_1' }, ctx);
     expect(result).toMatchObject({ isError: true, structuredContent: { code: 'plan_not_found' } });

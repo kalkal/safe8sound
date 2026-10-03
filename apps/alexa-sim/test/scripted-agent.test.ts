@@ -34,6 +34,20 @@ describe('ScriptedAgent', () => {
     expect(await a.ask("What's my battery level?", ctx)).toEqual(answers[0]);
   });
 
+  it('a last resort said by voice is never reported as applied: it points to the card (#176 review)', async () => {
+    const a = agent();
+    const offered = await a.ask('Last resort for a hot night', ctx);
+    if (!offered.ok) throw new Error(offered.error.message);
+    expect(offered.value.text).not.toMatch(/\?$/);
+    expect(offered.value.text).toContain('tap Apply the last-resort plan');
+    for (const said of ['Yes, apply the last resort', 'Apply the last-resort plan']) {
+      const reply = await a.ask(said, ctx);
+      if (!reply.ok) throw new Error(reply.error.message);
+      expect(reply.value.text).not.toMatch(/applied/i);
+      expect(reply.value.cards ?? []).toEqual([]);
+    }
+  });
+
   it('answers an unknown question with the scripted fallback and no status', async () => {
     const reply = await agent().ask('Tell me a joke', ctx);
     expect(reply).toEqual({ ok: true, value: { text: script.fallback } });

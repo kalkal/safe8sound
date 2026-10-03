@@ -12,6 +12,9 @@ export function GuardReceipt({ plan }: { plan: Plan }) {
   const passed = results.filter((g) => g.ok).length;
   const approved = passed === GUARANTEE_IDS.length;
   const simulated = isSimulated(plan);
+  // A last resort is offered on purpose when a guarantee cannot hold (#160): it says which, never a bare REJECTED.
+  const failed = results.filter((g) => !g.ok).map((g) => t(`guarantee.${g.id}`));
+  const stamp = approved ? t('receipt.approved') : plan.lastResort !== undefined ? t('receipt.lastResort', { failed: failed.join(', ') }) : t('receipt.rejected');
   return (
     <CardShell title={t('receipt.heading')} origin={simulated ? 'simulated' : 'live'}>
       <ol className="flow" aria-label={t('receipt.flow')}>
@@ -31,7 +34,7 @@ export function GuardReceipt({ plan }: { plan: Plan }) {
         </ul>
         <p className="receipt-summary">{t('receipt.summary', { passed: String(passed), total: String(GUARANTEE_IDS.length) })}</p>
         <p className="receipt-stamp" data-approved={approved} data-testid="receipt-stamp">
-          {t(approved ? 'receipt.approved' : 'receipt.rejected')}
+          {stamp}
         </p>
       </div>
     </CardShell>

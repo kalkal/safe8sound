@@ -1,7 +1,8 @@
 import { epochMs, type Plan } from '@cold-reserve/contracts';
+import { useState } from 'react';
 import { CardShell } from './CardShell.js';
 import { homeClock, isSimulated, levelSpans, pacingGeometry } from './plan-model.js';
-import { t } from './text.js';
+import { formatMeasure, t } from './text.js';
 
 export interface PlanCardProps {
   plan: Plan;
@@ -18,17 +19,27 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
   // The guard never modifies a plan: a rejected one can be read, never applied.
   // Apply only when the host can run it (onApply given), the plan is proposed and every guarantee passes.
   const applicable = onApply !== undefined && plan.status === 'proposed' && plan.guarantees.every((g) => g.ok);
+  // A last resort (#160) has its own button: the first of two steps, never the plain Apply.
+  const lastResort = plan.lastResort;
+  const lastResortApplicable = onApply !== undefined && plan.status === 'proposed' && lastResort !== undefined;
+  // One tap, one call: the buttons wait for the answer, which replaces this card.
+  const [sending, setSending] = useState(false);
   return (
     <CardShell title={t('plan.title')} origin={isSimulated(plan) ? 'simulated' : 'live'}>
-      <div className="plan-hero">
-        <p className="eyebrow">{t('plan.until')}</p>
-        <p className="hero-value" data-testid="plan-horizon">
-          {homeClock(plan.horizonAt, timeZone)}
-        </p>
-        <p className="chip">{t('plan.confidence', { confidence: t(`confidence.${plan.forecastConfidence}`) })}</p>
-        <p className="muted">{plan.confidenceReason}</p>
-      </div>
-      <LevelRibbon plan={plan} timeZone={timeZone} />
+      {lastResort === undefined ? (
+        <div className="plan-hero">
+          <p className="eyebrow">{t('plan.until')}</p>
+          <p className="hero-value" data-testid="plan-horizon">
+            {homeClock(plan.horizonAt, timeZone)}
+          </p>
+          <p className="chip">{t('plan.confidence', { confidence: t(`confidence.${plan.forecastConfidence}`) })}</p>
+          <p className="muted">{plan.confidenceReason}</p>
+        </div>
+      ) : (
+        <LastResortHero lastResort={lastResort} timeZone={timeZone} />
+      )}
+      {/* The ribbon reads as "Comfort … until the horizon": a last resort shows only its honest window. */}
+      {lastResort === undefined && <LevelRibbon plan={plan} timeZone={timeZone} />}
       <PacingLine plan={plan} timeZone={timeZone} batteryUsableWh={batteryUsableWh} />
       {(plan.warnings ?? []).map((w) => (
         <p key={w.code} className="warning" role="note">
@@ -42,7 +53,9 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
           <button
             type="button"
             className="button-primary"
+            disabled={sending}
             onClick={() => {
+              setSending(true);
               onApply(plan.id);
             }}
           >
@@ -53,8 +66,64 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
           </button>
         </div>
       )}
+      {lastResortApplicable && (
+        <div className="plan-actions">
+          <p className="muted">{t('plan.validUntil', { time: homeClock(plan.expiresAt, timeZone) })}</p>
+          <button
+            type="button"
+            className="button-primary"
+            disabled={sending}
+            onClick={() => {
+              setSending(true);
+              onApply(plan.id);
+            }}
+          >
+            {t('plan.applyLastResort')}
+          </button>
+          <button type="button" className="button-secondary" onClick={() => onDismiss?.()}>
+            {t('plan.dismiss')}
+          </button>
+        </div>
+      )}
     </CardShell>
   );
+}
+
+type LastResort = NonNullable<Plan['lastResort']>;
+
+/**
+ * The headline of a last resort (#160): until when the safe room stays within its limits, then how far past
+ * them it goes and by when. Every number from the plan; never a claim about the time after `safeUntil`.
+ */
+function LastResortHero({ lastResort: lr, timeZone }: { lastResort: LastResort; timeZone: string }) {
+  return (
+    <div className="plan-hero">
+      <p className="eyebrow">{t(lr.limitedBy === 'battery' ? 'plan.lastResortBatteryUntil' : 'plan.lastResortUntil')}</p>
+      <p className="hero-value" data-testid="plan-horizon">
+        {homeClock(lr.safeUntil, timeZone)}
+      </p>
+      <p className="warning" data-testid="last-resort-window">
+        {lastResortWindow(lr, timeZone)}
+      </p>
+    </div>
+  );
+}
+
+function lastResortWindow(lr: LastResort, timeZone: string): string {
+  if (lr.comfortLimitC === undefined || lr.worstC === undefined || lr.worstAt === undefined) return t('plan.lastResortNoWindow');
+  const until = homeClock(lr.safeUntil, timeZone);
+  const time = homeClock(lr.worstAt, timeZone);
+  const temp = formatMeasure(lr.worstC, 'C');
+  // The worst point is the end of the safe hours itself: "at" that time, never "up to … by" it.
+  const atEnd = epochMs(lr.worstAt) === epochMs(lr.safeUntil);
+  if (lr.loweredLimitC !== undefined) {
+    const limit = formatMeasure(lr.loweredLimitC, 'C');
+    return atEnd ? t('plan.lastResortLoweredAtEnd', { until, limit, temp }) : t('plan.lastResortLowered', { until, limit, temp, time });
+  }
+  const limit = formatMeasure(lr.comfortLimitC, 'C');
+  if (atEnd) return t('plan.lastResortAtEnd', { time, temp, limit });
+  // Past the limit below it is the heating season.
+  return t(lr.worstC < lr.comfortLimitC ? 'plan.lastResortDown' : 'plan.lastResortUp', { temp, time, limit });
 }
 
 function LevelRibbon({ plan, timeZone }: { plan: Plan; timeZone: string }) {

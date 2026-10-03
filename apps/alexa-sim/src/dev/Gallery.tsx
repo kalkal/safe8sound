@@ -12,6 +12,7 @@ import {
   advisoryPlan,
   cardThemeFor,
   hotDayPlan,
+  lastResortPlan,
   rejectedPlan,
   homeInStorm,
   safeRoomCalm,
@@ -48,6 +49,8 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       />
       <PlanCard plan={advisoryPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <PlanCard plan={stormPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
+      <PlanCard plan={lastResortPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
+      <GuardReceipt plan={lastResortPlan()} />
       <SafeRoomCard status={safeRoomInStorm()} />
       <FloorPlanCard status={homeInStorm()} />
       <ManualControlCard

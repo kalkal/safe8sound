@@ -39,7 +39,11 @@ export const isCardKind = (value: unknown): value is CardKind => typeof value ==
 export type CardState =
   | { kind: 'waiting' }
   | { kind: 'plan'; data: Plan }
-  | { kind: 'applied'; data: ApplyPlanOutput }
+  /**
+   * `fromThisFrame`: the result answers this frame's own apply_plan call. Only then may the frame send the
+   * last-resort token back: the host keeps the token per frame, and refuses it from a voice turn's card (#176).
+   */
+  | { kind: 'applied'; data: ApplyPlanOutput; fromThisFrame?: boolean }
   | { kind: 'reserve'; data: ReserveOutlook }
   | { kind: 'preferences'; data: GetPreferencesOutput }
   | { kind: 'storm'; data: SafeRoomStatus }

@@ -1,6 +1,6 @@
 import { SetPreferencesInputSchema, SetPreferencesOutputSchema, toolError, type ConfigChange, type PublicPreferences } from '@cold-reserve/contracts';
 import { toolErrorResult, type ToolCallResult } from './agent.js';
-import { SCRIPT_FIXTURES } from './script-fixtures.js';
+import { SCRIPT_FIXTURES, SCRIPTED_LAST_RESORT_TOKEN } from './script-fixtures.js';
 
 // Card actions on the scripted home: the same shapes the MCP tools return, from the script fixtures.
 
@@ -11,11 +11,23 @@ export const refuseAction = (): ToolCallResult =>
   toolErrorResult(toolError('agent_unavailable', "I can't reach the assistant right now, so nothing was changed."));
 
 function applyPlan(args: Record<string, unknown>): ToolCallResult {
+  const lastResort = SCRIPT_FIXTURES['last-resort-plan']();
+  if (lastResort.tool === 'plan_comfort' && args['planId'] === lastResort.result.id) return applyLastResort(args['lastResortToken']);
   const applied = SCRIPT_FIXTURES['hot-day-applied']();
   if (applied.tool !== 'apply_plan' || args['planId'] !== applied.result.plan.id) {
     return toolErrorResult(toolError('plan_not_found', 'That plan is not known: ask for a new one.'));
   }
   return success(applied.result, 'Plan applied.');
+}
+
+/** A last resort in two steps (#160): the first yes returns a confirmation, the second sends it back. */
+function applyLastResort(token: unknown): ToolCallResult {
+  if (token === undefined) {
+    const pending = SCRIPT_FIXTURES['last-resort-pending']();
+    return success(pending.result, 'Not applied yet: this is a last resort. Say yes again to apply it.');
+  }
+  if (token !== SCRIPTED_LAST_RESORT_TOKEN) return toolErrorResult(toolError('last_resort_token_invalid', 'That confirmation is not valid: ask for the plan again.'));
+  return success(SCRIPT_FIXTURES['last-resort-applied']().result, 'The last-resort plan is applied.');
 }
 
 function setPreferences(args: Record<string, unknown>, at: string | undefined): ToolCallResult {

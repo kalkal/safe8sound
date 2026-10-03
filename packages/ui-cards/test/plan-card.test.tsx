@@ -2,7 +2,7 @@
 import type { Plan } from '@cold-reserve/contracts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { advisoryPlan, hotDayPlan, rejectedPlan, stormPlan } from '../src/fixtures.js';
+import { advisoryPlan, hotDayPlan, lastResortPlan, rejectedPlan, stormPlan } from '../src/fixtures.js';
 import { PlanCard, type PlanCardProps } from '../src/PlanCard.js';
 
 afterEach(cleanup);
@@ -95,5 +95,67 @@ describe('PlanCard', () => {
     show({ ...hotDayPlan(), reserveFloorSocPct: undefined });
     expect(screen.getByRole('img', { name: /Expected charge/ }).querySelector('[data-part="floor"]')).toBeNull();
     expect(screen.queryByText(/in use/)).toBeNull();
+  });
+
+  describe('a last resort (#160): honest about the time, and reachable by touch', () => {
+    const lastResort = () => {
+      const plan = lastResortPlan();
+      if (plan.lastResort === undefined) throw new Error('fixture');
+      return { plan, lr: plan.lastResort };
+    };
+
+    it('leads with until when the safe room stays within its limits and how warm it gets after, never "comfortable until" the horizon', () => {
+      show(lastResortPlan());
+      expect(screen.queryByText('Comfortable at least until')).toBeNull();
+      expect(screen.getByText('Within its limits until')).toBeTruthy();
+      expect(screen.getByTestId('plan-horizon').textContent).toBe('22:00');
+      expect(screen.getByTestId('last-resort-window').textContent).toBe('Then up to 26.1 °C by 03:00, past the 24 °C limit.');
+      // The ribbon would read as "Comfort … to 07:00": a last resort does not show it.
+      expect(screen.queryByRole('list', { name: 'Level through the day' })).toBeNull();
+    });
+
+    it('says the limit that came down at night, when that is what ends the safe hours', () => {
+      const { plan, lr } = lastResort();
+      show({ ...plan, lastResort: { ...lr, loweredLimitC: lr.comfortLimitC } });
+      expect(screen.getByTestId('last-resort-window').textContent).toBe('From 22:00 the limit is 24 °C: up to 26.1 °C by 03:00.');
+    });
+
+    it('when the worst point is the end of the safe hours, says "at" that time', () => {
+      const { plan, lr } = lastResort();
+      show({ ...plan, lastResort: { ...lr, worstAt: lr.safeUntil } });
+      expect(screen.getByTestId('last-resort-window').textContent).toBe('At 22:00 the safe room is at 26.1 °C, past the 24 °C limit.');
+    });
+
+    it('when the battery ends the safe hours, says so', () => {
+      const { plan, lr } = lastResort();
+      show({ ...plan, lastResort: { ...lr, limitedBy: 'battery' } });
+      expect(screen.getByText('The battery lasts until')).toBeTruthy();
+    });
+
+    it('without the window, never claims more than the time', () => {
+      const { plan, lr } = lastResort();
+      show({ ...plan, lastResort: { safeUntil: lr.safeUntil, safeHours: lr.safeHours, limitedBy: lr.limitedBy } });
+      expect(screen.getByTestId('plan-horizon').textContent).toBe('22:00');
+      expect(screen.getByTestId('last-resort-window').textContent).toBe('After that the safe room leaves its limits.');
+    });
+
+    it('offers its own button, "Apply the last-resort plan": the first step, with no token', () => {
+      const onApply = vi.fn();
+      show(lastResortPlan(), { onApply });
+      expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();
+      const apply = screen.getByRole('button', { name: 'Apply the last-resort plan' });
+      fireEvent.click(apply);
+      expect(onApply).toHaveBeenCalledWith('plan_LastResort01');
+      // One tap, one call: the button waits for the answer.
+      expect((apply as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(apply);
+      expect(onApply).toHaveBeenCalledTimes(1);
+    });
+
+    it('a plain rejected plan still has no button', () => {
+      show(rejectedPlan(), { onApply: vi.fn() });
+      expect(screen.queryByRole('button', { name: 'Apply the last-resort plan' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();
+    });
   });
 });

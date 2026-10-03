@@ -3,7 +3,7 @@ import { PlanSchema, type Plan } from '@cold-reserve/contracts';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { GuardReceipt } from '../src/GuardReceipt.js';
-import { advisoryPlan, hotDayPlan, rejectedPlan } from '../src/fixtures.js';
+import { advisoryPlan, hotDayPlan, lastResortPlan, rejectedPlan } from '../src/fixtures.js';
 
 afterEach(cleanup);
 
@@ -73,5 +73,18 @@ describe('GuardReceipt', () => {
     cleanup();
     render(<GuardReceipt plan={hotDayPlan()} />);
     expect(screen.queryByText(CAVEAT)).toBeNull();
+  });
+
+  it('a last resort is stamped as one, naming what is not met, never a plain REJECTED (#160)', () => {
+    render(<GuardReceipt plan={lastResortPlan()} />);
+    const stamp = screen.getByTestId('receipt-stamp');
+    expect(stamp.textContent).toBe('LAST RESORT: Safe room comfort NOT MET');
+    expect(stamp.getAttribute('data-approved')).toBe('false');
+    expect(screen.queryByText('REJECTED')).toBeNull();
+  });
+
+  it('a plan the guard refuses is still REJECTED', () => {
+    render(<GuardReceipt plan={rejectedPlan()} />);
+    expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');
   });
 });

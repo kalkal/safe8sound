@@ -53,6 +53,27 @@ export function rejectedPlan(): Plan {
   return PlanSchema.parse(plan);
 }
 
+/**
+ * A last resort (#160): the night limit cannot be held, so the plan says honestly until when the safe room
+ * stays within its limits and how warm it gets after that. Applied only after a second yes.
+ */
+export function lastResortPlan(): Plan {
+  const plan = examplePlan();
+  Object.assign(plan, { id: 'plan_LastResort01', steps: hotDayPlan().steps, reserveFloorSocPct: 43, gridAvailable: true });
+  plan.guarantees = plan.guarantees.map((g) => (g.id === 'safe_room_comfort' ? { ...g, ok: false, reason: 'Above the 24 °C night limit from 22:00.' } : g));
+  plan.lastResort = {
+    safeUntil: '2026-07-15T22:00:00+02:00',
+    safeHours: 7,
+    limitedBy: 'temperature',
+    comfortLimitC: 24,
+    worstC: 26.1,
+    worstAt: '2026-07-16T03:00:00+02:00',
+    actions: ['close_curtains', 'drink_water'],
+  };
+  plan.warnings = [{ code: 'last_resort_plan', message: 'Last resort: within its limits until 22:00, then up to 26.1 °C by 03:00.' }];
+  return PlanSchema.parse(plan);
+}
+
 /** The real home during the hackathon: advice only, with a warning the voice must say. */
 export function advisoryPlan(): Plan {
   const plan = examplePlan();

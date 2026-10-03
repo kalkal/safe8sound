@@ -1,10 +1,10 @@
 import { ReserveOutlookSchema, toolError } from '@cold-reserve/contracts';
 import { exampleReserveOutlook } from '@cold-reserve/contracts/fixtures';
-import { hotDayPlan } from '@cold-reserve/ui-cards';
+import { hotDayPlan, lastResortPlan } from '@cold-reserve/ui-cards';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent } from '../../src/agent/agent.js';
 import type { ToolCard } from '../../src/agent/wire.js';
-import { answerCardCall, readToolCall } from '../../src/host/tool-calls.js';
+import { answerCardCall, createFrameConfirmation, readToolCall } from '../../src/host/tool-calls.js';
 import { SCRIPT_FIXTURES } from '../../src/agent/script-fixtures.js';
 
 // A card may ask the host to call a tool (MCP Apps tools/call). A card is untrusted content: each card
@@ -25,9 +25,10 @@ describe('readToolCall: each card bound to its own action', () => {
     expect(readToolCall({ name: 'set_preferences', arguments: { comfortC: { cooling: 24 }, confirmed: true } }, planCard)).toMatchObject({ ok: false });
   });
 
-  it('a card button is never the second yes to a last resort: it may not send a confirmation token (#160)', () => {
+  it('a card may not send a confirmation token it was not given (#160)', () => {
     const args = { planId: 'plan_7Hq2mX9vK3', lastResortToken: `lr_${'A'.repeat(32)}` };
     expect(readToolCall({ name: 'apply_plan', arguments: args }, planCard)).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+    expect(readToolCall({ name: 'apply_plan', arguments: args }, planCard, createFrameConfirmation())).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
   });
 
   it('lets the preferences card save a confirmed change only', () => {
@@ -94,5 +95,40 @@ describe('answerCardCall: a card action runs under the turn that showed the card
       log,
     });
     expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'warn', code: 'output_schema_violation', correlationId: 'turn-7', details: { tool: 'apply_plan' } });
+  });
+});
+
+describe('the second yes to a last resort by touch (#160, the main\'s decision B)', () => {
+  const card: ToolCard = { tool: 'plan_comfort', result: lastResortPlan() };
+  const token = `lr_${'T'.repeat(32)}`;
+  const firstAnswer = {
+    content: [],
+    structuredContent: { plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } },
+  };
+  const appliedAnswer = { content: [], structuredContent: { plan: { ...lastResortPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] } };
+  const agentWith = (callTool: Agent['callTool']): Agent => ({ canCallTools: true, ask: vi.fn(), callTool });
+
+  it('accepts only the token the first step gave this frame, for this plan, once', async () => {
+    const callTool = vi.fn<Agent['callTool']>().mockResolvedValueOnce(firstAnswer).mockResolvedValueOnce(appliedAnswer);
+    const log = vi.fn();
+    const confirmation = createFrameConfirmation();
+    const deps = { agent: agentWith(callTool), turnId: 'turn-8', log, confirmation };
+    await answerCardCall({ name: 'apply_plan', arguments: { planId: 'plan_LastResort01' } }, card, deps);
+
+    // Another token, or this token for another plan, is refused.
+    const forged = await answerCardCall({ name: 'apply_plan', arguments: { planId: 'plan_LastResort01', lastResortToken: `lr_${'F'.repeat(32)}` } }, card, deps);
+    expect(forged).toMatchObject({ isError: true, structuredContent: { code: 'invalid_input' } });
+    expect(readToolCall({ name: 'apply_plan', arguments: { planId: 'plan_someoneElse1', lastResortToken: token } }, card, confirmation)).toMatchObject({ ok: false });
+
+    const second = await answerCardCall({ name: 'apply_plan', arguments: { planId: 'plan_LastResort01', lastResortToken: token } }, card, deps);
+    expect(second).toBe(appliedAnswer);
+    expect(callTool).toHaveBeenLastCalledWith('apply_plan', { planId: 'plan_LastResort01', lastResortToken: token }, { correlationId: 'turn-8' });
+
+    // Used once: a replay is refused before reaching the server.
+    const replay = await answerCardCall({ name: 'apply_plan', arguments: { planId: 'plan_LastResort01', lastResortToken: token } }, card, deps);
+    expect(replay).toMatchObject({ isError: true });
+    expect(callTool).toHaveBeenCalledTimes(2);
+    // The token is never logged.
+    expect(JSON.stringify(log.mock.calls)).not.toContain(token);
   });
 });

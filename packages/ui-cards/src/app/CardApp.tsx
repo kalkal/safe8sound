@@ -1,4 +1,5 @@
 import type { ApplyPlanOutput } from '@cold-reserve/contracts';
+import { useEffect, useRef, useState } from 'react';
 import { GuardReceipt } from '../GuardReceipt.js';
 import { IceCubesCard } from '../IceCubesCard.js';
 import { PlanCard } from '../PlanCard.js';
@@ -6,6 +7,7 @@ import { PreferencesCard } from '../PreferencesCard.js';
 import { FloorPlanCard } from '../FloorPlanCard.js';
 import { ManualControlCard } from '../ManualControlCard.js';
 import { SafeRoomCard } from '../SafeRoomCard.js';
+import { homeClock } from '../plan-model.js';
 import { t } from '../text.js';
 import { CardErrorBoundary } from './CardErrorBoundary.js';
 import type { CardState } from './card-kinds.js';
@@ -66,7 +68,16 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
         </>
       );
     case 'applied':
-      return <AppliedPlan result={state.data} timeZone={timeZone} />;
+      return (
+        <AppliedPlan
+          result={state.data}
+          timeZone={timeZone}
+          canConfirm={canAct && state.fromThisFrame === true}
+          onConfirm={(args) => {
+            onCallTool('apply_plan', args);
+          }}
+        />
+      );
     case 'reserve':
       return <IceCubesCard outlook={state.data} />;
     case 'storm':
@@ -90,20 +101,65 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
   }
 }
 
-function AppliedPlan({ result, timeZone }: { result: ApplyPlanOutput; timeZone: string }) {
-  const { plan, alreadyApplied, advisoryOnly, manualInstructions, confirmation } = result;
+interface AppliedPlanProps {
+  result: ApplyPlanOutput;
+  timeZone: string;
+  /** The host can run card actions and this frame made the first step itself. */
+  canConfirm: boolean;
+  /** The second step of a last resort: apply_plan with the token the first step returned. */
+  onConfirm: (args: { planId: string; lastResortToken: string }) => void;
+}
+
+function AppliedPlan({ result, timeZone, canConfirm, onConfirm }: AppliedPlanProps) {
+  const [sending, setSending] = useState(false);
+  const noticeRef = useRef<HTMLParagraphElement>(null);
+  // The answer replaces the button the person tapped: focus goes to what it says.
+  useEffect(() => {
+    noticeRef.current?.focus();
+  }, []);
+  const { plan, alreadyApplied, advisoryOnly, manualInstructions, confirmation, familyAlert } = result;
   // The first yes to a last resort applies nothing (#160): the card must not say "applied".
   // Advice is never "applied": nothing changes in the home, the person does it (plan §11.6).
-  const notice =
-    confirmation !== undefined ? 'plan.notYetApplied' : advisoryOnly ? 'plan.appliedAsAdvice' : alreadyApplied ? 'plan.alreadyApplied' : 'plan.applied';
+  const confirmLabel = t('plan.confirmLastResort');
+  let notice: string;
+  if (confirmation === undefined) notice = t(advisoryOnly ? 'plan.appliedAsAdvice' : alreadyApplied ? 'plan.alreadyApplied' : 'plan.applied');
+  else {
+    const time = homeClock(confirmation.expiresAt, timeZone);
+    notice = canConfirm ? t('plan.notYetAppliedTap', { button: confirmLabel, time }) : t('plan.notYetApplied', { time });
+  }
   return (
     <>
-      <p className="notice" role="status">
-        {t(notice)}
+      <p className="notice" role="status" tabIndex={-1} ref={noticeRef}>
+        {notice}
       </p>
+      {/* The token stays in this frame's memory: it is sent back, never shown or logged. */}
+      {confirmation !== undefined && canConfirm && (
+        <div className="plan-actions">
+          <button
+            type="button"
+            className="button-primary"
+            disabled={sending}
+            onClick={() => {
+              setSending(true);
+              onConfirm({ planId: plan.id, lastResortToken: confirmation.token });
+            }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      )}
+      {familyAlert !== undefined && <FamilyAlert sent={familyAlert.sent} failed={familyAlert.failed} />}
       {/* The real home is read-only during the hackathon: the splits are set by hand (plan §11.6). */}
       {advisoryOnly && manualInstructions.length > 0 && <ManualControlCard instructions={manualInstructions} reason="read_only" />}
       <PlanCard plan={plan} timeZone={timeZone} />
     </>
   );
+}
+
+/** How the family alert of a last resort went (#170), in the words the voice uses; a failure is urgent. */
+function FamilyAlert({ sent, failed }: { sent: number; failed: number }) {
+  const total = sent + failed;
+  if (failed > 0) return <p role="alert">{t('plan.familyFailed', { failed: String(failed), total: String(total) })}</p>;
+  const text = total === 0 ? t('plan.familyNone') : sent === 1 ? t('plan.familySentOne') : t('plan.familySentMany', { sent: String(sent) });
+  return <p className="notice">{text}</p>;
 }
