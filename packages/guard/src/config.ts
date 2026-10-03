@@ -25,7 +25,14 @@ export const GuardConfigSchema = z.strictObject({
     minDwellMinutes: nonNegative,
   }),
   /** Time a plan gets to bring the safe room inside its thresholds. */
-  safeRoom: z.strictObject({ graceMinutes: nonNegative }),
+  safeRoom: z.strictObject({
+    graceMinutes: nonNegative,
+    /**
+     * How far ahead the safe-room hold looks for a lower limit (#24): it cools toward the strictest limit within
+     * this lead, so the room is already inside the night limit when it starts. 0 holds only the limit in force.
+     */
+    preCoolLeadMinutes: z.number().int().min(0).max(12 * 60),
+  }),
   /** Night recovery (feature queue item 1): sources in packages/contracts/src/night-recovery.ts. */
   nightRecovery: z
     .strictObject({

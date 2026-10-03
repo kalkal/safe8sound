@@ -18,6 +18,15 @@ const held = (i: HoldSafeRoomInput): HeldSafeRoom => {
   return r.value;
 };
 const safeMode = (h: HeldSafeRoom, ms: number) => h.controlsAt(ms).find((c) => c.id === 'bedroom-1')?.hvac?.mode;
+const setpointAt = (h: HeldSafeRoom, ms: number) => h.controlsAt(ms).find((c) => c.id === 'bedroom-1')?.hvac?.setpointC;
+/** The strictest limit the room faces from `ms` to the end of the pre-cooling lead (cooling: the lowest). */
+const strictestAhead = (i: HoldSafeRoomInput, ms: number): number => {
+  const limitAt = safeRoomLimitAt(i);
+  const step = i.config.projection.stepMinutes * 60_000;
+  let v = limitAt(ms);
+  for (let t = ms + step; t <= ms + i.config.safeRoom.preCoolLeadMinutes * 60_000; t += step) v = Math.min(v, limitAt(t));
+  return v;
+};
 
 describe('safeRoomLimitAt', () => {
   it('cooling: the safety maximum by day, the night threshold of the mode at night when lower', () => {
@@ -34,13 +43,12 @@ describe('safeRoomLimitAt', () => {
 });
 
 describe('holdSafeRoom', () => {
-  it('drives only the safe room: its split at the limit in force minus the margin, every other room off, no fans', () => {
+  it('drives only the safe room: its split at the strictest limit ahead minus the margin, every other room off, no fans', () => {
     const r = held(input());
-    const limitAt = safeRoomLimitAt(input());
     for (const ms of [T0, T0 + 3 * H, T0 + 6 * H]) {
       const controls = r.controlsAt(ms);
       const safe = controls.find((c) => c.id === 'bedroom-1');
-      expect(safe?.hvac?.setpointC).toBe(limitAt(ms) - opts.marginK);
+      expect(safe?.hvac?.setpointC).toBe(strictestAhead(input(), ms) - opts.marginK);
       expect(controls.filter((c) => c.id !== 'bedroom-1').every((c) => c.hvac === undefined && !c.fanOn)).toBe(true);
       expect(safe?.fanOn).toBe(false);
     }
@@ -108,8 +116,31 @@ describe('holdSafeRoom', () => {
     expect(safeMode(held(input({ season: 'neutral', snapshot: humid(40) })), T0)).toBe('cool');
   });
 
-  it('with an elderly person, the 24 °C night limit ends the safe hours when the night starts, on temperature', () => {
+  it('pre-cools toward the night limit within the lead: from 20:00 it aims at 24 °C, not at the day maximum (#24)', () => {
+    const i = input({ nightRecoveryMode: 'elderly', snapshot: snapshot({ tempC: 26 }) });
+    expect(i.config.safeRoom.preCoolLeadMinutes).toBeGreaterThanOrEqual(120);
+    expect(setpointAt(held(i), T0)).toBe(24 - opts.marginK);
+  });
+
+  it('with an elderly person, a room pre-cooled in time is within the 24 °C night limit when the night starts', () => {
     const r = held(input({ nightRecoveryMode: 'elderly', snapshot: snapshot({ tempC: 26 }) }));
+    // Without pre-cooling the safe hours ended at 22:00 on temperature; the split had two hours to get there.
+    expect(r.safeUntil === undefined || r.safeUntil.ms > Date.parse('2026-07-15T22:00:00+02:00')).toBe(true);
+  });
+
+  it('keeps whichever hold stays safe longer: pre-cooling never ends the safe hours sooner than holding the limit in force', () => {
+    const base = input({ nightRecoveryMode: 'elderly', snapshot: snapshot({ tempC: 26, socPct: 14, gridAvailable: false }) });
+    const plain = held({ ...base, config: { ...base.config, safeRoom: { ...base.config.safeRoom, preCoolLeadMinutes: 0 } } });
+    const chosen = held(base);
+    const end = (h: HeldSafeRoom) => h.safeUntil?.ms ?? Number.POSITIVE_INFINITY;
+    expect(end(chosen)).toBeGreaterThanOrEqual(end(plain));
+  });
+
+  it('without a lead, the split holds only the limit in force, and the 24 °C night limit ends the hours at 22:00', () => {
+    const base = input({ nightRecoveryMode: 'elderly', snapshot: snapshot({ tempC: 26 }) });
+    const i = { ...base, config: { ...base.config, safeRoom: { ...base.config.safeRoom, preCoolLeadMinutes: 0 } } };
+    const r = held(i);
+    expect(setpointAt(r, T0)).toBe(safeRoomLimitAt(i)(T0) - opts.marginK);
     expect(r.safeUntil).toEqual({ ms: Date.parse('2026-07-15T22:00:00+02:00'), limitedBy: 'temperature' });
   });
 

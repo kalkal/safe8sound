@@ -41,6 +41,9 @@ The guard also checks the safe room's night. This is a comfort-for-sleep measure
   - `infeasible`: no reference that keeps the room safe does it. The plan is **not** rejected. The result gives `bestAchievableHours` and the plan carries a `night_recovery_infeasible` warning, so voice and cards say it honestly.
 - **When the reference counts.** The reference proves the target reachable only if it respects what matters at night: off grid it must not run the battery out before the next recharge, and the room's humidity must stay inside its safety band (under the minimum only counts when the reference dries the room, #107). Hours bought by leaving the safe room without power before dawn, or at 85 % RH, are not "achievable".
 
+## Holding the safe room (`holdSafeRoom`)
+Storm mode's safe hours read the guard's hold of the safe room (#24). The hold drives the safe room only (every other room off) and dries or cools by humidity, like the planner. It aims at the strictest limit the room will face within `safeRoom.preCoolLeadMinutes` (180): from 19:00 it already cools toward the 22:00 night limit, so the room is inside that limit when the night starts. Pre-cooling costs battery, so the hold also runs without the lead and keeps whichever stays safe longer. A safe room with no reading, or one missing from the home profile, is `unknown_room`, never "safe for the whole horizon".
+
 ## Configuration
 Defaults are in `packages/guard/config/guard.json`, validated by `GuardConfigSchema`. An invalid file is an `invalid_config` error with the field paths.
 

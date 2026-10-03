@@ -58,9 +58,31 @@ export function holdSafeRoom(input: HoldSafeRoomInput, opts: HoldSafeRoomOptions
     // The projection drops a room the profile does not describe: no breach would ever be found.
     return err(toolError('unknown_room', `The safe room ${roomId} is not in the home profile.`, { details: { field: 'safeRoomId', roomId } }));
   }
+  const leadMs = input.config.safeRoom.preCoolLeadMinutes * 60_000;
+  const plain = holdWith(input, opts, 0);
+  if (leadMs === 0) return ok(plain);
+  // Pre-cooling (#24) costs battery: with too little of it the room can stay safe longer by holding only the
+  // limit in force. Like the last resort, the hold keeps whichever stays safe longer (plain on a tie).
+  const preCooled = holdWith(input, opts, leadMs);
+  const endOf = (h: HeldSafeRoom) => h.safeUntil?.ms ?? Number.POSITIVE_INFINITY;
+  return ok(endOf(preCooled) > endOf(plain) ? preCooled : plain);
+}
+
+/**
+ * One hold: the safe room's split aims at the strictest limit it will face within `leadMs` (0: the limit in
+ * force), so with a lead the room is already inside the night limit when the night starts, as a plan that
+ * pre-cools would have it.
+ */
+function holdWith(input: HoldSafeRoomInput, opts: HoldSafeRoomOptions, leadMs: number): HeldSafeRoom {
+  const roomId = input.preferences.safeRoomId;
   const limitAt = safeRoomLimitAt(input);
   const stepMs = input.config.projection.stepMinutes * 60_000;
   const heating = input.season === 'heating';
+  const targetAt = (ms: number): number => {
+    let target = limitAt(ms);
+    for (let t = ms + stepMs; t <= ms + leadMs; t += stepMs) target = heating ? Math.max(target, limitAt(t)) : Math.min(target, limitAt(t));
+    return target;
+  };
   const band = humidityBandWithin(opts.humidityBand, input.preferences.safety.humidity);
   const { switches, fixed } = holdModes(input);
   const commanded = new Map<number, { controls: readonly RoomControl[]; mode?: HvacMode }>();
@@ -72,7 +94,7 @@ export function holdSafeRoom(input: HoldSafeRoomInput, opts: HoldSafeRoomOptions
     const safe = rooms.find((r) => r.id === roomId);
     if (switches && safe !== undefined) humidityMode = nextHumidityMode(humidityMode, safe.humidityPct, band);
     const mode = switches ? (humidityMode ?? 'cool') : fixed;
-    const setpointC = celsius(heating ? limitAt(ms) + opts.marginK : limitAt(ms) - opts.marginK);
+    const setpointC = celsius(heating ? targetAt(ms) + opts.marginK : targetAt(ms) - opts.marginK);
     const controls = rooms.map((r): RoomControl => (r.id === roomId && mode !== undefined ? { id: r.id, hvac: { mode, setpointC }, fanOn: false } : { id: r.id, fanOn: false }));
     commanded.set(ms, { controls, ...(mode === undefined ? {} : { mode }) });
     return controls;
@@ -98,5 +120,5 @@ export function holdSafeRoom(input: HoldSafeRoomInput, opts: HoldSafeRoomOptions
     coolingMaxAt: limitAt,
     driesAt,
   });
-  return ok({ points, safeUntil: end, controlsAt, driesAt });
+  return { points, safeUntil: end, controlsAt, driesAt };
 }

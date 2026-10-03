@@ -6,7 +6,7 @@
   },
   "reserve": { "essentialLoadW": 350, "capWh": 6000 },
   "pacing": { "trackTolerancePct": 3, "downMarginPct": 3, "upMarginPct": 5, "maxChangesPerHour": 4, "minDwellMinutes": 20 },
-  "safeRoom": { "graceMinutes": 60 },
+  "safeRoom": { "graceMinutes": 60, "preCoolLeadMinutes": 180 },
   "nightRecovery": {
     "windowStartHour": 22,
     "windowEndHour": 7,
