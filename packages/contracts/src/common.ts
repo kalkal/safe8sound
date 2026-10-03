@@ -4,6 +4,9 @@ import { z } from 'zod';
 export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
 
 /** Random, lowercase ids: never derived from an address, a name or a serial number. */
+/** The real home's id (the only home that is not simulated): one constant for every package (#205 review). */
+export const REAL_HOME_ID = 'home';
+
 export const HomeIdSchema = z
   .string()
   .regex(/^[a-z0-9][a-z0-9#_-]{0,63}$/)

@@ -1,9 +1,11 @@
-import { GUARANTEE_IDS, HomeProfileSchema, LAST_RESORT_ACTIONS, PlanIdSchema, PlanSchema, PreferencesSchema, celsius, err, pct, toolError, type Forecast } from '@cold-reserve/contracts';
+import { GUARANTEE_IDS, HomeIdSchema, HomeProfileSchema, LAST_RESORT_ACTIONS, PlanIdSchema, PlanSchema, PreferencesSchema, celsius, err, pct, toolError, type Forecast } from '@cold-reserve/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
+import { localTimeText } from '../../src/time.js';
 import { holdSafeRoom } from '@cold-reserve/guard';
-import { guardFrame, loadInputs, planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
+import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
+import { guardFrame, loadInputs, planComfort, withAlternative } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { REAL, preferences, world } from './support.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
@@ -59,6 +61,53 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(missing.ok).toBe(false);
     const rejections = await w.store.listGuardRejections();
     expect(rejections.ok && rejections.value).toHaveLength(1);
+  });
+
+  it('next to the refusal, the plan the planner would accept: its level and until when, in the details and in the words (#186)', async () => {
+    const w = world('storm-blackout', 3);
+    const refused = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
+    if (refused.ok) throw new Error('expected a refusal');
+    const own = await planComfort(world('storm-blackout', 3).deps, { goal: 'cool' }, w.ctx);
+    if (!own.ok) throw new Error(own.error.message);
+    const level = own.value.steps[0]?.level;
+    expect(refused.error.details?.alternative).toEqual({ level, until: own.value.horizonAt });
+    const Level = `${(level ?? '').charAt(0).toUpperCase()}${(level ?? '').slice(1)}`;
+    expect(refused.error.message).toContain(`A plan that holds: ${Level} until ${localTimeText(own.value.horizonAt)}.`);
+    expect(refused.error.message.length).toBeLessThanOrEqual(300);
+    // The alternative is offered, never saved: nothing to apply until the model proposes it.
+    expect((await w.store.getPlan(PlanIdSchema.parse('plan_test_0001'))).ok).toBe(false);
+  });
+
+  it('a refusal says where its data came from; on a sandbox it carries neither the demo# id nor realHome (#198 review)', async () => {
+    const sandbox = HomeIdSchema.parse('demo#0123456789abcdef');
+    const w = world('storm-blackout', 3, { homeId: sandbox });
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, { ...w.ctx, homeId: sandbox });
+    if (r.ok) throw new Error('expected a refusal');
+    expect(r.error.details?.origin).toMatchObject({ energy: 'simulated', rooms: 'simulated', weather: 'simulated' });
+    expect(r.error.details?.realHome).toBeUndefined();
+    expect(JSON.stringify(r.error)).not.toContain('demo#');
+  });
+
+  it('a refusal on the real home says so, for the "simulated data" notice of the receipt', async () => {
+    const w = world('storm-blackout', 3, { homeId: REAL, readOnly: true });
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
+    if (r.ok) throw new Error('expected a refusal');
+    expect(r.error.details?.realHome).toBe(true);
+  });
+
+  it('tells the model how to propose the plan that holds: plan_comfort again with only the goal (#205 review)', () => {
+    const tool = comfortPlanModule(world('heatwave', 14).deps).tools.find((t) => t.name === 'plan_comfort');
+    expect(tool?.description).toContain('If a refusal names a plan that holds, call plan_comfort again with only the goal to propose it.');
+  });
+
+  it('a long reason is cut at a word, with "…", so the plan that holds always fits in 300 characters', () => {
+    const reason = `${'Peak load is far above the limit '.repeat(12)}end.`;
+    const refusal = toolError('inverter_limit_exceeded', reason.slice(0, 300));
+    const own = { candidate: { horizonAt: '2026-07-16T05:00:00.000Z', steps: [{ level: 'balanced' }], ladder: [] } } as unknown as Parameters<typeof withAlternative>[1];
+    const out = withAlternative(refusal, own, 'Europe/Rome');
+    expect(out.message.length).toBeLessThanOrEqual(300);
+    expect(out.message).toMatch(/[a-z]… A plan that holds: Balanced until 7:00 AM\.$/);
+    expect(out.message).not.toMatch(/\b[a-z]{1,2}… A plan/);
   });
 
   it('refuses rooms the home does not have', async () => {

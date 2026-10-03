@@ -141,4 +141,18 @@ describe('ErrorEnvelopeSchema', () => {
     const six = { ...refusal, details: { guarantees: [...rows, rows[0]] } };
     expect(ErrorEnvelopeSchema.safeParse(six).success).toBe(false);
   });
+
+  it('a guard refusal may name the plan the planner would accept: its level and until when (#186)', () => {
+    const refusal = { code: 'inverter_limit_exceeded', category: 'guard_rejection', message: 'Too much.', retryable: false, details: { alternative: { level: 'balanced', until: '2026-07-16T07:00:00+02:00' } } };
+    expect(ErrorEnvelopeSchema.safeParse(refusal).success).toBe(true);
+    expect(ErrorEnvelopeSchema.safeParse({ ...refusal, details: { alternative: { level: 'turbo', until: '2026-07-16T07:00:00+02:00' } } }).success).toBe(false);
+    expect(ErrorEnvelopeSchema.safeParse({ ...refusal, details: { alternative: { level: 'balanced' } } }).success).toBe(false);
+  });
+
+  it('a guard refusal may carry where its data came from, and that it is about the real home (true only) (#198 review)', () => {
+    const base = { code: 'inverter_limit_exceeded', category: 'guard_rejection', message: 'Too much.', retryable: false };
+    const origin = { energy: 'simulated', rooms: 'simulated', weather: 'simulated' };
+    expect(ErrorEnvelopeSchema.safeParse({ ...base, details: { origin, realHome: true } }).success).toBe(true);
+    expect(ErrorEnvelopeSchema.safeParse({ ...base, details: { realHome: false } }).success).toBe(false);
+  });
 });

@@ -100,6 +100,9 @@ describe('remote mode: simulator -> sim-api -> agent -> MCP server', () => {
     const refusal = GuardRefusalSchema.parse(card.result);
     expect(refusal.details?.guarantees?.filter((g) => !g.ok).map((g) => g.id)).toContain(refusal.details?.guarantee);
     expect(refusal.details?.nearestAllowed).toBeDefined();
+    // Next to the refusal, the plan that holds (#186): in the details for the card, in the words for the voice.
+    expect(refusal.details?.alternative).toBeDefined();
+    expect(refusal.message).toMatch(/A plan that holds: \w+ until /);
     // The voice says the refusal's own reason, never "applied".
     expect(answer.value.text).toBe(refusal.message.split(/(?<=[.;])\s/)[0]);
     expect(answer.value.text).not.toMatch(/applied/i);

@@ -15,6 +15,8 @@ test('a plan the guard refuses: the reason, the five rows and REJECTED, nothing 
   await expect(rows).toHaveCount(5);
   await expect(rows.filter({ hasText: 'Inverter limit' })).toContainText('FAIL');
   await expect(receipt.getByTestId('receipt-stamp')).toHaveText('REJECTED');
+  // Next to the refusal, the plan that holds: AI proposes, the guard refuses, here is the safe plan.
+  await expect(card.getByTestId('refusal-alternative')).toHaveText('The guard would accept: Balanced until 07:00.');
   await expect(card.getByRole('button', { name: /Apply/ })).toHaveCount(0);
   await expect(page.getByTestId('answer').last()).toContainText('The guard refused that plan');
 });

@@ -277,6 +277,30 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                     "minimum": 0,
                     "type": "integer",
                   },
+                  "alternative": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "level": {
+                        "enum": [
+                          "comfort",
+                          "balanced",
+                          "saver",
+                          "essential",
+                        ],
+                        "type": "string",
+                      },
+                      "until": {
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "level",
+                      "until",
+                    ],
+                    "type": "object",
+                  },
                   "field": {
                     "maxLength": 120,
                     "minLength": 1,
@@ -376,10 +400,50 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                   "nearestAllowed": {
                     "type": "number",
                   },
+                  "origin": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "energy": {
+                        "enum": [
+                          "live",
+                          "simulated",
+                        ],
+                        "type": "string",
+                      },
+                      "rooms": {
+                        "enum": [
+                          "live",
+                          "simulated",
+                        ],
+                        "type": "string",
+                      },
+                      "scenario": {
+                        "pattern": "^[a-z0-9][a-z0-9-]{0,47}$",
+                        "type": "string",
+                      },
+                      "weather": {
+                        "enum": [
+                          "live",
+                          "simulated",
+                        ],
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "energy",
+                      "rooms",
+                      "weather",
+                    ],
+                    "type": "object",
+                  },
                   "planId": {
                     "maxLength": 64,
                     "minLength": 1,
                     "type": "string",
+                  },
+                  "realHome": {
+                    "const": true,
+                    "type": "boolean",
                   },
                   "roomId": {
                     "maxLength": 64,

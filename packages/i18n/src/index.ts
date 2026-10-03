@@ -148,6 +148,7 @@ const enUS = {
   'receipt.titleProposed': 'Guard · proposed plan',
   'receipt.listProposed': 'Guard check for the proposed plan',
   'plan.refused': 'The guard refused this plan: {message}',
+  'plan.alternative': 'The guard would accept: {level} until {time}.',
   'guarantee.storm_reserve': 'Storm reserve',
   'guarantee.inverter_limit': 'Inverter limit',
   'guarantee.battery_power': 'Battery power',

@@ -128,6 +128,8 @@ describe('the plan card shows a guard refusal (#186, approved)', () => {
     expect(GuardRefusalSchema.safeParse(toolError('store_unavailable', 'Down.')).success).toBe(false);
     expect(GuardRefusalSchema.safeParse({ ...refusal, details: { guarantee: 'inverter_limit' } }).success).toBe(false);
     expect(GuardRefusalSchema.safeParse({ ...refusal, details: { guarantees: rows.slice(0, 4) } }).success).toBe(false);
+    // Five rows, but one guarantee twice: not the guard's verdict (#198 review).
+    expect(GuardRefusalSchema.safeParse({ ...refusal, details: { guarantees: [...rows.slice(0, 4), rows[0]] } }).success).toBe(false);
     expect(ToolCardSchema.safeParse({ tool: 'apply_plan', result: refusal }).success).toBe(false);
   });
 });

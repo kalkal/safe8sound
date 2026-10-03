@@ -1,6 +1,6 @@
 import {
   ApplyPlanOutputSchema,
-  ErrorEnvelopeSchema,
+  GuardRefusalSchema,
   GetPreferencesOutputSchema,
   PlanSchema,
   ReserveOutlookSchema,
@@ -78,10 +78,9 @@ const EnvelopeSchema = z.object({ message: z.string().min(1), retryable: z.boole
 export function parseCardResult(kind: CardKind, result: ToolResultLike): CardState {
   if (result.isError === true) {
     // The plan card shows a guard refusal as its receipt when the refusal carries all five rows (#186).
-    const refusal = ErrorEnvelopeSchema.safeParse(result.structuredContent);
-    if (kind === 'plan' && refusal.success && refusal.data.category === 'guard_rejection' && refusal.data.details?.guarantees?.length === 5) {
-      return { kind: 'refused', data: refusal.data };
-    }
+    // The same rule as the agent's (one schema, #198 review): a guard_rejection with its five distinct rows.
+    const refusal = GuardRefusalSchema.safeParse(result.structuredContent);
+    if (kind === 'plan' && refusal.success) return { kind: 'refused', data: refusal.data };
     const envelope = EnvelopeSchema.safeParse(result.structuredContent);
     return { kind: 'error', message: envelope.success ? envelope.data.message : t('card.failed'), retryable: envelope.success && envelope.data.retryable };
   }

@@ -49,7 +49,7 @@
     {
       "id": "plan-refused",
       "patterns": ["every room to 21"],
-      "text": "The guard refused that plan: peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid.",
+      "text": "The guard refused that plan: peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. A plan that holds: Balanced until 7 AM.",
       "withStatus": false,
       "cards": [
         {

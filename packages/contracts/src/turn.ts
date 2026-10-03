@@ -39,9 +39,10 @@ export type StatusFacts = z.infer<typeof StatusFactsSchema>;
  * A plan the guard refused, with its whole verdict (approved in #186): the plan card shows it as the REJECTED
  * receipt. Only a guard_rejection with the five guarantee rows; every other error stays text.
  */
-export const GuardRefusalSchema = ErrorEnvelopeSchema.refine((e) => e.category === 'guard_rejection' && e.details?.guarantees?.length === 5, {
-  message: 'A guard refusal carries the five guarantee rows',
-});
+export const GuardRefusalSchema = ErrorEnvelopeSchema.refine(
+  (e) => e.category === 'guard_rejection' && e.details?.guarantees?.length === 5 && new Set(e.details.guarantees.map((g) => g.id)).size === 5,
+  { message: 'A guard refusal carries the five guarantee rows, one per guarantee' },
+);
 export type GuardRefusal = z.infer<typeof GuardRefusalSchema>;
 
 export const ToolCardSchema = z.discriminatedUnion('tool', [

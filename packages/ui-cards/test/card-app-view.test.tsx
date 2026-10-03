@@ -127,10 +127,18 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
 
   it('a refused plan: what the guard said, with the nearest allowed value, and the REJECTED receipt; nothing to apply (#186)', () => {
     show({ kind: 'refused', data: inverterRefusal() });
-    expect(screen.getByRole('alert').textContent).toBe('The guard refused this plan: Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W.');
+    expect(screen.getByRole('alert').textContent).toBe(
+      'The guard refused this plan: Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W. A plan that holds: Balanced until 7:00 AM.',
+    );
     expect(screen.getByRole('region', { name: 'Guard check' })).toBeTruthy();
     expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');
     expect(screen.queryByRole('button', { name: /Apply/ })).toBeNull();
+  });
+
+  it('a refused plan with an alternative names it, in home time (#186)', () => {
+    const refusal = inverterRefusal();
+    show({ kind: 'refused', data: { ...refusal, details: { ...refusal.details, alternative: { level: 'balanced', until: '2026-07-16T07:00:00+02:00' } } } });
+    expect(screen.getByTestId('refusal-alternative').textContent).toBe('The guard would accept: Balanced until 07:00.');
   });
 
   it('shows the ice cubes', () => {

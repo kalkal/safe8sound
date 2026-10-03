@@ -51,7 +51,8 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       // 1. The model proposes "every room at 22 °C": the guard refuses it and says why.
       const greedy = await call(TOKEN, 'plan_comfort', { goal: 'cool', setpointC: 22, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
       expect(greedy.isError).toBe(true);
-      expect((greedy.content as { type: string; text: string }[])[0]?.text).toMatch(/Nearest allowed: 6000 W\.$/);
+      // The value the guard would accept, then the plan that holds (#186).
+      expect((greedy.content as { type: string; text: string }[])[0]?.text).toMatch(/Nearest allowed: 6000 W\. A plan that holds: Comfort until \d{1,2}:\d\d (AM|PM)\.$/);
       expect(ErrorEnvelopeSchema.parse(greedy.structuredContent)).toMatchObject({
         code: 'inverter_limit_exceeded',
         category: 'guard_rejection',

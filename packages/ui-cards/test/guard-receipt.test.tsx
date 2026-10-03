@@ -99,4 +99,15 @@ describe('GuardReceipt', () => {
     expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');
     expect(screen.getByText('4/5 PASS · no AI in this check')).toBeTruthy();
   });
+
+  it('a refusal shows where its data came from, and the "simulated data" notice on the real home, like a plan (#198 review)', () => {
+    const refusal = inverterRefusal();
+    const origin = { energy: 'simulated' as const, rooms: 'simulated' as const, weather: 'simulated' as const };
+    render(<RefusalReceipt refusal={{ ...refusal, details: { ...refusal.details, origin } }} />);
+    expect(screen.getByTestId('origin-badge').textContent).toContain('SIMULATED');
+    expect(screen.queryByText(CAVEAT)).toBeNull();
+    cleanup();
+    render(<RefusalReceipt refusal={{ ...refusal, details: { ...refusal.details, origin, realHome: true } }} />);
+    expect(screen.getByText(CAVEAT)).toBeTruthy();
+  });
 });

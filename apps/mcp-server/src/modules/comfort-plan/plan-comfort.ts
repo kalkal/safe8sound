@@ -1,5 +1,6 @@
 import {
   PlanSchema,
+  REAL_HOME_ID,
   celsius,
   err,
   ok,
@@ -153,7 +154,16 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   const safest = fromHold ?? (chosen === undefined && !overridden ? lastResortOf(tried, deps, guardInput) : undefined);
   if (chosen === undefined && safest !== undefined) chosen = safest.attempt;
   if (chosen === undefined) {
-    const rejection = last === undefined ? undefined : rejectionOf(last.verdict);
+    const refused = last === undefined ? undefined : rejectionOf(last.verdict);
+    // A plan the model proposed and the guard refused: next to the refusal, the plan the planner would accept
+    // (#186), so the person hears "here is the safe plan". Offered, never saved: the model proposes it.
+    const offered = refused !== undefined && overridden ? withAlternative(refused, firstPassing(deps, guardInput, ladder), profile.location.tz) : refused;
+    // The receipt's badge and its "simulated data" notice (#198 review): the data origin, and the real home as a
+    // flag, never a home id (a sandbox id stays out of tool output).
+    const rejection =
+      offered === undefined
+        ? undefined
+        : { ...offered, details: { ...offered.details, origin: snapshot.origin, ...(ctx.homeId === REAL_HOME_ID ? { realHome: true as const } : {}) } };
     if (last !== undefined) {
       await recordRejection(store, last.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId });
     }
@@ -351,6 +361,50 @@ function tryRung(
   const steps = withTargets(humid, { socMin, fromMs: atMs, toMs: context.horizonMs, safeRoomId: preferences.safeRoomId, config: deps.config.planner });
   const candidate: CandidatePlan = { horizonAt: new Date(context.horizonMs).toISOString(), steps, ladder };
   return { candidate, verdict: runGuard({ ...guardInput, plan: candidate }), guardInput };
+}
+
+/** The planner's own search, without the model's overrides: the first plan that holds every guarantee. */
+function firstPassing(deps: ComfortPlanDeps, guardInput: GuardInput, ladder: LevelStep[]): Attempt | undefined {
+  for (let i = 0; i < ladder.length; i++) {
+    const rung = ladder[i];
+    if (rung === undefined) continue;
+    const withNight = tryRung(deps, guardInput, ladder.slice(i), rung, false, undefined, undefined, true);
+    if (withNight.verdict.ok) return withNight;
+    const plain = tryRung(deps, guardInput, ladder.slice(i), rung, false);
+    if (plain.verdict.ok) return plain;
+  }
+  const essential = ladder.length - 1;
+  const rung = ladder[essential];
+  if (rung === undefined) return undefined;
+  for (const cycle of deps.config.planner.dutyCycles) {
+    // With night cooling first, then without it, as the planner's own search does.
+    const withNight = tryRung(deps, guardInput, ladder.slice(essential), rung, false, undefined, cycle, true);
+    if (withNight.verdict.ok) return withNight;
+    const plain = tryRung(deps, guardInput, ladder.slice(essential), rung, false, undefined, cycle);
+    if (plain.verdict.ok) return plain;
+  }
+  return undefined;
+}
+
+/** At most `max` characters, cut at a word with "…" when it must be cut. */
+function cutAtWord(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 0 ? cut.slice(0, space) : cut).replace(/[\s.,;:]+$/, '')}…`;
+}
+
+/** The refusal with the plan that holds: in the details, and said in its last sentence (the message keeps 300). */
+export function withAlternative(refusal: ErrorEnvelope, alternative: Pick<Attempt, 'candidate'> | undefined, tz: string): ErrorEnvelope {
+  const level = alternative?.candidate.steps[0]?.level;
+  if (alternative === undefined || level === undefined) return refusal;
+  const until = localIso(Date.parse(alternative.candidate.horizonAt), tz);
+  const said = ` A plan that holds: ${level.charAt(0).toUpperCase()}${level.slice(1)} until ${localTimeText(until)}.`;
+  return {
+    ...refusal,
+    message: `${cutAtWord(refusal.message, 300 - said.length)}${said}`,
+    details: { ...refusal.details, alternative: { level, until } },
+  };
 }
 
 /** Until the next recharge the forecast shows, else as far as the weather is known. */

@@ -1,5 +1,8 @@
 import { z } from 'zod';
+import { IsoDateTimeSchema } from './common.js';
 import { GuaranteeIdSchema, GuaranteeResultSchema } from './guarantees.js';
+import { DataOriginSchema } from './origin.js';
+import { LevelSchema } from './pacing.js';
 import { MeasureUnitSchema } from './units.js';
 
 // Error taxonomy shared by every package (docs/error-handling.md §2).
@@ -114,6 +117,12 @@ export const ErrorDetailsSchema = z.strictObject({
   roomId: z.string().min(1).max(64).optional(),
   /** A guard refusal's whole verdict, for the REJECTED receipt card (approved in #186): at most the five rows. */
   guarantees: z.array(GuaranteeResultSchema).max(5).optional(),
+  /** Next to a refusal, the plan the planner would accept: its level and until when (approved in #186). */
+  alternative: z.strictObject({ level: LevelSchema, until: IsoDateTimeSchema }).optional(),
+  /** Where a refusal's data came from, for the receipt's LIVE/SIMULATED badge (approved in #198). */
+  origin: DataOriginSchema.optional(),
+  /** Present, true, only when the refusal is about the real home: never a home id in tool output (approved in #198). */
+  realHome: z.literal(true).optional(),
 });
 export type ErrorDetails = z.infer<typeof ErrorDetailsSchema>;
 

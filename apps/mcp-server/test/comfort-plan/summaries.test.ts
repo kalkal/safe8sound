@@ -299,9 +299,9 @@ describe('what the model reads', () => {
     expect(text).toContain('simulated');
   });
 
-  it('a refusal names the value the guard would accept', async () => {
+  it('a refusal names the value the guard would accept, then the plan that holds (#186)', async () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(22), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
-    expect(!r.ok && r.error.message).toMatch(/Nearest allowed: 6000 W\.$/);
+    expect(!r.ok && r.error.message).toMatch(/Nearest allowed: 6000 W\. A plan that holds: \w+ until \d{1,2}:\d\d (AM|PM)\.$/);
   });
 });

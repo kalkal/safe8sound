@@ -1,10 +1,8 @@
-import { GUARANTEE_IDS, type DataOriginValue, type ErrorEnvelope, type GuaranteeResult, type Plan } from '@cold-reserve/contracts';
+import { GUARANTEE_IDS, REAL_HOME_ID, type DataOriginValue, type ErrorEnvelope, type GuaranteeResult, type Plan } from '@cold-reserve/contracts';
 import { CardShell } from './CardShell.js';
 import { isSimulated } from './plan-model.js';
 import { formatMeasure, t } from './text.js';
 
-/** The real home's id; the judges and the demo use simulated homes (plan §9.4, §13.2.1). */
-const REAL_HOME_ID = 'home';
 
 /** The guard as a till receipt (signature element 4): all five guarantees, deterministic, no AI. */
 export function GuardReceipt({ plan }: { plan: Plan }) {
@@ -23,10 +21,22 @@ export function GuardReceipt({ plan }: { plan: Plan }) {
 
 /**
  * A plan the guard refused (#186): the receipt from the refusal's own verdict, all five rows, REJECTED. No plan
- * was saved, so it is "the proposed plan"; the refusal does not carry the data origin, so no badge is guessed.
+ * was saved, so it is "the proposed plan"; its data origin and the real-home flag give the badge and the notice.
  */
 export function RefusalReceipt({ refusal }: { refusal: ErrorEnvelope }) {
-  return <ReceiptView guarantees={refusal.details?.guarantees ?? []} title={t('receipt.titleProposed')} list={t('receipt.listProposed')} caveat={false} lastResort={false} />;
+  const origin = refusal.details?.origin;
+  // Older refusals carry no origin: no badge is guessed. With it, the same badge and notice as a plan's receipt.
+  const simulated = origin !== undefined && Object.values(origin).includes('simulated');
+  return (
+    <ReceiptView
+      guarantees={refusal.details?.guarantees ?? []}
+      title={t('receipt.titleProposed')}
+      list={t('receipt.listProposed')}
+      {...(origin === undefined ? {} : { origin: simulated ? ('simulated' as const) : ('live' as const) })}
+      caveat={simulated && refusal.details?.realHome === true}
+      lastResort={false}
+    />
+  );
 }
 
 interface ReceiptViewProps {
