@@ -70,6 +70,8 @@ export const ERROR_CATALOG = {
   store_unavailable: { category: 'dependency_unavailable' },
   /** The configuration store (SSM) timed out or failed at startup: retried on the next request (#112). */
   config_unavailable: { category: 'dependency_unavailable' },
+  /** A device made safe before a storm did not answer (approved in #172): recorded as failed, the storm goes on. */
+  device_unreachable: { category: 'dependency_unavailable' },
   // rate_limited: wait retryAfterMs
   demo_quota_exceeded: { category: 'rate_limited' },
   /** A second question for a home while one is still running (#101): retry after retryAfterMs. */

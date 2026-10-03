@@ -1,4 +1,4 @@
-import { FamilyContactSchema, HomeIdSchema } from '@cold-reserve/contracts';
+import { FamilyContactSchema, HomeIdSchema, StormDeviceSchema } from '@cold-reserve/contracts';
 import { fixedClock } from '@cold-reserve/core';
 import { stormMessage } from '@cold-reserve/i18n';
 import { dynamoStateStoreFactory } from '@cold-reserve/store-dynamodb';
@@ -42,6 +42,11 @@ describe('storm-mode wiring', () => {
     expect(await first.value.notifier.send({ homeId: demo, contact, transition: 'power_back', text: text.value, at: new Date(clock.now()).toISOString() })).toEqual({ ok: true, value: undefined });
     const listed = await later.value.inbox(demo);
     expect(listed.ok && listed.value.map((m) => `${m.transition}:${m.role}`)).toEqual(['power_back:daughter']);
+  });
+
+  it('wires the simulated device adapter (the only one there is): a demo device is made safe', async () => {
+    const w = wiring();
+    expect(await w.devices.secure(StormDeviceSchema.parse({ entityId: 'lawn_mower.garden', domain: 'lawn_mower' }))).toEqual({ ok: true, value: undefined });
   });
 
   it('storm ids are fresh and valid', () => {

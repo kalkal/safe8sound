@@ -176,6 +176,9 @@ const enUS = {
   'manual.doneLabel': 'Done',
   'manual.progress': '{done} of {total} rooms done.',
   'manual.allDone': 'All rooms are set. Thank you.',
+  // Devices made safe before a storm (queue item 7, issue #24): fixed labels, never a name from the home.
+  'device.lawn_mower': 'the robot mower',
+  'device.cover': 'the shutters',
   // The family phone in the simulator (surface C, issue #24).
   'phone.title': "Your daughter's phone (simulated)",
   'phone.empty': 'No messages from {product} yet.',

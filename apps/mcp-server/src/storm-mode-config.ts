@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { StormIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Preferences, type Result, type StormId } from '@cold-reserve/contracts';
-import type { Clock, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, DeviceAdapter, StateStoreFactory } from '@cold-reserve/core';
 import { createInAppNotifier, type InAppNotifier } from '@cold-reserve/notifier-inapp';
+import { createSimulatedDevices } from '@cold-reserve/source-simulator';
 import file from '../config/storm-mode.json' with { type: 'json' };
 import { parseStormModeConfig, type StormModeConfig } from './modules/storm-mode/index.js';
 import { defaultPreferencesFor, type PreferencesConfig } from './preferences-config.js';
@@ -19,6 +20,11 @@ export interface StormModeWiring {
   /** The simulated phone's inbox, for the web app and the E2E tests. */
   readonly inbox: InAppNotifier['inbox'];
   readonly newStormId: () => StormId;
+  /**
+   * The devices made safe on entering a storm (queue item 7): the simulated adapter, the only one there is.
+   * The read-only real home never calls it: storm-mode only gives advice there (plan §13.2 p.1).
+   */
+  readonly devices: DeviceAdapter;
 }
 
 /** 20 random letters and digits after `storm_`: inside StormIdSchema. */
@@ -41,5 +47,6 @@ export function stormModeWiring(opts: { storeFor: StateStoreFactory; preferences
     notifier: phone.value.notifier,
     inbox: phone.value.inbox,
     newStormId,
+    devices: createSimulatedDevices().adapter,
   });
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { EntityIdSchema, HomeIdSchema, uniqueBy } from './common.js';
+import { StormDeviceSchema } from './storm-prep.js';
 import { KilowattSchema, PctSchema, RatioSchema, WattHourSchema, WattSchema } from './units.js';
 
 export const HOME_SCHEMA_VERSION = 1;
@@ -83,6 +84,8 @@ export const HomeProfileSchema = z
      * the safe room run. An assumption to calibrate on the plant (optional, added 2026-10-01, approved in #19).
      */
     epsBaseLoadW: z.number().min(0).max(5000).brand<'Watt'>().optional(),
+    /** Devices made safe when a storm is prepared (queue item 7, approved in #24); simulated only. */
+    stormDevices: z.array(StormDeviceSchema).max(10).optional(),
     /** Rounded to one decimal (about 10 km): never the precise location. */
     location: z.strictObject({
       latRounded: z.number().min(-90).max(90).refine(roundedToOneDecimal, { message: 'Round to one decimal' }),

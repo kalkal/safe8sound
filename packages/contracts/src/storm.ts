@@ -4,6 +4,7 @@ import { HomeLinkSchema } from './snapshot.js';
 import { DataOriginSchema } from './origin.js';
 import { LevelReasonSchema, LevelSchema } from './pacing.js';
 import { ContactChannelSchema } from './preferences.js';
+import { DeviceAdviceSchema, DeviceSecuredSchema, FamilyReplySchema } from './storm-prep.js';
 import { CelsiusSchema, PctSchema } from './units.js';
 
 // Storm mode contracts (plan §3.1, §9.2, §11.2 p.8, §13.2.4). Additive, approved in #23.
@@ -74,6 +75,10 @@ export const StormSessionSchema = z
       .regex(/^[a-z0-9][a-z0-9-]{0,47}$/)
       .optional(),
     notifications: z.array(StormNotificationSchema).max(50),
+    /** Devices made safe on entering the storm, demo homes only (queue item 7, approved in #24). */
+    devicesSecured: z.array(DeviceSecuredSchema).max(10).optional(),
+    /** The family's replies from the phone, by role (queue item 3, approved in #24). */
+    familyReplies: z.array(FamilyReplySchema).max(50).optional(),
   })
   .superRefine((s, ctx) => {
     if ((s.phase === 'ended') !== (s.endedAt !== undefined)) {
@@ -102,6 +107,8 @@ export const StartStormModeOutputSchema = z
     reason: z.enum(['requested', 'grid_still_up', 'grid_lost']),
     safeHours: z.number().nonnegative(),
     safeUntil: IsoDateTimeSchema,
+    /** The read-only home only: what to make safe by hand (approved in #24, Q6). */
+    deviceAdvice: z.array(DeviceAdviceSchema).max(10).optional(),
   })
   .superRefine((o, ctx) => {
     if (o.reserveUnlocked !== (o.effectiveMode === 'active')) {
@@ -125,6 +132,8 @@ export const SafeRoomStatusSchema = z.strictObject({
   safeHours: z.number().nonnegative(),
   safeUntil: IsoDateTimeSchema,
   stormPhase: StormPhaseSchema.optional(),
+  /** The family's latest reply in this storm, by role only (approved in #24). */
+  lastCheckIn: FamilyReplySchema.optional(),
   origin: DataOriginSchema,
   homeLink: HomeLinkSchema,
 });

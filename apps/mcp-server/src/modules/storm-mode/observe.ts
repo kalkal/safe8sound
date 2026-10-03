@@ -1,5 +1,6 @@
 import {
   SendableTransitionSchema,
+  categoryOf,
   err,
   ok,
   toolError,
@@ -16,8 +17,9 @@ import {
   type StormNotification,
   type StormSession,
 } from '@cold-reserve/contracts';
-import { epsBaseLoadW, holdPowerW, planNotifications, safeHours, stormReduce, type NotificationPlan, type StateStore, type StormContext, type StormEvent } from '@cold-reserve/core';
+import { epsBaseLoadW, holdPowerW, planNotifications, prepareDevices, safeHours, stormReduce, type DeviceFailure, type NotificationPlan, type StateStore, type StormContext, type StormEvent } from '@cold-reserve/core';
 import { LOCALES, stormMessage, type Locale, type StormMessageFields } from '@cold-reserve/i18n';
+import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
 import type { StormHome, StormModeDeps } from './deps.js';
 
@@ -39,6 +41,8 @@ export interface Observed {
   readonly nowMs: number;
   readonly safeHours: number;
   readonly session: StormSession | undefined;
+  /** Who asked: the correlation id and the home of the log lines. */
+  readonly ctx: ToolContext;
 }
 
 /** Level of the status: Essential while the storm is active; otherwise the person's comfort, as the interim deriver says (TODO(#19)). */
@@ -138,7 +142,7 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext): Promise<R
   const store = deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId });
   const latest = await store.getLatestStormSession();
   if (!latest.ok) return latest;
-  return ok({ home, store, preferences: preferences.value, snapshot: snapshot.value, safeRoom, nowMs: deps.clock.now(), safeHours: hours.value, session: latest.value });
+  return ok({ home, store, preferences: preferences.value, snapshot: snapshot.value, safeRoom, nowMs: deps.clock.now(), safeHours: hours.value, session: latest.value, ctx });
 }
 
 /** The reading as a detector event: the grid state is measured; the level follows the session. */
@@ -173,9 +177,32 @@ export async function detect(deps: StormModeDeps, o: Observed, event: StormEvent
     if (!sent.ok) return sent;
     session = sent.value.session;
   }
+  // Entering the storm makes the house safe, once per session; the read-only home only gets advice.
+  const entering = step.transitions.some((t) => t === 'storm_prepared' || t === 'storm_started');
+  const devices = o.home.profile.stormDevices ?? [];
+  if (entering && session.devicesSecured === undefined && !o.home.readOnly && deps.devices !== undefined && devices.length > 0) {
+    const prep = await prepareDevices({ devices, adapter: deps.devices, readOnly: false, at: new Date(o.nowMs).toISOString() });
+    session = { ...session, devicesSecured: prep.secured };
+    for (const failure of prep.failures) logDeviceFailure(deps, o, failure);
+  }
   const saved = await o.store.saveStormSession(session);
   if (!saved.ok) return saved;
   return ok({ ...o, session });
+}
+
+/** One warn line per device that did not answer: its code and entity id, never a name or the adapter's text. */
+function logDeviceFailure(deps: StormModeDeps, o: Observed, failure: DeviceFailure): void {
+  deps.logger.log({
+    ts: new Date(o.nowMs).toISOString(),
+    level: 'warn',
+    component: 'mcp-server',
+    message: 'A device was not made safe before the storm; the storm goes on.',
+    correlationId: o.ctx.correlationId,
+    ...(isSandbox(o.ctx.homeId) ? {} : { homeId: o.ctx.homeId }),
+    code: failure.code,
+    category: categoryOf(failure.code),
+    details: { event: 'storm_device_failed', entityId: failure.entityId, ...(failure.errorName === undefined ? {} : { errorName: failure.errorName }), ...homeDetail(o.ctx.homeId) },
+  });
 }
 
 /** One detector pass on the current reading: what the tick and the ingest run (plan §9.2). */

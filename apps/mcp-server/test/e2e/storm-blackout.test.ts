@@ -76,6 +76,9 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       const started = await call('start_storm_mode', { mode: 'prepare' });
       const start = StartStormModeOutputSchema.parse(started.structuredContent);
       expect(start).toMatchObject({ effectiveMode: 'active', reserveUnlocked: true, reason: 'grid_lost' });
+      // Queue item 7: the simulated house docks its mower and closes its shutter; the voice says so by fixed labels.
+      expect(start.session.devicesSecured?.map((d) => `${d.entityId}:${d.action}:${d.outcome}`)).toEqual(['lawn_mower.garden:dock:done', 'cover.living_room:close:done']);
+      expect(textOf(started)).toContain('Made safe before the storm: the robot mower is docked, the shutters are closed.');
       expect(JSON.stringify(started)).not.toMatch(/Giulia|phone-/);
       expect((await inbox())[0]?.text).toContain(`keeps it safe until ${clock(Date.parse(start.safeUntil))}.`);
       const status = await call('get_safe_room_status');

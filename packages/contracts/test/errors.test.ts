@@ -50,6 +50,8 @@ describe('error catalog (docs/error-handling.md §2)', () => {
     expect(categoryOf('storm_reserve_violated')).toBe('guard_rejection');
     // SSM timeout or 5xx at startup: transient, retried (#112).
     expect(categoryOf('config_unavailable')).toBe('dependency_unavailable');
+    // A device made safe before a storm did not answer (#172): transient, the storm goes on.
+    expect(categoryOf('device_unreachable')).toBe('dependency_unavailable');
     // A second question while one is still running for the same home (#101): wait, then ask again.
     expect(categoryOf('turn_in_progress')).toBe('rate_limited');
     expect(categoryOf('battery_power_exceeded')).toBe('guard_rejection');

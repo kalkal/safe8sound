@@ -13,6 +13,7 @@ export const packageName = '@cold-reserve/source-simulator';
 export { SimulatorParamsSchema, parseSimParams, type SimulatorParams } from './params.js';
 export { ScenarioSchema, inputsAt, parseScenario, type Scenario } from './scenario.js';
 export { SimulatorSource, type SimulatorSourceOptions } from './simulator-source.js';
+export { createSimulatedDevices, type SimulatedDevices } from './devices.js';
 
 export const SCENARIO_IDS = ['clear-day', 'heatwave', 'storm-blackout'] as const;
 export type ScenarioId = (typeof SCENARIO_IDS)[number];

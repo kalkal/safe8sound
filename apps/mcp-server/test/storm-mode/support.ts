@@ -1,5 +1,5 @@
 import { PreferencesSchema, StormIdSchema, ok, type HomeId, type HomeProfile, type Preferences, type Snapshot } from '@cold-reserve/contracts';
-import { fixedClock, type Notifier } from '@cold-reserve/core';
+import { fixedClock, memoryLogger, type Notifier } from '@cold-reserve/core';
 import { createInAppNotifier } from '@cold-reserve/notifier-inapp';
 import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
@@ -58,6 +58,7 @@ export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'st
     const s = { ...sim().snapshotAt(scenarioMs), homeId: h };
     return over.snapshot ? over.snapshot(s) : s;
   };
+  const logger = memoryLogger();
   const deps: StormModeDeps = {
     homes: (h) =>
       h === DEMO
@@ -69,6 +70,7 @@ export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'st
     config: stormConfig(),
     notifier: over.notifier ?? phone.value.notifier,
     newStormId: () => StormIdSchema.parse(`storm_test${String(++n).padStart(8, '0')}`),
+    logger,
   };
   const ctx: ToolContext = { correlationId: 'test-correlation', clientId: 'test', homeId: DEMO };
   /** Moves the scenario to hour `h` and the wall clock by the same amount. */
@@ -76,7 +78,7 @@ export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'st
     clock.set(clock.now() + (startMs + h * H - scenarioMs));
     scenarioMs = startMs + h * H;
   };
-  return { deps, ctx, store: storeFor(DEMO), clock, profile, inbox: async () => {
+  return { deps, ctx, logs: logger.lines, store: storeFor(DEMO), clock, profile, inbox: async () => {
       const listed = await phone.value.inbox(DEMO);
       if (!listed.ok) throw new Error(listed.error.message);
       return listed.value;

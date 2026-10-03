@@ -12,7 +12,7 @@ import {
   type StartStormModeOutputSchema,
   type StormSession,
 } from '@cold-reserve/contracts';
-import { effectiveStormMode } from '@cold-reserve/core';
+import { effectiveStormMode, prepareDevices } from '@cold-reserve/core';
 import { stormPreview } from '@cold-reserve/i18n';
 import type { z } from 'zod';
 import type { ToolContext } from '../../tool.js';
@@ -21,6 +21,9 @@ import { localIso } from '../../time.js';
 import { deliver, detect, levelOf, localeOf, messageFields, readHome, readingEvent, type Observed } from './observe.js';
 
 const HOUR_MS = 3_600_000;
+
+/** Never called: prepareDevices does not touch the adapter on a read-only home. */
+const noAdapter = { secure: () => Promise.reject(new Error('the read-only home calls no device')) };
 
 /** Until when the safe room is covered, in the home's time zone. */
 const safeUntilOf = (o: Observed) => localIso(o.nowMs + o.safeHours * HOUR_MS, o.home.profile.location.tz);
@@ -46,6 +49,9 @@ export async function startStormMode(deps: StormModeDeps, input: StartStormModeI
   const session = o.value.session;
   if (session === undefined || session.phase === 'ended') return err(toolError('unexpected_error', 'The storm request left no open session.'));
   const active = session.phase === 'active';
+  // The read-only home: never an adapter call, only what to do by hand (plan §13.2 p.1, Q6 of #24).
+  const devices = o.value.home.profile.stormDevices ?? [];
+  const advice = o.value.home.readOnly && devices.length > 0 ? (await prepareDevices({ devices, adapter: noAdapter, readOnly: true, at: session.startedAt })).advice : [];
   return ok({
     session,
     effectiveMode: session.phase,
@@ -54,6 +60,7 @@ export async function startStormMode(deps: StormModeDeps, input: StartStormModeI
     reason: active ? 'grid_lost' : effectiveStormMode(input.mode, o.value.snapshot.gridAvailable).reason,
     safeHours: o.value.safeHours,
     safeUntil: safeUntilOf(o.value),
+    ...(advice.length > 0 ? { deviceAdvice: advice } : {}),
   });
 }
 
@@ -62,6 +69,9 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext): Pro
   const o = await readHome(deps, ctx);
   if (!o.ok) return o;
   const { safeRoom, snapshot, session } = o.value;
+  // The family's latest reply in this storm, by role only; its time on the home's clock (queue item 3).
+  // Once the storm has ended, an old "on my way" is not news any more.
+  const reply = session?.phase === 'ended' ? undefined : session?.familyReplies?.at(-1);
   return ok({
     safeRoomId: safeRoom.id,
     tempC: safeRoom.tempC,
@@ -71,6 +81,7 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext): Pro
     safeHours: o.value.safeHours,
     safeUntil: safeUntilOf(o.value),
     ...(session === undefined ? {} : { stormPhase: session.phase }),
+    ...(reply === undefined ? {} : { lastCheckIn: { ...reply, at: localIso(Date.parse(reply.at), o.value.home.profile.location.tz) } }),
     origin: snapshot.origin,
     homeLink: snapshot.homeLink,
   });
