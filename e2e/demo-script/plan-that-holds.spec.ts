@@ -11,7 +11,7 @@ test('a refused proposal: the plan that holds, the refusal said above it, APPROV
 
   const card = page.frameLocator('iframe[title="Plan card"]');
   await expect(card.getByTestId('refused-proposal')).toHaveText(
-    'The guard refused the proposed setpoint: Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W. This plan holds instead.',
+    'The guard refused the proposed plan: Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W. This plan holds instead.',
   );
   // One plan card, and no refusal card next to it.
   await expect(page.locator('iframe[title="Plan card"]')).toHaveCount(1);

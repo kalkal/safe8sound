@@ -111,7 +111,11 @@ export function createHomeAgent(deps: {
     const cards = recorder.cards();
     const status = recorder.status();
     const reply = replyText(answer.value.text);
-    if (reply.cut) deps.log?.(logLine(toolError('output_schema_violation', 'The model wrote more than a reply may carry.'), 'ReplyTooLong', { correlationId }));
+    // A warning, not an internal error: the person still gets an answer, cut, or a sentence for an empty one.
+    if (reply.cut || reply.empty) {
+      const line = logLine(toolError('output_schema_violation', 'The model reply did not fit a TurnReply.'), reply.cut ? 'ReplyTooLong' : 'ReplyEmpty', { correlationId });
+      deps.log?.({ ...line, level: 'warn' });
+    }
     return ok({ text: reply.text, ...(status === undefined ? {} : { status }), ...(cards.length === 0 ? {} : { cards: [...cards] }) });
   };
 

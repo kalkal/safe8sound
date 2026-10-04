@@ -334,7 +334,7 @@ describe('what the model reads', () => {
     if (!r.ok) throw new Error(r.error.message);
     const text = planSummary(r.value, NIGHT);
     expect(r.value.refusedProposal?.message).toMatch(/Nearest allowed: 6000 W\.$/);
-    expect(text.startsWith(`The guard refused the proposed setpoint and rooms: ${r.value.refusedProposal?.message ?? ''} This plan holds instead and is ready to apply. Proposed plan ${r.value.id}: `)).toBe(true);
+    expect(text.startsWith(`The guard refused the plan you proposed: ${r.value.refusedProposal?.message ?? ''} This plan holds instead and is ready to apply. Proposed plan ${r.value.id}: `)).toBe(true);
     // Never sends the model back to propose again: the plan that holds is already here.
     expect(text).not.toMatch(/call plan_comfort again/);
   });

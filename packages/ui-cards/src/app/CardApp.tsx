@@ -75,11 +75,6 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
       return (
         <>
           <p role="alert">{t('plan.refused', { message: state.data.message })}</p>
-          {state.data.details?.alternative !== undefined && (
-            <p className="notice" data-testid="refusal-alternative">
-              {t('plan.alternative', { level: t(`level.${state.data.details.alternative.level}`), time: homeClock(state.data.details.alternative.until, timeZone) })}
-            </p>
-          )}
           <RefusalReceipt refusal={state.data} />
         </>
       );

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { holdSafeRoom } from '@cold-reserve/guard';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
-import { guardFrame, loadInputs, planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
+import { guardFrame, loadInputs, planComfort, withHint } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { REAL, preferences, world } from './support.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
@@ -85,6 +85,25 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(rejections.ok && rejections.value).toHaveLength(1);
   });
 
+  it('when only a last resort is left, the refusal tells the model to ask again with only the goal (#202 follow-up)', async () => {
+    const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
+    if (r.ok) throw new Error('expected a refusal');
+    expect(r.error.message).toMatch(/\. Call plan_comfort again with only the goal: the answer is the last resort\.$/);
+    expect(r.error.message.length).toBeLessThanOrEqual(300);
+    // And it is so: the same call with only the goal gives the last resort.
+    const again = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    expect(again.ok && again.value.lastResort).toBeDefined();
+  });
+
+  it('a hint after a long guard message keeps the 300 characters: the message is cut at a word, with an ellipsis', () => {
+    const long = `Humidity ${'would reach far too much '.repeat(20)}end.`;
+    const text = withHint(long, 'Ask again.');
+    expect(text.length).toBeLessThanOrEqual(300);
+    expect(text).toMatch(/^Humidity would reach far too much .*much… Ask again\.$/);
+    expect(withHint('Short.', 'Ask again.')).toBe('Short. Ask again.');
+  });
+
   it('a refusal says where its data came from; on a sandbox it carries neither the demo# id nor realHome (#198 review)', async () => {
     const sandbox = HomeIdSchema.parse('demo#0123456789abcdef');
     const w = world('storm-blackout', 3, { homeId: sandbox, snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
@@ -105,6 +124,7 @@ describe('plan_comfort (two-phase: propose)', () => {
   it('tells the model that a refused proposal comes back as the plan that holds (#202)', () => {
     const tool = comfortPlanModule(world('heatwave', 14).deps).tools.find((t) => t.name === 'plan_comfort');
     expect(tool?.description).toContain('If the guard refuses your setpoint or rooms, the answer is the plan that holds instead, ready to apply, with a note of the refusal.');
+    expect(tool?.description).toContain('If only a last resort is left, the refusal says so: call plan_comfort again with only the goal.');
   });
 
   it('refuses rooms the home does not have', async () => {
@@ -179,10 +199,11 @@ describe('plan_comfort (two-phase: propose)', () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(26), roomIds: ['bedroom-1'] }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
-    // Either the proposal held exactly as proposed (cool, never switched to dry), or the guard refused it and the
-    // planner's own plan answers, with the refusal noted: never a silently edited proposal.
-    if (r.value.refusedProposal === undefined) expect(r.value.steps.filter((s) => s.roomId === 'bedroom-1').map((s) => s.hvacMode)).not.toContain('dry');
-    else expect(r.value.guarantees.every((g) => g.ok)).toBe(true);
+    // Cool at 26 °C lets the humid heatwave night push the safe room above 60 % (the guided test of #202): the
+    // guard refuses the proposal as it is, never a silently edited one, and the planner's own plan answers.
+    expect(r.value.refusedProposal).toEqual({ code: 'safe_room_comfort_violated', message: expect.stringMatching(/^Humidity in the safe room would reach \d+ %, above 60 %/) as unknown });
+    expect(r.value.guarantees.every((g) => g.ok)).toBe(true);
+    expect(r.value.steps.filter((s) => s.roomId === 'bedroom-1').map((s) => s.hvacMode)).toContain('dry');
   });
 
   it('property: whoever is home, however humid the safe room and whatever humidity limits the person set, the planner never gives up on humidity', async () => {
@@ -292,6 +313,10 @@ describe('last resort (approved in #19: proposal only)', () => {
     // Without the safe room's reading no candidate names a safe-until either: no last resort, the guard's refusal.
     expect(r.ok ? undefined : r.error.code).toBe('safe_room_comfort_violated');
     expect(proposed).toBeUndefined();
+    // With no last resort either, a refused proposal never sends the model to ask again for one.
+    const proposal = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['living', 'study'] }, w.ctx);
+    if (proposal.ok) throw new Error('expected a refusal');
+    expect(proposal.error.message).not.toContain('Call plan_comfort again');
   });
 
   it('the safe hours start now and end at the time given', async () => {

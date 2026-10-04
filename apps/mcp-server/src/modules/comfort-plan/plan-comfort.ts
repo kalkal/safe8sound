@@ -77,6 +77,18 @@ export function guardFrame(
   return { season: seasonFor(goal, inputs.forecast.hourly, inputs.preferences), nightRecoveryMode: elderly ? 'elderly' : 'standard' };
 }
 
+const LAST_RESORT_HINT = 'Call plan_comfort again with only the goal: the answer is the last resort.';
+const MAX_MESSAGE = 300;
+
+/** The guard's message and a hint after it, within the envelope's 300 characters: the message is cut at a word. */
+export function withHint(message: string, hint: string): string {
+  const room = MAX_MESSAGE - hint.length - 1;
+  if (message.length <= room) return `${message} ${hint}`;
+  const head = message.slice(0, room - 1);
+  const space = head.lastIndexOf(' ');
+  return `${space > 0 ? head.slice(0, space) : head}… ${hint}`;
+}
+
 export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput, ctx: ToolContext): Promise<Result<Plan, ErrorEnvelope>> {
   const loaded = await loadInputs(deps, ctx);
   if (!loaded.ok) return loaded;
@@ -174,10 +186,14 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     const refused = last === undefined ? undefined : rejectionOf(last.verdict);
     // The receipt's badge and its "simulated data" notice (#198 review): the data origin, and the real home as a
     // flag, never a home id (a sandbox id stays out of tool output).
+    // A refused proposal when only the last resort is left: the model asks again with only the goal, so the
+    // person hears the last resort and its two yeses (#202 follow-up). The hold's failure is logged by that call.
+    const lastResortLeft = refused !== undefined && overridden && lastResortOf(holdAttempts(deps, guardInput, () => undefined), deps, guardInput) !== undefined;
+    const message = refused === undefined ? '' : lastResortLeft ? withHint(refused.message, LAST_RESORT_HINT) : refused.message;
     const rejection =
       refused === undefined
         ? undefined
-        : { ...refused, details: { ...refused.details, origin: snapshot.origin, ...(ctx.homeId === REAL_HOME_ID ? { realHome: true as const } : {}) } };
+        : { ...refused, message, details: { ...refused.details, origin: snapshot.origin, ...(ctx.homeId === REAL_HOME_ID ? { realHome: true as const } : {}) } };
     if (last !== undefined) {
       await recordRejection(store, last.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId });
     }

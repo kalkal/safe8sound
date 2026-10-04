@@ -103,7 +103,7 @@ describe('remote mode: simulator -> sim-api -> agent -> MCP server', () => {
     expect(card.result.refusedProposal?.code).toBeDefined();
     expect(card.result.guarantees.every((g) => g.ok)).toBe(true);
     // The voice says the refusal first, never "applied".
-    expect(answer.value.text).toMatch(/^The guard refused the proposed setpoint and rooms: /);
+    expect(answer.value.text).toMatch(/^The guard refused the plan you proposed: /);
     expect(answer.value.text).not.toMatch(/applied/i);
     // And the plan is applicable as it is, from its card.
     const applied = await agent.callTool('apply_plan', { planId: card.result.id }, { correlationId: crypto.randomUUID() });

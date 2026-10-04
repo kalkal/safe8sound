@@ -14,7 +14,7 @@ describe('PlanCard', () => {
   it('a plan that answers a refused proposal says the refusal inside the card, above the estimate (#202, #231)', () => {
     const { container } = show(planThatHolds());
     const note = screen.getByTestId('refused-proposal');
-    expect(note.textContent).toBe(`The guard refused the proposed setpoint: ${planThatHolds().refusedProposal?.message ?? ''} This plan holds instead.`);
+    expect(note.textContent).toBe(`The guard refused the proposed plan: ${planThatHolds().refusedProposal?.message ?? ''} This plan holds instead.`);
     // Inside the card's own box, so it takes the card's width at any frame width.
     expect(container.querySelector('section.card')?.contains(note)).toBe(true);
   });

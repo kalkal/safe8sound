@@ -73,9 +73,12 @@ describe('createHomeAgent: one sandbox home, its agent, its MCP session and its 
     expect(cut.length).toBeLessThanOrEqual(600);
     expect(cut).toMatch(/^The plan holds\. .*night long\.$/);
     // Said in the log, never silently: the model wrote more than an answer may carry.
-    expect(lines).toContainEqual(expect.objectContaining({ code: 'output_schema_violation', correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60' }));
+    // A warning, not an internal error: the person still gets an answer.
+    expect(lines).toEqual([expect.objectContaining({ level: 'warn', code: 'output_schema_violation', errorName: 'ReplyTooLong', correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60' })]);
     expect(await ask('<thinking>The guard refused 22 °C, so I offer the plan.</thinking> The plan holds: shall I apply it?')).toBe('The plan holds: shall I apply it?');
-    expect(await ask('   ')).toBe('Sorry, I have no answer to that. Please ask again.');
+    const empty: AgentLogEntry[] = [];
+    expect(await ask('   ', (e) => empty.push(e))).toBe('Sorry, I have no answer to that. Please ask again.');
+    expect(empty).toEqual([expect.objectContaining({ level: 'warn', code: 'output_schema_violation', errorName: 'ReplyEmpty' })]);
     expect(await ask('x'.repeat(700))).toHaveLength(600);
   });
 

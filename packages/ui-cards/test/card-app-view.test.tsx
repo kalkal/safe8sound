@@ -142,7 +142,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     const plan = { ...hotDayPlan(), refusedProposal: { code: 'inverter_limit_exceeded' as const, message: 'Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W.' } };
     const onCallTool = show({ kind: 'plan', data: plan });
     expect(screen.getByTestId('refused-proposal').textContent).toBe(
-      'The guard refused the proposed setpoint: Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W. This plan holds instead.',
+      'The guard refused the proposed plan: Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W. This plan holds instead.',
     );
     fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: plan.id });
@@ -151,12 +151,6 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
   it('a plan the model did not propose carries no refusal note', () => {
     show({ kind: 'plan', data: hotDayPlan() });
     expect(screen.queryByTestId('refused-proposal')).toBeNull();
-  });
-
-  it('a refused plan with an alternative names it, in home time (#186)', () => {
-    const refusal = inverterRefusal();
-    show({ kind: 'refused', data: { ...refusal, details: { ...refusal.details, alternative: { level: 'balanced', until: '2026-07-16T07:00:00+02:00' } } } });
-    expect(screen.getByTestId('refusal-alternative').textContent).toBe('The guard would accept: Balanced until 07:00.');
   });
 
   it('shows the ice cubes', () => {
