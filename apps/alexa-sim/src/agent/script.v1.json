@@ -54,8 +54,8 @@
     },
     {
       "id": "plan-that-holds",
-      "patterns": ["every room to 21"],
-      "text": "The guard refused that setpoint: peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Here is the plan that holds instead. Shall I apply it?",
+      "patterns": ["every room to 21", "cool the living room all afternoon"],
+      "text": "I can't: that would eat into the 6 kWh kept for a storm. Here is the plan that holds instead. Shall I apply it?",
       "withStatus": false,
       "cards": [
         {

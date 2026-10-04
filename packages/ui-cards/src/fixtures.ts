@@ -91,9 +91,28 @@ export function inverterRefusal(): ErrorEnvelope {
   });
 }
 
+/**
+ * The guard refuses a plan that would spend the storm reserve on comfort (scene 2b of the video): cooling the
+ * living room all afternoon too takes the battery to 34 %, below the 43 % floor that keeps 6 kWh for a storm.
+ * The texts are the guard's own (constraints.ts, rejection.ts), so the card says what the real guard would say.
+ */
+export function stormReserveRefusal(): ErrorEnvelope {
+  const reason = 'The plan takes the battery to 34 %, below the 43 % kept for a storm (6.0 kWh).';
+  const guarantees = hotDayPlan().guarantees.map((g) =>
+    g.id === 'storm_reserve' ? { id: g.id, ok: false, reason, measured: 34, limit: 43, nearestAllowed: 43, unit: '%' as const } : g,
+  );
+  return ErrorEnvelopeSchema.parse({
+    code: 'storm_reserve_violated',
+    category: 'guard_rejection',
+    message: `${reason} Nearest allowed: 43 %.`,
+    retryable: false,
+    details: { guarantee: 'storm_reserve', measured: 34, limit: 43, nearestAllowed: 43, unit: '%', guarantees },
+  });
+}
+
 /** The model proposed too much and the guard refused it (#202): the answer is the planner's own plan that holds. */
 export function planThatHolds(): Plan {
-  return PlanSchema.parse({ ...hotDayPlan(), refusedProposal: { code: 'inverter_limit_exceeded', message: inverterRefusal().message } });
+  return PlanSchema.parse({ ...hotDayPlan(), refusedProposal: { code: 'storm_reserve_violated', message: stormReserveRefusal().message } });
 }
 
 /** The real home during the hackathon: advice only, with a warning the voice must say. */

@@ -15,6 +15,11 @@ describe('PlanCard', () => {
     const { container } = show(planThatHolds());
     const note = screen.getByTestId('refused-proposal');
     expect(note.textContent).toBe(`The guard refused the proposed plan: ${planThatHolds().refusedProposal?.message ?? ''} This plan holds instead.`);
+    // The video's refusal is about the storm reserve, the product's own promise, not the inverter (scene 2b).
+    expect(planThatHolds().refusedProposal).toEqual({
+      code: 'storm_reserve_violated',
+      message: 'The plan takes the battery to 34 %, below the 43 % kept for a storm (6.0 kWh). Nearest allowed: 43 %.',
+    });
     // Inside the card's own box, so it takes the card's width at any frame width.
     expect(container.querySelector('section.card')?.contains(note)).toBe(true);
   });

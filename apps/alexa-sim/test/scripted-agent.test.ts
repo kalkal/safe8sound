@@ -84,6 +84,18 @@ describe('ScriptedAgent', () => {
     expect(PlanSchema.parse(card?.tool === 'plan_comfort' ? card.result : undefined)).toMatchObject({ status: 'proposed', goal: 'cool' });
   });
 
+  it('the refusal in scene 2b is about the storm reserve: voice and card name the same promise, then the plan that holds', async () => {
+    for (const q of ['Also cool the living room all afternoon.', 'Cool every room to 21 degrees now.']) {
+      const reply = await agent().ask(q, ctx);
+      expect(reply.ok && reply.value.text).toBe("I can't: that would eat into the 6 kWh kept for a storm. Here is the plan that holds instead. Shall I apply it?");
+      const card = reply.ok ? reply.value.cards?.[0] : undefined;
+      const plan = card?.tool === 'plan_comfort' ? PlanSchema.parse(card.result) : undefined;
+      expect(plan?.refusedProposal?.code).toBe('storm_reserve_violated');
+      expect(plan?.reserveWh).toBe(6000);
+      expect(plan?.guarantees.every((g) => g.ok)).toBe(true);
+    }
+  });
+
   it('applies the plan when asked, with the apply_plan result', async () => {
     const reply = await agent().ask('Apply the plan', ctx);
     const card = reply.ok ? reply.value.cards?.[0] : undefined;

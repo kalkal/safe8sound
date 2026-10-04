@@ -21,6 +21,7 @@ import {
   safeRoomCalm,
   safeRoomInStorm,
   stormPlan,
+  stormReserveRefusal,
 } from '@cold-reserve/ui-cards';
 
 // Dev-only style lab (plan §11.1bis point 8): every card on contract fixtures, in the theme the host
@@ -56,6 +57,7 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       <PlanCard plan={stormPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <PlanCard plan={lastResortPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <GuardReceipt plan={lastResortPlan()} />
+      <RefusalReceipt refusal={stormReserveRefusal()} />
       <RefusalReceipt refusal={inverterRefusal()} />
       <SafeRoomCard status={safeRoomInStorm()} />
       <FloorPlanCard status={homeInStorm()} />
