@@ -2,7 +2,7 @@
 import type { Plan } from '@cold-reserve/contracts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { advisoryPlan, hotDayPlan, lastResortPlan, planThatHolds, rejectedPlan, stormPlan } from '../src/fixtures.js';
+import { advisoryPlan, hotDayPlan, lastResortPlan, planThatHolds, rejectedPlan, stormPlan, surplusPlan } from '../src/fixtures.js';
 import { PlanCard, type PlanCardProps } from '../src/PlanCard.js';
 
 afterEach(cleanup);
@@ -11,6 +11,25 @@ const TZ = 'Europe/Rome';
 const show = (plan: Plan, props: Partial<PlanCardProps> = {}) => render(<PlanCard plan={plan} timeZone={TZ} {...props} />);
 
 describe('PlanCard', () => {
+  it('shows where the solar surplus went (#227): the window, the kWh kept at home and the rooms in order, by name', () => {
+    show(surplusPlan());
+    const surplus = screen.getByRole('region', { name: 'Solar surplus, 12:00 to 16:00' });
+    expect(within(surplus).getByTestId('surplus-kept').textContent).toBe('2.4 kWh');
+    expect(within(surplus).getByText('kept at home instead of sent to the grid')).toBeTruthy();
+    const rooms = within(surplus).getByRole('list', { name: 'Where it went, in order' });
+    expect(within(rooms).getAllByRole('listitem').map((r) => r.textContent)).toEqual([
+      'Bedroom 1Safe room · cooled to 24 °C · 0.8 °C above target',
+      'LivingOccupied · cooled to 25 °C · 0.4 °C below target',
+    ]);
+    // Names, never internal ids.
+    expect(surplus.textContent).not.toContain('bedroom-1');
+  });
+
+  it('a plan without a surplus has no surplus section', () => {
+    show(hotDayPlan());
+    expect(screen.queryByRole('region', { name: /Solar surplus/ })).toBeNull();
+  });
+
   it('a plan that answers a refused proposal says the refusal inside the card, above the estimate (#202, #231)', () => {
     const { container } = show(planThatHolds());
     const note = screen.getByTestId('refused-proposal');

@@ -96,6 +96,14 @@ describe('ScriptedAgent', () => {
     }
   });
 
+  it('scene 2a (#227): where the solar surplus went, the voice saying the numbers the card shows', async () => {
+    const reply = await agent().ask('Where did the solar surplus go today?', ctx);
+    const card = reply.ok ? reply.value.cards?.[0] : undefined;
+    const plan = card?.tool === 'plan_comfort' ? PlanSchema.parse(card.result) : undefined;
+    expect(plan?.surplus?.keptKWh).toBe(2.4);
+    expect(reply.ok && reply.value.text).toContain('2.4 kWh between 12:00 and 16:00');
+  });
+
   it('applies the plan when asked, with the apply_plan result', async () => {
     const reply = await agent().ask('Apply the plan', ctx);
     const card = reply.ok ? reply.value.cards?.[0] : undefined;

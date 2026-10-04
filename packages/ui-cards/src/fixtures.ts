@@ -35,6 +35,25 @@ export function hotDayPlan(): Plan {
   return PlanSchema.parse(plan);
 }
 
+/**
+ * An ordinary sunny afternoon (#203, #227; video scene 2a): the solar surplus stays at home instead of going to
+ * the grid, the safe room first, then the occupied room furthest above its target.
+ */
+export function surplusPlan(): Plan {
+  return PlanSchema.parse({
+    ...hotDayPlan(),
+    surplus: {
+      from: '2026-07-15T12:00:00+02:00',
+      to: '2026-07-15T16:00:00+02:00',
+      keptKWh: 2.4,
+      rooms: [
+        { roomId: 'bedroom-1', setpointC: 24, reason: 'safe_room', aboveTargetK: 0.8 },
+        { roomId: 'living', setpointC: 25, reason: 'occupied', aboveTargetK: -0.4 },
+      ],
+    },
+  });
+}
+
 /** Storm: the grid is measured down, the reserve becomes the budget, so there is no floor. */
 export function stormPlan(): Plan {
   const plan: Partial<Plan> = { ...hotDayPlan(), gridAvailable: false };

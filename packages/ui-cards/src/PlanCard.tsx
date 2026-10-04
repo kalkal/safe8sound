@@ -1,7 +1,8 @@
 import { epochMs, type Plan } from '@cold-reserve/contracts';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { CardShell } from './CardShell.js';
 import { homeClock, isSimulated, levelSpans, pacingGeometry } from './plan-model.js';
+import { roomLabel } from './SafeRoomCard.js';
 import { formatMeasure, t } from './text.js';
 
 export interface PlanCardProps {
@@ -32,6 +33,8 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
           {t('plan.refusedProposal', { message: plan.refusedProposal.message })}
         </p>
       )}
+      {/* On an ordinary day the headline is where the sun went (video scene 2a): first, before the estimate. */}
+      {plan.surplus !== undefined && <SurplusRouting surplus={plan.surplus} timeZone={timeZone} />}
       {lastResort === undefined ? (
         <div className="plan-hero">
           <p className="eyebrow">{t('plan.until')}</p>
@@ -92,6 +95,45 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
         </div>
       )}
     </CardShell>
+  );
+}
+
+type Surplus = NonNullable<Plan['surplus']>;
+
+/**
+ * Where the solar surplus went instead of the grid (#203, #227): the window, the energy kept at home as the big
+ * number, and the rooms in the order they got it, by name, with the reason and the setpoint. Every number is the
+ * plan's own, so voice and card say the same.
+ */
+function SurplusRouting({ surplus, timeZone }: { surplus: Surplus; timeZone: string }) {
+  const titleId = useId();
+  return (
+    <section className="surplus" aria-labelledby={titleId}>
+      <h3 id={titleId} className="eyebrow">
+        {t('plan.surplusTitle', { from: homeClock(surplus.from, timeZone), to: homeClock(surplus.to, timeZone) })}
+      </h3>
+      <p className="surplus-kept">
+        <span className="hero-value" data-testid="surplus-kept">
+          {t('plan.surplusKept', { kwh: surplus.keptKWh.toFixed(1) })}
+        </span>
+        <span className="muted">{t('plan.surplusKeptNote')}</span>
+      </p>
+      <ol className="surplus-rooms" aria-label={t('plan.surplusRooms')}>
+        {surplus.rooms.map((room) => (
+          <li key={room.roomId}>
+            <strong>{roomLabel(room.roomId)}</strong>
+            <span>
+              {t('plan.surplusRoom', {
+                reason: t(`surplusReason.${room.reason}`),
+                setpoint: String(room.setpointC),
+                delta: Math.abs(room.aboveTargetK).toFixed(1),
+                side: t(room.aboveTargetK >= 0 ? 'surplus.above' : 'surplus.below'),
+              })}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

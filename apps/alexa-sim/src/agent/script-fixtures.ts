@@ -1,6 +1,6 @@
 import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
-import { homeInStorm, hotDayPlan, lastResortPlan, planThatHolds, safeRoomCalm, safeRoomInStorm, stormPlan } from '@cold-reserve/ui-cards';
+import { homeInStorm, hotDayPlan, lastResortPlan, planThatHolds, safeRoomCalm, safeRoomInStorm, stormPlan, surplusPlan } from '@cold-reserve/ui-cards';
 import { ToolCardSchema, type ToolCard } from './wire.js';
 
 // The tool results the script can show, by name: built from the contract fixtures, the same data the
@@ -20,6 +20,8 @@ export const SCRIPT_FIXTURES = {
       result: { plan: { ...hotDayPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] },
     }),
   /** The model proposed too much (#186, scene 2b): the guard refused it, and the answer is the plan that holds (#202). */
+  /** An ordinary sunny afternoon (#227, video scene 2a): where the solar surplus went instead of the grid. */
+  'daily-routing': () => card({ tool: 'plan_comfort', result: surplusPlan() }),
   'plan-that-holds': () => card({ tool: 'plan_comfort', result: planThatHolds() }),
   /** A last resort (#160): the night limit cannot hold; the plan says until when, and how warm after. */
   'last-resort-plan': () => card({ tool: 'plan_comfort', result: lastResortPlan() }),

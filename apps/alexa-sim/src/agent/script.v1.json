@@ -53,6 +53,18 @@
       ]
     },
     {
+      "id": "daily-routing",
+      "patterns": ["sunny afternoon", "solar surplus", "where did the sun go", "where did the surplus go"],
+      "text": "Today the sun's surplus stayed at home: 2.4 kWh between 12:00 and 16:00, first to the safe room, then to the living room.",
+      "withStatus": false,
+      "cards": [
+        {
+          "tool": "plan_comfort",
+          "fixture": "daily-routing"
+        }
+      ]
+    },
+    {
       "id": "plan-that-holds",
       "patterns": ["every room to 21", "cool the living room all afternoon"],
       "text": "I can't: that would eat into the 6 kWh kept for a storm. Here is the plan that holds instead. Shall I apply it?",
