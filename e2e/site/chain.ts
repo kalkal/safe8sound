@@ -29,7 +29,7 @@ export function chainEnv() {
   const invoke = secret('SITE_E2E_INVOKE');
   const mcpUrl = `http://127.0.0.1:${String(PORTS.mcp)}/mcp`;
   return {
-    mcp: { PORT: String(PORTS.mcp), MCP_CLIENTS: `agent@demo#*=${agentMcp},simapi@demo#*=${simMcp}`, MCP_SCENARIO: 'clear-day', MCP_SCENARIO_START_H: '14', MCP_SCENARIO_SPEED: '0' },
+    mcp: { PORT: String(PORTS.mcp), MCP_CLIENTS: `agent:agent@demo#*=${agentMcp},cards:simapi@demo#*=${simMcp}`, MCP_SCENARIO: 'clear-day', MCP_SCENARIO_START_H: '14', MCP_SCENARIO_SPEED: '0' },
     agent: { PORT: String(PORTS.agent), AGENT_MCP_URL: mcpUrl, AGENT_MCP_TOKEN: agentMcp, AGENT_INVOKE_TOKEN: invoke },
     simApi: {
       PORT: String(PORTS.simApi),

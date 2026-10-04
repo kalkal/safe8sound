@@ -3,6 +3,7 @@ import { HomeIdSchema, PlanSchema } from '@cold-reserve/contracts';
 import { examplePlan } from '@cold-reserve/contracts/fixtures';
 import { describe, expect, it } from 'vitest';
 import { McpToken } from '../src/config.js';
+import type { AgentLogEntry } from '../src/log.js';
 import { createTurnRecorder, mcpRequestHeaders, mcpToolset, withCorrelationHeader, type McpSession } from '../src/mcp-tools.js';
 
 const PLAN = PlanSchema.parse(examplePlan()) as unknown as Record<string, unknown>;
@@ -14,6 +15,15 @@ const STATUS = {
 };
 
 /** A fake MCP server: records every call with its arguments. */
+const TURN = '3f6c1a9e-8b2d-4c7e-9a1f-2b3c4d5e6f70';
+
+/** A recorder inside a model turn, as home-agent makes one for every question (#230, #233). */
+function inTurn() {
+  const recorder = createTurnRecorder();
+  recorder.reset(TURN);
+  return recorder;
+}
+
 function fakeSession(results: Record<string, { text: string; structuredContent?: Record<string, unknown>; isError?: boolean }>) {
   const calls: { name: string; args: unknown; correlationId?: string | undefined }[] = [];
   const session: McpSession = {
@@ -38,7 +48,7 @@ const run = async (tools: Awaited<ReturnType<typeof mcpToolset>>, name: string, 
 describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
   it('offers every server tool to the model with its description and input schema', async () => {
     const { session } = fakeSession({ get_home_status: { text: 'Battery at 45%.' }, plan_comfort: { text: 'Plan proposed.' } });
-    const tools = await mcpToolset(session, createTurnRecorder());
+    const tools = await mcpToolset(session, inTurn());
     expect(tools.map((t) => [t.name, t.description])).toEqual([
       ['get_home_status', 'The get_home_status tool.'],
       ['plan_comfort', 'The plan_comfort tool.'],
@@ -51,7 +61,7 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
       get_home_status: { text: 'Battery at 45%.', structuredContent: STATUS },
       get_energy_forecast: { text: 'Hot tomorrow.', structuredContent: { secretish: 1 } },
     });
-    const recorder = createTurnRecorder();
+    const recorder = inTurn();
     const tools = await mcpToolset(session, recorder);
     expect(await run(tools, 'plan_comfort', { goal: 'cool' })).toBe('Plan proposed.');
     await run(tools, 'get_home_status', {});
@@ -74,21 +84,37 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
       homeLink: 'ok',
     };
     const { session } = fakeSession({ get_safe_room_status: { text: 'Safe room.', structuredContent: SAFE_ROOM } });
-    const recorder = createTurnRecorder();
+    const recorder = inTurn();
     await run(await mcpToolset(session, recorder), 'get_safe_room_status', {});
     expect(recorder.cards()).toEqual([{ tool: 'get_safe_room_status', result: SAFE_ROOM }]);
   });
 
   it('drops a card whose result breaks its contract (one bad card never costs the answer)', async () => {
     const { session } = fakeSession({ plan_comfort: { text: 'Plan proposed.', structuredContent: { id: 'not-a-plan' } } });
-    const recorder = createTurnRecorder();
+    const recorder = inTurn();
     expect(await run(await mcpToolset(session, recorder), 'plan_comfort', {})).toBe('Plan proposed.');
     expect(recorder.cards()).toEqual([]);
   });
 
+  it('never calls a tool outside a well-formed turn: one log line, and the model gets an error (#233)', async () => {
+    const { session, calls } = fakeSession({ apply_plan: { text: 'Plan applied.' } });
+    const lines: AgentLogEntry[] = [];
+    const malformed = createTurnRecorder();
+    malformed.reset('c-1');
+    for (const recorder of [createTurnRecorder(), malformed]) {
+      const tools = await mcpToolset(session, recorder, (line) => lines.push(line));
+      await expect(run(tools, 'apply_plan', { planId: 'plan-0001' })).rejects.toThrow('not called');
+    }
+    expect(calls).toEqual([]);
+    expect(lines.map((l) => [l.level, l.code, l.errorName, l.correlationId])).toEqual([
+      ['warn', 'invalid_input', 'TurnIdInvalid', 'none'],
+      ['warn', 'invalid_input', 'TurnIdInvalid', 'none'],
+    ]);
+  });
+
   it('turns an MCP tool error into an error result for the model, with no card', async () => {
     const { session } = fakeSession({ apply_plan: { text: 'The plan expired.', structuredContent: { code: 'plan_expired' }, isError: true } });
-    const recorder = createTurnRecorder();
+    const recorder = inTurn();
     const tools = await mcpToolset(session, recorder);
     await expect(run(tools, 'apply_plan', { planId: 'plan-0001' })).rejects.toThrow('The plan expired.');
     expect(recorder.cards()).toEqual([]);
@@ -98,7 +124,7 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
     const rows = ['storm_reserve', 'inverter_limit', 'battery_power', 'safe_room_comfort', 'pacing_on_track'].map((id) => ({ id, ok: id !== 'inverter_limit', reason: 'r' }));
     const refusal = { code: 'inverter_limit_exceeded', category: 'guard_rejection', message: 'Peak load too high. Nearest allowed: 6000 W.', retryable: false, details: { guarantee: 'inverter_limit', guarantees: rows } };
     const { session } = fakeSession({ plan_comfort: { text: refusal.message, structuredContent: refusal, isError: true } });
-    const recorder = createTurnRecorder();
+    const recorder = inTurn();
     const tools = await mcpToolset(session, recorder);
     await expect(run(tools, 'plan_comfort', { goal: 'cool' })).rejects.toThrow('Nearest allowed: 6000 W.');
     expect(recorder.cards()).toEqual([{ tool: 'plan_comfort', result: refusal }]);
@@ -125,7 +151,7 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
     const { session } = fakeSession({
       plan_comfort: { text: 'No.', structuredContent: { code: 'inverter_limit_exceeded', category: 'guard_rejection', message: 'No.', retryable: false }, isError: true },
     });
-    const recorder = createTurnRecorder();
+    const recorder = inTurn();
     const tools = await mcpToolset(session, recorder);
     await expect(run(tools, 'plan_comfort', { goal: 'cool' })).rejects.toThrow('No.');
     expect(recorder.cards()).toEqual([]);
@@ -134,7 +160,7 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
   it('apply_plan as the model sees it has no lastResortToken: the token is the card’s, never the model’s (#201)', async () => {
     const { session, calls } = fakeSession({ apply_plan: { text: 'Plan applied.' } });
     const withToken = { ...session, listTools: async () => (await session.listTools()).map((t) => ({ ...t, inputSchema: { type: 'object' as const, properties: { planId: { type: 'string' }, lastResortToken: { type: 'string', pattern: '^lr_' } }, required: ['planId'] } })) };
-    const tools = await mcpToolset(withToken, createTurnRecorder());
+    const tools = await mcpToolset(withToken, inTurn());
     const apply = tools.find((t) => t.name === 'apply_plan');
     expect(JSON.stringify(apply?.toolSpec.inputSchema)).not.toMatch(/lastResortToken|lr_/);
     // A token the model passes anyway (made up, or read somewhere) never reaches the server.
@@ -144,14 +170,14 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
 
   it('passes the model arguments through unchanged: a "home" argument is the server\'s problem, never a header', async () => {
     const { session, calls } = fakeSession({ get_home_status: { text: 'ok' } });
-    const tools = await mcpToolset(session, createTurnRecorder());
+    const tools = await mcpToolset(session, inTurn());
     await run(tools, 'get_home_status', { home: 'home' });
-    expect(calls).toEqual([{ name: 'get_home_status', args: { home: 'home' } }]);
+    expect(calls).toEqual([{ name: 'get_home_status', args: { home: 'home' }, correlationId: TURN }]);
   });
 
   it('sends the correlation id of the turn with every MCP call', async () => {
     const { session, calls } = fakeSession({ get_home_status: { text: 'ok' } });
-    const recorder = createTurnRecorder();
+    const recorder = inTurn();
     const tools = await mcpToolset(session, recorder);
     recorder.reset('0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60');
     await run(tools, 'get_home_status', {});
@@ -160,7 +186,7 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
 
   it('starts every turn with no cards', async () => {
     const { session } = fakeSession({ plan_comfort: { text: 'ok', structuredContent: PLAN } });
-    const recorder = createTurnRecorder();
+    const recorder = inTurn();
     await run(await mcpToolset(session, recorder), 'plan_comfort', {});
     recorder.reset();
     expect(recorder.cards()).toEqual([]);

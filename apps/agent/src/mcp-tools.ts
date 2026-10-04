@@ -1,9 +1,10 @@
-import { CORRELATION_ID_HEADER, CorrelationIdSchema, GuardRefusalSchema, TURN_HEADER, HOME_HEADER, StatusFactsSchema, ToolCardSchema, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
+import { CORRELATION_ID_HEADER, CorrelationIdSchema, GuardRefusalSchema, TURN_HEADER, HOME_HEADER, StatusFactsSchema, ToolCardSchema, toolError, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { FunctionTool } from '@strands-agents/sdk';
 import type { AgentConfig, McpToken } from './config.js';
+import { logLine, type AgentLogEntry } from './log.js';
 
 // Our own MCP wrapper (approved in #101): Strands' McpTool drops structuredContent, so each server
 // tool becomes a Strands tool here. The model gets the text; the code keeps the card data.
@@ -91,7 +92,12 @@ function modelArgs(name: string, args: Record<string, unknown>): Record<string, 
   return hidden === undefined ? args : Object.fromEntries(Object.entries(args).filter(([key]) => !hidden.includes(key)));
 }
 
-export async function mcpToolset(session: McpSession, recorder: TurnRecorder): Promise<FunctionTool[]> {
+/**
+ * The model's tools, over our own MCP session. Every call names its turn (#230): outside a well-formed turn the tool
+ * is not called at all, the model gets an error and one warn line is logged (#233), so the agent never passes for
+ * the person's tap on a card.
+ */
+export async function mcpToolset(session: McpSession, recorder: TurnRecorder, log?: (line: AgentLogEntry) => void): Promise<FunctionTool[]> {
   return (await session.listTools()).map(
     (info) =>
       new FunctionTool({
@@ -102,7 +108,13 @@ export async function mcpToolset(session: McpSession, recorder: TurnRecorder): P
           const args = modelArgs(info.name, typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {});
           // The Strands loop passes its cancel signal (turn deadline); a direct invoke may not.
           const signal = (context as { cancelSignal?: AbortSignal } | undefined)?.cancelSignal;
-          const result = await session.callTool(info.name, args, signal, recorder.correlationId());
+          const turn = CorrelationIdSchema.safeParse(recorder.correlationId());
+          if (!turn.success) {
+            const error = toolError('invalid_input', `The tool ${info.name} was not called: this turn has no valid turn id.`);
+            log?.(logLine(error, 'TurnIdInvalid'));
+            throw new Error(error.message);
+          }
+          const result = await session.callTool(info.name, args, signal, turn.data);
           // A tool error reaches the model as an error result (with its text). Only a guard refusal with its
           // verdict also becomes a card, the REJECTED receipt (#186); every other error stays text.
           if (result.isError === true) {

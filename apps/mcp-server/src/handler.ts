@@ -268,7 +268,7 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       return problem(error, correlationId, undefined, { 'www-authenticate': bearerChallenge(req) });
     }
     // A phone token opens the family inbox only, never a tool (#24).
-    if (grant === null || grant.scope !== undefined) {
+    if (grant === null || grant.scope === 'phone') {
       const error = toolError('wrong_client', 'The token was not issued for this server.');
       record(error, correlationId);
       return problem(error, correlationId, undefined, { 'www-authenticate': bearerChallenge(req, 'invalid_token') });
@@ -311,6 +311,26 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       record(turn.error, correlationId, { clientId: grant.clientId });
       return problem(turn.error, correlationId);
     }
+    // #233: the agent's tool calls always name their turn, so it never passes for the person's tap; a card action
+    // (sim-api) never names one, so it never passes for a turn. Unscoped clients keep both ways (the accepted risk).
+    const unnamed = grant.scope === 'agent' && turn.value === undefined && isToolCall(body);
+    const named = grant.scope === 'cards' && turn.value !== undefined;
+    if (unnamed || named) {
+      const error = toolError('invalid_input', unnamed ? `The agent's tool calls name their turn in ${TURN_HEADER}.` : `A card action names no turn: send no ${TURN_HEADER}.`);
+      // A refused client is a warning even though the input category is not logged: a token used the wrong way.
+      deps.logger.log({
+        ts: new Date().toISOString(),
+        level: 'warn',
+        component: 'mcp-server',
+        code: error.code,
+        category: error.category,
+        message: error.message,
+        correlationId,
+        clientId: grant.clientId,
+        details: { event: unnamed ? 'agent_call_without_turn' : 'card_action_with_turn' },
+      });
+      return problem(error, correlationId);
+    }
     const ctx: ToolContext = { correlationId, clientId: grant.clientId, homeId, ...(turn.value === undefined ? {} : { turnId: turn.value }) };
     const server = buildServer(ctx);
     // Stateless: no sessionIdGenerator (the documented `undefined` breaks exactOptionalPropertyTypes).
@@ -330,6 +350,21 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
     headers.set(CORRELATION_ID_HEADER, correlationId);
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   };
+}
+
+/**
+ * A JSON-RPC tools/call: the only request that acts; initialize and tools/list name no turn. A batch counts as one if
+ * any of its messages is (the SDK still accepts batches): it cannot carry a tool call past the turn rule (#245 review).
+ */
+function isToolCall(body: string): boolean {
+  const isCall = (message: unknown) => typeof message === 'object' && message !== null && (message as { method?: unknown }).method === 'tools/call';
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return Array.isArray(parsed) ? parsed.some(isCall) : isCall(parsed);
+  } catch {
+    // Not JSON: the transport refuses it anyway, before any tool runs.
+    return false;
+  }
 }
 
 /** Malformed JSON counts as "initialize": the transport then answers with a JSON-RPC parse error. */

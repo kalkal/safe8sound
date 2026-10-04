@@ -37,7 +37,7 @@ export function createHomeAgent(deps: {
   const start = async (): Promise<Built> => {
     const recorder = createTurnRecorder();
     const session = await deps.connect(deps.home);
-    const tools = await mcpToolset(session, recorder);
+    const tools = await mcpToolset(session, recorder, deps.log);
     return { agent: createAgent({ config: deps.config, model: deps.model, tools, ...(deps.log ? { log: deps.log } : {}) }), recorder, session };
   };
 
@@ -66,7 +66,7 @@ export function createHomeAgent(deps: {
       ready = undefined; // the next turn tries to connect again
       const failure = classifyFailure(e);
       if (failure.kind === 'bug') throw failure.error;
-      deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId, cause: e instanceof Error ? e.cause : undefined }));
+      deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId, httpStatus: failure.httpStatus, cause: e instanceof Error ? e.cause : undefined }));
       return err(failure.error);
     } finally {
       clearTimeout(timer);

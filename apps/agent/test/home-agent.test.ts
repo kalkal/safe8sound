@@ -8,6 +8,11 @@ import { createHomeAgent } from '../src/home-agent.js';
 import type { AgentLogEntry } from '../src/log.js';
 import type { McpSession } from '../src/mcp-tools.js';
 
+// Turn ids are UUIDs, as sim-api makes them: outside a well-formed turn the agent calls no tool (#233).
+const TURN_A = '00000000-0000-4000-8000-00000000000a';
+const TURN_B = '00000000-0000-4000-8000-00000000000b';
+const TURN_C = '00000000-0000-4000-8000-00000000000c';
+
 const CONFIG: AgentConfig = {
   model: { provider: 'fake' },
   maxTokens: 400,
@@ -84,8 +89,8 @@ describe('createHomeAgent: one sandbox home, its agent, its MCP session and its 
 
   it('adds the status facts when get_home_status ran, and keeps cards to their own turn', async () => {
     const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(session()) });
-    await agent.ask('Make a plan', 'a');
-    const reply = await agent.ask("What's my battery level?", 'b');
+    await agent.ask('Make a plan', TURN_A);
+    const reply = await agent.ask("What's my battery level?", TURN_B);
     expect(reply).toMatchObject({ ok: true, value: { text: 'Battery at 45%.', status: STATUS } });
     expect(reply.ok && reply.value.cards).toBeUndefined();
   });
@@ -100,8 +105,8 @@ describe('createHomeAgent: one sandbox home, its agent, its MCP session and its 
   it('opens the MCP session once and reuses it across turns', async () => {
     const s = session();
     const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(s) });
-    await agent.ask('Battery?', 'a');
-    await agent.ask('Battery?', 'b');
+    await agent.ask('Battery?', TURN_A);
+    await agent.ask('Battery?', TURN_B);
     expect(s.opened).toBe(1);
   });
 
@@ -112,7 +117,15 @@ describe('createHomeAgent: one sandbox home, its agent, its MCP session and its 
       model: new FakeModel(policy),
       connect: () => Promise.reject(new TypeError('fetch failed', { cause: Object.assign(new Error('x'), { code: 'ECONNREFUSED' }) })),
     });
-    expect(await agent.ask('Battery?', 'a')).toMatchObject({ ok: false, error: { code: 'agent_unavailable', retryable: true } });
+    expect(await agent.ask('Battery?', TURN_A)).toMatchObject({ ok: false, error: { code: 'agent_unavailable', retryable: true } });
+  });
+
+  it('logs the HTTP status when the MCP server refuses the session (401 at connect, #233)', async () => {
+    const logs: AgentLogEntry[] = [];
+    const refused = Object.assign(new Error('Error POSTing to endpoint (HTTP 401)'), { code: 401 });
+    const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.reject(refused), log: (e) => logs.push(e) });
+    expect(await agent.ask('Battery?', TURN_A)).toMatchObject({ ok: false, error: { code: 'invalid_config', retryable: false } });
+    expect(logs).toMatchObject([{ level: 'error', code: 'invalid_config', correlationId: TURN_A, details: { httpStatus: 401 } }]);
   });
 });
 
@@ -133,8 +146,8 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
     };
     const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(s) });
 
-    const first = agent.ask('Make a plan', 'turn-a');
-    const second = agent.ask("What's my battery level?", 'turn-b');
+    const first = agent.ask('Make a plan', TURN_A);
+    const second = agent.ask("What's my battery level?", TURN_B);
     release();
     const [a, b] = await Promise.all([first, second]);
 
@@ -142,15 +155,15 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
     expect(a.ok && a.value.status).toBeUndefined();
     expect(b).toMatchObject({ ok: true, value: { text: 'Battery at 45%.', status: STATUS } });
     expect(b.ok && b.value.cards).toBeUndefined();
-    expect(base.correlationIds).toEqual(['turn-a', 'turn-b']);
+    expect(base.correlationIds).toEqual([TURN_A, TURN_B]);
   });
 
   it('a turn that throws (a bug) does not block the next one', async () => {
     let attempts = 0;
     const connect = () => (++attempts === 1 ? Promise.reject(new RangeError('bug while connecting')) : Promise.resolve(session()));
     const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect });
-    const first = agent.ask("What's my battery level?", 'turn-a');
-    const second = agent.ask("What's my battery level?", 'turn-b');
+    const first = agent.ask("What's my battery level?", TURN_A);
+    const second = agent.ask("What's my battery level?", TURN_B);
     await expect(first).rejects.toThrow(RangeError);
     expect(await second).toMatchObject({ ok: true, value: { text: 'Battery at 45%.' } });
   });
@@ -170,11 +183,11 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
     };
     const logs: AgentLogEntry[] = [];
     const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(s), log: (e) => logs.push(e) });
-    const first = agent.ask('Battery?', 'turn-a');
-    const second = agent.ask('Battery?', 'turn-b');
-    const third = await agent.ask('Battery?', 'turn-c');
+    const first = agent.ask('Battery?', TURN_A);
+    const second = agent.ask('Battery?', TURN_B);
+    const third = await agent.ask('Battery?', TURN_C);
     expect(third).toMatchObject({ ok: false, error: { code: 'turn_in_progress', category: 'rate_limited', retryAfterMs: CONFIG.turnDeadlineMs } });
-    expect(logs).toMatchObject([{ code: 'turn_in_progress', correlationId: 'turn-c' }]);
+    expect(logs).toMatchObject([{ code: 'turn_in_progress', correlationId: TURN_C }]);
     release();
     expect((await first).ok && (await second).ok).toBe(true);
   });
@@ -189,7 +202,7 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
     const s: McpSession = {
       listTools: () => base.listTools(),
       callTool: async (name, args, signal, correlationId) => {
-        if (correlationId === 'turn-a') {
+        if (correlationId === TURN_A) {
           await gate;
           now += CONFIG.turnDeadlineMs; // the first turn used the whole budget of the second one
         }
@@ -207,14 +220,14 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
       },
       now: () => now,
     });
-    const first = agent.ask('Battery?', 'turn-a');
-    const second = agent.ask('Battery?', 'turn-b');
+    const first = agent.ask('Battery?', TURN_A);
+    const second = agent.ask('Battery?', TURN_B);
     release();
     expect(await first).toMatchObject({ ok: true });
     expect(await second).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
-    expect(base.correlationIds).toEqual(['turn-a']);
+    expect(base.correlationIds).toEqual([TURN_A]);
     // The second turn never started, so the agent (and its history) is kept for the next one.
-    expect(await agent.ask('Battery?', 'turn-c')).toMatchObject({ ok: true });
+    expect(await agent.ask('Battery?', TURN_C)).toMatchObject({ ok: true });
     expect(connects).toBe(1);
   });
 
@@ -244,8 +257,8 @@ describe('createHomeAgent: two turns at once for the same home (review of #121)'
       });
     };
     const agent = createHomeAgent({ config: quick, home: HOME, model: new FakeModel(policy), connect });
-    expect(await agent.ask('Make a plan', 'turn-a')).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
-    const next = agent.ask("What's my battery level?", 'turn-b');
+    expect(await agent.ask('Make a plan', TURN_A)).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
+    const next = agent.ask("What's my battery level?", TURN_B);
     release();
     const reply = await next;
     expect(opened).toBe(2);
@@ -273,7 +286,7 @@ describe('createHomeAgent: the first turn opens the MCP session within the deadl
     };
     const agent = createHomeAgent({ config: quick, home: HOME, model: new FakeModel(policy), connect });
     const started = Date.now();
-    expect(await agent.ask('Battery?', 'turn-a')).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
+    expect(await agent.ask('Battery?', TURN_A)).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
     expect(Date.now() - started).toBeLessThan(1000);
     const base = session();
     resolveLate({
@@ -284,7 +297,7 @@ describe('createHomeAgent: the first turn opens the MCP session within the deadl
         return Promise.resolve();
       },
     });
-    expect(await agent.ask('Battery?', 'turn-b')).toMatchObject({ ok: true, value: { text: 'Battery at 45%.' } });
+    expect(await agent.ask('Battery?', TURN_B)).toMatchObject({ ok: true, value: { text: 'Battery at 45%.' } });
     expect(attempts).toBe(2);
     expect(lateClosed).toBe(true);
   });
@@ -311,7 +324,7 @@ describe('createHomeAgent: connecting and answering share one deadline (review o
     };
     const agent = createHomeAgent({ config, home: HOME, model: new FakeModel(policy), connect });
     const started = Date.now();
-    const reply = await agent.ask('Battery?', 'turn-a');
+    const reply = await agent.ask('Battery?', TURN_A);
     const elapsed = Date.now() - started;
     expect(reply).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
     expect(elapsed).toBeLessThan(config.turnDeadlineMs + 120);

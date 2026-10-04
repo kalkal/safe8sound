@@ -15,6 +15,8 @@ import { connectMcp } from '../../src/mcp-tools.js';
 // server; the next turn, after the person's yes, and a card tap both apply.
 const MCP_DIR = join(import.meta.dirname, '..', '..', '..', 'mcp-server');
 const TOKEN = randomBytes(24).toString('hex');
+/** sim-api's card actions: a token of their own, with the cards scope (#233). */
+const CARDS_TOKEN = randomBytes(24).toString('hex');
 const HOME = HomeIdSchema.parse('demo#0123456789abcdef');
 let server: ChildProcess;
 let url: string;
@@ -22,7 +24,7 @@ let url: string;
 beforeAll(async () => {
   server = spawn(process.execPath, ['--import', 'tsx', join(MCP_DIR, 'src', 'local.ts')], {
     cwd: MCP_DIR,
-    env: { ...process.env, PORT: '0', MCP_CLIENTS: `agent@demo#*=${TOKEN}`, MCP_SCENARIO: 'heatwave', MCP_SCENARIO_START_H: '14', MCP_SCENARIO_SPEED: '0' },
+    env: { ...process.env, PORT: '0', MCP_CLIENTS: `agent:agent@demo#*=${TOKEN},cards:sim@demo#*=${CARDS_TOKEN}`, MCP_SCENARIO: 'heatwave', MCP_SCENARIO_START_H: '14', MCP_SCENARIO_SPEED: '0' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   server.stderr?.resume();
@@ -60,20 +62,25 @@ const config = (mcpUrl: string): AgentConfig => ({
 
 const planIdIn = (text: string | undefined) => /planId (plan_[A-Za-z0-9]+)/.exec(text ?? '')?.[1];
 
-/** A card tap: sim-api's call, with the sandbox header and a correlation id, but no turn header. */
-async function cardTap(planId: string, correlationId: string): Promise<{ isError?: boolean; structuredContent?: { plan?: { status?: string } } }> {
-  const res = await fetch(url, {
+/** A tools/call of apply_plan as a client sends it, without a turn header. */
+function applyWithoutTurn(token: string, planId: string, correlationId: string): Promise<Response> {
+  return fetch(url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
-      authorization: `Bearer ${TOKEN}`,
+      authorization: `Bearer ${token}`,
       'mcp-protocol-version': '2025-11-25',
       'x-cold-reserve-home': HOME,
       'x-correlation-id': correlationId,
     },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'apply_plan', arguments: { planId } } }),
   });
+}
+
+/** A card tap: sim-api's call with its cards token, the sandbox header and a correlation id, never a turn header. */
+async function cardTap(planId: string, correlationId: string): Promise<{ isError?: boolean; structuredContent?: { plan?: { status?: string } } }> {
+  const res = await applyWithoutTurn(CARDS_TOKEN, planId, correlationId);
   return ((await res.json()) as { result: { isError?: boolean; structuredContent?: { plan?: { status?: string } } } }).result;
 }
 
@@ -97,6 +104,8 @@ describe('the person confirms before the agent applies (#230)', () => {
     expect(planId).toMatch(/^plan_/);
     expect(answer.text).toMatch(/^Not applied: the person has not confirmed yet\./);
     expect(answer.text).not.toMatch(/is active|applied\./i);
+    // The agent's own token cannot pass for a tap: without a turn its apply is refused before any tool runs (#233).
+    expect((await applyWithoutTurn(TOKEN, planId ?? '', turn)).status).toBe(400);
     // The card the person sees is the plan, still proposed; their tap applies it, in the same turn.
     expect(answer.cards?.map((c) => (c as { tool: string }).tool)).toEqual(['plan_comfort']);
     const tapped = await cardTap(planId ?? '', turn);

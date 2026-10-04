@@ -48,7 +48,9 @@ Input: `planId`.
 1. An already applied plan returns the stored outcome (`alreadyApplied: true`): agents and bridges may retry safely.
 2. On the real home, a plan built on simulated data is refused (`simulated_plan_on_real_home`, forbidden; plan §9.4).
 3. The guard revalidates the plan on the current state, in the same frame as propose: the season from the plan's goal and the current forecast (an `auto` plan made for heating keeps the heating minimum), and the night mode from who is in the safe room now. A refusal writes nothing and is logged.
-4. The conditional write `status = proposed AND now < expiresAt` applies it once (F5's StateStore); otherwise the result is `plan_expired`. `now` is the home's domain time (its scenario clock), passed with the call (#175).
+4. The conditional write `status = proposed AND now < expiresAt` applies it once (F5's StateStore); otherwise the result is `plan_expired`.
+   - **Confirm before apply (#230, #233).** `apply_plan` is refused (`confirmation_required`) in the turn that proposed the plan: the agent names its turn in `x-cold-reserve-turn` on every tool call, and the plan remembers the turn it was proposed in. The agent's MCP client has the `agent` scope: a tool call without a turn is refused (400). The agent itself calls no tool outside a well-formed turn. sim-api's card actions use a `cards` client and never name a turn: a tap is the person's own yes.
+   - **Accepted risk.** The rule is "not in the same turn". A later turn, or text the model reads in it (a family reply, for example), could still lead the model to apply a plan proposed earlier. Clients without a scope (bench, Inspector, other MCP clients) send no turn, so their `apply_plan` counts as a tap. The guard still revalidates every apply against the hard limits. `now` is the home's domain time (its scenario clock), passed with the call (#175).
 5. On the real home the plan is advice only (read-only during the hackathon): the answer lists the manual setting per room.
 
 ## What the model reads

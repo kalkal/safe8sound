@@ -44,7 +44,8 @@ function start(app: string, env: Record<string, string>): Promise<string> {
 
 beforeAll(async () => {
   const mcp = await start('mcp-server', {
-    MCP_CLIENTS: `agent@demo#*=${AGENT_MCP},simapi@demo#*=${SIM_MCP}`,
+    // As deployed (#233): the agent always names its turn, the card actions never do.
+    MCP_CLIENTS: `agent:agent@demo#*=${AGENT_MCP},cards:simapi@demo#*=${SIM_MCP}`,
     MCP_SCENARIO: 'clear-day',
     MCP_SCENARIO_START_H: '14',
     MCP_SCENARIO_SPEED: '0',

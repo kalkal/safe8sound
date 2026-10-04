@@ -9,8 +9,10 @@ export interface ClientGrant {
   /**
    * What the token opens. Absent: the MCP endpoint. `phone`: only the family phone's inbox (#24),
    * never a tool; listed in MCP_CLIENTS as `phone:<client>@<homeId>=<token>`, revocable on its own.
+   * `agent`: the MCP endpoint, and every tool call names its turn (x-cold-reserve-turn), so the agent never passes for
+   * the person's tap. `cards`: the MCP endpoint for card actions (sim-api), which never name a turn (#233).
    */
-  readonly scope?: 'phone';
+  readonly scope?: ClientScope;
 }
 
 export interface ServerConfig {
@@ -34,6 +36,9 @@ export interface ServerConfig {
   readonly protectedResource?: { readonly resource: string; readonly authorizationServers: readonly string[] };
 }
 
+export type ClientScope = 'phone' | 'agent' | 'cards';
+const SCOPES: readonly string[] = ['phone', 'agent', 'cards'] satisfies ClientScope[];
+
 const MIN_TOKEN_LENGTH = 32;
 const CLIENT_ID = /^[a-z][a-z0-9-]{0,31}$/;
 const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
@@ -42,7 +47,7 @@ const DEFAULT_METRICS_NAMESPACE = 'ColdReserve/Mcp';
 const invalid = (message: string) => err(toolError('invalid_config', message));
 
 /**
- * Parses `MCP_CLIENTS` = `[phone:]<client>@<homeId>=<token>,...` (locally from `.env`, on Lambda from SSM).
+ * Parses `MCP_CLIENTS` = `[phone:|agent:|cards:]<client>@<homeId>=<token>,...` (locally from `.env`, on Lambda from SSM).
  * Error messages name the client or the entry, never the token.
  */
 export function parseClients(raw: string | undefined): Result<ReadonlyMap<string, ClientGrant>, ErrorEnvelope> {
@@ -56,16 +61,16 @@ export function parseClients(raw: string | undefined): Result<ReadonlyMap<string
     const sandboxes = rawHome === 'demo#*';
     const homeId = HomeIdSchema.safeParse(sandboxes ? 'demo' : rawHome);
     if (!match || !CLIENT_ID.test(clientId) || !homeId.success) {
-      return invalid(`MCP_CLIENTS entry ${String(index + 1)} is not [phone:]<client>@<homeId>=<token>.`);
+      return invalid(`MCP_CLIENTS entry ${String(index + 1)} is not [<scope>:]<client>@<homeId>=<token>.`);
     }
-    if (scope !== undefined && scope !== 'phone') return invalid(`Client "${clientId}" has an unknown scope; the only one is phone.`);
+    if (scope !== undefined && !SCOPES.includes(scope)) return invalid(`Client "${clientId}" has an unknown scope; the scopes are ${SCOPES.join(', ')}.`);
     // The phone reads one home's inbox: a visitor sandbox has no phone view until a sandbox-bound token exists.
     if (scope === 'phone' && sandboxes) return invalid(`Phone client "${clientId}" names one home: demo#* sandboxes have no phone view.`);
     if (token.length < MIN_TOKEN_LENGTH) return invalid(`The token of client "${clientId}" is shorter than ${MIN_TOKEN_LENGTH} characters.`);
     if (clients.has(token)) return invalid(`Client "${clientId}" reuses another client's token.`);
     if (seen.has(clientId)) return invalid(`Client "${clientId}" is listed twice.`);
     seen.add(clientId);
-    clients.set(token, { clientId, homeId: homeId.data, ...(sandboxes ? { sandboxes: true as const } : {}), ...(scope === 'phone' ? { scope } : {}) });
+    clients.set(token, { clientId, homeId: homeId.data, ...(sandboxes ? { sandboxes: true as const } : {}), ...(scope === undefined ? {} : { scope: scope as ClientScope }) });
   }
   return ok(clients);
 }

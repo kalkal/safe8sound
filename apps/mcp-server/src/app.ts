@@ -222,6 +222,23 @@ export function logSourceEvent(logger: Logger, homeId: HomeId): (event: SourceEv
   };
 }
 
+/**
+ * The client scopes at start-up (#233): how many grants are agent, cards, phone or unscoped, counts only. After a
+ * deploy it shows whether the agent:/cards: prefixes in the SSM client list took.
+ */
+function logClientScopes(config: ServerConfig, logger: Logger): void {
+  const counts = { agent: 0, cards: 0, phone: 0, unscoped: 0 };
+  for (const grant of config.clients.values()) counts[grant.scope ?? 'unscoped'] += 1;
+  logger.log({
+    ts: new Date().toISOString(),
+    level: 'info',
+    component: 'mcp-server',
+    message: `Client scopes: ${String(counts.agent)} agent, ${String(counts.cards)} cards, ${String(counts.phone)} phone, ${String(counts.unscoped)} unscoped.`,
+    correlationId: 'startup',
+    details: { event: 'client_scopes', ...counts },
+  });
+}
+
 /** The Protected Resource Metadata mode at start-up (#149): auto, fixed or off, never the URL itself. */
 function logMetadataMode(config: ServerConfig, logger: Logger): void {
   const pr = config.protectedResource;
@@ -271,6 +288,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const homeSim = simulator(home);
   warnMissingEpsLoad([demo, home], opts.logger);
   logMetadataMode(config.value, opts.logger);
+  logClientScopes(config.value, opts.logger);
   const homes = new Map<HomeId, HomeEntry>([
     [DEMO, { source: demoSim, profile: demo, readOnly: false, levelSince, clock }],
     [HOME, { source: new FallbackSource({ primary: noLiveHome, fallback: homeSim, clock, onEvent: logSourceEvent(opts.logger, HOME) }), profile: home, readOnly: true, levelSince, clock }],
