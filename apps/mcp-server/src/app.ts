@@ -1,19 +1,21 @@
 import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
-import { epsBaseLoadW, isTimeZone, localMidnightMs, scenarioClock, type Clock, type HomeDataSource } from '@cold-reserve/core';
+import { epsBaseLoadW, isTimeZone, localMidnightMs, scenarioClock, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
 import { FallbackSource, type SourceEvent } from '@cold-reserve/source-fallback';
-import { SCENARIO_IDS, SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
+import { SCENARIO_IDS, SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, profileAtPlace, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
 import { withCardResources, type CardDocuments } from './cards.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
 import type { ComfortPlanWiring } from './comfort-plan-config.js';
 import { atHome } from './modules/comfort-plan/deps.js';
 import { comfortPlanModule } from './modules/comfort-plan/index.js';
+import { demoSettingsModule, type SandboxChoices } from './modules/demo-settings.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
 import { stormModeModule, type StormModeDeps } from './modules/storm-mode/index.js';
 import { familyReply } from './modules/storm-mode/tools.js';
 import type { PhoneReplyHandler } from './phone-inbox.js';
 import type { StormModeWiring } from './storm-mode-config.js';
 import { createSandboxes } from './sandboxes.js';
+import { refreshFrom, shippedPlace, withHousehold, type SandboxPlay } from './sandbox-play.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
 
 export interface AppOptions {
@@ -39,6 +41,13 @@ export interface AppOptions {
   readonly scenarioClock?: Clock;
   /** Local entry only: the battery at the scenario start, in % (MCP_SCENARIO_START_SOC_PCT), to reach the last resort. */
   readonly scenarioStartSocPct?: number;
+  /** The timeline the caller built `scenarioClock` from: the sandboxes' clocks come from the same one (C2b). */
+  readonly scenarioTimeline?: ScenarioTimeline;
+  /**
+   * Where the visitors' sandbox settings live (C2b, #222). With it, every sandbox request reads its settings and the
+   * demo-settings tools are served; without it (tests), sandboxes play the defaults.
+   */
+  readonly settingsStoreFor?: StateStoreFactory;
 }
 
 /**
@@ -47,18 +56,32 @@ export interface AppOptions {
  * sessions and the local store agree on "now".
  */
 export function scenarioClockFor(env: Readonly<Record<string, string | undefined>>, wall: Clock): Result<Clock, ErrorEnvelope> {
+  const play = scenarioPlayFor(env, wall);
+  return play.ok ? ok(play.value.clock) : play;
+}
+
+/**
+ * The timeline and the env scenario's clock on it, built once (C2b): an entry passes both to createApp, so the
+ * sandboxes' clocks come from the same timeline as the demo's (the same start, with the default `start` anchor).
+ */
+export function scenarioPlayFor(env: Readonly<Record<string, string | undefined>>, wall: Clock): Result<{ timeline: ScenarioTimeline; clock: Clock }, ErrorEnvelope> {
   const start = scenarioStartFor(env);
   if (!start.ok) return start;
   const timeline = scenarioTimelineFor(env, wall);
   if (!timeline.ok) return timeline;
-  // The zone of the place the scenario is played in (L1, #217): the reference place until sandboxes choose theirs (C2).
-  return timeline.value.clockFor({ startAt: start.value.scenario.startAt, tz: builtInPlace('reference').tz });
+  // The env scenario plays in the reference place (L1, #217); a sandbox plays the place of its settings (C2b).
+  const clock = timeline.value.clockFor({ startAt: start.value.scenario.startAt, tz: builtInPlace('reference').tz });
+  return clock.ok ? ok({ timeline: timeline.value, clock: clock.value }) : clock;
 }
 
 /** What every home's scenario clock shares: the anchor rule, the speed and the start hour (C2a, Refs #222). */
 export interface ScenarioTimeline {
-  /** The scenario clock of a home playing a scenario that starts at `startAt` in a place of zone `tz`. */
-  clockFor(play: { readonly startAt: string; readonly tz: string }): Result<Clock, ErrorEnvelope>;
+  /**
+   * The scenario clock of a home playing a scenario that starts at `startAt` in a place of zone `tz`. With
+   * `startedAtMs`, the home's day was started again at that wall instant (a sandbox's restart, C2b): it plays from
+   * the start hour then, whatever the shared anchor.
+   */
+  clockFor(play: { readonly startAt: string; readonly tz: string; readonly startedAtMs?: number }): Result<Clock, ErrorEnvelope>;
 }
 
 /**
@@ -77,8 +100,8 @@ export function scenarioTimelineFor(env: Readonly<Record<string, string | undefi
   const check = scenarioAnchor(raw, startedAtMs, builtInPlace('reference').tz);
   if (!check.ok) return check;
   return ok({
-    clockFor: ({ startAt, tz }) => {
-      const anchor = scenarioAnchor(raw, startedAtMs, tz);
+    clockFor: ({ startAt, tz, startedAtMs: restartedAtMs }) => {
+      const anchor = restartedAtMs === undefined ? scenarioAnchor(raw, startedAtMs, tz) : ok(restartedAtMs);
       if (!anchor.ok) return anchor;
       return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: Date.parse(startAt) + startH.value * HOUR_MS, speed: speed.value }));
     },
@@ -86,7 +109,7 @@ export function scenarioTimelineFor(env: Readonly<Record<string, string | undefi
 }
 
 /** The scenario and the instant the server starts in it (its start plus MCP_SCENARIO_START_H): one definition. */
-function scenarioStartFor(env: Readonly<Record<string, string | undefined>>): Result<{ scenario: Scenario; startMs: number }, ErrorEnvelope> {
+function scenarioStartFor(env: Readonly<Record<string, string | undefined>>): Result<{ scenario: Scenario; scenarioId: ScenarioId; startMs: number }, ErrorEnvelope> {
   const scenarioId = env['MCP_SCENARIO'] ?? 'clear-day';
   if (!(SCENARIO_IDS as readonly string[]).includes(scenarioId)) {
     return err(toolError('invalid_config', `MCP_SCENARIO must be one of ${SCENARIO_IDS.join(', ')}.`));
@@ -94,7 +117,7 @@ function scenarioStartFor(env: Readonly<Record<string, string | undefined>>): Re
   const startH = number(env, 'MCP_SCENARIO_START_H', 0);
   if (!startH.ok) return startH;
   const scenario = builtInScenario(scenarioId as ScenarioId);
-  return ok({ scenario, startMs: Date.parse(scenario.startAt) + startH.value * HOUR_MS });
+  return ok({ scenario, scenarioId: scenarioId as ScenarioId, startMs: Date.parse(scenario.startAt) + startH.value * HOUR_MS });
 }
 
 export interface App {
@@ -103,7 +126,7 @@ export interface App {
   readonly handler: McpHandler;
   /** The family phone's reply (POST /phone/reply, #24), over the storm module's own deps; absent without it. */
   readonly familyReply?: PhoneReplyHandler;
-  /** A home's own scenario clock: for what is composed before the app, like the playthrough of its stores (#234). */
+  /** A home's own scenario clock, for what is composed before the app: its stores' playthrough (#234), preferences (C2b). */
   readonly homeClock: (homeId: HomeId) => Clock | undefined;
 }
 
@@ -231,11 +254,15 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   }
   const scenario = startSoc === undefined ? builtIn : { ...builtIn, initial: { ...builtIn.initial, batterySocPct: pct(startSoc) } };
   const scenarioStartMs = start.value.startMs;
-  const derived = opts.scenarioClock === undefined ? scenarioClockFor(env, opts.wallClock) : ok(opts.scenarioClock);
+  const timeline = opts.scenarioTimeline === undefined ? scenarioTimelineFor(env, opts.wallClock) : ok(opts.scenarioTimeline);
+  if (!timeline.ok) return timeline;
+  const reference = builtInPlace('reference');
+  const derived = opts.scenarioClock === undefined ? timeline.value.clockFor({ startAt: builtIn.startAt, tz: reference.tz }) : ok(opts.scenarioClock);
   if (!derived.ok) return derived;
   const clock = derived.value;
   const params = defaultSimParams();
   const levelSince = new Date(scenarioStartMs).toISOString();
+  const startHMs = scenarioStartMs - Date.parse(builtIn.startAt);
 
   const demo = demoProfile();
   const home = HomeProfileSchema.parse({ ...demo, homeId: HOME });
@@ -253,16 +280,46 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     [DEMO, () => demoSim.forecast()],
     [HOME, () => homeSim.forecast()],
   ]);
-  // Visitor sandboxes (#101): a copy of the demo home per visitor, created on first use, 24 h TTL, daily cap.
-  const sandboxes = createSandboxes({
+
+  // Visitor sandboxes (#101) play their own settings (C2b, #222): the scenario, the place, who is at home and the
+  // start of their day, each on its own scenario clock. Before any settings are saved, today's sandbox (Q3).
+  const sandboxDefaults: SandboxChoices = { scenarioId: start.value.scenarioId, locationId: 'reference', units: 'C', household: 'older-man' };
+  const playSandbox = (homeId: HomeId, choices: SandboxChoices & { readonly version?: number | undefined; readonly scenarioStartedAt?: string | undefined }): Result<SandboxPlay, ErrorEnvelope> => {
+    // Only the reference place ships until L2 (C2b Q2): set_scenario refuses the others before they are stored.
+    if (choices.locationId !== 'reference') return err(toolError('invalid_config', 'The stored place is not available.', { details: { field: 'locationId' } }));
+    const place = builtInPlace(choices.locationId);
+    const played = withHousehold(builtInScenario(choices.scenarioId, choices.locationId), choices.household);
+    const sandboxScenario = startSoc === undefined ? played : { ...played, initial: { ...played.initial, batterySocPct: pct(startSoc) } };
+    const homeClock = timeline.value.clockFor({
+      startAt: sandboxScenario.startAt,
+      tz: place.tz,
+      ...(choices.scenarioStartedAt === undefined ? {} : { startedAtMs: Date.parse(choices.scenarioStartedAt) }),
+    });
+    if (!homeClock.ok) return homeClock;
+    const profile = profileAtPlace(demo, place);
+    const sim = new SimulatorSource({ profile: HomeProfileSchema.parse({ ...profile, homeId }), scenario: sandboxScenario, params, clock: homeClock.value });
+    const since = new Date(Date.parse(sandboxScenario.startAt) + startHMs).toISOString();
+    return ok({
+      entry: { source: sim, profile, readOnly: false, levelSince: since, clock: homeClock.value },
+      forecast: () => sim.forecast(),
+      ...(choices.version === undefined ? {} : { version: choices.version }),
+    });
+  };
+  const settingsStoreFor = opts.settingsStoreFor;
+  const sandboxes = createSandboxes<SandboxPlay>({
     clock: opts.wallClock,
     ttlMs: sandboxTtlH.value * HOUR_MS,
     maxNewPerDay: sandboxMaxNew.value,
+    // The defaults always build: they are today's sandbox, checked at start-up below.
     create: (homeId) => {
-      const sim = simulator(HomeProfileSchema.parse({ ...demo, homeId }));
-      return { entry: { source: sim, profile: demo, readOnly: false, levelSince, clock } satisfies HomeEntry, forecast: () => sim.forecast() };
+      const play = playSandbox(homeId, sandboxDefaults);
+      if (!play.ok) throw new Error(play.error.message);
+      return play.value;
     },
+    ...(settingsStoreFor === undefined ? {} : { refresh: refreshFrom(settingsStoreFor, playSandbox, opts.logger) }),
   });
+  const startUp = playSandbox(DEMO, sandboxDefaults);
+  if (!startUp.ok) return startUp;
   const sandboxFor = (homeId: HomeId) => (SandboxHomeIdSchema.safeParse(homeId).success ? sandboxes.get(homeId) : undefined);
 
   const homeFor = (homeId: HomeId) => {
@@ -285,6 +342,22 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver }),
     ...(opts.comfortPlan === undefined ? [] : [comfortPlanModule({ ...opts.comfortPlan, model: params, homes: planningHome, logger: opts.logger })]),
     ...(stormDeps === undefined ? [] : [stormModeModule(stormDeps)]),
+    ...(settingsStoreFor === undefined
+      ? []
+      : [
+          demoSettingsModule({
+            storeFor: settingsStoreFor,
+            wallClock: opts.wallClock,
+            defaults: sandboxDefaults,
+            place: (id) => {
+              const place = shippedPlace(id);
+              return place === undefined ? undefined : { id: place.id, label: place.label, tz: place.tz };
+            },
+            logger: opts.logger,
+            // This container plays the change at once; the others at their next request.
+            onChange: (homeId, _settings, correlationId) => sandboxes.refresh(homeId, correlationId),
+          }),
+        ]),
     ...(opts.modules ?? []),
   ];
   const registry = createRegistry(opts.cardDocuments === undefined ? modules : withCardResources(modules, opts.cardDocuments));

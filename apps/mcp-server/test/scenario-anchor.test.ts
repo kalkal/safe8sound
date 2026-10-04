@@ -85,6 +85,39 @@ describe('the scenario timeline (C2a, Refs #222): one anchor and speed, a clock 
     expect(clock.ok && clock.value.now()).toBe(before.value.now());
   });
 
+  it('gives the same clock as before with the default start anchor too, while the wall moves (review of #225)', () => {
+    const env = { MCP_SCENARIO: 'heatwave', MCP_SCENARIO_START_H: '6', MCP_SCENARIO_SPEED: '2' };
+    const moving = settableClock(at('2026-10-01T10:00:00Z'));
+    const timeline = scenarioTimelineFor(env, moving);
+    const before = scenarioClockFor(env, moving);
+    if (!timeline.ok || !before.ok) throw new Error('config');
+    const clock = timeline.value.clockFor({ startAt: '2026-07-16T00:00:00+02:00', tz: 'Europe/Rome' });
+    if (!clock.ok) throw new Error('clock');
+    // Start hour 6 (06:00 in Rome, 04:00 UTC) at the server start, then twice as fast as the wall.
+    for (const [step, expected] of [
+      [0, '2026-07-16T04:00:00.000Z'],
+      [90_000, '2026-07-16T04:03:00.000Z'],
+      [3 * H, '2026-07-16T10:00:00.000Z'],
+    ] as const) {
+      moving.set(at('2026-10-01T10:00:00Z') + step);
+      expect(new Date(clock.value.now()).toISOString()).toBe(expected);
+      expect(clock.value.now()).toBe(before.value.now());
+    }
+  });
+
+  it('a sandbox started at its own wall instant plays its day from the start hour then, whatever the shared anchor (C2b)', () => {
+    const moving = settableClock(at('2026-10-01T10:00:00Z'));
+    const timeline = scenarioTimelineFor({ MCP_SCENARIO_ANCHOR: 'daily', MCP_SCENARIO_START_H: '8' }, moving);
+    if (!timeline.ok) throw new Error('config');
+    const restarted = timeline.value.clockFor({ startAt: '2026-07-16T00:00:00+02:00', tz: 'Europe/Rome', startedAtMs: at('2026-10-01T09:30:00Z') });
+    if (!restarted.ok) throw new Error('clock');
+    // 30 wall minutes after the restart: 08:30 on the scenario day, in Rome (06:30 UTC).
+    expect(new Date(restarted.value.now()).toISOString()).toBe('2026-07-16T06:30:00.000Z');
+    // Two wall hours after the restart: 10:00 in Rome.
+    moving.set(at('2026-10-01T11:30:00Z'));
+    expect(new Date(restarted.value.now()).toISOString()).toBe('2026-07-16T08:00:00.000Z');
+  });
+
   it('plays two scenarios side by side: the same wall instant is each scenario own time', () => {
     const timeline = scenarioTimelineFor({ MCP_SCENARIO_ANCHOR: 'daily' }, wall(at('2026-10-01T10:00:00Z')));
     if (!timeline.ok) throw new Error('config');

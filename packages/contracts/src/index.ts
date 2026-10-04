@@ -25,4 +25,5 @@ export * from './correlation.js';
 export * from './stored.js';
 export * from './storm-prep.js';
 export * from './sandbox-settings.js';
+export * from './demo-settings.js';
 export * from './admin-settings.js';

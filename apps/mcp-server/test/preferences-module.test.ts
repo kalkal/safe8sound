@@ -63,6 +63,15 @@ describe('preferences module (MCP tools)', () => {
     expect((await call(d, 'get_preferences', {})).structuredContent).toMatchObject({ isDefault: false, preferences: { safety: { cooling: { maxC: 28 } } } });
   });
 
+  it('stamps a change at the home own scenario time when the home has a clock (C2b, review of #225)', async () => {
+    const homeMs = Date.parse('2026-07-17T09:30:00Z');
+    const set = await call(deps({ clockFor: () => ({ now: () => homeMs }) }), 'set_preferences', { safety: { cooling: { maxC: 28 } }, confirmed: true });
+    expect(set.structuredContent).toMatchObject({ changes: [{ ts: '2026-07-17T09:30:00.000Z' }] });
+    // A home without its own clock keeps the module clock.
+    const plain = await call(deps({ clockFor: () => undefined }), 'set_preferences', { safety: { cooling: { maxC: 28 } }, confirmed: true });
+    expect(plain.structuredContent).toMatchObject({ changes: [{ ts: '2026-07-15T12:00:00.000Z' }] });
+  });
+
   it('reports every refusal of the domain through MCP, and saves nothing', async () => {
     const d = deps();
     expect(await call(d, 'set_preferences', { comfortC: { cooling: 29 }, confirmed: true })).toMatchObject({

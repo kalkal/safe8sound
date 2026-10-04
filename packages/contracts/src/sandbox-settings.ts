@@ -26,5 +26,10 @@ export const SandboxSettingsSchema = z.strictObject({
   household: HouseholdSchema,
   /** The battery when the storm scenario starts, in %, or the configured reserve. */
   stormStartSoc: z.union([z.number().int().min(30).max(100), z.literal('from-reserve')]).optional(),
+  /**
+   * The wall instant the visitor last started the day from (C2b, approved in #222): set on a restart and on a
+   * new scenario or place, so every container plays the same hour. Absent: the shared timeline's start.
+   */
+  scenarioStartedAt: IsoDateTimeSchema.optional(),
 });
 export type SandboxSettings = z.infer<typeof SandboxSettingsSchema>;

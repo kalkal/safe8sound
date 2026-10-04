@@ -146,7 +146,8 @@ export interface StoreScope {
   /**
    * The wall instant the home's current playthrough of its scenario began (#234): a daily replay, a server start or a
    * sandbox restart. Storm sessions and family messages belong to it, so a replayed day never sees the last one's.
-   * Absent (the real home, tests): one playthrough for ever, today's keys.
+   * Every home on a scenario clock has one, the simulated `home` entry included. Absent (a home on a real clock,
+   * tests): one playthrough for ever, today's keys.
    */
   readonly playthrough?: number;
 }

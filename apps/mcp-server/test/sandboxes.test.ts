@@ -59,3 +59,33 @@ describe('sandbox homes (#101): created on first use, 24 h TTL, a daily cap', ()
     expect(sandboxes.admit(home(2)).ok).toBe(true);
   });
 });
+
+describe('sandbox refresh (C2, #222): a sandbox follows its stored settings', () => {
+  it('replaces a live sandbox with what refresh builds, and leaves it when refresh keeps it', async () => {
+    let now = Date.UTC(2026, 9, 4, 9);
+    let version = 1;
+    const sandboxes = createSandboxes({
+      clock: { now: () => now },
+      ttlMs: 24 * HOUR,
+      maxNewPerDay: 5,
+      create: (h) => ({ home: h, version: 0 }),
+      refresh: (_h, current) => Promise.resolve(current.version === version ? current : { ...current, version }),
+    });
+    sandboxes.admit(home(1));
+    await sandboxes.refresh(home(1), 'c-1');
+    expect(sandboxes.get(home(1))).toEqual({ home: home(1), version: 1 });
+    const same = sandboxes.get(home(1));
+    await sandboxes.refresh(home(1), 'c-2');
+    expect(sandboxes.get(home(1))).toBe(same);
+    version = 2;
+    now += HOUR;
+    await sandboxes.refresh(home(1), 'c-3');
+    expect(sandboxes.get(home(1))).toEqual({ home: home(1), version: 2 });
+  });
+
+  it('does nothing for a sandbox that is not live, and nothing without a refresh', async () => {
+    const { sandboxes } = setup();
+    await expect(sandboxes.refresh(home(9), 'c-1')).resolves.toBeUndefined();
+    expect(sandboxes.get(home(9))).toBeUndefined();
+  });
+});

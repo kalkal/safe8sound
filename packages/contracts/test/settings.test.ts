@@ -46,6 +46,10 @@ describe('SandboxSettingsSchema', () => {
     expect(SandboxSettingsSchema.safeParse({ ...SANDBOX, stormStartSoc: 'from-reserve' }).success).toBe(true);
   });
 
+  it('accepts the wall instant the day was last started from (C2b, approved in #222)', () => {
+    expect(SandboxSettingsSchema.safeParse({ ...SANDBOX, scenarioStartedAt: '2026-10-04T10:00:00Z' }).success).toBe(true);
+  });
+
   it.each([
     ['an unknown scenario', { scenarioId: 'blizzard' }],
     ['an unknown place', { locationId: 'paris' }],
@@ -55,6 +59,7 @@ describe('SandboxSettingsSchema', () => {
     ['a storm charge above 100 %', { stormStartSoc: 101 }],
     ['a fractional storm charge', { stormStartSoc: 45.5 }],
     ['version 0', { version: 0 }],
+    ['a start that is not an ISO instant', { scenarioStartedAt: 'this morning' }],
     ['an extra field (a home id, a threshold)', { homeId: 'home' }],
     ['a health threshold (not a setting)', { comfortC: 26 }],
   ])('refuses %s', (_case, change) => {

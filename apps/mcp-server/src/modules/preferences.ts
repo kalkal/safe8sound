@@ -27,6 +27,8 @@ export interface PreferencesModuleDeps {
   /** What a home uses before anyone saved preferences (from config). */
   readonly defaultsFor: (homeId: HomeId) => Preferences;
   readonly clock: Clock;
+  /** A home's own scenario clock (C2b): a change is stamped at that home's time; without one, `clock`. */
+  readonly clockFor?: (homeId: HomeId) => Clock | undefined;
 }
 
 // set_preferences overwrites safety thresholds: marked destructive, so the host asks for confirmation.
@@ -74,7 +76,7 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
       const next = updatePreferences(read.value.preferences, update, {
         limits: deps.limits,
         roomIds: deps.roomIdsFor(ctx.homeId),
-        at: new Date(deps.clock.now()).toISOString(),
+        at: new Date((deps.clockFor?.(ctx.homeId) ?? deps.clock).now()).toISOString(),
         by: 'user',
         // The model passed confirmed: true after the host prompt; the log says so, not more.
         confirmedVia: 'tool',

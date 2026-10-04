@@ -300,6 +300,8 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
         record(admitted.error, correlationId, { clientId: grant.clientId });
         return problem(admitted.error, correlationId);
       }
+      // The visitor's saved settings (C2b): one read per request, so every container plays a change at once.
+      await deps.sandboxes.refresh(sandbox.data, correlationId);
       homeId = sandbox.data;
     }
 

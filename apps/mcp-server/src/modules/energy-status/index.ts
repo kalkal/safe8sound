@@ -14,7 +14,7 @@ export interface HomeEntry {
   readonly profile: HomeProfile;
   readonly readOnly: boolean;
   readonly levelSince: string;
-  /** The home's own scenario clock (C2a, Refs #222): its simulator runs on it. */
+  /** The home's own scenario clock (C2a; a sandbox's from its settings, C2b): its simulator runs on it. */
   readonly clock?: Clock;
 }
 

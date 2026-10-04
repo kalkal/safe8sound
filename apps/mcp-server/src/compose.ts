@@ -30,6 +30,8 @@ export interface ComposeOptions {
   readonly preferences: PreferencesConfig;
   readonly storeFor: StateStoreFactory;
   readonly clock: Clock;
+  /** A home's own scenario clock (C2b), known once the app is built: the entries bind it late. */
+  readonly clockFor?: (homeId: HomeId) => Clock | undefined;
 }
 
 export function composeModules(opts: ComposeOptions): Result<CapabilityModule[], ErrorEnvelope> {
@@ -43,6 +45,7 @@ export function composeModules(opts: ComposeOptions): Result<CapabilityModule[],
     roomIdsFor: (homeId) => profileFor(homeId)?.rooms.map((room) => room.id) ?? [],
     defaultsFor: () => demoDefaults.value,
     clock: opts.clock,
+    ...(opts.clockFor === undefined ? {} : { clockFor: opts.clockFor }),
   });
   return ok([{ ...preferences, enabledFor: (homeId) => profileFor(homeId) !== undefined }]);
 }

@@ -8,6 +8,11 @@ export interface Sandboxes<T> {
   admit(home: HomeId): Result<T, ErrorEnvelope>;
   /** The live sandbox of `home`, if any (no creation, no TTL refresh). */
   get(home: HomeId): T | undefined;
+  /**
+   * Brings a live sandbox up to date with its stored settings (C2, #222): the handler awaits it right after
+   * `admit`, so every container sees a change at its next request. It never throws: a failure keeps the sandbox.
+   */
+  refresh(home: HomeId, correlationId: string): Promise<void>;
 }
 
 /**
@@ -18,7 +23,14 @@ export interface Sandboxes<T> {
  * so the real daily ceiling is `maxNewPerDay` × concurrent instances (10 on a new account). A store-backed
  * counter replaces it if the demo goes public.
  */
-export function createSandboxes<T>(opts: { clock: Clock; ttlMs: number; maxNewPerDay: number; create: (home: HomeId) => T }): Sandboxes<T> {
+export function createSandboxes<T>(opts: {
+  clock: Clock;
+  ttlMs: number;
+  maxNewPerDay: number;
+  create: (home: HomeId) => T;
+  /** Returns the sandbox to keep: the same one, or one rebuilt from new settings. It handles its own failures. */
+  refresh?: (home: HomeId, current: T, correlationId: string) => Promise<T>;
+}): Sandboxes<T> {
   const live = new Map<HomeId, { value: T; lastUsedMs: number }>();
   let day = -1;
   let createdToday = 0;
@@ -52,6 +64,13 @@ export function createSandboxes<T>(opts: { clock: Clock; ttlMs: number; maxNewPe
     get(home) {
       sweep(opts.clock.now());
       return live.get(home)?.value;
+    },
+    async refresh(home, correlationId) {
+      const entry = live.get(home);
+      if (entry === undefined || opts.refresh === undefined) return;
+      const next = await opts.refresh(home, entry.value, correlationId);
+      // Another request may have replaced or forgotten it meanwhile: only the entry we read is updated.
+      if (live.get(home) === entry) entry.value = next;
     },
   };
 }

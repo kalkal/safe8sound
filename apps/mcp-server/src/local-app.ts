@@ -1,7 +1,7 @@
 import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import type { Clock, Logger } from '@cold-reserve/core';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
-import { createApp, scenarioClockFor, type App } from './app.js';
+import { createApp, scenarioPlayFor, type App } from './app.js';
 import type { CardDocuments } from './cards.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules } from './compose.js';
@@ -33,25 +33,31 @@ export function createLocalApp(
   env: Readonly<Record<string, string | undefined>>,
   opts: { readonly wallClock: Clock; readonly logger: Logger; readonly cardDocuments?: CardDocuments },
 ): Result<LocalApp, ErrorEnvelope> {
-  const clock = scenarioClockFor(env, opts.wallClock);
-  if (!clock.ok) return clock;
+  const play = scenarioPlayFor(env, opts.wallClock);
+  if (!play.ok) return play;
+  const clock = play.value.clock;
   const startSoc = localStartSocPct(env);
   if (!startSoc.ok) return startSoc;
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) return preferences;
   // The store's clock is the wall's: it drives only the retention; plan expiry is judged on the home's scenario time (#175).
-  // Each home's stores are scoped to its playthrough (#234); the app knows the home clocks once built.
+  const memory = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: opts.wallClock });
+  // The app knows each home's clock once built: its stores are scoped to its playthrough (#234) and preferences are
+  // stamped at its own time (C2b).
   let homeClock: App['homeClock'] = () => undefined;
-  const storeFor = withPlaythrough(memoryStateStoreFactory({ backing: createMemoryBacking(), clock: opts.wallClock }), (homeId) => homeClock(homeId));
-  const modules = composeModules({ preferences: preferences.value, storeFor, clock: clock.value });
+  const storeFor = withPlaythrough(memory, (homeId) => homeClock(homeId));
+  const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId) });
   if (!modules.ok) return modules;
-  const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock: clock.value });
+  const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock });
   if (!stormMode.ok) return stormMode;
-  const comfortPlan = comfortPlanWiring({ storeFor, preferences: preferences.value, clock: clock.value, notifier: stormMode.value.notifier });
+  const comfortPlan = comfortPlanWiring({ storeFor, preferences: preferences.value, clock, notifier: stormMode.value.notifier });
   if (!comfortPlan.ok) return comfortPlan;
   const app = createApp(env, {
     wallClock: opts.wallClock,
-    scenarioClock: clock.value,
+    scenarioClock: clock,
+    scenarioTimeline: play.value.timeline,
+    // Settings belong to the sandbox, not to a playthrough of its day.
+    settingsStoreFor: memory,
     logger: wallStamped(opts.logger, opts.wallClock),
     modules: modules.value,
     comfortPlan: comfortPlan.value,
