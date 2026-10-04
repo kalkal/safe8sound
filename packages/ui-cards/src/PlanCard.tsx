@@ -26,6 +26,12 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
   const [sending, setSending] = useState(false);
   return (
     <CardShell title={t('plan.title')} origin={isSimulated(plan) ? 'simulated' : 'live'}>
+      {/* The guard refused the model's proposal and this plan holds instead (#202): said first, inside the card. */}
+      {plan.refusedProposal !== undefined && (
+        <p className="notice" data-testid="refused-proposal">
+          {t('plan.refusedProposal', { message: plan.refusedProposal.message })}
+        </p>
+      )}
       {lastResort === undefined ? (
         <div className="plan-hero">
           <p className="eyebrow">{t('plan.until')}</p>

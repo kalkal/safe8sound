@@ -58,11 +58,6 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
     case 'plan':
       return (
         <>
-          {state.data.refusedProposal !== undefined && (
-            <p className="notice" data-testid="refused-proposal">
-              {t('plan.refusedProposal', { message: state.data.refusedProposal.message })}
-            </p>
-          )}
           <PlanCard
             plan={state.data}
             timeZone={timeZone}

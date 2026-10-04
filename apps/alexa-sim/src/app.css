@@ -71,6 +71,8 @@
 
   .answer {
     display: grid;
+    /* One column as wide as the answer: a card frame never shrinks to its content (#231). */
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
     padding: var(--space-4);
     border: var(--border-thin) solid var(--surface-card-line);
@@ -231,6 +233,7 @@
   /* The cards of an answer, one under the other at the chat's reading width. */
   .tool-cards {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
   }
 
@@ -243,6 +246,10 @@
 
 @layer surfaces {
   /* A ui:// card frame: full width, height from the card (MCP Apps size change), no border of its own. */
+  .card-frame-host {
+    inline-size: 100%;
+  }
+
   .card-frame {
     display: block;
     inline-size: 100%;

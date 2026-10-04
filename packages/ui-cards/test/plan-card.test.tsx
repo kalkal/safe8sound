@@ -2,7 +2,7 @@
 import type { Plan } from '@cold-reserve/contracts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { advisoryPlan, hotDayPlan, lastResortPlan, rejectedPlan, stormPlan } from '../src/fixtures.js';
+import { advisoryPlan, hotDayPlan, lastResortPlan, planThatHolds, rejectedPlan, stormPlan } from '../src/fixtures.js';
 import { PlanCard, type PlanCardProps } from '../src/PlanCard.js';
 
 afterEach(cleanup);
@@ -11,6 +11,14 @@ const TZ = 'Europe/Rome';
 const show = (plan: Plan, props: Partial<PlanCardProps> = {}) => render(<PlanCard plan={plan} timeZone={TZ} {...props} />);
 
 describe('PlanCard', () => {
+  it('a plan that answers a refused proposal says the refusal inside the card, above the estimate (#202, #231)', () => {
+    const { container } = show(planThatHolds());
+    const note = screen.getByTestId('refused-proposal');
+    expect(note.textContent).toBe(`The guard refused the proposed setpoint: ${planThatHolds().refusedProposal?.message ?? ''} This plan holds instead.`);
+    // Inside the card's own box, so it takes the card's width at any frame width.
+    expect(container.querySelector('section.card')?.contains(note)).toBe(true);
+  });
+
   it('leads with how long the safe room stays comfortable, said as an estimate with its confidence', () => {
     show(hotDayPlan());
     expect(screen.getByText('Comfortable at least until')).toBeTruthy();

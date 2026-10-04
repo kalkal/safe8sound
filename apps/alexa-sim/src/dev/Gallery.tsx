@@ -15,6 +15,7 @@ import {
   hotDayPlan,
   inverterRefusal,
   lastResortPlan,
+  planThatHolds,
   rejectedPlan,
   homeInStorm,
   safeRoomCalm,
@@ -37,6 +38,8 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
   return (
     <div className="gallery">
       <PlanCard plan={hotDayPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
+      {/* The guard refused the model's proposal; this plan holds instead (#202, #231). */}
+      <PlanCard plan={planThatHolds()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <GuardReceipt plan={hotDayPlan()} />
       <GuardReceipt plan={longIdPlan} />
       <IceCubesCard outlook={outlook} />
