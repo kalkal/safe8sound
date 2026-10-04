@@ -23,6 +23,7 @@ export { PreferencesCard, type PreferencesCardProps } from './PreferencesCard.js
 export { FloorPlanCard } from './FloorPlanCard.js';
 export { ManualControlCard, type ManualReason } from './ManualControlCard.js';
 export { SafeRoomCard } from './SafeRoomCard.js';
+export { DEMO_CONTEXT_KEY, TAP_MARK_MS, installTapMarks, isDemoContext } from './demo-taps.js';
 export { homeInStorm } from './home-fixtures.js';
 export { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, planThatHolds, rejectedPlan, safeRoomCalm, safeRoomInStorm, stormPlan, stormReserveRefusal } from './fixtures.js';
 export { homeClock, levelSpans, pacingGeometry } from './plan-model.js';

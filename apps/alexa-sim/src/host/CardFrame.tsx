@@ -1,5 +1,5 @@
 import { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge';
-import { CARD_KINDS, type CardKind } from '@cold-reserve/ui-cards';
+import { CARD_KINDS, DEMO_CONTEXT_KEY, type CardKind } from '@cold-reserve/ui-cards';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ToolCard } from '../agent/wire.js';
 import { log } from '../log.js';
@@ -19,6 +19,17 @@ const INITIAL_HEIGHT_PX = 360;
 /** The modes this host can show a card in (#200): full screen only when the person asks for it. */
 const DISPLAY_MODES: ('inline' | 'fullscreen')[] = ['inline', 'fullscreen'];
 
+/** The hostContext of a frame: the MCP Apps fields, plus the simulator's own demo key only in demo mode. */
+export function hostContextFor({ theme, timeZone, fullscreen, demo }: { theme: 'dark' | 'light'; timeZone: string; fullscreen: boolean; demo: boolean }) {
+  return {
+    theme,
+    timeZone,
+    displayMode: fullscreen ? ('fullscreen' as const) : ('inline' as const),
+    availableDisplayModes: DISPLAY_MODES,
+    ...(demo ? { [DEMO_CONTEXT_KEY]: true } : {}),
+  };
+}
+
 /** The card kind that shows a tool's result; a tool without a card has none (never another card's kind). */
 export const kindOf = (tool: string): CardKind | undefined => (Object.keys(CARD_KINDS) as CardKind[]).find((kind) => CARD_KINDS[kind].tool === tool);
 
@@ -33,12 +44,12 @@ export function CardFrame({ card, turnId }: { card: ToolCard; turnId: string }) 
 }
 
 function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind; turnId: string }) {
-  const { agent, documentFor, theme, timeZone } = useCardHost();
+  const { agent, documentFor, theme, timeZone, demo = false } = useCardHost();
   const document = useMemo(() => documentFor(kind), [documentFor, kind]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
-  const contextRef = useRef({ theme, timeZone });
-  contextRef.current = { theme, timeZone };
+  const contextRef = useRef({ theme, timeZone, demo });
+  contextRef.current = { theme, timeZone, demo };
   const [height, setHeight] = useState(INITIAL_HEIGHT_PX);
   const [failed, setFailed] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -50,7 +61,7 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
     // Card actions only when the agent can run them: the card hides Apply/Save otherwise.
     const capabilities = agent.canCallTools ? { serverTools: {}, logging: {} } : { logging: {} };
     const bridge = new AppBridge(null, HOST_INFO, capabilities, {
-      hostContext: { ...contextRef.current, displayMode: 'inline', availableDisplayModes: DISPLAY_MODES },
+      hostContext: hostContextFor({ ...contextRef.current, fullscreen: false }),
     });
     bridge.addEventListener('initialized', () => {
       // A refused plan (#186) reaches the frame as what it is: an error result, with the guard's verdict.
@@ -94,8 +105,8 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
   }, [agent, card, document, turnId]);
 
   useEffect(() => {
-    bridgeRef.current?.setHostContext({ theme, timeZone, displayMode: fullscreen ? 'fullscreen' : 'inline', availableDisplayModes: DISPLAY_MODES });
-  }, [theme, timeZone, fullscreen]);
+    bridgeRef.current?.setHostContext(hostContextFor({ theme, timeZone, fullscreen, demo }));
+  }, [theme, timeZone, fullscreen, demo]);
 
   // Full screen: Escape on the page goes back too (inside the frame the card handles it), and focus follows
   // the frame in and back, so a keyboard user is never left behind the overlay.

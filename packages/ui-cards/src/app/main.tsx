@@ -1,6 +1,7 @@
 import { useApp, type McpUiHostContext } from '@modelcontextprotocol/ext-apps/react';
 import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { installTapMarks, isDemoContext } from '../demo-taps.js';
 import { t } from '../text.js';
 import { cardThemeFor } from '../theme.js';
 import { CardApp } from './CardApp.js';
@@ -16,6 +17,8 @@ function Card({ kind }: { kind: CardKind }) {
   const [state, setState] = useState<CardState>({ kind: 'waiting' });
   const [context, setContext] = useState<Context>({});
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | undefined>(undefined);
+  // Demo mode for the video: only the simulator sets it; the card then marks each tap inside its frame.
+  const [demo, setDemo] = useState(false);
 
   const { app, error } = useApp({
     appInfo: { name: 'cold-reserve-cards', version: '0.1.0' },
@@ -25,7 +28,9 @@ function Card({ kind }: { kind: CardKind }) {
       created.addEventListener('toolresult', (result) => {
         setState(parseCardResult(kind, result));
       });
-      created.addEventListener('hostcontextchanged', ({ theme, timeZone, displayMode, availableDisplayModes }) => {
+      created.addEventListener('hostcontextchanged', (changed) => {
+        const { theme, timeZone, displayMode, availableDisplayModes } = changed;
+        if (isDemoContext(changed)) setDemo(true);
         setContext((previous) => ({
           ...previous,
           ...(theme !== undefined && { theme }),
@@ -46,8 +51,11 @@ function Card({ kind }: { kind: CardKind }) {
         ...(initial.displayMode !== undefined && { displayMode: initial.displayMode }),
         ...(initial.availableDisplayModes !== undefined && { availableDisplayModes: initial.availableDisplayModes }),
       });
+      setDemo(isDemoContext(initial));
     }
   }, [app]);
+
+  useEffect(() => (demo ? installTapMarks(document) : undefined), [demo]);
 
   useEffect(() => {
     document.documentElement.dataset['cardTheme'] = cardThemeFor(context.theme);

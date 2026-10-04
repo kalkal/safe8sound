@@ -47,6 +47,8 @@ const ConfigSchema = z
     /** The family phone (#24): the scripted scene's messages, or the real inbox through the dev proxy. */
     phone: z.enum(['scripted', 'inbox']),
     phonePollMs: ms,
+    /** Demo mode for recording the video: tap marks, "You said" caption, light bar. Off unless `?demo=1`. */
+    demo: z.boolean(),
   })
   .refine((c) => c.agent === 'scripted' || c.simApiUrl !== undefined, { path: ['simApiUrl'], message: 'The remote agent needs a sim-api URL' })
   .refine((c) => c.turnBudgetMs >= c.agentTimeoutMs, { path: ['turnBudgetMs'], message: 'The turn budget must cover the agent timeout' });
@@ -68,6 +70,7 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>, s
     homeTimeZone: env['VITE_HOME_TIME_ZONE'] ?? DEFAULT_HOME_TIME_ZONE,
     phone: env['VITE_PHONE'] ?? 'scripted',
     phonePollMs: env['VITE_PHONE_POLL_MS'] ?? 5_000,
+    demo: params.get('demo') === '1',
     voice: {
       speech: fakeSpeech ? 'fake' : 'browser',
       lang: env['VITE_VOICE_LANG'] ?? 'en-US',

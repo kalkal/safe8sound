@@ -11,6 +11,7 @@ import { useVoice, type StudioVoice } from '../voice/use-voice.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { AnswerCard } from './AnswerCard.js';
 import { DemoCodeGate } from './DemoCodeGate.js';
+import { DemoOverlay } from './DemoOverlay.js';
 import { ExampleQuestions } from './ExampleQuestions.js';
 import { t } from './text.js';
 
@@ -26,9 +27,11 @@ export interface ConversationProps {
   session?: DemoSession;
   /** Remote mode only: the replies may be read by the studio voice (Polly, F8d #25). */
   studioVoice?: StudioVoice;
+  /** Demo mode for recording the video (`?demo=1`): "You said" caption and the light bar. */
+  demo?: boolean;
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice }: ConversationProps) {
+export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false }: ConversationProps) {
   const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
@@ -230,6 +233,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
         {privacy !== null && <p className="notice">{t(privacy)}</p>}
       </form>
       )}
+      {demo && <DemoOverlay said={question !== null && !snapshot.matches('idle') && !listening ? question : null} speaking={speaking} />}
     </>
   );
 }

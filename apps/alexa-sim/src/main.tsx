@@ -1,6 +1,6 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import './app.css';
-import { cardThemeFor } from '@cold-reserve/ui-cards';
+import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, Suspense, lazy, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -57,6 +57,16 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   useEffect(() => {
     document.documentElement.dataset['cardTheme'] = cardThemeFor(theme);
   }, [theme]);
+  // Demo mode for the video: taps on the page are marked here, taps inside a card by the card itself.
+  useEffect(() => {
+    if (!config.demo) return undefined;
+    document.documentElement.dataset['demo'] = '';
+    const uninstall = installTapMarks(document);
+    return () => {
+      uninstall();
+      delete document.documentElement.dataset['demo'];
+    };
+  }, [config.demo]);
   return (
     <>
       <button
@@ -69,9 +79,9 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       >
         {t('theme.toggle')}
       </button>
-      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone }}>
+      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo }}>
         <QueryClientProvider client={queryClient}>
-          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />
+          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} demo={config.demo} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />
         </QueryClientProvider>
       </CardHostProvider>
       {(config.agent === 'scripted' || config.phone === 'inbox') && (

@@ -54,6 +54,8 @@ const enUS = {
   'demo.again': 'Enter the demo code again to continue.',
   'demo.disabled': 'The demo is switched off for now.',
   'demo.privacy': 'This demo keeps your IP address in its access logs for 30 days, for security.',
+  // Demo mode for recording the video (?demo=1): what the person said, as a caption.
+  'demoMode.youSaid': 'You said: “{said}”',
   'status.battery': 'Battery',
   'surface.failed': 'This part of the screen stopped working. Reload the page to try again.',
   'config.invalid': 'The simulator is not configured correctly. Check its settings and reload the page.',

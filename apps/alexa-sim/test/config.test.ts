@@ -13,6 +13,7 @@ describe('simulator config', () => {
         homeTimeZone: 'Europe/Rome',
         phone: 'scripted',
         phonePollMs: 5_000,
+        demo: false,
         voice: {
           speech: 'browser',
           lang: 'en-US',
@@ -26,6 +27,12 @@ describe('simulator config', () => {
         },
       },
     });
+  });
+
+  it('demo mode for the video is off by default and on only with ?demo=1, in any build', () => {
+    expect(parseConfig({}, '?demo=1', false)).toMatchObject({ ok: true, value: { demo: true } });
+    expect(parseConfig({}, '?demo=yes', false)).toMatchObject({ ok: true, value: { demo: false } });
+    expect(parseConfig({}, '?gallery', true)).toMatchObject({ ok: true, value: { demo: false } });
   });
 
   it('reads the phone from the real inbox when asked, and refuses an unknown phone source (#24)', () => {

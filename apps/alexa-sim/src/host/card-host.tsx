@@ -11,6 +11,8 @@ export interface CardHost {
   theme: 'dark' | 'light';
   /** IANA zone of the home: every card shows the home's clock. */
   timeZone: string;
+  /** Demo mode for the video (`?demo=1`): the cards mark each tap inside their frame. */
+  demo?: boolean;
 }
 
 const CardHostContext = createContext<CardHost | null>(null);
