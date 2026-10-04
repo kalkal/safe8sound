@@ -31,8 +31,14 @@
     {
       "id": "apply-last-resort",
       "patterns": ["apply the last resort", "apply the last-resort plan", "yes apply the last resort"],
-      "text": "Not done yet. In this demo you confirm the last resort on the card: tap Apply the last-resort plan, then Yes, apply it now.",
-      "withStatus": false
+      "text": "Not applied yet: this is a last resort. To apply it, tap Yes, apply it now on its card.",
+      "withStatus": false,
+      "cards": [
+        {
+          "tool": "apply_plan",
+          "fixture": "last-resort-pending"
+        }
+      ]
     },
     {
       "id": "apply-plan",

@@ -281,9 +281,11 @@ describe('what the model reads', () => {
     expect(text).toContain(warning);
     // The family alert is said when it happened, never promised (#170 review).
     expect(text).not.toContain('family');
-    expect(text).toContain(
-      `Only if the person says yes again, call apply_plan with planId ${p.value.id} and lastResortToken ${r.value.confirmation.token} (valid until ${localTimeText(r.value.confirmation.expiresAt)}).`,
-    );
+    // The second yes is the person's tap on the card (#201): the model never sees the token, its format or a way to pass it.
+    expect(text).toContain(`The second yes is a tap on the card, "Yes, apply it now", before ${localTimeText(r.value.confirmation.expiresAt)}.`);
+    expect(text).toContain('Never ask the person for a token or a code, and never make one up.');
+    expect(text).not.toContain(r.value.confirmation.token);
+    expect(text).not.toMatch(/lr_|lastResortToken|token (that )?starts/i);
     expect(text).not.toContain('applied as advice');
   });
 

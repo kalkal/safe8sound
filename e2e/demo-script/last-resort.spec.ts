@@ -29,3 +29,25 @@ test('last resort: honest headline, two taps to apply, the family is told', asyn
   await expect(card.getByText('1 registered family contact was alerted.')).toBeVisible();
   await expect(card.getByRole('button', { name: 'Yes, apply it now' })).toHaveCount(0);
 });
+
+test('a spoken first yes brings the confirmation card: one tap applies it, never "say yes again" (#215 review)', async ({ page }) => {
+  await page.goto('/');
+  const ask = async (question: string) => {
+    await page.getByLabel('Ask a question').fill(question);
+    await page.getByRole('button', { name: 'Ask' }).click();
+  };
+  await ask('Last resort for a hot night');
+  await expect(page.frameLocator('iframe[title="Plan card"]').getByRole('region', { name: 'Plan' })).toBeVisible();
+
+  // The first yes by voice: nothing applied, and the card of that answer offers the second yes.
+  await ask('Yes, apply the last resort');
+  await expect(page.getByTestId('answer').last()).toContainText('Not applied yet: this is a last resort.');
+  const confirm = page.locator('iframe[title="Applied plan card"]').last().contentFrame();
+  await expect(confirm.getByRole('status').filter({ hasText: 'Not applied yet: this is a last resort.' })).toBeVisible();
+  await expect(confirm.locator('body')).not.toContainText('say yes again');
+  await expect(confirm.locator('body')).not.toContainText('lr_');
+
+  await confirm.getByRole('button', { name: 'Yes, apply it now' }).click();
+  await expect(confirm.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
+  await expect(confirm.getByText('1 registered family contact was alerted.')).toBeVisible();
+});

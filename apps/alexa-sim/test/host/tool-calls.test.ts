@@ -4,7 +4,7 @@ import { hotDayPlan, inverterRefusal, lastResortPlan } from '@cold-reserve/ui-ca
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent } from '../../src/agent/agent.js';
 import type { ToolCard } from '../../src/agent/wire.js';
-import { answerCardCall, createFrameConfirmation, readToolCall } from '../../src/host/tool-calls.js';
+import { answerCardCall, confirmationFor, createFrameConfirmation, readToolCall } from '../../src/host/tool-calls.js';
 import { SCRIPT_FIXTURES } from '../../src/agent/script-fixtures.js';
 
 // A card may ask the host to call a tool (MCP Apps tools/call). A card is untrusted content: each card
@@ -135,5 +135,35 @@ describe('the second yes to a last resort by touch (#160, the main\'s decision B
     expect(callTool).toHaveBeenCalledTimes(2);
     // The token is never logged.
     expect(JSON.stringify(log.mock.calls)).not.toContain(token);
+  });
+});
+
+describe('the confirmation card from a voice turn (#215 review): its own token, once', () => {
+  const token = `lr_${'V'.repeat(32)}`;
+  const card: ToolCard = {
+    tool: 'apply_plan',
+    result: { plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } },
+  };
+  const second = (args: Record<string, unknown>, c: ToolCard, confirmation = confirmationFor(c)) => readToolCall({ name: 'apply_plan', arguments: args }, c, confirmation);
+
+  it('the host keeps the token the card was born with: the card may send exactly that, once', () => {
+    const confirmation = confirmationFor(card);
+    expect(second({ planId: 'plan_LastResort01', lastResortToken: token }, card, confirmation)).toEqual({
+      ok: true,
+      value: { name: 'apply_plan', args: { planId: 'plan_LastResort01', lastResortToken: token } },
+    });
+    expect(second({ planId: 'plan_LastResort01', lastResortToken: token }, card, confirmation)).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+  });
+
+  it('never another token, another plan, or a first yes from that card', () => {
+    expect(second({ planId: 'plan_LastResort01', lastResortToken: `lr_${'F'.repeat(32)}` }, card)).toMatchObject({ ok: false });
+    expect(second({ planId: 'plan_someoneElse1', lastResortToken: token }, card)).toMatchObject({ ok: false });
+    expect(second({ planId: 'plan_LastResort01' }, card)).toMatchObject({ ok: false });
+  });
+
+  it('an applied plan card has no confirmation: it may call nothing', () => {
+    const applied = SCRIPT_FIXTURES['hot-day-applied']();
+    expect(confirmationFor(applied).pending).toBeUndefined();
+    expect(readToolCall({ name: 'apply_plan', arguments: { planId: 'plan_7Hq2mX9vK3' } }, applied, confirmationFor(applied))).toMatchObject({ ok: false });
   });
 });

@@ -21,8 +21,13 @@ export const LastResortTokenSchema = z.string().regex(/^lr_[A-Za-z0-9_-]{22,64}$
 
 export const ApplyPlanInputSchema = z.strictObject({
   planId: PlanIdSchema,
-  /** The second, explicit yes to a last-resort plan: the token the first step returned (optional, approved in #160). */
-  lastResortToken: LastResortTokenSchema.optional(),
+  /**
+   * The second, explicit yes to a last-resort plan: the token the first step returned (optional, approved in #160).
+   * Carried by the host only, from the card's tap (#201); the published description says so to any MCP client.
+   */
+  lastResortToken: LastResortTokenSchema.optional().describe(
+    'Host only: set by the card when the person taps "Yes, apply it now". Never ask the person for it and never make one up.',
+  ),
 });
 export type ApplyPlanInput = z.infer<typeof ApplyPlanInputSchema>;
 

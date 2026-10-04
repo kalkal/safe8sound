@@ -65,15 +65,37 @@ export type TurnRecorder = ReturnType<typeof createTurnRecorder>;
 
 const textOf = (result: McpCallResult) => result.content.map((c) => c.text ?? '').join('\n');
 
+/**
+ * Arguments only the host may carry (#201): the last-resort token comes from the card's second tap. The model
+ * never sees them in a schema and never passes them, so it cannot ask the person for one or make one up.
+ */
+const HOST_ONLY_ARGS: Readonly<Record<string, readonly string[]>> = { apply_plan: ['lastResortToken'] };
+
+/** The tool's input schema without the host-only arguments. */
+function modelSchema(name: string, schema: McpToolInfo['inputSchema']): McpToolInfo['inputSchema'] {
+  const hidden = HOST_ONLY_ARGS[name];
+  if (hidden === undefined) return schema;
+  const all = typeof schema['properties'] === 'object' && schema['properties'] !== null ? (schema['properties'] as Record<string, unknown>) : {};
+  const properties = Object.fromEntries(Object.entries(all).filter(([key]) => !hidden.includes(key)));
+  const required = Array.isArray(schema['required']) ? (schema['required'] as unknown[]).filter((key) => typeof key === 'string' && !hidden.includes(key)) : undefined;
+  return { ...schema, properties, ...(required === undefined ? {} : { required }) };
+}
+
+/** The model's arguments without any host-only one it passed anyway. */
+function modelArgs(name: string, args: Record<string, unknown>): Record<string, unknown> {
+  const hidden = HOST_ONLY_ARGS[name];
+  return hidden === undefined ? args : Object.fromEntries(Object.entries(args).filter(([key]) => !hidden.includes(key)));
+}
+
 export async function mcpToolset(session: McpSession, recorder: TurnRecorder): Promise<FunctionTool[]> {
   return (await session.listTools()).map(
     (info) =>
       new FunctionTool({
         name: info.name,
         description: info.description ?? info.name,
-        inputSchema: info.inputSchema,
+        inputSchema: modelSchema(info.name, info.inputSchema),
         callback: async (input, context) => {
-          const args = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {};
+          const args = modelArgs(info.name, typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {});
           // The Strands loop passes its cancel signal (turn deadline); a direct invoke may not.
           const signal = (context as { cancelSignal?: AbortSignal } | undefined)?.cancelSignal;
           const result = await session.callTool(info.name, args, signal, recorder.correlationId());

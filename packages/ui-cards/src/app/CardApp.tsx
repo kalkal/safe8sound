@@ -89,7 +89,7 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
           result={state.data}
           timeZone={timeZone}
           fromThisFrame={state.fromThisFrame === true}
-          canConfirm={canAct && state.fromThisFrame === true}
+          canConfirm={canAct}
           onConfirm={(args) => {
             onCallTool('apply_plan', args);
           }}

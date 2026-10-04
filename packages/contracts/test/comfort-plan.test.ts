@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { examplePlan } from '../src/fixtures.js';
 import { ApplyPlanInputSchema, ApplyPlanOutputSchema, ManualInstructionSchema, PlanComfortInputSchema, ReserveOutlookInputSchema, categoryOf } from '../src/index.js';
 
@@ -83,5 +84,14 @@ describe('comfort-plan tool I/O (approved in #19)', () => {
 
   it('a simulated plan on the real home is forbidden', () => {
     expect(categoryOf('simulated_plan_on_real_home')).toBe('forbidden');
+  });
+});
+
+describe('the last-resort token in the published apply_plan schema (#201, #215 review)', () => {
+  it('says it is the host’s only: set by the card, never asked for, never made up', () => {
+    const published = z.toJSONSchema(ApplyPlanInputSchema) as { properties: Record<string, { description?: string }> };
+    expect(published.properties['lastResortToken']?.description).toBe(
+      'Host only: set by the card when the person taps "Yes, apply it now". Never ask the person for it and never make one up.',
+    );
   });
 });

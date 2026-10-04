@@ -117,8 +117,9 @@ const enUS = {
   'plan.applied': 'Plan applied.',
   'plan.alreadyApplied': 'The plan was already applied.',
   // The first yes to a last resort (#160): nothing is applied until the person says yes again, by voice or by touch.
-  'plan.notYetApplied': 'Not applied yet: this is a last resort. Say yes again to apply it, before {time}.',
-  'plan.notYetAppliedTap': 'Not applied yet: this is a last resort. Say yes again, or tap "{button}", before {time}.',
+  // The second yes is a tap on the card (#201, #215): never "say yes again", which only issued a new token.
+  'plan.notYetApplied': 'Not applied yet: this is a last resort. It is applied only with a tap on its card, before {time}.',
+  'plan.notYetAppliedTap': 'Not applied yet: this is a last resort. Tap "{button}" to apply it, before {time}.',
   'plan.applyLastResort': 'Apply the last-resort plan',
   'plan.confirmLastResort': 'Yes, apply it now',
   // The honest window of a last resort (#160): the real time, never "comfortable until" the horizon.

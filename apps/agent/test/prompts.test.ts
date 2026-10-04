@@ -10,8 +10,12 @@ describe('system prompt (versioned, short: cost rule)', () => {
   const prompt = buildSystemPrompt();
 
   it('is versioned and matches the snapshot, so every change shows up in review', () => {
-    expect(PROMPT_VERSION).toBe('v1');
+    expect(PROMPT_VERSION).toBe('v2');
     expect(prompt).toMatchSnapshot();
+  });
+
+  it('never asks the person for ids, tokens or codes, and never makes one up (#201)', () => {
+    expect(prompt).toContain('Never ask the person for an id, a token or a code, and never make one up; a last resort is confirmed by a tap on its card.');
   });
 
   it('names the product from i18n, never hard-coded', () => {
@@ -60,11 +64,13 @@ describe('few-shot dialogues (plan §4: hot day, storm, "how is Grandpa doing?")
 });
 
 describe('the system prompt inside the code (G1a: it must survive the CJS bundle for AgentCore)', () => {
-  it('comes from a generated module that matches prompts/system.v1.md (run `pnpm --filter @cold-reserve/agent prompts`)', async () => {
+  it('comes from a generated module that matches every prompts/system.<version>.md (run `pnpm --filter @cold-reserve/agent prompts`)', async () => {
     const { readFile } = await import('node:fs/promises');
-    const source = (await readFile(new URL('../prompts/system.v1.md', import.meta.url), 'utf8')).trim();
+    const read = async (version: string) => (await readFile(new URL(`../prompts/system.${version}.md`, import.meta.url), 'utf8')).trim();
     const { SYSTEM_PROMPTS } = await import('../src/prompts.generated.js');
-    expect(SYSTEM_PROMPTS.v1).toBe(source);
-    expect(SYSTEM_PROMPT_TEMPLATE).toBe(source);
+    // A new version is a new file (#215 review): the old ones stay, unchanged, next to it.
+    expect(Object.keys(SYSTEM_PROMPTS)).toEqual(['v1', 'v2']);
+    for (const [version, text] of Object.entries(SYSTEM_PROMPTS)) expect(text).toBe(await read(version));
+    expect(SYSTEM_PROMPT_TEMPLATE).toBe(await read(PROMPT_VERSION));
   });
 });

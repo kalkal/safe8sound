@@ -114,6 +114,17 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
     expect(recorder.cards()).toEqual([]);
   });
 
+  it('apply_plan as the model sees it has no lastResortToken: the token is the card’s, never the model’s (#201)', async () => {
+    const { session, calls } = fakeSession({ apply_plan: { text: 'Plan applied.' } });
+    const withToken = { ...session, listTools: async () => (await session.listTools()).map((t) => ({ ...t, inputSchema: { type: 'object' as const, properties: { planId: { type: 'string' }, lastResortToken: { type: 'string', pattern: '^lr_' } }, required: ['planId'] } })) };
+    const tools = await mcpToolset(withToken, createTurnRecorder());
+    const apply = tools.find((t) => t.name === 'apply_plan');
+    expect(JSON.stringify(apply?.toolSpec.inputSchema)).not.toMatch(/lastResortToken|lr_/);
+    // A token the model passes anyway (made up, or read somewhere) never reaches the server.
+    await run(tools, 'apply_plan', { planId: 'plan-0001', lastResortToken: `lr_${'x'.repeat(30)}` });
+    expect(calls[0]?.args).toEqual({ planId: 'plan-0001' });
+  });
+
   it('passes the model arguments through unchanged: a "home" argument is the server\'s problem, never a header', async () => {
     const { session, calls } = fakeSession({ get_home_status: { text: 'ok' } });
     const tools = await mcpToolset(session, createTurnRecorder());

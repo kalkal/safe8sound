@@ -22,6 +22,23 @@ export interface FrameConfirmation {
 
 export const createFrameConfirmation = (): FrameConfirmation => ({ pending: undefined });
 
+/**
+ * A frame's confirmation from the card it shows (#215 review): the confirmation card of a spoken first yes is
+ * born with its token, so the host holds that token as the frame's pending confirmation, for its one tap.
+ */
+export function confirmationFor(card: ToolCard): FrameConfirmation {
+  if (card.tool !== 'apply_plan' || card.result.confirmation === undefined) return createFrameConfirmation();
+  return { pending: { planId: card.result.plan.id, token: card.result.confirmation.token } };
+}
+
+/** The second yes: only the token this frame holds, for its plan, once (a replay never reaches the server). */
+function acceptsToken(planId: string, token: string, confirmation: FrameConfirmation | undefined): boolean {
+  const pending = confirmation?.pending;
+  if (pending === undefined || pending.planId !== planId || pending.token !== token) return false;
+  if (confirmation !== undefined) confirmation.pending = undefined;
+  return true;
+}
+
 const refuse = (message: string): Result<never, ErrorEnvelope> => err(toolError('invalid_input', message, { details: { field: 'name' } }));
 
 export function readToolCall(
@@ -37,13 +54,17 @@ export function readToolCall(
     // The plan card applies its own plan, never another one.
     if (!parsed.success || parsed.data.planId !== card.result.id) return refuse('This card may only apply its own plan.');
     const token = parsed.data.lastResortToken;
-    if (token !== undefined) {
-      const pending = confirmation?.pending;
-      if (pending === undefined || pending.planId !== parsed.data.planId || pending.token !== token) {
-        return refuse('This card may only confirm a last-resort plan with the confirmation it was given.');
-      }
-      // Once: a second tap, or a replay, never reaches the server.
-      if (confirmation !== undefined) confirmation.pending = undefined;
+    if (token !== undefined && !acceptsToken(parsed.data.planId, token, confirmation)) {
+      return refuse('This card may only confirm a last-resort plan with the confirmation it was given.');
+    }
+    return ok({ name: 'apply_plan', args: parsed.data });
+  }
+  // The confirmation card (a spoken first yes, #215): only its own second yes, with the token it was born with.
+  if (card.tool === 'apply_plan' && params.name === 'apply_plan') {
+    const parsed = ApplyPlanInputSchema.safeParse(args);
+    const token = parsed.success ? parsed.data.lastResortToken : undefined;
+    if (!parsed.success || token === undefined || !acceptsToken(parsed.data.planId, token, confirmation)) {
+      return refuse('This card may only confirm its own last-resort plan.');
     }
     return ok({ name: 'apply_plan', args: parsed.data });
   }

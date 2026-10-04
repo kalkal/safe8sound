@@ -44,7 +44,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       fromThisFrame: true,
     });
     const notice = screen.getByRole('status');
-    expect(notice.textContent).toBe('Not applied yet: this is a last resort. Say yes again, or tap "Yes, apply it now", before 15:10.');
+    expect(notice.textContent).toBe('Not applied yet: this is a last resort. Tap "Yes, apply it now" to apply it, before 15:10.');
     // CE-22: the notice and its button sit in a card, and the receipt stays: the person still sees what fails.
     expect(notice.closest('.card')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Yes, apply it now' }).closest('.card')).toBe(notice.closest('.card'));
@@ -63,24 +63,27 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(onCallTool).toHaveBeenCalledTimes(1);
   });
 
-  it('a confirmation from a voice turn has no button: the host would refuse it, so the card says to say yes again (#176 review)', () => {
+  it('a confirmation from a voice turn shows the second-step button too: the host holds that card token (#215 review)', () => {
     const token = `lr_${'Q'.repeat(32)}`;
-    show({ kind: 'applied', data: { plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } } });
-    expect(screen.getByRole('status').textContent).toBe('Not applied yet: this is a last resort. Say yes again to apply it, before 15:10.');
-    expect(screen.queryByRole('button', { name: 'Yes, apply it now' })).toBeNull();
+    const onCallTool = show({ kind: 'applied', data: { plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } } });
+    expect(screen.getByRole('status').textContent).toBe('Not applied yet: this is a last resort. Tap "Yes, apply it now" to apply it, before 15:10.');
+    // Never "say yes again": a second spoken yes only issued a new token, a loop that never applied.
+    expect(document.body.textContent).not.toMatch(/say yes again/i);
     expect(document.body.innerHTML).not.toContain(token);
     // A voice turn's card never takes the focus from the Ask box (#176 re-review).
     expect(document.activeElement).not.toBe(screen.getByRole('status'));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, apply it now' }));
+    expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_LastResort01', lastResortToken: token });
   });
 
-  it('without card actions, the second step is said by voice only', () => {
+  it('without card actions, the card says it is applied only with a tap on its card, and offers no button', () => {
     const token = `lr_${'Q'.repeat(32)}`;
     show(
       { kind: 'applied', data: { plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } }, fromThisFrame: true },
       undefined,
       false,
     );
-    expect(screen.getByRole('status').textContent).toBe('Not applied yet: this is a last resort. Say yes again to apply it, before 15:10.');
+    expect(screen.getByRole('status').textContent).toBe('Not applied yet: this is a last resort. It is applied only with a tap on its card, before 15:10.');
     expect(screen.queryByRole('button', { name: 'Yes, apply it now' })).toBeNull();
   });
 

@@ -5,7 +5,7 @@ import { SYSTEM_PROMPTS } from './prompts.generated.js';
 
 // The system prompt and few-shot dialogues are data, versioned in apps/agent/prompts/ (plan §4).
 // A new version is a new file; the snapshot test shows every change in review.
-export const PROMPT_VERSION = 'v1';
+export const PROMPT_VERSION = 'v2';
 
 /** The MCP tools of the plan (§4). Few-shot dialogues may only use these. */
 export const PLAN_TOOLS = [

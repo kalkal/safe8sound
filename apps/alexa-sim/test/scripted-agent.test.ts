@@ -40,11 +40,18 @@ describe('ScriptedAgent', () => {
     if (!offered.ok) throw new Error(offered.error.message);
     expect(offered.value.text).not.toMatch(/\?$/);
     expect(offered.value.text).toContain('tap Apply the last-resort plan');
+    // A spoken first yes (#215 review): nothing applied, and the confirmation card comes with it, so the second
+    // yes is one tap away on the card the voice points to.
     for (const said of ['Yes, apply the last resort', 'Apply the last-resort plan']) {
       const reply = await a.ask(said, ctx);
       if (!reply.ok) throw new Error(reply.error.message);
-      expect(reply.value.text).not.toMatch(/applied/i);
-      expect(reply.value.cards ?? []).toEqual([]);
+      expect(reply.value.text).toMatch(/^Not applied yet: this is a last resort\. /);
+      expect(reply.value.text).toContain('Yes, apply it now');
+      expect(reply.value.text).not.toMatch(/say yes again/i);
+      const card = reply.value.cards?.[0];
+      if (card?.tool !== 'apply_plan') throw new Error('no confirmation card');
+      expect(card.result.plan.status).toBe('proposed');
+      expect(card.result.confirmation).toBeDefined();
     }
   });
 
