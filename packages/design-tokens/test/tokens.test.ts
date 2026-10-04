@@ -57,6 +57,12 @@ describe('buildTokens (Style Dictionary 5, DTCG 2025.10)', () => {
     }
   });
 
+  it('draws the ice cubes at 56 px and lets one melt in a second and a half (owner decision, 2 Oct)', async () => {
+    const root = block(await css(), ':root');
+    expect(root).toContain('--cube-size: 56px;');
+    expect(root).toContain('--duration-melt: 1500ms;');
+  });
+
   it('lets the storm theme redefine only its own tokens', async () => {
     const storm = block(await css(), ':root.theme-storm');
     const names = [...storm.matchAll(/--([a-z0-9-]+):/g)].map((m) => m[1]);

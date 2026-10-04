@@ -11,7 +11,7 @@
     --space-3: 12px;
     --space-4: 16px;
     --space-6: 24px;
-    --cube-size: 28px;
+    --cube-size: 56px;
     --font-size-min: 14px;
     --font-size-body: 16px;
     --font-size-lead: 20px;
@@ -23,6 +23,7 @@
     --font-weight-medium: 500;
     --font-weight-bold: 700;
     --duration-fast: 150ms;
+    --duration-melt: 1500ms;
     --surface-card: light-dark(oklch(1.0000 0.0000 0.00), oklch(0.2076 0.0135 258.37));
     --surface-card-raised: light-dark(oklch(0.9654 0.0042 236.50), oklch(0.2579 0.0174 255.68));
     --surface-card-line: light-dark(oklch(0.2076 0.0135 258.37 / 0.16), oklch(1.0000 0.0000 0.00 / 0.15));

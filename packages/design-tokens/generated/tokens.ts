@@ -22,6 +22,7 @@ export const TOKEN_NAMES = [
   "font-weight-medium",
   "font-weight-bold",
   "duration-fast",
+  "duration-melt",
   "surface-card",
   "surface-card-raised",
   "surface-card-line",

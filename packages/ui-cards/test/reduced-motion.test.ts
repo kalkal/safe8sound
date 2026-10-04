@@ -43,4 +43,9 @@ describe('reduced motion', () => {
     const declarations = [...source.replace(motionRule, '').matchAll(/(transition|animation)[\w-]*\s*:\s*([^;]+);/g)];
     for (const [, , value] of declarations) expect(value).not.toMatch(/\d+m?s\b/);
   });
+
+  it('the melting cube moves only through the melt duration token, so reduced motion shows it already melted', () => {
+    const source = css('cards.css');
+    expect(source).toMatch(/\.cube\[data-melting="true"\]::after\s*\{[^}]*animation:[^;]*var\(--duration-melt\)[^;]*forwards;/);
+  });
 });

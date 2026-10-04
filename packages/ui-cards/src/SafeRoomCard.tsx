@@ -47,7 +47,14 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
       </ul>
       <div className="cubes" role="img" aria-label={cubesLabel(status.safeHours)}>
         {cubeFills(status.safeHours).map((fill, i) => (
-          <span key={i} className="cube" data-fill={fill} style={{ '--fill': String(fill) } as CSSProperties} />
+          <span
+            key={i}
+            className="cube"
+            data-fill={fill}
+            // In the storm the hour being used melts once, from full to what is left (the time that remains).
+            {...(inStorm && i === Math.floor(status.safeHours) ? { 'data-melting': true } : {})}
+            style={{ '--fill': String(fill) } as CSSProperties}
+          />
         ))}
       </div>
       {inStorm && <p className="advice">{t('safeRoom.stay')}</p>}

@@ -421,6 +421,8 @@
   .cube {
     position: relative;
     overflow: hidden;
+    /* The token is the cube as seen, border included. */
+    box-sizing: border-box;
     inline-size: var(--cube-size);
     block-size: var(--cube-size);
     border: var(--border-thin) solid var(--cube-edge);
@@ -433,6 +435,23 @@
       block-size: calc(var(--fill) * 100%);
       background: var(--cube-fill);
       content: "";
+    }
+  }
+
+  /* In the storm the cube of the hour being used empties once, slowly, from full to what is left of it: the
+     time that remains, shown (design analysis, "Movimento"). No loop, no blink; with reduced motion it is
+     simply drawn at its level. */
+  .cube[data-melting="true"]::after {
+    animation: cube-melt var(--duration-melt) ease-in-out forwards;
+  }
+
+  @keyframes cube-melt {
+    from {
+      block-size: 100%;
+    }
+
+    to {
+      block-size: calc(var(--fill) * 100%);
     }
   }
 

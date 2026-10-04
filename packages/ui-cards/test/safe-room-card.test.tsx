@@ -53,6 +53,21 @@ describe('SafeRoomCard', () => {
     expect(screen.getByRole('img', { name: '10½ hours: 10 full cubes and part of one more.' })).toBeTruthy();
   });
 
+  it('in the storm, the cube of the hour being used empties once, from full to what is left of it (video, scene 3)', () => {
+    const { container } = render(<SafeRoomCard status={safeRoomInStorm()} />);
+    const cubes = [...container.querySelectorAll<HTMLElement>('.cube')];
+    const melting = cubes.filter((c) => c.dataset['melting'] === 'true');
+    expect(melting).toHaveLength(1);
+    // 10.4 hours: ten full cubes, and the eleventh is the hour now being used.
+    expect(cubes.indexOf(melting[0] as HTMLElement)).toBe(10);
+    expect(Number(melting[0]?.dataset['fill'])).toBeCloseTo(0.4);
+  });
+
+  it('no cube empties outside the storm', () => {
+    const { container } = render(<SafeRoomCard status={safeRoomCalm()} />);
+    expect(container.querySelectorAll('.cube[data-melting="true"]')).toHaveLength(0);
+  });
+
   it('tells what to do during the storm, and nothing alarming outside it', () => {
     render(<SafeRoomCard status={safeRoomInStorm()} />);
     expect(screen.getByText('Stay in the safe room and keep the door closed.')).toBeTruthy();
