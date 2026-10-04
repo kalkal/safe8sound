@@ -60,7 +60,10 @@ export async function loadInputs(deps: ComfortPlanDeps, ctx: ToolContext): Promi
   const [snapshot, preferences] = await Promise.all([home.source.snapshot(), deps.preferencesFor(ctx.homeId, home.profile)]);
   if (!snapshot.ok) return snapshot;
   if (!preferences.ok) return preferences;
-  return ok({ home, snapshot: snapshot.value, forecast: home.forecast(), profile: home.profile, preferences: preferences.value });
+  // Every projection reads the weather hour by hour: without one it cannot run, so say so as a value (#238).
+  const forecast = home.forecast();
+  if (forecast.hourly.length === 0) return err(toolError('forecast_unavailable', 'No weather hour to plan with.'));
+  return ok({ home, snapshot: snapshot.value, forecast, profile: home.profile, preferences: preferences.value });
 }
 
 /**

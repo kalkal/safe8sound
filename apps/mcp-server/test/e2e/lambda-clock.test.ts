@@ -109,6 +109,21 @@ describe('Lambda composition: domain on the scenario clock, store TTL on the wal
     }
   });
 
+  it('the last hour of the scenario day answers: a plan at 23:00 applies at 23:05, and 23:55 is never unexpected_error (#238)', async () => {
+    const { wall, call, close } = await lambdaOn({ MCP_SCENARIO: 'clear-day' }, Date.parse('2026-10-04T21:00:00Z'));
+    try {
+      const plan = PlanSchema.parse((await call('plan_comfort', { goal: 'cool' })).structuredContent);
+      wall.set(Date.parse('2026-10-04T21:05:00Z'));
+      expect((await call('apply_plan', { planId: plan.id })).isError).not.toBe(true);
+      wall.set(Date.parse('2026-10-04T21:55:00Z'));
+      const late = await call('plan_comfort', { goal: 'cool' });
+      expect(late.isError === true ? (late.structuredContent as { code?: string }).code : 'ok').not.toBe('unexpected_error');
+      expect((await call('get_reserve_outlook')).isError).not.toBe(true);
+    } finally {
+      await close();
+    }
+  });
+
   it('a bad scenario setting stops the start, as on the local entry', () => {
     const storeFor = dynamoStateStoreFactory({ table: createFakeTable(), clock: { now: () => WALL }, rng: seededRng(1) });
     expect(createLambdaApp({ MCP_CLIENTS: `agent@demo=${TOKEN}`, MCP_SCENARIO_ANCHOR: 'tomorrow' }, { wallClock: { now: () => WALL }, logger: memoryLogger(), storeFor })).toMatchObject({

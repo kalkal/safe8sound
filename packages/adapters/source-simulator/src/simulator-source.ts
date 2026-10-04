@@ -100,7 +100,9 @@ export class SimulatorSource implements HomeDataSource {
   forecast(): Forecast {
     const { scenario } = this.#opts;
     const nowMs = this.#opts.clock.now();
-    const first = Math.min(scenario.durationH, Math.max(0, Math.ceil((nowMs - this.#startMs) / HOUR_MS)));
+    // Never past the last hour: from then on the forecast keeps that hour, which the projection holds to the end of
+    // the plan, so the last hour of the day still plans and applies (#238). Before it, nothing changes.
+    const first = Math.min(scenario.durationH - 1, Math.max(0, Math.ceil((nowMs - this.#startMs) / HOUR_MS)));
     return {
       fetchedAt: iso(this.#startMs + this.#elapsedS(nowMs) * 1000),
       confidence: 'high',

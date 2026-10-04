@@ -151,6 +151,20 @@ describe('SimulatorSource', () => {
     expect(f.confidence).toBe('high');
   });
 
+  it('forecast: never empty; from the last hour of the day on it keeps that hour, which the projection holds (#238)', () => {
+    const { start, scenario } = source('clear-day');
+    const lastHour = scenario.hourly[scenario.durationH - 1];
+    for (const nowMs of [start + (scenario.durationH - 1) * HOUR + 1, start + (scenario.durationH - 0.5) * HOUR, start + scenario.durationH * HOUR, start + (scenario.durationH + 5) * HOUR]) {
+      const f = source('clear-day', { nowMs }).sim.forecast();
+      expect(ForecastSchema.safeParse(f).success).toBe(true);
+      expect(f.hourly).toHaveLength(1);
+      expect(f.hourly[0]).toMatchObject({ ts: new Date(start + (scenario.durationH - 1) * HOUR).toISOString(), tempOutC: lastHour?.tempOutC });
+    }
+    // Before the last hour nothing changes: from the next whole hour to the end.
+    expect(source('clear-day', { nowMs: start + (scenario.durationH - 2) * HOUR + 1 }).sim.forecast().hourly).toHaveLength(1);
+    expect(source('clear-day', { nowMs: start + (scenario.durationH - 3) * HOUR + 1 }).sim.forecast().hourly).toHaveLength(2);
+  });
+
   it('heatwave is hotter than clear-day', () => {
     const max = (id: ScenarioId) => Math.max(...builtInScenario(id).hourly.map((h) => h.tempOutC));
     expect(max('heatwave')).toBeGreaterThan(max('clear-day'));
