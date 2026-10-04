@@ -1,7 +1,7 @@
 import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
 import { epsBaseLoadW, isTimeZone, localMidnightMs, scenarioClock, type Clock, type HomeDataSource } from '@cold-reserve/core';
 import { FallbackSource, type SourceEvent } from '@cold-reserve/source-fallback';
-import { SCENARIO_IDS, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
+import { SCENARIO_IDS, SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
 import { withCardResources, type CardDocuments } from './cards.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
@@ -50,8 +50,8 @@ export function scenarioClockFor(env: Readonly<Record<string, string | undefined
   if (!start.ok) return start;
   const speed = number(env, 'MCP_SCENARIO_SPEED', 1);
   if (!speed.ok) return speed;
-  // The place of the demo home; per-place scenarios (L1) pass their own zone.
-  const anchor = scenarioAnchor(env['MCP_SCENARIO_ANCHOR'], wall.now(), demoProfile().location.tz);
+  // The zone of the place the scenario is played in (L1, #217): the reference place until sandboxes choose theirs (C2).
+  const anchor = scenarioAnchor(env['MCP_SCENARIO_ANCHOR'], wall.now(), builtInPlace('reference').tz);
   if (!anchor.ok) return anchor;
   return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: start.value.startMs, speed: speed.value }));
 }
@@ -105,7 +105,7 @@ function number(env: Readonly<Record<string, string | undefined>>, key: string, 
  * above 1) the simulator stops at the end of the scenario. With `daily` the scenario jumps back 24 h at
  * midnight: a long-running local server replays the day again from its start.
  */
-function scenarioAnchor(raw: string | undefined, startedAtMs: number, placeTimeZone: string): Result<number | ((wallMs: number) => number), ErrorEnvelope> {
+export function scenarioAnchor(raw: string | undefined, startedAtMs: number, placeTimeZone: string): Result<number | ((wallMs: number) => number), ErrorEnvelope> {
   if (raw === undefined || raw === 'start') return ok(startedAtMs);
   if (raw === 'daily') {
     if (!isTimeZone(placeTimeZone)) return err(toolError('invalid_config', 'The place of the scenario has no valid IANA time zone.'));

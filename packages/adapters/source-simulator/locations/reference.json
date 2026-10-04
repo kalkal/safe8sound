@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "id": "reference",
+  "label": "Reference home (central Italy)",
+  "latRounded": 41.9,
+  "lonRounded": 12.5,
+  "tz": "Europe/Rome",
+  "source": { "name": "Cold Reserve scenario scripts (values written for the demo)", "url": "https://github.com/kalkal/cold-reserve", "license": "Written for this project", "retrievedAt": "2026-10-04" },
+  "pvYieldFactor": 1,
+  "days": {
+    "clear-day": {
+      "date": "2026-07-15",
+      "hourly": [
+        { "tempOutC": 24, "humidityOutPct": 70, "irradianceWm2": 0 },
+        { "tempOutC": 23.5, "humidityOutPct": 72, "irradianceWm2": 0 },
+        { "tempOutC": 23, "humidityOutPct": 74, "irradianceWm2": 0 },
+        { "tempOutC": 22.5, "humidityOutPct": 75, "irradianceWm2": 0 },
+        { "tempOutC": 22, "humidityOutPct": 76, "irradianceWm2": 0 },
+        { "tempOutC": 22, "humidityOutPct": 76, "irradianceWm2": 0 },
+        { "tempOutC": 23, "humidityOutPct": 72, "irradianceWm2": 3 },
+        { "tempOutC": 25, "humidityOutPct": 65, "irradianceWm2": 48 },
+        { "tempOutC": 27, "humidityOutPct": 58, "irradianceWm2": 209 },
+        { "tempOutC": 29, "humidityOutPct": 52, "irradianceWm2": 398 },
+        { "tempOutC": 30.5, "humidityOutPct": 47, "irradianceWm2": 573 },
+        { "tempOutC": 31.5, "humidityOutPct": 44, "irradianceWm2": 687 },
+        { "tempOutC": 32.5, "humidityOutPct": 41, "irradianceWm2": 761 },
+        { "tempOutC": 33, "humidityOutPct": 40, "irradianceWm2": 787 },
+        { "tempOutC": 33.5, "humidityOutPct": 39, "irradianceWm2": 765 },
+        { "tempOutC": 33.5, "humidityOutPct": 39, "irradianceWm2": 693 },
+        { "tempOutC": 33, "humidityOutPct": 40, "irradianceWm2": 589 },
+        { "tempOutC": 32, "humidityOutPct": 42, "irradianceWm2": 432 },
+        { "tempOutC": 30.5, "humidityOutPct": 46, "irradianceWm2": 236 },
+        { "tempOutC": 28.5, "humidityOutPct": 52, "irradianceWm2": 63 },
+        { "tempOutC": 27, "humidityOutPct": 58, "irradianceWm2": 10 },
+        { "tempOutC": 26, "humidityOutPct": 62, "irradianceWm2": 0 },
+        { "tempOutC": 25, "humidityOutPct": 65, "irradianceWm2": 0 },
+        { "tempOutC": 24.5, "humidityOutPct": 68, "irradianceWm2": 0 }
+      ],
+      "sun": {
+        "sunrise": ["2026-07-15T05:45:00+02:00", "2026-07-16T05:46:00+02:00"],
+        "sunset": ["2026-07-15T20:40:00+02:00"]
+      }
+    },
+    "heatwave": {
+      "date": "2026-07-16",
+      "hourly": [
+        { "tempOutC": 27, "humidityOutPct": 60, "irradianceWm2": 0 },
+        { "tempOutC": 26.5, "humidityOutPct": 62, "irradianceWm2": 0 },
+        { "tempOutC": 26, "humidityOutPct": 64, "irradianceWm2": 0 },
+        { "tempOutC": 25.5, "humidityOutPct": 65, "irradianceWm2": 0 },
+        { "tempOutC": 25, "humidityOutPct": 66, "irradianceWm2": 0 },
+        { "tempOutC": 25, "humidityOutPct": 66, "irradianceWm2": 0 },
+        { "tempOutC": 26, "humidityOutPct": 62, "irradianceWm2": 3 },
+        { "tempOutC": 28.5, "humidityOutPct": 55, "irradianceWm2": 48 },
+        { "tempOutC": 31, "humidityOutPct": 48, "irradianceWm2": 209 },
+        { "tempOutC": 33, "humidityOutPct": 42, "irradianceWm2": 398 },
+        { "tempOutC": 35, "humidityOutPct": 37, "irradianceWm2": 573 },
+        { "tempOutC": 36.5, "humidityOutPct": 34, "irradianceWm2": 687 },
+        { "tempOutC": 37.5, "humidityOutPct": 31, "irradianceWm2": 761 },
+        { "tempOutC": 38, "humidityOutPct": 30, "irradianceWm2": 787 },
+        { "tempOutC": 38.5, "humidityOutPct": 29, "irradianceWm2": 765 },
+        { "tempOutC": 38.5, "humidityOutPct": 29, "irradianceWm2": 693 },
+        { "tempOutC": 38, "humidityOutPct": 30, "irradianceWm2": 589 },
+        { "tempOutC": 37, "humidityOutPct": 32, "irradianceWm2": 432 },
+        { "tempOutC": 35, "humidityOutPct": 36, "irradianceWm2": 236 },
+        { "tempOutC": 32.5, "humidityOutPct": 42, "irradianceWm2": 63 },
+        { "tempOutC": 30.5, "humidityOutPct": 48, "irradianceWm2": 10 },
+        { "tempOutC": 29.5, "humidityOutPct": 52, "irradianceWm2": 0 },
+        { "tempOutC": 28.5, "humidityOutPct": 55, "irradianceWm2": 0 },
+        { "tempOutC": 27.5, "humidityOutPct": 58, "irradianceWm2": 0 },
+        { "tempOutC": 27, "humidityOutPct": 60, "irradianceWm2": 0 },
+        { "tempOutC": 26.5, "humidityOutPct": 62, "irradianceWm2": 0 },
+        { "tempOutC": 26, "humidityOutPct": 64, "irradianceWm2": 0 },
+        { "tempOutC": 26, "humidityOutPct": 65, "irradianceWm2": 0 },
+        { "tempOutC": 25.5, "humidityOutPct": 66, "irradianceWm2": 0 },
+        { "tempOutC": 25.5, "humidityOutPct": 66, "irradianceWm2": 0 },
+        { "tempOutC": 26.5, "humidityOutPct": 62, "irradianceWm2": 3 },
+        { "tempOutC": 29, "humidityOutPct": 55, "irradianceWm2": 48 },
+        { "tempOutC": 31.5, "humidityOutPct": 48, "irradianceWm2": 209 },
+        { "tempOutC": 33.5, "humidityOutPct": 42, "irradianceWm2": 398 },
+        { "tempOutC": 35.5, "humidityOutPct": 37, "irradianceWm2": 573 },
+        { "tempOutC": 37, "humidityOutPct": 34, "irradianceWm2": 687 }
+      ],
+      "sun": {
+        "sunrise": ["2026-07-16T05:46:00+02:00", "2026-07-17T05:47:00+02:00"],
+        "sunset": ["2026-07-16T20:39:00+02:00"]
+      }
+    },
+    "storm-blackout": {
+      "date": "2026-07-17",
+      "hourly": [
+        { "tempOutC": 31, "humidityOutPct": 60, "irradianceWm2": 152 },
+        { "tempOutC": 31, "humidityOutPct": 62, "irradianceWm2": 157 },
+        { "tempOutC": 30, "humidityOutPct": 68, "irradianceWm2": 153 },
+        { "tempOutC": 28, "humidityOutPct": 80, "irradianceWm2": 69 },
+        { "tempOutC": 26, "humidityOutPct": 88, "irradianceWm2": 59 },
+        { "tempOutC": 25, "humidityOutPct": 90, "irradianceWm2": 43 },
+        { "tempOutC": 24.5, "humidityOutPct": 90, "irradianceWm2": 24 },
+        { "tempOutC": 24, "humidityOutPct": 90, "irradianceWm2": 6 },
+        { "tempOutC": 23.5, "humidityOutPct": 90, "irradianceWm2": 1 },
+        { "tempOutC": 23.5, "humidityOutPct": 88, "irradianceWm2": 0 },
+        { "tempOutC": 23, "humidityOutPct": 88, "irradianceWm2": 0 },
+        { "tempOutC": 23, "humidityOutPct": 88, "irradianceWm2": 0 },
+        { "tempOutC": 22.5, "humidityOutPct": 88, "irradianceWm2": 0 },
+        { "tempOutC": 22.5, "humidityOutPct": 88, "irradianceWm2": 0 },
+        { "tempOutC": 22, "humidityOutPct": 88, "irradianceWm2": 0 },
+        { "tempOutC": 22, "humidityOutPct": 88, "irradianceWm2": 0 },
+        { "tempOutC": 22, "humidityOutPct": 88, "irradianceWm2": 0 },
+        { "tempOutC": 22, "humidityOutPct": 86, "irradianceWm2": 0 },
+        { "tempOutC": 22.5, "humidityOutPct": 84, "irradianceWm2": 2 },
+        { "tempOutC": 23.5, "humidityOutPct": 80, "irradianceWm2": 29 },
+        { "tempOutC": 25, "humidityOutPct": 74, "irradianceWm2": 125 },
+        { "tempOutC": 26.5, "humidityOutPct": 68, "irradianceWm2": 239 },
+        { "tempOutC": 28, "humidityOutPct": 62, "irradianceWm2": 344 },
+        { "tempOutC": 29, "humidityOutPct": 58, "irradianceWm2": 412 }
+      ],
+      "sun": {
+        "sunrise": ["2026-07-18T05:47:00+02:00"],
+        "sunset": ["2026-07-17T20:38:00+02:00"]
+      }
+    }
+  }
+}

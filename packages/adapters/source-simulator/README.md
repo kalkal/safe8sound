@@ -27,12 +27,23 @@ The 1R1C constants are in K/kW and kWh/K as in the contract.
   C 0.03 kWh/K per m², tau about 20 h). The location is the placeholder, never the home.
 - `data/simulator-params.json`: physics parameters (config, never constants in code). Dry-mode
   factors, fan-only power, internal gains and humidity rates are S6 assumptions to calibrate on real data.
-- `scenarios/*.json`: `clear-day`, `heatwave`, `storm-blackout`. Each has a semantic `version`, a `seed`,
-  one hourly value per hour of `durationH` (weather + base load, interpolated inside the hour; 24 hours, 36 for
-  `heatwave` so a plan made in the afternoon sees the whole night), half-open `[fromH, toH)` windows
-  for grid outages, occupancy (roles only) and HVAC settings, and `simulatedGroups`: the field groups the
-  scenario replaces even over a live home. `storm-blackout` lists all three groups, so it is always
-  fully simulated. The clear-day and heatwave weather is the PVGIS July profile of S6 turned into irradiance.
+- A scenario is a **script played in a place** (L1, #217); `mergeScenario` joins them into the scenario the
+  simulator runs, validated against the home.
+- `scenarios/*.json`, the scripts: `clear-day`, `heatwave`, `storm-blackout`. What happens at home, whatever the
+  place: a semantic `version`, a `seed`, the local `startHour`, one hourly value per hour of `durationH` (storm
+  probability and base load, interpolated inside the hour; 24 hours, 36 for `heatwave` so a plan made in the
+  afternoon sees the whole night), half-open `[fromH, toH)` windows for grid outages, occupancy (roles only)
+  and HVAC settings, and `simulatedGroups`: the field groups the scenario replaces even over a live home.
+  `storm-blackout` lists all three groups, so it is always fully simulated.
+- `locations/<id>.json`, the places: a label, the coordinates rounded to one decimal (a city, never a home),
+  the IANA zone, the data `source` (name, URL, licence, retrieval date), a `pvYieldFactor` that scales the sun,
+  and for every scenario its real day: the `date`, the hourly outdoor temperature, humidity and irradiance,
+  sunrise and sunset, and an optional real `outage` added to the script's. The scenario starts at the
+  script's local hour on that day, in the place's zone. The `reference` place keeps the numbers the scenarios
+  had before the split (a test compares them with a copy of the old files): its clear-day and heatwave weather
+  is the PVGIS July profile of S6 turned into irradiance. Turin and Houston come with L2. A sandbox home takes
+  its location from its place (`profileAtPlace`). An invalid place file is `invalid_config` naming its fields,
+  never their content.
 
 ## Humidity parameters (`humidity` in `data/simulator-params.json`)
 

@@ -1,6 +1,6 @@
 import { HomeStatusSchema } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { createApp } from '../src/app.js';
+import { createApp, scenarioAnchor } from '../src/app.js';
 import { settableClock } from './comfort-plan/support.js';
 import { TOKEN, callTool, post, toolResult } from './helpers.js';
 
@@ -19,6 +19,11 @@ function instance(env: Record<string, string>, startedAt: number) {
 }
 
 describe('scenario anchor (MCP_SCENARIO_ANCHOR)', () => {
+  it('daily: refuses a place without a valid IANA zone with invalid_config (L1, #217)', () => {
+    expect(scenarioAnchor('daily', 0, 'Mars/Olympus')).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    expect(scenarioAnchor('daily', 0, 'Europe/Rome').ok).toBe(true);
+  });
+
   it('daily: two containers started hours apart give the same time and battery', async () => {
     const a = instance({ MCP_SCENARIO_ANCHOR: 'daily' }, at('2026-10-01T07:00:00Z'));
     const b = instance({ MCP_SCENARIO_ANCHOR: 'daily' }, at('2026-10-01T11:00:00Z'));
