@@ -143,6 +143,12 @@ export interface StateStore {
 /** What a store knows of the request it serves: its failures are logged with this correlation id (#111). */
 export interface StoreScope {
   readonly correlationId?: string;
+  /**
+   * The wall instant the home's current playthrough of its scenario began (#234): a daily replay, a server start or a
+   * sandbox restart. Storm sessions and family messages belong to it, so a replayed day never sees the last one's.
+   * Absent (the real home, tests): one playthrough for ever, today's keys.
+   */
+  readonly playthrough?: number;
 }
 
 export type StateStoreFactory = (homeId: HomeId, scope?: StoreScope) => StateStore;

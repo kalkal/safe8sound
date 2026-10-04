@@ -4,6 +4,7 @@ import { createApp, scenarioClockFor, type App } from './app.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules } from './compose.js';
 import { wallStamped } from './log-clock.js';
+import { withPlaythrough } from './playthrough.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 import { stormModeWiring } from './storm-mode-config.js';
 
@@ -18,18 +19,21 @@ export function createLambdaApp(
 ): Result<App, ErrorEnvelope> {
   const clock = scenarioClockFor(env, opts.wallClock);
   if (!clock.ok) return clock;
+  // Each home's stores are scoped to its playthrough (#234): the daily replay never sees yesterday's storm.
+  let homeClock: App['homeClock'] = () => undefined;
+  const storeFor = withPlaythrough(opts.storeFor, (homeId) => homeClock(homeId));
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) return preferences;
-  const modules = composeModules({ preferences: preferences.value, storeFor: opts.storeFor, clock: clock.value });
+  const modules = composeModules({ preferences: preferences.value, storeFor, clock: clock.value });
   if (!modules.ok) return modules;
   // The family phone's inbox lives in the same table (#24); its HTTP route is not served here.
-  const stormMode = stormModeWiring({ storeFor: opts.storeFor, preferences: preferences.value, clock: clock.value });
+  const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock: clock.value });
   if (!stormMode.ok) return stormMode;
-  const comfortPlan = comfortPlanWiring({ storeFor: opts.storeFor, preferences: preferences.value, clock: clock.value, notifier: stormMode.value.notifier });
+  const comfortPlan = comfortPlanWiring({ storeFor, preferences: preferences.value, clock: clock.value, notifier: stormMode.value.notifier });
   if (!comfortPlan.ok) return comfortPlan;
   // No cardDocuments yet: the built card bundle is not shipped with the function, so the Lambda serves
   // the tools without their ui:// cards. TODO(#104): ship the card bundle with the MCP Lambda.
-  return createApp(env, {
+  const app = createApp(env, {
     wallClock: opts.wallClock,
     scenarioClock: clock.value,
     logger: wallStamped(opts.logger, opts.wallClock),
@@ -38,4 +42,6 @@ export function createLambdaApp(
     stormMode: stormMode.value,
     ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }),
   });
+  if (app.ok) homeClock = app.value.homeClock;
+  return app;
 }

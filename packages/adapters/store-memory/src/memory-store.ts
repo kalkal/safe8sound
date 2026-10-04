@@ -35,12 +35,14 @@ import {
   type PlanApplication,
   type StateStore,
   type StateStoreFactory,
+  type StoreScope,
   type StateStoreTtl,
 } from '@cold-reserve/core';
 
 // In-memory StateStore. It mirrors the DynamoDB single-table keys (plan §3.2) so both adapters
 // behave the same: PK = HOME#<homeId>, SK = PREFS | PLAN#<id> | EVENT#<ts>#<n> | GUARD#<ts>#<n> |
-// STORM#<startedAt>#<id> | INBOX#<at>#<n> | CONFIRM#<planId>.
+// STORM#<startedAt>#<id> | INBOX#<at>#<n> | CONFIRM#<planId>; within a playthrough (#234) the storm and inbox keys
+// start with PLAY#<playthrough>#.
 // Expired items are invisible on read, like DynamoDB TTL items that are not yet deleted.
 
 interface Item {
@@ -70,18 +72,21 @@ const MAX_CHANGES = 99;
 
 export const memoryStateStoreFactory =
   (options: MemoryStateStoreOptions): StateStoreFactory =>
-  (homeId) =>
-    new MemoryStateStore(homeId, options);
+  (homeId, scope) =>
+    new MemoryStateStore(homeId, options, scope);
 
 class MemoryStateStore implements StateStore {
   readonly homeId: HomeId;
   readonly #options: MemoryStateStoreOptions;
   readonly #ttl: StateStoreTtl;
+  /** Where this playthrough's storm sessions and family messages live (#234); '' without one. */
+  readonly #play: string;
 
-  constructor(homeId: HomeId, options: MemoryStateStoreOptions) {
+  constructor(homeId: HomeId, options: MemoryStateStoreOptions, scope?: StoreScope) {
     this.homeId = homeId;
     this.#options = options;
     this.#ttl = options.ttl ?? DEFAULT_STATE_STORE_TTL;
+    this.#play = scope?.playthrough === undefined ? '' : `PLAY#${String(scope.playthrough)}#`;
   }
 
   getPreferences(): Promise<Result<Preferences | undefined, ErrorEnvelope>> {
@@ -106,7 +111,8 @@ class MemoryStateStore implements StateStore {
   }
 
   listConfigChanges(): Promise<Result<ConfigChange[], ErrorEnvelope>> {
-    const changes = this.#query<ConfigChange>('EVENT#').sort((a, b) => epochMs(a.ts) - epochMs(b.ts));
+    // In the order they were written: a replayed day's scenario times are no order (#234).
+    const changes = this.#logInWriteOrder<ConfigChange>('EVENT#');
     return Promise.resolve(ok(changes));
   }
 
@@ -178,7 +184,7 @@ class MemoryStateStore implements StateStore {
   }
 
   listGuardRejections(): Promise<Result<GuardRejection[], ErrorEnvelope>> {
-    const rejections = this.#query<GuardRejection>('GUARD#').sort((a, b) => epochMs(b.at) - epochMs(a.at));
+    const rejections = this.#logInWriteOrder<GuardRejection>('GUARD#').reverse();
     return Promise.resolve(ok(rejections));
   }
 
@@ -187,13 +193,13 @@ class MemoryStateStore implements StateStore {
       return Promise.resolve(err(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } })));
     }
     // Same key as store-dynamodb: the start time in UTC, then the id.
-    const sk = `STORM#${new Date(session.startedAt).toISOString()}#${session.id}`;
+    const sk = `${this.#play}STORM#${new Date(session.startedAt).toISOString()}#${session.id}`;
     this.#put(sk, { value: session, expiresAtMs: this.#retainedFor(this.#ttl.stormSessionDays) });
     return Promise.resolve(ok(undefined));
   }
 
   getLatestStormSession(): Promise<Result<StormSession | undefined, ErrorEnvelope>> {
-    const sessions = this.#readAll(this.#query<unknown>('STORM#'), StormSessionSchema, 'STORM#');
+    const sessions = this.#readAll(this.#query<unknown>(`${this.#play}STORM#`), StormSessionSchema, 'STORM#');
     if (!sessions.ok) return Promise.resolve(sessions);
     const [latest] = sessions.value.sort((a, b) => epochMs(b.startedAt) - epochMs(a.startedAt));
     return Promise.resolve(ok(latest));
@@ -206,14 +212,14 @@ class MemoryStateStore implements StateStore {
       return Promise.resolve(err(toolError('invalid_input', 'A family message breaks its contract.', { details: { field } })));
     }
     // Same key as store-dynamodb: the time in UTC, then a sequence, so two messages at once are both kept.
-    const sk = `INBOX#${new Date(message.at).toISOString()}#${String(this.#next()).padStart(12, '0')}`;
+    const sk = `${this.#play}INBOX#${new Date(message.at).toISOString()}#${String(this.#next()).padStart(12, '0')}`;
     this.#put(sk, { value: parsed.data, expiresAtMs: this.#retainedFor(this.#ttl.inboxDays) });
     return Promise.resolve(ok(undefined));
   }
 
   listInbox(limit: number): Promise<Result<InboxMessage[], ErrorEnvelope>> {
     const newest = [...this.#partition()]
-      .filter(([sk, item]) => sk.startsWith('INBOX#') && this.#live(item))
+      .filter(([sk, item]) => sk.startsWith(`${this.#play}INBOX#`) && this.#live(item))
       .sort(([a], [b]) => (a < b ? 1 : -1))
       .slice(0, Math.max(0, limit))
       .map(([, item]) => structuredClone(item.value));
@@ -316,6 +322,15 @@ class MemoryStateStore implements StateStore {
   #query<T>(prefix: string): T[] {
     return [...this.#partition()]
       .filter(([sk, item]) => sk.startsWith(prefix) && this.#live(item))
+      .map(([, item]) => structuredClone(item.value) as T);
+  }
+
+  /** A log's live entries, oldest write first: its keys end with the backing's write sequence. */
+  #logInWriteOrder<T>(prefix: string): T[] {
+    const seq = (sk: string) => Number(sk.slice(sk.lastIndexOf('#') + 1));
+    return [...this.#partition()]
+      .filter(([sk, item]) => sk.startsWith(prefix) && this.#live(item))
+      .sort(([a], [b]) => seq(a) - seq(b))
       .map(([, item]) => structuredClone(item.value) as T);
   }
 

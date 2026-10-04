@@ -55,6 +55,18 @@ describe('clocks', () => {
     expect(clock.now()).toBe(1_060_000);
   });
 
+  it('says when its current playthrough began: the fixed anchor for ever, a daily anchor anew every day (#234)', () => {
+    let wall = Date.parse('2026-10-01T05:00:00Z');
+    const fixed = scenarioClock({ wall: { now: () => wall }, anchorMs: 5_000, scenarioStartMs: 0 });
+    const daily = scenarioClock({ wall: { now: () => wall }, anchorMs: utcDayStart, scenarioStartMs: 0 });
+    expect(fixed.playthrough?.()).toBe(5_000);
+    expect(daily.playthrough?.()).toBe(Date.parse('2026-10-01T00:00:00Z'));
+    wall = Date.parse('2026-10-02T05:00:00Z');
+    expect(fixed.playthrough?.()).toBe(5_000);
+    expect(daily.playthrough?.()).toBe(Date.parse('2026-10-02T00:00:00Z'));
+    expect(fixedClock(1).playthrough).toBeUndefined();
+  });
+
   it('runs in real time by default', () => {
     const clock = scenarioClock({ wall: fixedClock(7_000), anchorMs: 5_000, scenarioStartMs: 0 });
     expect(clock.now()).toBe(2_000);

@@ -6,6 +6,7 @@ import type { CardDocuments } from './cards.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules } from './compose.js';
 import { wallStamped } from './log-clock.js';
+import { withPlaythrough } from './playthrough.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 import { stormModeWiring, type StormModeWiring } from './storm-mode-config.js';
 
@@ -39,7 +40,9 @@ export function createLocalApp(
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) return preferences;
   // The store's clock is the wall's: it drives only the retention; plan expiry is judged on the home's scenario time (#175).
-  const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: opts.wallClock });
+  // Each home's stores are scoped to its playthrough (#234); the app knows the home clocks once built.
+  let homeClock: App['homeClock'] = () => undefined;
+  const storeFor = withPlaythrough(memoryStateStoreFactory({ backing: createMemoryBacking(), clock: opts.wallClock }), (homeId) => homeClock(homeId));
   const modules = composeModules({ preferences: preferences.value, storeFor, clock: clock.value });
   if (!modules.ok) return modules;
   const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock: clock.value });
@@ -57,5 +60,6 @@ export function createLocalApp(
     ...(opts.cardDocuments === undefined ? {} : { cardDocuments: opts.cardDocuments }),
   });
   if (!app.ok) return app;
+  homeClock = app.value.homeClock;
   return ok({ app: app.value, stormMode: stormMode.value });
 }

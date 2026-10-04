@@ -45,7 +45,7 @@ import { z } from 'zod';
 import type { TableClient, TableItem } from './table.js';
 
 // StateStore on the single table (plan §3.2): PK = HOME#<homeId>; SK = PREFS | PLAN#<id> |
-// EVENT#<ts>#<n> | GUARD#<ts>#<n> | CONFIRM#<planId> | STORM#… | INBOX#… | SETTINGS (a sandbox's settings, C1,
+// EVENT#<ts>#<n> | GUARD#<ts>#<n> | CONFIRM#<planId> | [PLAY#<playthrough>#]STORM#… | [PLAY#<playthrough>#]INBOX#… | SETTINGS (a sandbox's settings, C1,
 // with a top-level `version` for the conditional write). One item outside the homes: PK = ADMIN#CONFIG,
 // SK = CONFIG, the demo's admin config read by every home (C1, same conditional write). The sim-api's quota
 // counters live under DEMO#… (counter.ts). Every item carries schemaVersion; logs and plans carry the DynamoDB TTL
@@ -112,6 +112,8 @@ class DynamoStateStore implements StateStore {
   readonly #correlationId: string | undefined;
   readonly #ttl: StateStoreTtl;
   readonly #pk: string;
+  /** Where this playthrough's storm sessions and family messages live (#234); '' without one. */
+  readonly #play: string;
   #sequence = 0;
 
   constructor(homeId: HomeId, options: DynamoStateStoreOptions, scope?: StoreScope) {
@@ -121,6 +123,7 @@ class DynamoStateStore implements StateStore {
     this.#rng = options.rng;
     this.#onError = options.onError;
     this.#correlationId = scope?.correlationId;
+    this.#play = scope?.playthrough === undefined ? '' : `PLAY#${String(scope.playthrough)}#`;
     this.#ttl = options.ttl ?? DEFAULT_STATE_STORE_TTL;
     this.#pk = `HOME#${homeId}`;
   }
@@ -150,8 +153,8 @@ class DynamoStateStore implements StateStore {
 
   listConfigChanges() {
     return this.#run('listConfigChanges', async () => {
-      const changes = (await this.#live('EVENT#')).map((item) => parse(ConfigChangeSchema, item));
-      return changes.sort((a, b) => epochMs(a.ts) - epochMs(b.ts));
+      // In the order they were written: a replayed day's scenario times are no order (#234).
+      return inWriteOrder(await this.#live('EVENT#')).map((item) => parse(ConfigChangeSchema, item));
     });
   }
 
@@ -264,11 +267,12 @@ class DynamoStateStore implements StateStore {
 
   listGuardRejections() {
     return this.#run('listGuardRejections', async () => {
-      const rejections = (await this.#live('GUARD#')).map((item): GuardRejection => {
-        const { planId, ...rest } = parse(GuardRejectionSchema, item);
-        return planId === undefined ? rest : { ...rest, planId };
-      });
-      return rejections.sort((a, b) => epochMs(b.at) - epochMs(a.at));
+      return inWriteOrder(await this.#live('GUARD#'))
+        .reverse()
+        .map((item): GuardRejection => {
+          const { planId, ...rest } = parse(GuardRejectionSchema, item);
+          return planId === undefined ? rest : { ...rest, planId };
+        });
     });
   }
 
@@ -277,7 +281,7 @@ class DynamoStateStore implements StateStore {
       if (session.homeId !== this.homeId) {
         fail(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } }));
       }
-      await this.#table.put(this.#item(stormKey(session), session, this.#retainedFor(this.#ttl.stormSessionDays)));
+      await this.#table.put(this.#item(`${this.#play}${stormKey(session)}`, session, this.#retainedFor(this.#ttl.stormSessionDays)));
     });
   }
 
@@ -285,7 +289,7 @@ class DynamoStateStore implements StateStore {
     return this.#run('getLatestStormSession', async () => {
       // SK = STORM#<startedAt in UTC>#<id>: the newest session is the highest key, one item read.
       // Retention counts from the write and sessions are written in the order they start: if it has expired, every older one has too.
-      const [latest] = await this.#table.query(this.#pk, 'STORM#', { newestFirst: true, limit: 1 });
+      const [latest] = await this.#table.query(this.#pk, `${this.#play}STORM#`, { newestFirst: true, limit: 1 });
       return latest && this.#isLive(latest) ? parse(StormSessionSchema, latest) : undefined;
     });
   }
@@ -297,7 +301,7 @@ class DynamoStateStore implements StateStore {
         fail(toolError('invalid_input', 'A family message breaks its contract.', { details: { field: parsed.error.issues[0]?.path.join('.') ?? 'message' } }));
       }
       // SK = INBOX#<at in UTC>#<suffix>: newest first is the reverse key order; two messages at once are both kept.
-      const sk = `INBOX#${new Date(message.at).toISOString()}#${this.#suffix()}`;
+      const sk = `${this.#play}INBOX#${new Date(message.at).toISOString()}#${this.#suffix()}`;
       await this.#table.put(this.#item(sk, message, this.#retainedFor(this.#ttl.inboxDays)));
     });
   }
@@ -306,7 +310,7 @@ class DynamoStateStore implements StateStore {
     return this.#run('listInbox', async () => {
       if (limit <= 0) return [];
       // Messages are written in time order and kept from the write, so the live ones are a prefix of the newest-first page.
-      const newest = await this.#table.query(this.#pk, 'INBOX#', { newestFirst: true, limit });
+      const newest = await this.#table.query(this.#pk, `${this.#play}INBOX#`, { newestFirst: true, limit });
       return newest.filter((item) => this.#isLive(item)).map((item) => parse(InboxMessageSchema, item));
     });
   }
@@ -411,6 +415,20 @@ function parse<T>(schema: z.ZodType<T>, item: TableItem): T {
 }
 
 /** Sort key of a storm session (plan §3.2): the start time in UTC orders the sessions, the id keeps it unique. */
+/** Log items, oldest write first: their keys end with `<wall ms>-<sequence>-<random>` (#suffix). */
+function inWriteOrder(items: readonly TableItem[]): TableItem[] {
+  const order = (item: TableItem) => {
+    const sk = item['SK'];
+    const [ms = 0, seq = 0] = sk.slice(sk.lastIndexOf('#') + 1).split('-').map(Number);
+    return [ms, seq] as const;
+  };
+  return [...items].sort((a, b) => {
+    const [am, as] = order(a);
+    const [bm, bs] = order(b);
+    return am - bm || as - bs;
+  });
+}
+
 const stormKey = (session: StormSession) => `STORM#${new Date(session.startedAt).toISOString()}#${session.id}`;
 
 function fail(error: ErrorEnvelope): never {

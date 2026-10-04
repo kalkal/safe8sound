@@ -103,6 +103,8 @@ export interface App {
   readonly handler: McpHandler;
   /** The family phone's reply (POST /phone/reply, #24), over the storm module's own deps; absent without it. */
   readonly familyReply?: PhoneReplyHandler;
+  /** A home's own scenario clock: for what is composed before the app, like the playthrough of its stores (#234). */
+  readonly homeClock: (homeId: HomeId) => Clock | undefined;
 }
 
 const HOUR_MS = 3_600_000;
@@ -293,5 +295,6 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     registry: registry.value,
     handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes, ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }) }),
     ...(stormDeps === undefined ? {} : { familyReply: (input, ctx) => familyReply(atHome(stormDeps, ctx.homeId), input, ctx) }),
+    homeClock: (homeId) => homeFor(homeId)?.clock,
   });
 }

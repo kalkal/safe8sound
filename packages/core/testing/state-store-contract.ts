@@ -528,6 +528,54 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
       });
     });
 
+    describe('playthroughs of a replayed scenario day (#234)', () => {
+      // The daily anchor replays the same scenario day; a sandbox restart plays it again. Each playthrough starts at a
+      // wall instant, and the store is scoped to it: its storm and its family messages are its own.
+      const HOUR = 60 * MINUTE_MS;
+
+      it('storm sessions and family messages belong to the playthrough they were written in', async () => {
+        const t = setup();
+        const first = t.harness.factory(t.homeA, { playthrough: t.start });
+        const second = t.harness.factory(t.homeA, { playthrough: t.start + DAY_MS });
+        await first.saveStormSession(t.storm(t.homeA, 'storm_firstplay01', 8 * HOUR, 'active'));
+        await first.saveInboxMessage(message(t, 8 * HOUR, 'from the first playthrough'));
+        t.harness.setNow(t.start + MINUTE_MS);
+        // The replay is earlier on the scenario day than the first playthrough's storm: it still never sees it.
+        expect(await second.getLatestStormSession()).toEqual({ ok: true, value: undefined });
+        expect(await second.listInbox(10)).toEqual({ ok: true, value: [] });
+        await second.saveStormSession(t.storm(t.homeA, 'storm_replayed001', 2 * HOUR));
+        expect(await second.getLatestStormSession()).toMatchObject({ ok: true, value: { id: 'storm_replayed001' } });
+        expect(await first.getLatestStormSession()).toMatchObject({ ok: true, value: { id: 'storm_firstplay01' } });
+        expect(await first.listInbox(10)).toMatchObject({ ok: true, value: [{ text: 'from the first playthrough' }] });
+      });
+
+      it('the config-change and refusal logs span every playthrough, in the order they were written', async () => {
+        const t = setup();
+        const first = t.harness.factory(t.homeA, { playthrough: t.start });
+        const second = t.harness.factory(t.homeA, { playthrough: t.start + DAY_MS });
+        const late = t.change(8 * HOUR, 28);
+        const early = t.change(2 * HOUR, 26);
+        await first.putPreferences(t.prefs(), [late]);
+        await first.recordGuardRejection({ at: t.at(8 * HOUR), failed: ['pacing_on_track'] });
+        t.harness.setNow(t.start + MINUTE_MS);
+        // Written later, at an earlier scenario hour of the replayed day.
+        await second.putPreferences(t.prefs(), [early]);
+        await second.recordGuardRejection({ at: t.at(2 * HOUR), failed: ['storm_reserve'] });
+        for (const store of [first, second, t.harness.factory(t.homeA)]) {
+          expect(await store.listConfigChanges()).toEqual({ ok: true, value: [late, early] });
+          expect(await store.listGuardRejections()).toMatchObject({ ok: true, value: [{ failed: ['storm_reserve'] }, { failed: ['pacing_on_track'] }] });
+        }
+      });
+
+      it('a store without a playthrough keeps today\'s keys: what it writes, it reads', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        await store.saveStormSession(t.storm(t.homeA, 'storm_noplaythru', HOUR));
+        expect(await t.harness.factory(t.homeA).getLatestStormSession()).toMatchObject({ ok: true, value: { id: 'storm_noplaythru' } });
+        expect(await t.harness.factory(t.homeA, { playthrough: t.start }).getLatestStormSession()).toEqual({ ok: true, value: undefined });
+      });
+    });
+
     describe('sandbox settings (C1, approved in #214)', () => {
       const settings = (version: number, at: string): SandboxSettings =>
         SandboxSettingsSchema.parse({ version, updatedAt: at, scenarioId: 'heatwave', locationId: 'turin', units: 'C', household: 'older-woman' });
