@@ -24,6 +24,6 @@ export { FloorPlanCard } from './FloorPlanCard.js';
 export { ManualControlCard, type ManualReason } from './ManualControlCard.js';
 export { SafeRoomCard } from './SafeRoomCard.js';
 export { homeInStorm } from './home-fixtures.js';
-export { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, rejectedPlan, safeRoomCalm, safeRoomInStorm, stormPlan } from './fixtures.js';
+export { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, planThatHolds, rejectedPlan, safeRoomCalm, safeRoomInStorm, stormPlan } from './fixtures.js';
 export { homeClock, levelSpans, pacingGeometry } from './plan-model.js';
 export { cardThemeFor, type CardTheme } from './theme.js';

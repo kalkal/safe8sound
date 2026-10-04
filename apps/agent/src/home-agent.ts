@@ -6,6 +6,7 @@ import { classifyFailure } from './failure.js';
 import { logLine, type AgentLogEntry } from './log.js';
 import type { HomeAgent } from './invocations.js';
 import { createTurnRecorder, mcpToolset, type McpSession, type TurnRecorder } from './mcp-tools.js';
+import { replyText } from './reply-text.js';
 
 /** One running turn and one waiting: a third question for the same home is refused (review of #132). */
 const MAX_TURNS_PER_HOME = 2;
@@ -109,7 +110,9 @@ export function createHomeAgent(deps: {
     }
     const cards = recorder.cards();
     const status = recorder.status();
-    return ok({ text: answer.value.text, ...(status === undefined ? {} : { status }), ...(cards.length === 0 ? {} : { cards: [...cards] }) });
+    const reply = replyText(answer.value.text);
+    if (reply.cut) deps.log?.(logLine(toolError('output_schema_violation', 'The model wrote more than a reply may carry.'), 'ReplyTooLong', { correlationId }));
+    return ok({ text: reply.text, ...(status === undefined ? {} : { status }), ...(cards.length === 0 ? {} : { cards: [...cards] }) });
   };
 
   // One turn at a time per home (review of #121): the recorder and the conversation history belong to

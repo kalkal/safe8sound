@@ -48,16 +48,15 @@ async function withServer<T>(env: Record<string, string>, run: (call: (token: st
 describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confirm, retry', () => {
   it('runs the whole flow through MCP', async () => {
     await withServer({ MCP_SCENARIO: 'heatwave', MCP_SCENARIO_START_H: '14' }, async (call) => {
-      // 1. The model proposes "every room at 22 °C": the guard refuses it and says why.
+      // 1. The model proposes "every room at 22 °C": the guard refuses it, and the answer is the plan that holds,
+      // saved and ready to apply, with the refusal said first (#202).
       const greedy = await call(TOKEN, 'plan_comfort', { goal: 'cool', setpointC: 22, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
-      expect(greedy.isError).toBe(true);
-      // The value the guard would accept, then the plan that holds (#186).
-      expect((greedy.content as { type: string; text: string }[])[0]?.text).toMatch(/Nearest allowed: 6000 W\. A plan that holds: Comfort until \d{1,2}:\d\d (AM|PM)\.$/);
-      expect(ErrorEnvelopeSchema.parse(greedy.structuredContent)).toMatchObject({
-        code: 'inverter_limit_exceeded',
-        category: 'guard_rejection',
-        details: { guarantee: 'inverter_limit', nearestAllowed: 6000, unit: 'W' },
-      });
+      expect(greedy.isError).toBeFalsy();
+      const holds = PlanSchema.parse(greedy.structuredContent);
+      expect(holds.refusedProposal?.code).toBe('inverter_limit_exceeded');
+      expect(holds.guarantees.every((g) => g.ok)).toBe(true);
+      expect(textOf(greedy)).toMatch(/^The guard refused the proposed setpoint and rooms: .*Nearest allowed: 6000 W\. This plan holds instead and is ready to apply\./);
+      expect(textOf(greedy)).toContain(`call apply_plan with planId ${holds.id}`);
 
       // 2. It asks the planner instead: the most comfortable plan the guard accepts.
       const proposed = await call(TOKEN, 'plan_comfort', { goal: 'cool' });

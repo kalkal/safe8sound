@@ -2,10 +2,9 @@ import { GUARANTEE_IDS, HomeIdSchema, HomeProfileSchema, LAST_RESORT_ACTIONS, Pl
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
-import { localTimeText } from '@cold-reserve/core';
 import { holdSafeRoom } from '@cold-reserve/guard';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
-import { guardFrame, loadInputs, planComfort, withAlternative } from '../../src/modules/comfort-plan/plan-comfort.js';
+import { guardFrame, loadInputs, planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { REAL, preferences, world } from './support.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
@@ -47,8 +46,31 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(new Set(r.value.steps.map((s) => s.level))).toEqual(new Set([levels[0]]));
   });
 
-  it('checks exactly what the model proposed: the guard says no, with the nearest allowed value; nothing is saved', async () => {
+  it('a refused proposal comes back as the plan that holds: saved, applicable, with a short note of the refusal (#202)', async () => {
     const w = world('storm-blackout', 3);
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
+    if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
+    const plan = PlanSchema.parse(r.value);
+    // The planner's own plan for the same moment, as plan_comfort with only the goal gives it.
+    const own = await planComfort(world('storm-blackout', 3).deps, { goal: 'cool' }, w.ctx);
+    if (!own.ok) throw new Error(own.error.message);
+    expect(plan.steps).toEqual(own.value.steps);
+    expect(plan.guarantees.every((g) => g.ok)).toBe(true);
+    expect(plan.lastResort).toBeUndefined();
+    expect(plan.refusedProposal?.code).toMatch(/_(violated|exceeded|off_track|unmet)$/);
+    expect(plan.refusedProposal?.message).toMatch(/Nearest allowed/);
+    // Saved and applicable: the person can apply it in one step.
+    const saved = await w.store.getPlan(plan.id);
+    expect(saved.ok && saved.value.status).toBe('proposed');
+    const applied = await applyPlan(w.deps, { planId: plan.id }, w.ctx);
+    expect(applied.ok && applied.value.plan.status).toBe('applied');
+    // The guard's no to the proposal stays in the audit trail.
+    const rejections = await w.store.listGuardRejections();
+    expect(rejections.ok && rejections.value).toHaveLength(1);
+  });
+
+  it('checks exactly what the model proposed: when nothing holds, the guard says no, with the nearest allowed value; nothing is saved', async () => {
+    const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -63,24 +85,9 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(rejections.ok && rejections.value).toHaveLength(1);
   });
 
-  it('next to the refusal, the plan the planner would accept: its level and until when, in the details and in the words (#186)', async () => {
-    const w = world('storm-blackout', 3);
-    const refused = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
-    if (refused.ok) throw new Error('expected a refusal');
-    const own = await planComfort(world('storm-blackout', 3).deps, { goal: 'cool' }, w.ctx);
-    if (!own.ok) throw new Error(own.error.message);
-    const level = own.value.steps[0]?.level;
-    expect(refused.error.details?.alternative).toEqual({ level, until: own.value.horizonAt });
-    const Level = `${(level ?? '').charAt(0).toUpperCase()}${(level ?? '').slice(1)}`;
-    expect(refused.error.message).toContain(`A plan that holds: ${Level} until ${localTimeText(own.value.horizonAt)}.`);
-    expect(refused.error.message.length).toBeLessThanOrEqual(300);
-    // The alternative is offered, never saved: nothing to apply until the model proposes it.
-    expect((await w.store.getPlan(PlanIdSchema.parse('plan_test_0001'))).ok).toBe(false);
-  });
-
   it('a refusal says where its data came from; on a sandbox it carries neither the demo# id nor realHome (#198 review)', async () => {
     const sandbox = HomeIdSchema.parse('demo#0123456789abcdef');
-    const w = world('storm-blackout', 3, { homeId: sandbox });
+    const w = world('storm-blackout', 3, { homeId: sandbox, snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, { ...w.ctx, homeId: sandbox });
     if (r.ok) throw new Error('expected a refusal');
     expect(r.error.details?.origin).toMatchObject({ energy: 'simulated', rooms: 'simulated', weather: 'simulated' });
@@ -89,25 +96,15 @@ describe('plan_comfort (two-phase: propose)', () => {
   });
 
   it('a refusal on the real home says so, for the "simulated data" notice of the receipt', async () => {
-    const w = world('storm-blackout', 3, { homeId: REAL, readOnly: true });
+    const w = world('storm-blackout', 3, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
     if (r.ok) throw new Error('expected a refusal');
     expect(r.error.details?.realHome).toBe(true);
   });
 
-  it('tells the model how to propose the plan that holds: plan_comfort again with only the goal (#205 review)', () => {
+  it('tells the model that a refused proposal comes back as the plan that holds (#202)', () => {
     const tool = comfortPlanModule(world('heatwave', 14).deps).tools.find((t) => t.name === 'plan_comfort');
-    expect(tool?.description).toContain('If a refusal names a plan that holds, call plan_comfort again with only the goal to propose it.');
-  });
-
-  it('a long reason is cut at a word, with "…", so the plan that holds always fits in 300 characters', () => {
-    const reason = `${'Peak load is far above the limit '.repeat(12)}end.`;
-    const refusal = toolError('inverter_limit_exceeded', reason.slice(0, 300));
-    const own = { candidate: { horizonAt: '2026-07-16T05:00:00.000Z', steps: [{ level: 'balanced' }], ladder: [] } } as unknown as Parameters<typeof withAlternative>[1];
-    const out = withAlternative(refusal, own, 'Europe/Rome');
-    expect(out.message.length).toBeLessThanOrEqual(300);
-    expect(out.message).toMatch(/[a-z]… A plan that holds: Balanced until 7:00 AM\.$/);
-    expect(out.message).not.toMatch(/\b[a-z]{1,2}… A plan/);
+    expect(tool?.description).toContain('If the guard refuses your setpoint or rooms, the answer is the plan that holds instead, ready to apply, with a note of the refusal.');
   });
 
   it('refuses rooms the home does not have', async () => {
@@ -174,10 +171,14 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(r.value.steps.filter((s) => s.roomId === 'bedroom-1')[0]?.hvacMode).toBe('cool');
   });
 
-  it('leaves a plan the model proposed as it is: no mode is changed for humidity', async () => {
+  it('checks a plan the model proposed as it is: no mode is changed for humidity; refused, the answer is the plan that holds (#202)', async () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(26), roomIds: ['bedroom-1'] }, w.ctx);
-    expect(r.ok ? r.value.steps.filter((s) => s.roomId === 'bedroom-1').map((s) => s.hvacMode) : r.error.code).not.toContain('dry');
+    if (!r.ok) throw new Error(r.error.message);
+    // Either the proposal held exactly as proposed (cool, never switched to dry), or the guard refused it and the
+    // planner's own plan answers, with the refusal noted: never a silently edited proposal.
+    if (r.value.refusedProposal === undefined) expect(r.value.steps.filter((s) => s.roomId === 'bedroom-1').map((s) => s.hvacMode)).not.toContain('dry');
+    else expect(r.value.guarantees.every((g) => g.ok)).toBe(true);
   });
 
   it('property: whoever is home, however humid the safe room and whatever humidity limits the person set, the planner never gives up on humidity', async () => {

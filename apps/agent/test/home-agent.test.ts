@@ -59,6 +59,26 @@ describe('createHomeAgent: one sandbox home, its agent, its MCP session and its 
     expect(TurnReplySchema.parse(reply.value)).toEqual({ text: 'Plan proposed.', cards: [{ tool: 'plan_comfort', result: PLAN }] });
   });
 
+  it('always answers a valid TurnReply: a long model text is cut at a sentence, thinking is dropped, an empty text is said (#202)', async () => {
+    const say = (text: string): FakePolicy => () => ({ text });
+    const ask = async (text: string, log?: (e: AgentLogEntry) => void) => {
+      const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(say(text)), connect: () => Promise.resolve(session()), ...(log ? { log } : {}) });
+      const reply = await agent.ask('Keep Grandpa cool tomorrow', '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60');
+      if (!reply.ok) throw new Error(reply.error.message);
+      return TurnReplySchema.parse(reply.value).text;
+    };
+    const lines: AgentLogEntry[] = [];
+    const long = `The plan holds. ${'It keeps the safe room cool all night long. '.repeat(20)}`;
+    const cut = await ask(long, (e) => lines.push(e));
+    expect(cut.length).toBeLessThanOrEqual(600);
+    expect(cut).toMatch(/^The plan holds\. .*night long\.$/);
+    // Said in the log, never silently: the model wrote more than an answer may carry.
+    expect(lines).toContainEqual(expect.objectContaining({ code: 'output_schema_violation', correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60' }));
+    expect(await ask('<thinking>The guard refused 22 °C, so I offer the plan.</thinking> The plan holds: shall I apply it?')).toBe('The plan holds: shall I apply it?');
+    expect(await ask('   ')).toBe('Sorry, I have no answer to that. Please ask again.');
+    expect(await ask('x'.repeat(700))).toHaveLength(600);
+  });
+
   it('adds the status facts when get_home_status ran, and keeps cards to their own turn', async () => {
     const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(policy), connect: () => Promise.resolve(session()) });
     await agent.ask('Make a plan', 'a');

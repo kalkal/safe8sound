@@ -85,11 +85,15 @@ export function inverterRefusal(): ErrorEnvelope {
   return ErrorEnvelopeSchema.parse({
     code: 'inverter_limit_exceeded',
     category: 'guard_rejection',
-    message: 'Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W. A plan that holds: Balanced until 7:00 AM.',
+    message: 'Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W.',
     retryable: false,
-    // The plan the planner would accept instead (#186): Balanced until the morning.
-    details: { guarantee: 'inverter_limit', measured: 8000, limit: 6000, nearestAllowed: 6000, unit: 'W', guarantees, alternative: { level: 'balanced', until: '2026-07-16T07:00:00+02:00' } },
+    details: { guarantee: 'inverter_limit', measured: 8000, limit: 6000, nearestAllowed: 6000, unit: 'W', guarantees },
   });
+}
+
+/** The model proposed too much and the guard refused it (#202): the answer is the planner's own plan that holds. */
+export function planThatHolds(): Plan {
+  return PlanSchema.parse({ ...hotDayPlan(), refusedProposal: { code: 'inverter_limit_exceeded', message: inverterRefusal().message } });
 }
 
 /** The real home during the hackathon: advice only, with a warning the voice must say. */

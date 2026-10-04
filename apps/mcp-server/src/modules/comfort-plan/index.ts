@@ -32,7 +32,7 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
           'Proposes a comfort plan for the coming hours (cool, heat, dry or auto) that the guard accepts: the five guarantees, ' +
           'the level ladder, the night recovery of the safe room and what would happen without the plan. Nothing changes in the home: ' +
           'confirm it with apply_plan. You may propose a setpoint and rooms; the guard then checks exactly that, and a refusal says why ' +
-          'and what would be allowed. If a refusal names a plan that holds, call plan_comfort again with only the goal to propose it.',
+          'and what would be allowed. If the guard refuses your setpoint or rooms, the answer is the plan that holds instead, ready to apply, with a note of the refusal.',
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         input: PlanComfortInputSchema,
         output: PlanSchema,

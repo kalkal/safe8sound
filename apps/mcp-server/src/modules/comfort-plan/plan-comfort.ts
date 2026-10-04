@@ -153,17 +153,27 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   const fromHold = chosen === undefined && !overridden ? lastResortOf(holdAttempts(deps, guardInput, holdFailed), deps, guardInput) : undefined;
   const safest = fromHold ?? (chosen === undefined && !overridden ? lastResortOf(tried, deps, guardInput) : undefined);
   if (chosen === undefined && safest !== undefined) chosen = safest.attempt;
+  // A plan the model proposed and the guard refused (#202): when the planner's own plan holds, that plan is the
+  // answer, saved and applicable, with a short note of the refusal. Never only a refusal when a plan holds.
+  let refusedProposal: { code: ErrorEnvelope['code']; message: string } | undefined;
+  if (chosen === undefined && overridden && last !== undefined) {
+    const refusal = rejectionOf(last.verdict);
+    const holds = refusal === undefined ? undefined : firstPassing(deps, guardInput, ladder);
+    if (refusal !== undefined && holds !== undefined) {
+      // The guard's no to the proposal stays in the audit trail.
+      await recordRejection(store, last.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId });
+      refusedProposal = { code: refusal.code, message: refusal.message };
+      chosen = holds;
+    }
+  }
   if (chosen === undefined) {
     const refused = last === undefined ? undefined : rejectionOf(last.verdict);
-    // A plan the model proposed and the guard refused: next to the refusal, the plan the planner would accept
-    // (#186), so the person hears "here is the safe plan". Offered, never saved: the model proposes it.
-    const offered = refused !== undefined && overridden ? withAlternative(refused, firstPassing(deps, guardInput, ladder), profile.location.tz) : refused;
     // The receipt's badge and its "simulated data" notice (#198 review): the data origin, and the real home as a
     // flag, never a home id (a sandbox id stays out of tool output).
     const rejection =
-      offered === undefined
+      refused === undefined
         ? undefined
-        : { ...offered, details: { ...offered.details, origin: snapshot.origin, ...(ctx.homeId === REAL_HOME_ID ? { realHome: true as const } : {}) } };
+        : { ...refused, details: { ...refused.details, origin: snapshot.origin, ...(ctx.homeId === REAL_HOME_ID ? { realHome: true as const } : {}) } };
     if (last !== undefined) {
       await recordRejection(store, last.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId });
     }
@@ -196,6 +206,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     ...(chosen.verdict.nightRecovery === undefined ? {} : { nightRecovery: chosen.verdict.nightRecovery }),
     ...(warningsOf(chosen, safest).length === 0 ? {} : { warnings: warningsOf(chosen, safest) }),
     ...(safest === undefined ? {} : { lastResort: safest.lastResort }),
+    ...(refusedProposal === undefined ? {} : { refusedProposal }),
     ...(counterfactual === undefined ? {} : { counterfactual }),
   };
   const parsed = PlanSchema.safeParse(draft);
@@ -384,27 +395,6 @@ function firstPassing(deps: ComfortPlanDeps, guardInput: GuardInput, ladder: Lev
     if (plain.verdict.ok) return plain;
   }
   return undefined;
-}
-
-/** At most `max` characters, cut at a word with "…" when it must be cut. */
-function cutAtWord(text: string, max: number): string {
-  if (text.length <= max) return text;
-  const cut = text.slice(0, max - 1);
-  const space = cut.lastIndexOf(' ');
-  return `${(space > 0 ? cut.slice(0, space) : cut).replace(/[\s.,;:]+$/, '')}…`;
-}
-
-/** The refusal with the plan that holds: in the details, and said in its last sentence (the message keeps 300). */
-export function withAlternative(refusal: ErrorEnvelope, alternative: Pick<Attempt, 'candidate'> | undefined, tz: string): ErrorEnvelope {
-  const level = alternative?.candidate.steps[0]?.level;
-  if (alternative === undefined || level === undefined) return refusal;
-  const until = localIso(Date.parse(alternative.candidate.horizonAt), tz);
-  const said = ` A plan that holds: ${level.charAt(0).toUpperCase()}${level.slice(1)} until ${localTimeText(until)}.`;
-  return {
-    ...refusal,
-    message: `${cutAtWord(refusal.message, 300 - said.length)}${said}`,
-    details: { ...refusal.details, alternative: { level, until } },
-  };
 }
 
 /** Until the next recharge the forecast shows, else as far as the weather is known. */

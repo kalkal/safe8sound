@@ -18,7 +18,7 @@ Input: `goal` (`cool | heat | dry | auto`), plus optional `setpointC` and `roomI
    - cool again once it is below `dryOffPct` (45 %);
    - inside the band the mode never flips.
 
-   One mode for the whole evening and night fails both ways: cool lets humid night air push the room above 60 %, and dry takes it below 40 % (dry removes about 18 points of RH in half an hour). The modes come from one closed-loop projection, where the control reads the room states. They become plan steps, so the guard projects exactly the same plan. Setpoints, fans and pacing stay as planned. A plan the model proposes is left as it is.
+   One mode for the whole evening and night fails both ways: cool lets humid night air push the room above 60 %, and dry takes it below 40 % (dry removes about 18 points of RH in half an hour). The modes come from one closed-loop projection, where the control reads the room states. They become plan steps, so the guard projects exactly the same plan. Setpoints, fans and pacing stay as planned. A plan the model proposes is checked as it is; if the guard refuses it, the answer is the planner's own plan that holds, saved and ready to apply, with the refusal said first (#202).
 5. **Pacing inside the hour.** If no rung is accepted, the essential rung runs the safe room's unit part of the time: dry for N minutes per period, then only the fan (config `dutyCycles`, most first). This keeps the room dry and cool for much less energy.
 6. **Decision.** The first candidate the guard accepts is proposed:
    - it carries the ladder from its rung down, so later steps down need no new consent;

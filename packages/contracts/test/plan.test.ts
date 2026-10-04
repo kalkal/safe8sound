@@ -146,3 +146,12 @@ describe('PlanSchema', () => {
     });
   });
 });
+
+describe('a plan that answers a refused proposal (#202)', () => {
+  it('may carry the refusal of the model proposal: its code and its message, nothing else', () => {
+    const refusedProposal = { code: 'safe_room_comfort_violated', message: 'Humidity in the safe room would reach 69 %, above 60 %. Nearest allowed: 60 %.' };
+    expect(PlanSchema.safeParse({ ...examplePlan(), refusedProposal }).success).toBe(true);
+    expect(PlanSchema.safeParse({ ...examplePlan(), refusedProposal: { ...refusedProposal, details: {} } }).success).toBe(false);
+    expect(PlanSchema.safeParse({ ...examplePlan(), refusedProposal: { ...refusedProposal, code: 'not_a_code' } }).success).toBe(false);
+  });
+});

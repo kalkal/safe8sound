@@ -11,10 +11,10 @@ import { world } from './support.js';
 const greedy: PlanComfortInput = { goal: 'cool', setpointC: celsius(22), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] };
 
 describe('comfort-plan logging', () => {
-  it('plan_comfort: the refusal wins over a store that cannot log it, and the failure is logged with its correlation id', async () => {
+  it('plan_comfort: a refused proposal is answered with the plan that holds even when the store cannot log the refusal; the failure is logged with its correlation id', async () => {
     const w = world('heatwave', 14, { failRejections: true });
     const r = await planComfort(w.deps, greedy, w.ctx);
-    expect(!r.ok && r.error.code).toBe('inverter_limit_exceeded');
+    expect(r.ok && r.value.refusedProposal?.code).toBe('inverter_limit_exceeded');
     expect(w.logger.lines).toContainEqual(
       expect.objectContaining({ level: 'warn', component: 'mcp-server', code: 'store_unavailable', category: 'dependency_unavailable', correlationId: 'test-correlation', homeId: 'demo' }),
     );

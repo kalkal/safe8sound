@@ -33,6 +33,8 @@ export interface McpSession {
 // get_home_status is not a card here yet: a floor plan on every battery answer would clutter the screen (#171).
 const CARD_TOOLS: ReadonlySet<string> = new Set(['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences', 'get_safe_room_status']);
 
+const isRefusal = (c: ToolCard) => c.tool === 'plan_comfort' && GuardRefusalSchema.safeParse(c.result).success;
+
 /** What a turn produced besides the text: valid cards and the status facts of get_home_status. */
 export function createTurnRecorder() {
   let cards: ToolCard[] = [];
@@ -41,9 +43,11 @@ export function createTurnRecorder() {
   return {
     record(tool: string, structured: Record<string, unknown> | undefined) {
       if (structured === undefined) return;
-      if (CARD_TOOLS.has(tool) && cards.length < 4) {
+      if (CARD_TOOLS.has(tool)) {
         const card = ToolCardSchema.safeParse({ tool, result: structured });
-        if (card.success) cards.push(card.data);
+        // At most one refusal card per answer, the last (#202): earlier refusals of the turn are replaced.
+        if (card.success && isRefusal(card.data)) cards = cards.filter((c) => !isRefusal(c));
+        if (card.success && cards.length < 4) cards.push(card.data);
       }
       if (tool === 'get_home_status') {
         const facts = StatusFactsSchema.safeParse({ batterySocPct: structured['batterySocPct'], origin: structured['origin'], ts: structured['ts'] });

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { ApplyPlanOutputSchema, GuardRefusalSchema } from '@cold-reserve/contracts';
+import { ApplyPlanOutputSchema } from '@cold-reserve/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDemoSession } from '../../src/agent/demo-session.js';
 import { createRemoteAgent } from '../../src/agent/remote-agent.js';
@@ -89,23 +89,26 @@ describe('remote mode: simulator -> sim-api -> agent -> MCP server', () => {
     expect(answer.value.status?.origin).toMatchObject({ energy: 'simulated' });
   }, 60_000);
 
-  it('a plan the guard refuses comes back with its REJECTED receipt card, and the voice says why (#186)', async () => {
+  it('a setpoint the guard refuses is answered with the plan that holds, ready to apply from its card (#202)', async () => {
     const { session, agent } = remote();
     await session.start(CODE);
     const answer = await agent.ask('Cool every room to 21 degrees now.', { correlationId: crypto.randomUUID() });
     expect(answer.ok).toBe(true);
     if (!answer.ok) return;
-    const card = answer.value.cards?.find((c) => c.tool === 'plan_comfort');
-    if (card?.tool !== 'plan_comfort' || 'id' in card.result) throw new Error('no refusal card');
-    const refusal = GuardRefusalSchema.parse(card.result);
-    expect(refusal.details?.guarantees?.filter((g) => !g.ok).map((g) => g.id)).toContain(refusal.details?.guarantee);
-    expect(refusal.details?.nearestAllowed).toBeDefined();
-    // Next to the refusal, the plan that holds (#186): in the details for the card, in the words for the voice.
-    expect(refusal.details?.alternative).toBeDefined();
-    expect(refusal.message).toMatch(/A plan that holds: \w+ until /);
-    // The voice says the refusal's own reason, never "applied".
-    expect(answer.value.text).toBe(refusal.message.split(/(?<=[.;])\s/)[0]);
+    const plans = answer.value.cards?.filter((c) => c.tool === 'plan_comfort') ?? [];
+    // One plan card, the plan that holds: never a refusal card on its own.
+    expect(plans).toHaveLength(1);
+    const card = plans[0];
+    if (card?.tool !== 'plan_comfort' || !('id' in card.result)) throw new Error('no plan card');
+    expect(card.result.refusedProposal?.code).toBeDefined();
+    expect(card.result.guarantees.every((g) => g.ok)).toBe(true);
+    // The voice says the refusal first, never "applied".
+    expect(answer.value.text).toMatch(/^The guard refused the proposed setpoint and rooms: /);
     expect(answer.value.text).not.toMatch(/applied/i);
+    // And the plan is applicable as it is, from its card.
+    const applied = await agent.callTool('apply_plan', { planId: card.result.id }, { correlationId: crypto.randomUUID() });
+    expect(applied.isError).toBeFalsy();
+    expect(ApplyPlanOutputSchema.parse(applied.structuredContent)).toMatchObject({ alreadyApplied: false, plan: { id: card.result.id } });
   }, 60_000);
 
   it('applies a plan from its card (the card action goes through sim-api to the MCP server)', async () => {

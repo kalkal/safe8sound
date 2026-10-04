@@ -85,7 +85,11 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
       : lr.limitedBy === 'battery'
         ? `Proposed last-resort plan ${p.id}: the safe room alone, until the battery runs out at ${localTimeText(lr.safeUntil)}`
         : `Proposed last-resort plan ${p.id}: the safe room alone, within its limits until ${localTimeText(lr.safeUntil)}`;
+  // A refused proposal (#202): the first words say so and that this plan holds, so the model offers it at once.
+  const refused =
+    p.refusedProposal === undefined ? [] : [`The guard refused the proposed setpoint and rooms: ${p.refusedProposal.message} This plan holds instead and is ready to apply.`];
   const parts = [
+    ...refused,
     `${head} (${commanded}), built on ${dataText(p.sourceOrigin)}.`,
     `What it does: ${roomSettings(p)}.`,
     `Confirming it also allows these steps down if the battery falls behind: ${p.ladder.map(rungText).join('; ')}.`,

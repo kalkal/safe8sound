@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { EntityIdSchema, HomeIdSchema, IsoDateTimeSchema, epochMs } from './common.js';
 import { GUARANTEE_IDS, GuaranteeResultSchema } from './guarantees.js';
 import { HvacModeSchema } from './home.js';
+import { ErrorCodeSchema } from './errors.js';
 import { DataOriginSchema } from './origin.js';
 import { CounterfactualSchema } from './counterfactual.js';
 import { NightRecoverySchema, PlanWarningSchema } from './night-recovery.js';
@@ -87,6 +88,11 @@ export const PlanSchema = z
     counterfactual: CounterfactualSchema.optional(),
     /** What must be said even though the plan is accepted (optional, added 2026-09-29). */
     warnings: z.array(PlanWarningSchema).max(10).optional(),
+    /**
+     * The model proposed a setpoint or rooms and the guard refused them: this plan is the planner's own that holds,
+     * and this is the refusal it answers, its code and message (optional, additive, approved in #202).
+     */
+    refusedProposal: z.strictObject({ code: ErrorCodeSchema, message: z.string().min(1).max(300) }).optional(),
     /**
      * Present when no plan keeps the safe room within its limits until the next recharge: this is the safest
      * one, proposed so the person hears until when the room is safe and why (optional, added 2026-10-01,

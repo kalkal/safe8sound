@@ -104,6 +104,23 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
     expect(recorder.cards()).toEqual([{ tool: 'plan_comfort', result: refusal }]);
   });
 
+  it('keeps at most one refusal card per answer, the last, even when the cards are full (#202)', () => {
+    const rows = ['storm_reserve', 'inverter_limit', 'battery_power', 'safe_room_comfort', 'pacing_on_track'].map((id) => ({ id, ok: id !== 'inverter_limit', reason: 'r' }));
+    const refusal = (message: string) => ({ code: 'inverter_limit_exceeded', category: 'guard_rejection', message, retryable: false, details: { guarantee: 'inverter_limit', guarantees: rows } });
+    const recorder = createTurnRecorder();
+    recorder.record('plan_comfort', refusal('First.'));
+    recorder.record('plan_comfort', PLAN);
+    recorder.record('plan_comfort', refusal('Second.'));
+    recorder.record('plan_comfort', PLAN);
+    recorder.record('plan_comfort', PLAN);
+    recorder.record('plan_comfort', refusal('Third.'));
+    const cards = recorder.cards();
+    expect(cards).toHaveLength(4);
+    const refusals = cards.filter((c) => 'category' in c.result);
+    expect(refusals.map((c) => (c.result as { message: string }).message)).toEqual(['Third.']);
+    expect(cards.at(-1)?.result).toMatchObject({ message: 'Third.' });
+  });
+
   it('a refusal without its verdict, or an error of another kind, stays text only', async () => {
     const { session } = fakeSession({
       plan_comfort: { text: 'No.', structuredContent: { code: 'inverter_limit_exceeded', category: 'guard_rejection', message: 'No.', retryable: false }, isError: true },
