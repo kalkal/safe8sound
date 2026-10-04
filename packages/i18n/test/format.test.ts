@@ -21,7 +21,7 @@ describe('format', () => {
   });
 
   it('fills {product} from the single product name, which may still change', () => {
-    expect(PRODUCT_NAME).toBe('Cold Reserve');
+    expect(PRODUCT_NAME).toBe('Safe-8-Sound');
     expect(format('en-US', 'app.welcome')).toEqual({ ok: true, value: `Welcome to ${PRODUCT_NAME}.` });
   });
 

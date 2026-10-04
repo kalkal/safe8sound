@@ -2,8 +2,8 @@ import { err, ok, type LastResortAction, type Result, type SendableTransition, t
 
 // Every user-facing string lives in a catalog (plan §14.1). en-US for the hackathon; it-IT later.
 
-/** The one place the product name lives: it is still a working name. Catalogs use {product}. */
-export const PRODUCT_NAME = 'Cold Reserve';
+/** The one place the product name lives (owner decision, 3-4 Oct; read "Safe Eight Sound"). Catalogs use {product}; technical names stay cold-reserve. */
+export const PRODUCT_NAME = 'Safe-8-Sound';
 
 const enUS = {
   'app.welcome': 'Welcome to {product}.',

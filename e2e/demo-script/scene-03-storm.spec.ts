@@ -30,7 +30,7 @@ async function expectVoiceMatchesSafeRoom(page: Page) {
 test('scene 3: power out → safe room and the night, the daughter is told; Essential; power is back', async ({ page }) => {
   await page.goto('/');
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
-  await expect(phone.getByText('No messages from Cold Reserve yet.')).toBeVisible();
+  await expect(phone.getByText('No messages from Safe-8-Sound yet.')).toBeVisible();
 
   await ask(page, "The power's out");
   const safeRoom = page.frameLocator('iframe[title="Safe room card"]');

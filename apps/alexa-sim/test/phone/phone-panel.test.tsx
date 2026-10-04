@@ -12,7 +12,7 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
   it('says it is a simulated phone, and that nothing has arrived yet', () => {
     render(<PhonePanel feed={createScriptedPhone()} timeZone="Europe/Rome" />);
     expect(screen.getByRole('region', { name: "Your daughter's phone (simulated)" })).toBeTruthy();
-    expect(screen.getByText('No messages from Cold Reserve yet.')).toBeTruthy();
+    expect(screen.getByText('No messages from Safe-8-Sound yet.')).toBeTruthy();
   });
 
   it('shows each message as a notification: title in words, home time, and the full text', () => {
@@ -20,7 +20,7 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
     phone.deliver([phoneMessage('storm-started')]);
     render(<PhonePanel feed={phone} timeZone="Europe/Rome" />);
     const note = screen.getByRole('article', { name: 'Power outage (storm) at home' });
-    expect(within(note).getByText('Cold Reserve · 19:42')).toBeTruthy();
+    expect(within(note).getByText('Safe-8-Sound · 19:42')).toBeTruthy();
     expect(note.textContent).toContain('keeps it safe until');
   });
 
