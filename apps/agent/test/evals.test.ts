@@ -162,3 +162,22 @@ describe('referencePolicy (the local and CI fake model)', () => {
     expect(referencePolicy(call('x', ['Error: Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W.']))).toEqual({ text: 'Peak load 8.0 kW is above the limit.' });
   });
 });
+
+describe('the eval case of #201: a confirmation never asks for a token or a code', () => {
+  it('replaces the weakest ambiguous case, so the suite stays at 20 and the categories keep their counts', () => {
+    const c = EVAL_SUITE.cases.find((x) => x.id === 'confirm-no-token');
+    expect(c).toMatchObject({ category: 'ambiguous', utterance: 'Yes, confirm it.', expect: { noTools: true, asksQuestion: true } });
+    // Real regex word boundaries (a backslash and b), never the backspace character a lost backslash would leave.
+    expect(c?.expect.mustNotMatch).toEqual(['\\btoken\\b', '\\bcode\\b', 'lr_']);
+    expect(c?.expect.mustNotMatch?.[0]?.charCodeAt(0)).toBe(92);
+    expect(EVAL_SUITE.cases.find((x) => x.id === 'ambiguous-hmm')).toBeUndefined();
+  });
+
+  it('a reply that asks for a code fails the case; the reference policy passes it', async () => {
+    const asks = new FakeModel(() => ({ text: 'Sure, what is the confirmation code that starts with lr_?' }));
+    const bad = await runEvals({ ...EVAL_SUITE, cases: EVAL_SUITE.cases.filter((x) => x.id === 'confirm-no-token') }, () => createAgent({ config: CONFIG, model: asks, tools: stubTools() }));
+    expect(bad.results[0]?.pass).toBe(false);
+    const good = await runEvals({ ...EVAL_SUITE, cases: EVAL_SUITE.cases.filter((x) => x.id === 'confirm-no-token') }, () => createAgent({ config: CONFIG, model: new FakeModel(referencePolicy), tools: stubTools() }));
+    expect(good.results[0]?.pass).toBe(true);
+  });
+});

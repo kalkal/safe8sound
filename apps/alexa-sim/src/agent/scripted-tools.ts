@@ -24,7 +24,7 @@ function applyPlan(args: Record<string, unknown>): ToolCallResult {
 function applyLastResort(token: unknown): ToolCallResult {
   if (token === undefined) {
     const pending = SCRIPT_FIXTURES['last-resort-pending']();
-    return success(pending.result, 'Not applied yet: this is a last resort. Say yes again to apply it.');
+    return success(pending.result, 'Not applied yet: this is a last resort. Tap "Yes, apply it now" on its card to apply it.');
   }
   if (token !== SCRIPTED_LAST_RESORT_TOKEN) return toolErrorResult(toolError('last_resort_token_invalid', 'That confirmation is not valid: ask for the plan again.'));
   return success(SCRIPT_FIXTURES['last-resort-applied']().result, 'The last-resort plan is applied.');

@@ -22,6 +22,13 @@ describe('ScriptedAgent.callTool: simulated actions on the scripted home', () =>
     expect(ApplyPlanOutputSchema.parse(result.structuredContent).plan.status).toBe('applied');
   });
 
+  it('the first step says the second yes is a tap on the card, never "say yes again" (#201)', async () => {
+    const result = await scripted().callTool('apply_plan', { planId: 'plan_LastResort01' }, ctx);
+    const text = result.content.map((c) => c.text).join(' ');
+    expect(text).toBe('Not applied yet: this is a last resort. Tap "Yes, apply it now" on its card to apply it.');
+    expect(text).not.toMatch(/say yes again|token|lr_/i);
+  });
+
   it('applies the scripted last resort in two steps, as the tool does (#160)', async () => {
     const first = ApplyPlanOutputSchema.parse((await scripted().callTool('apply_plan', { planId: 'plan_LastResort01' }, ctx)).structuredContent);
     expect(first.plan.status).toBe('proposed');
