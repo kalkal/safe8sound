@@ -36,7 +36,14 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         input: PlanComfortInputSchema,
         output: PlanSchema,
-        summarize: (plan) => planSummary(plan, { ...summaryOptions, timeZone: deps.homes(plan.homeId)?.profile.location.tz ?? 'UTC' }),
+        summarize: (plan) => {
+          const profile = deps.homes(plan.homeId)?.profile;
+          return planSummary(plan, {
+            ...summaryOptions,
+            timeZone: profile?.location.tz ?? 'UTC',
+            roomNames: Object.fromEntries((profile?.rooms ?? []).map((r) => [r.id, r.name])),
+          });
+        },
         handler: (args, ctx) => planComfort(atHome(deps, ctx.homeId), args, ctx),
       }),
       defineTool({

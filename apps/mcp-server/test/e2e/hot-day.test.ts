@@ -72,8 +72,15 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       // The 36-hour heatwave shows the whole night: the night-recovery guarantee is met and said with its hours.
       expect(plan.nightRecovery?.status).toBe('met');
       expect(text).toMatch(/Night recovery \(elderly\) met: [\d.]+ of 6 hours at or below 24 °C/);
-      expect(text).toMatch(/What it does: bedroom-1: (cool|dry) at \d+(\.\d)? °C/);
+      expect(text).toMatch(/What it does: Bedroom: (cool|dry) at \d+(\.\d)? °C/);
       expect(plan.counterfactual?.scenarios.noPlan.peakTempC).toBeGreaterThan(plan.counterfactual?.scenarios.plan.peakTempC ?? Infinity);
+      // An ordinary summer day (#203): the battery is full at 2 PM, so the solar surplus cools the house instead
+      // of going to the grid, the safe room first; the text says where, in order, and the kWh kept at home.
+      const surplus = plan.surplus;
+      if (surplus === undefined) throw new Error('no solar surplus on the hot day');
+      expect(surplus.rooms[0]?.reason).toBe('safe_room');
+      expect(text).toMatch(/Solar surplus from \d{1,2}:\d\d [AP]M to \d{1,2}:\d\d [AP]M: [\d.]+ kWh kept at home instead of exported to the grid\. Where it went, in order: 1\) Bedroom \(safe room\), cooled to [\d.]+ °C/);
+      expect(text).toContain(`${surplus.keptKWh.toFixed(1)} kWh kept at home`);
 
       // 3. The person confirms; the agent retries after a timeout: one application only.
       const first = await call(TOKEN, 'apply_plan', { planId: plan.id });

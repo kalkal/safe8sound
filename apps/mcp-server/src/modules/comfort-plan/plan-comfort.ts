@@ -19,7 +19,7 @@ import {
   type Result,
   type Snapshot,
 } from '@cold-reserve/contracts';
-import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, seasonFor, withTargets, type HumidityMode } from '@cold-reserve/core';
+import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, orderSurplusRooms, seasonFor, surplusWindow, withTargets, type HumidityMode } from '@cold-reserve/core';
 import { buildContext, counterfactualOf, currentControls, holdSafeRoom, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
@@ -47,6 +47,10 @@ interface Attempt {
   readonly candidate: CandidatePlan;
   readonly verdict: GuardVerdict;
   readonly guardInput: GuardInput;
+  /** Where the solar surplus went, when the guard accepted the plan with it (#203). */
+  readonly surplus?: NonNullable<Plan['surplus']>;
+  /** The guarantees the plan with the surplus failed, when the guard refused it and the plan without it stands. */
+  readonly surplusRefused?: readonly GuaranteeId[];
 }
 
 /** The home, its latest snapshot, the forecast and the preferences; any failure comes back unchanged. */
@@ -209,11 +213,24 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     ...(refusedProposal === undefined ? {} : { refusedProposal }),
     ...(ctx.turnId === undefined ? {} : { proposedInTurn: ctx.turnId }),
     ...(counterfactual === undefined ? {} : { counterfactual }),
+    ...(chosen.surplus === undefined ? {} : { surplus: chosen.surplus }),
   };
   const parsed = PlanSchema.safeParse(draft);
   if (!parsed.success) return err(toolError('output_schema_violation', 'The proposed plan does not match its schema.'));
   const saved = await store.savePlan(parsed.data);
   if (!saved.ok) return saved;
+  if (chosen.surplusRefused !== undefined) {
+    // The scene must be explainable: why the surplus went to the grid after all.
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'info',
+      component: 'mcp-server',
+      message: `Solar surplus not used: the guard refused the plan with it (${chosen.surplusRefused.join(', ')}).`,
+      correlationId: ctx.correlationId,
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      details: { event: 'surplus_refused', planId: parsed.data.id, failed: [...chosen.surplusRefused], ...homeDetail(ctx.homeId) },
+    });
+  }
   if (safest !== undefined) {
     // Audit trail of a last resort: the guard did refuse it, and the log says it was proposed anyway.
     await recordRejection(store, safest.attempt.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId }, parsed.data.id);
@@ -362,18 +379,122 @@ function tryRung(
       : base.flatMap((s) => (s.roomId === preferences.safeRoomId && s.hvacMode !== 'off' ? dutyCycle(s, { ...cycle, fromMs: atMs, toMs: cycleEndMs }) : [s]));
   const nightly = season === 'cooling' && nightCooling ? withNightCooling(paced, deps, guardInput, atMs, horizonMs) : paced;
   // A plan the model proposed is checked exactly as it is; the planner's own plans follow the humidity.
-  const humid = season === 'cooling' && !exact ? withHumidityControl(nightly, deps, guardInput, horizonMs) : nightly;
-  const untargeted: CandidatePlan = { horizonAt: new Date(horizonMs).toISOString(), steps: humid, ladder };
-  const context = buildContext({ ...guardInput, plan: untargeted });
-  // Each target is the lowest SOC the projection expects until the next target (see withTargets).
-  const socMin = (fromMs: number, toMs: number) => {
-    const socs = context.points.filter((p) => p.ms >= fromMs && p.ms < toMs).map((p) => p.socPct);
-    return socs.length === 0 ? (context.points.at(-1)?.socPct ?? snapshot.batterySocPct) : Math.min(...socs);
+  const finish = (steps: readonly PlanStep[]) => {
+    const humid = season === 'cooling' && !exact ? withHumidityControl(steps, deps, guardInput, horizonMs) : [...steps];
+    const untargeted: CandidatePlan = { horizonAt: new Date(horizonMs).toISOString(), steps: humid, ladder };
+    const context = buildContext({ ...guardInput, plan: untargeted });
+    // Each target is the lowest SOC the projection expects until the next target (see withTargets).
+    const socMin = (fromMs: number, toMs: number) => {
+      const socs = context.points.filter((p) => p.ms >= fromMs && p.ms < toMs).map((p) => p.socPct);
+      return socs.length === 0 ? (context.points.at(-1)?.socPct ?? snapshot.batterySocPct) : Math.min(...socs);
+    };
+    const targeted = withTargets(humid, { socMin, fromMs: atMs, toMs: context.horizonMs, safeRoomId: preferences.safeRoomId, config: deps.config.planner });
+    const candidate: CandidatePlan = { horizonAt: new Date(context.horizonMs).toISOString(), steps: targeted, ladder };
+    return { candidate, context, verdict: runGuard({ ...guardInput, plan: candidate }) };
   };
-  const steps = withTargets(humid, { socMin, fromMs: atMs, toMs: context.horizonMs, safeRoomId: preferences.safeRoomId, config: deps.config.planner });
-  const candidate: CandidatePlan = { horizonAt: new Date(context.horizonMs).toISOString(), steps, ladder };
-  return { candidate, verdict: runGuard({ ...guardInput, plan: candidate }), guardInput };
+  const plain = finish(nightly);
+  // The solar surplus (#203): cooling, on grid, the planner's own plans only. The guard checks the whole plan
+  // with it; if it refuses, the plan without it stands.
+  const surplus = season === 'cooling' && !exact && snapshot.gridAvailable ? withSurplus(nightly, deps, guardInput, rung, plain.context, horizonMs) : undefined;
+  if (surplus !== undefined) {
+    const used = finish(surplus.steps);
+    const keptKWh = Math.round(((exportWh(plain.context) - exportWh(used.context)) / 1000) * 10) / 10;
+    if (used.verdict.ok && keptKWh > 0) {
+      return { candidate: used.candidate, verdict: used.verdict, guardInput, surplus: { ...surplus.info, keptKWh } };
+    }
+    if (!used.verdict.ok) {
+      const refused = used.verdict.guarantees.filter((g) => !g.ok).map((g) => g.id);
+      return { candidate: plain.candidate, verdict: plain.verdict, guardInput, surplusRefused: refused };
+    }
+  }
+  return { candidate: plain.candidate, verdict: plain.verdict, guardInput };
 }
+
+/** Energy the projection sends to the grid, in Wh. */
+function exportWh(context: GuardContext): number {
+  const stepH = context.input.config.projection.stepMinutes / 60;
+  return context.points.reduce((wh, p) => wh + p.flows.gridExportW * stepH, 0);
+}
+
+/**
+ * The solar surplus at home instead of on the grid (#203, owner decisions of 4/10): where the projection of the
+ * plan exports, the safe room first, then the rooms occupied now or slept in tonight, the hottest above target
+ * first, are cooled a little below comfort for that window, while the mean export covers their units' nominal
+ * input. Never
+ * colder than the household asked: comfort minus the configured offset (less in the safe room with an elderly
+ * person), never under the heating minimum plus one. After the window each room goes back to its setting.
+ */
+function withSurplus(
+  steps: readonly PlanStep[],
+  deps: ComfortPlanDeps,
+  guardInput: GuardInput,
+  rung: LevelStep,
+  context: GuardContext,
+  horizonMs: number,
+): { steps: PlanStep[]; info: Omit<NonNullable<Plan['surplus']>, 'keptKWh'> } | undefined {
+  const { profile, preferences, snapshot } = guardInput;
+  const cfg = deps.config.planner.surplus;
+  const stepMs = deps.guard.projection.stepMinutes * 60_000;
+  const window = surplusWindow(context.points, { minExportW: cfg.minExportW, stepMs, minSocPct: cfg.socFullPct });
+  if (window === undefined) return undefined;
+  const night = nextNightWindow(window.fromMs, horizonMs, profile.location.tz, deps.guard.nightRecovery);
+  const tonight = night !== undefined && night.startMs >= window.toMs;
+  const byPriority = [...profile.rooms].sort((a, b) => rank(preferences.roomPriority, a.id) - rank(preferences.roomPriority, b.id));
+  const cooling = byPriority.filter((r) => r.hvacUnits.some((u) => u.modes.includes('cool')));
+  const order = orderSurplusRooms(
+    cooling.map((r) => {
+      const now = snapshot.rooms.find((x) => x.id === r.id);
+      return { id: r.id, tempC: now?.tempC ?? preferences.comfortC.cooling, occupied: (now?.occupants.length ?? 0) > 0, isSafe: r.id === preferences.safeRoomId, sleptIn: r.sleptIn ?? false };
+    }),
+    { comfortC: preferences.comfortC.cooling, tonight },
+  );
+  // A unit cooling a room down draws about its nominal input; the guard then checks the inverter at the real draw.
+  const demandW = (id: string) => profile.rooms.find((r) => r.id === id)?.hvacUnits.reduce((w, u) => w + u.inputKw.nominal * 1000, 0) ?? 0;
+  // The person at risk first: if the safe room does not fit, nobody gets the surplus (#226 review).
+  if (order[0]?.reason === 'safe_room' && demandW(order[0].roomId) > window.meanExportW) return undefined;
+  let drawW = 0;
+  const chosen = order.filter((r) => {
+    if (drawW + demandW(r.roomId) > window.meanExportW) return false;
+    drawW += demandW(r.roomId);
+    return true;
+  });
+  if (chosen.length === 0) return undefined;
+
+  const setpointOf = (roomId: string) => {
+    const offset = roomId === preferences.safeRoomId && guardInput.nightRecoveryMode === 'elderly' ? cfg.elderlyOffsetK : cfg.offsetK;
+    return celsius(Math.round(Math.max(preferences.comfortC.cooling - offset, preferences.safety.heating.minC + 1) * 10) / 10);
+  };
+  const from = new Date(window.fromMs).toISOString();
+  const to = new Date(window.toMs).toISOString();
+  const ids = new Set(chosen.map((r) => r.roomId));
+  const inWindow = (st: PlanStep) => ids.has(st.roomId) && Date.parse(st.ts) >= window.fromMs && Date.parse(st.ts) < window.toMs;
+  const added = chosen.flatMap((r): PlanStep[] => {
+    const own = steps.filter((st) => st.roomId === r.roomId).sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+    const before = own.filter((st) => Date.parse(st.ts) <= window.fromMs).at(-1);
+    const after = own.filter((st) => Date.parse(st.ts) <= window.toMs).at(-1);
+    const cool: PlanStep = { ts: from, roomId: r.roomId, hvacMode: 'cool', setpointC: setpointOf(r.roomId), fanOn: before?.fanOn ?? false, level: before?.level ?? rung.level, batteryTargetSocPct: pct(0) };
+    const back: PlanStep = after !== undefined ? { ...after, ts: to } : { ...cool, ts: to, hvacMode: 'off', fanOn: false };
+    const resumes = own.some((st) => Date.parse(st.ts) === window.toMs);
+    return window.toMs < horizonMs && !resumes ? [cool, back] : [cool];
+  });
+  // In time order, and the person's room priority at the same time: the text and the manual steps keep their order.
+  const ordered = [...steps.filter((st) => !inWindow(st)), ...added].sort(
+    (a, b) => Date.parse(a.ts) - Date.parse(b.ts) || rank(preferences.roomPriority, a.roomId) - rank(preferences.roomPriority, b.roomId),
+  );
+  return {
+    steps: ordered,
+    info: {
+      from: localIso(window.fromMs, profile.location.tz),
+      to: localIso(window.toMs, profile.location.tz),
+      rooms: chosen.map((r) => ({ roomId: r.roomId, setpointC: setpointOf(r.roomId), reason: r.reason, aboveTargetK: r.aboveTargetK })),
+    },
+  };
+}
+
+const rank = (order: readonly string[], id: string) => {
+  const i = order.indexOf(id);
+  return i < 0 ? order.length : i;
+};
 
 /** The planner's own search, without the model's overrides: the first plan that holds every guarantee. */
 function firstPassing(deps: ComfortPlanDeps, guardInput: GuardInput, ladder: LevelStep[]): Attempt | undefined {

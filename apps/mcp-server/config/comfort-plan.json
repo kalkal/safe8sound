@@ -41,6 +41,13 @@
       "dryOnPct": 55,
       "dryOffPct": 45,
       "marginPct": 3
+    },
+    "surplus": {
+      "$comment": "#203: solar surplus at home instead of on the grid (on grid, cooling). A step exporting under minExportW, or with the battery under socFullPct, does not count; setpoint = max(comfort - offsetK, heating minimum + 1), elderlyOffsetK in the safe room with an elderly person.",
+      "minExportW": 300,
+      "socFullPct": 95,
+      "offsetK": 2,
+      "elderlyOffsetK": 1
     }
   },
   "outlook": {

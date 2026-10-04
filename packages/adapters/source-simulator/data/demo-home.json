@@ -10,6 +10,7 @@
       "id": "bedroom-1",
       "name": "Bedroom",
       "isSafeRoom": true,
+      "sleptIn": true,
       "thermal": { "rKPerKw": 44.4, "cKwhPerK": 0.45 },
       "hvacUnits": [
         {
@@ -27,6 +28,7 @@
       "id": "bedroom-2",
       "name": "Second bedroom",
       "isSafeRoom": false,
+      "sleptIn": true,
       "thermal": { "rKPerKw": 47.6, "cKwhPerK": 0.42 },
       "hvacUnits": [
         {

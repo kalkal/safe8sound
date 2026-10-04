@@ -145,6 +145,32 @@ describe('PlanSchema', () => {
       });
     });
   });
+
+  describe('solar surplus at home instead of on the grid (optional, approved in #203)', () => {
+    const surplus = {
+      from: '2026-07-16T16:00:00+02:00',
+      to: '2026-07-16T20:00:00+02:00',
+      keptKWh: 3.4,
+      rooms: [
+        { roomId: 'bedroom-1', setpointC: 24, reason: 'safe_room', aboveTargetK: 1 },
+        { roomId: 'bedroom-2', setpointC: 23, reason: 'occupied_tonight', aboveTargetK: 6.9 },
+      ],
+    };
+
+    it('carries the window, the kWh kept at home and the rooms in the order the surplus went', () => {
+      expect(PlanSchema.parse({ ...examplePlan(), surplus }).surplus).toEqual(surplus);
+      expect(PlanSchema.parse(examplePlan()).surplus).toBeUndefined();
+    });
+
+    it('a window that ends after it starts, kWh not negative, one to twelve rooms each once, a known reason', () => {
+      const bad = (over: object) => PlanSchema.safeParse({ ...examplePlan(), surplus: { ...surplus, ...over } }).success;
+      expect(bad({ to: surplus.from })).toBe(false);
+      expect(bad({ keptKWh: -0.1 })).toBe(false);
+      expect(bad({ rooms: [] })).toBe(false);
+      expect(bad({ rooms: [surplus.rooms[0], surplus.rooms[0]] })).toBe(false);
+      expect(bad({ rooms: [{ ...surplus.rooms[0], reason: 'nice' }] })).toBe(false);
+    });
+  });
 });
 
 describe('a plan that answers a refused proposal (#202)', () => {

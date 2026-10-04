@@ -31,6 +31,17 @@ export const ComfortPlanConfigSchema = z.strictObject({
     humidityBand: z
       .strictObject({ dryOnPct: z.number().min(30).max(90), dryOffPct: z.number().min(30).max(90), marginPct: z.number().min(0).max(10) })
       .refine((h) => h.dryOffPct < h.dryOnPct, { message: 'The lower edge of the band is below the upper one' }),
+    /** Solar surplus at home instead of on the grid (#203): which export counts, and how far below comfort it cools. */
+    surplus: z
+      .strictObject({
+        $comment: z.string().optional(),
+        minExportW: z.number().positive().max(10_000),
+        /** Export alone is not a full battery (PV above the maximum charge exports at any SOC): only at or above this. */
+        socFullPct: z.number().min(50).max(100),
+        offsetK: z.number().min(0).max(3),
+        elderlyOffsetK: z.number().min(0).max(3),
+      })
+      .refine((s) => s.elderlyOffsetK <= s.offsetK, { message: 'The safe room with an elderly person is cooled no further than the others' }),
   }),
   /** Average load at each level for the reserve outlook; Essential comes from the guard config. */
   outlook: z.strictObject({

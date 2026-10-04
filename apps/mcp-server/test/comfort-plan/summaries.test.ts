@@ -17,6 +17,29 @@ const night = guardConfig().nightRecovery;
 const NIGHT = { nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour), nightStartHour: night.windowStartHour, nightEndHour: night.windowEndHour, timeZone: 'Europe/Rome' };
 
 describe('what the model reads', () => {
+  it('plan_comfort: where the solar surplus went, in order, by room name, with every number (#203)', () => {
+    const surplus = {
+      from: '2026-07-16T16:00:00+02:00',
+      to: '2026-07-16T20:05:00+02:00',
+      keptKWh: 3.4,
+      rooms: [
+        { roomId: 'bedroom-1', setpointC: 24, reason: 'safe_room' as const, aboveTargetK: 1 },
+        { roomId: 'bedroom-2', setpointC: 23, reason: 'occupied_tonight' as const, aboveTargetK: 6.9 },
+        { roomId: 'study', setpointC: 23, reason: 'occupied' as const, aboveTargetK: 2 },
+      ],
+    };
+    const names = { 'bedroom-1': 'Bedroom', 'bedroom-2': 'Second bedroom', study: 'Study' };
+    const text = planSummary({ ...examplePlan(), surplus } as Plan, { ...NIGHT, roomNames: names });
+    expect(text).toContain(
+      'Solar surplus from 4:00 PM to 8:05 PM: 3.4 kWh kept at home instead of exported to the grid. Where it went, in order: ' +
+        '1) Bedroom (safe room), cooled to 24 °C, now 1.0 °C above target; ' +
+        '2) Second bedroom (slept in tonight), cooled to 23 °C, now 6.9 °C above target; ' +
+        '3) Study (occupied), cooled to 23 °C, now 2.0 °C above target.',
+    );
+    for (const id of ['bedroom-2', 'study']) expect(text.slice(text.indexOf('Solar surplus'))).not.toContain(id);
+    expect(planSummary(examplePlan() as Plan, { ...NIGHT, roomNames: names })).not.toContain('Solar surplus');
+  });
+
   it('plan_comfort: plan id, level, horizon, every guarantee with its reason, the reserve, the night and the counterfactual', async () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
@@ -221,11 +244,15 @@ describe('what the model reads', () => {
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const p = r.value;
-    const text = planSummary(p, NIGHT);
+    // Room labels, never internal ids (CE-13, #226 review).
+    const names = Object.fromEntries(w.profile.rooms.map((x) => [x.id, x.name]));
+    const text = planSummary(p, { ...NIGHT, roomNames: names });
+    const doesLine = text.slice(text.indexOf('What it does:'), text.indexOf('.', text.indexOf('What it does:')));
     for (const roomId of new Set(p.steps.map((s) => s.roomId))) {
       const s = [...p.steps].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts)).find((x) => x.roomId === roomId);
       if (s === undefined) throw new Error('no step');
-      expect(text).toContain(`${roomId}: ${s.hvacMode === 'off' ? 'off' : `${s.hvacMode} at ${String(s.setpointC)} °C`}`);
+      expect(doesLine).toContain(`${names[roomId] ?? ''}: ${s.hvacMode === 'off' ? 'off' : `${s.hvacMode} at ${String(s.setpointC)} °C`}`);
+      expect(doesLine).not.toContain(roomId);
     }
     for (const rung of p.ladder) {
       const offset = `${rung.setpointOffsetK >= 0 ? '+' : ''}${String(rung.setpointOffsetK)} K`;

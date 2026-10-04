@@ -49,6 +49,13 @@ describe('HomeProfileSchema', () => {
     expect(HomeProfileSchema.safeParse({ ...exampleHomeProfile(), epsBaseLoadW: -1 }).success).toBe(false);
   });
 
+  it('a room may say someone sleeps in it, for the solar surplus before the night (optional, approved in #203)', () => {
+    const rooms = exampleHomeProfile().rooms.map((r, i) => (i === 0 ? { ...r, sleptIn: true } : r));
+    expect(HomeProfileSchema.parse({ ...exampleHomeProfile(), rooms }).rooms[0]?.sleptIn).toBe(true);
+    expect(HomeProfileSchema.parse(exampleHomeProfile()).rooms[0]?.sleptIn).toBeUndefined();
+    expect(RoomSchema.safeParse({ ...exampleHomeProfile().rooms[0], sleptIn: 'yes' }).success).toBe(false);
+  });
+
   it('rejects unknown fields such as serial numbers', () => {
     const input = { ...exampleHomeProfile(), serialNumber: 'X' };
     expect(HomeProfileSchema.safeParse(input).success).toBe(false);

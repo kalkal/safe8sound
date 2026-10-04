@@ -47,6 +47,8 @@ export const RoomSchema = z.strictObject({
   fans: z.array(FanUnitSchema),
   presenceSensorId: EntityIdSchema.optional(),
   climateSensorId: EntityIdSchema.optional(),
+  /** Someone sleeps here: the solar surplus before the night pre-cools it (optional, added 2026-10-04, approved in #203). */
+  sleptIn: z.boolean().optional(),
 });
 export type Room = z.infer<typeof RoomSchema>;
 

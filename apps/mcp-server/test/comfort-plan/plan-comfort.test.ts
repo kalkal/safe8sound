@@ -1,4 +1,4 @@
-import { GUARANTEE_IDS, HomeIdSchema, HomeProfileSchema, LAST_RESORT_ACTIONS, PlanIdSchema, PlanSchema, PreferencesSchema, celsius, err, pct, toolError, type Forecast } from '@cold-reserve/contracts';
+import { GUARANTEE_IDS, HomeIdSchema, HomeProfileSchema, LAST_RESORT_ACTIONS, PlanIdSchema, PlanSchema, PreferencesSchema, celsius, err, pct, toolError, kilowatt, watt, type Forecast, type HomeProfile } from '@cold-reserve/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
@@ -165,7 +165,11 @@ describe('plan_comfort (two-phase: propose)', () => {
     // 35 % in the bedroom, a 42 % minimum: no plan can raise the humidity, so that is a warning (#107).
     const prefs = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 42, maxPct: 60 } } });
     const w = world('heatwave', 12, { preferences: prefs, snapshot: (s) => ({ ...s, rooms: s.rooms.map((x) => (x.id === 'bedroom-1' ? { ...x, humidityPct: pct(35) } : x)) }) });
-    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    // Without the solar surplus (#203): cooling the room a degree further raises its humidity past the minimum
+    // within the hour, and the dry-air case this test pins would be gone.
+    const planner = w.deps.config.planner;
+    const deps = { ...w.deps, config: { ...w.deps.config, planner: { ...planner, surplus: { ...planner.surplus, minExportW: 10_000 } } } };
+    const r = await planComfort(deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     expect(r.value.warnings?.some((x) => x.code === 'dry_air')).toBe(true);
     expect(r.value.steps.filter((s) => s.roomId === 'bedroom-1')[0]?.hvacMode).toBe('cool');
@@ -379,6 +383,101 @@ describe('last resort (approved in #19: proposal only)', () => {
       { numRuns: runs(30) },
     );
   }, 300_000);
+});
+
+/** An inverter limit the plain plan fits in and the plan with the surplus does not (found by probing the hot day). */
+const SURPLUS_TIGHT_INVERTER_W = 5_000;
+
+describe('solar surplus at home instead of on the grid (#203)', () => {
+  // The hot day at 16:00, battery full: today's plan would export about 9.5 kWh between 16:00 and 20:00.
+  const sunny = () => world('heatwave', 14);
+  const planned = async (w: ReturnType<typeof world>, input: Parameters<typeof planComfort>[1] = { goal: 'cool' }) => {
+    const r = await planComfort(w.deps, input, w.ctx);
+    if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
+    return PlanSchema.parse(r.value);
+  };
+
+  it('sends the surplus to the safe room first, then the rooms used tonight or now, the hottest first, and keeps the kWh at home', async () => {
+    const p = await planned(sunny());
+    const s = p.surplus;
+    if (s === undefined) throw new Error('no surplus');
+    expect(s.rooms[0]).toMatchObject({ roomId: 'bedroom-1', reason: 'safe_room' });
+    expect(s.rooms.slice(1).map((r) => r.reason).every((r) => r === 'occupied' || r === 'occupied_tonight')).toBe(true);
+    const above = s.rooms.slice(1).map((r) => r.aboveTargetK);
+    expect(above).toEqual([...above].sort((a, b) => b - a));
+    expect(s.rooms.map((r) => r.roomId)).not.toContain('living');
+    expect(s.keptKWh).toBeGreaterThan(0);
+    expect(s.from).toMatch(/\+02:00$/);
+    expect(Date.parse(s.to)).toBeGreaterThan(Date.parse(s.from));
+    expect(p.guarantees.every((g) => g.ok)).toBe(true);
+  });
+
+  it('never colder than the household asked: comfort minus the offset, and less in the safe room with an elderly person', async () => {
+    const p = await planned(sunny());
+    const cfg = sunny().deps.config.planner.surplus;
+    const [safe, ...others] = p.surplus?.rooms ?? [];
+    expect(safe?.setpointC).toBe(Math.max(preferences.comfortC.cooling - cfg.elderlyOffsetK, preferences.safety.heating.minC + 1));
+    for (const r of others) expect(r.setpointC).toBe(Math.max(preferences.comfortC.cooling - cfg.offsetK, preferences.safety.heating.minC + 1));
+    // The plan itself cools those rooms at those setpoints from the start of the window.
+    for (const r of p.surplus?.rooms ?? []) {
+      expect(p.steps.some((st) => st.roomId === r.roomId && st.ts === new Date(Date.parse(p.surplus?.from ?? '')).toISOString() && st.setpointC === r.setpointC && st.hvacMode !== 'off')).toBe(true);
+    }
+  });
+
+  it('at 60 % the charge-limit export before the battery is full is no surplus: the window starts once it is (#226 review)', async () => {
+    // PV above the 5 kW maximum charge exports at 60 % too; that energy the night needs, so it stays out.
+    const full = await planned(sunny());
+    const p = await planned(world('heatwave', 14, { snapshot: (x) => ({ ...x, batterySocPct: pct(60) }) }));
+    const s = p.surplus;
+    if (s === undefined || full.surplus === undefined) throw new Error('no surplus once the battery is full');
+    expect(Date.parse(s.from)).toBeGreaterThan(Date.parse(full.surplus.from));
+    const atFrom = p.steps.filter((x) => x.roomId === 'bedroom-1' && Date.parse(x.ts) <= Date.parse(s.from)).at(-1);
+    expect(atFrom?.batteryTargetSocPct).toBeGreaterThanOrEqual(sunny().deps.config.planner.surplus.socFullPct);
+  });
+
+  /** The same home with the profile changed (an inverter limit, a unit). */
+  const withProfile = (w: ReturnType<typeof world>, f: (p: HomeProfile) => HomeProfile) => {
+    const home = w.deps.homes(w.ctx.homeId);
+    if (home === undefined) throw new Error('no home');
+    return { ...w.deps, homes: () => ({ ...home, profile: f(home.profile) }) };
+  };
+
+  it('the person at risk first: if the safe room cannot have the surplus, nobody has it (#226 review)', async () => {
+    const w = sunny();
+    const deps = withProfile(w, (p) => ({
+      ...p,
+      rooms: p.rooms.map((r) => (r.id === 'bedroom-1' ? { ...r, hvacUnits: r.hvacUnits.map((u) => ({ ...u, inputKw: { ...u.inputKw, nominal: kilowatt(9) } })) } : r)),
+    }));
+    const r = await planComfort(deps, { goal: 'cool' }, w.ctx);
+    expect(r.ok && r.value.surplus).toBeFalsy();
+  });
+
+  it('when the guard refuses the plan with the surplus, the plan without it stands and the log says why (#226 review)', async () => {
+    const w = sunny();
+    const deps = withProfile(w, (p) => ({ ...p, inverterMaxAcW: watt(SURPLUS_TIGHT_INVERTER_W) }));
+    const r = await planComfort(deps, { goal: 'cool' }, w.ctx);
+    expect(r.ok && r.value.surplus).toBeFalsy();
+    const line = w.logger.lines.find((l) => l.details?.['event'] === 'surplus_refused');
+    expect(line).toMatchObject({ level: 'info', correlationId: 'test-correlation' });
+    expect((line?.details?.['failed'] as string[] | undefined)?.length).toBeGreaterThan(0);
+  });
+
+  it('no surplus when nothing is exported, off grid, when heating, or on a plan the model proposed', async () => {
+    expect((await planned(world('clear-day', 0))).surplus).toBeUndefined();
+    expect((await planned(world('heatwave', 14, { snapshot: (x) => ({ ...x, gridAvailable: false }) }))).surplus).toBeUndefined();
+    const coldSpell = (f: Forecast): Forecast => ({ ...f, hourly: f.hourly.map((h) => ({ ...h, tempOutC: celsius(12), humidityOutPct: pct(40) })) });
+    expect((await planned(world('heatwave', 14, { forecast: coldSpell }), { goal: 'heat' })).surplus).toBeUndefined();
+    // A plan the model proposed is checked as it is, never given the surplus. (When the guard refuses it the
+    // planner's own plan comes back instead, #228, and that one may carry the surplus.) Wide humidity limits
+    // here, so the proposal itself passes on this sunny day.
+    const wide = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 20, maxPct: 90 } } });
+    const w = world('heatwave', 14, { preferences: wide });
+    const proposed = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(23) }, w.ctx);
+    expect(proposed.ok && proposed.value.refusedProposal).toBeUndefined();
+    expect(proposed.ok && proposed.value.surplus).toBeUndefined();
+    const own = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    expect(own.ok && own.value.surplus).toBeDefined();
+  });
 });
 
 describe('the guard frame (season and night mode), shared by propose and apply', () => {

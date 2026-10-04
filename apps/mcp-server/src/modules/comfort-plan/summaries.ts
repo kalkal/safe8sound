@@ -14,12 +14,13 @@ function dataText(o: DataOrigin): string {
 }
 
 /** Each room's first setting in the plan, in time order. */
-function roomSettings(p: Plan): string {
+/** What the plan does in each room, by room label (CE-13): never an internal id. */
+function roomSettings(p: Plan, names: Readonly<Record<string, string>> | undefined): string {
   const first = new Map<string, Plan['steps'][number]>();
   for (const s of [...p.steps].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))) if (!first.has(s.roomId)) first.set(s.roomId, s);
   if (first.size === 0) return 'no room is run';
   return [...first.values()]
-    .map((s) => `${s.roomId}: ${s.hvacMode === 'off' ? 'off' : `${s.hvacMode} at ${String(s.setpointC)} °C`}${s.fanOn ? ', fan on' : ''}`)
+    .map((s) => `${names?.[s.roomId] ?? 'a room'}: ${s.hvacMode === 'off' ? 'off' : `${s.hvacMode} at ${String(s.setpointC)} °C`}${s.fanOn ? ', fan on' : ''}`)
     .join('; ');
 }
 
@@ -41,6 +42,23 @@ export interface PlanSummaryOptions {
   readonly nightEndHour: number;
   /** The home's time zone: every time in the text is its clock time, at its own date (daylight saving). */
   readonly timeZone: string;
+  /** Room labels by id, for the sentences a person hears (CE-13): never an internal id. */
+  readonly roomNames?: Readonly<Record<string, string>>;
+}
+
+const SURPLUS_REASON = { safe_room: 'safe room', occupied: 'occupied', occupied_tonight: 'slept in tonight' } as const;
+
+/** Where the solar surplus went (#203), in order, by room name, with every number (F7): the scene reads alone. */
+function surplusText(s: NonNullable<Plan['surplus']>, opts: PlanSummaryOptions): string {
+  const rooms = s.rooms.map((r, i) => {
+    const name = opts.roomNames?.[r.roomId] ?? 'a room';
+    const side = r.aboveTargetK >= 0 ? 'above' : 'below';
+    return `${String(i + 1)}) ${name} (${SURPLUS_REASON[r.reason]}), cooled to ${String(r.setpointC)} °C, now ${Math.abs(r.aboveTargetK).toFixed(1)} °C ${side} target`;
+  });
+  return (
+    `Solar surplus from ${localTimeText(s.from)} to ${localTimeText(s.to)}: ${s.keptKWh.toFixed(1)} kWh kept at home instead of exported to the grid. ` +
+    `Where it went, in order: ${rooms.join('; ')}.`
+  );
 }
 
 /** The wall-clock hour of a time already in the home's zone (localIso), read from the text itself. */
@@ -91,7 +109,8 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   const parts = [
     ...refused,
     `${head} (${commanded}), built on ${dataText(p.sourceOrigin)}.`,
-    `What it does: ${roomSettings(p)}.`,
+    `What it does: ${roomSettings(p, opts.roomNames)}.`,
+    ...(p.surplus === undefined ? [] : [surplusText(p.surplus, opts)]),
     `Confirming it also allows these steps down if the battery falls behind: ${p.ladder.map(rungText).join('; ')}.`,
     `Guarantees: ${p.guarantees.map((g) => `${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`).join(' ')}`,
     `Storm reserve ${one(p.reserveWh / 1000)} kWh${p.reserveFloorSocPct === undefined ? '' : `: the battery stays at or above ${one(p.reserveFloorSocPct)} % while the grid is up`}.`,

@@ -54,6 +54,27 @@ export const LAST_RESORT_ACTIONS = ['close_curtains', 'drink_water', 'fan_below_
 export const LastResortActionSchema = z.enum(LAST_RESORT_ACTIONS);
 export type LastResortAction = z.infer<typeof LastResortActionSchema>;
 
+/** Why a room got the solar surplus, in the order it got it (approved in #203). */
+export const SurplusReasonSchema = z.enum(['safe_room', 'occupied', 'occupied_tonight']);
+
+export const PlanSurplusSchema = z
+  .strictObject({
+    /** The window the projection would export in, in home time. */
+    from: IsoDateTimeSchema,
+    to: IsoDateTimeSchema,
+    /** Export of the same plan without the surplus use, minus the export with it: kept at home. */
+    keptKWh: z.number().nonnegative(),
+    /** The rooms in the order the surplus went: the safe room first, then the hottest above target. */
+    rooms: z
+      .array(z.strictObject({ roomId: EntityIdSchema, setpointC: CelsiusSchema, reason: SurplusReasonSchema, aboveTargetK: z.number() }))
+      .min(1)
+      .max(12),
+  })
+  .superRefine((s, ctx) => {
+    if (epochMs(s.to) <= epochMs(s.from)) ctx.addIssue({ code: 'custom', path: ['to'], message: 'The window ends after it starts' });
+    if (new Set(s.rooms.map((r) => r.roomId)).size !== s.rooms.length) ctx.addIssue({ code: 'custom', path: ['rooms'], message: 'Each room appears once' });
+  });
+
 export const PlanSchema = z
   .strictObject({
     schemaVersion: z.literal(PLAN_SCHEMA_VERSION),
@@ -101,6 +122,11 @@ export const PlanSchema = z
      * one, proposed so the person hears until when the room is safe and why (optional, added 2026-10-01,
      * approved in #19). It is applied only after a second, explicit confirmation (approved in #160).
      */
+    /**
+     * Where the solar surplus went instead of the grid (optional, added 2026-10-04, approved in #203): on grid,
+     * cooling only, with the battery unable to take more. The guard checked the whole plan with it.
+     */
+    surplus: PlanSurplusSchema.optional(),
     lastResort: z
       .strictObject({
         safeUntil: IsoDateTimeSchema,
