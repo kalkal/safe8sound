@@ -48,7 +48,9 @@ export const referencePolicy: FakePolicy = (call) => {
   if (result !== undefined) {
     // A tool error reaches the model as "Error: <text>": the person hears the text, never the prefix.
     const spoken = result.replace(/^Error: /, '');
-    return { text: spoken.split(/(?<=[.;])\s/)[0] ?? spoken };
+    const first = spoken.split(/(?<=[.;])\s/)[0] ?? spoken;
+    // A proposed plan is said and then asked about: apply_plan waits for the person's yes (#230).
+    return { text: !result.startsWith('Error: ') && /\bproposed\b/i.test(first) ? `${first} Shall I apply it?` : first };
   }
   if (INJECTION.test(said)) return { text: REFUSAL };
   const rule = RULES.find(([pattern]) => pattern.test(said));

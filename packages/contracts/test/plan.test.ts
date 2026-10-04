@@ -155,3 +155,11 @@ describe('a plan that answers a refused proposal (#202)', () => {
     expect(PlanSchema.safeParse({ ...examplePlan(), refusedProposal: { ...refusedProposal, code: 'not_a_code' } }).success).toBe(false);
   });
 });
+
+describe('the turn that proposed a plan (#230)', () => {
+  it('may be recorded as a UUID, and only as one', () => {
+    const turn = '3f6c1a9e-8b2d-4c7e-9a1f-2b3c4d5e6f70';
+    expect(PlanSchema.safeParse({ ...examplePlan(), proposedInTurn: turn }).success).toBe(true);
+    expect(PlanSchema.safeParse({ ...examplePlan(), proposedInTurn: 'turn-1' }).success).toBe(false);
+  });
+});

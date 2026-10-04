@@ -207,6 +207,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     ...(warningsOf(chosen, safest).length === 0 ? {} : { warnings: warningsOf(chosen, safest) }),
     ...(safest === undefined ? {} : { lastResort: safest.lastResort }),
     ...(refusedProposal === undefined ? {} : { refusedProposal }),
+    ...(ctx.turnId === undefined ? {} : { proposedInTurn: ctx.turnId }),
     ...(counterfactual === undefined ? {} : { counterfactual }),
   };
   const parsed = PlanSchema.safeParse(draft);

@@ -133,6 +133,22 @@ describe('runEvals on the Strands loop with the fake model (no Bedrock: cost rul
     expect(report.passed).toBe(false);
   });
 
+  it('propose and apply in one turn fails the hot-day case; asking first passes it (#230)', async () => {
+    const eager = new FakeModel((call) => {
+      if (call.toolResults.length === 0) return { toolUse: { name: 'plan_comfort', input: { goal: 'cool' } } };
+      if (call.toolResults.length === 1) return { toolUse: { name: 'apply_plan', input: { planId: 'p-1' } } };
+      return { text: 'I have set up cooling for Grandpa. The plan is active.' };
+    });
+    const report = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: eager, tools: stubTools() }));
+    expect(report.results.find((r) => r.id === 'hot-grandpa')).toMatchObject({ toolChoice: true, trajectory: false, answer: false, pass: false });
+    // Even without calling apply_plan, saying it is active is a failed answer: the case wants a question.
+    const claims = new FakeModel((call) => (call.toolResults.length === 0 ? { toolUse: { name: 'plan_comfort', input: { goal: 'cool' } } } : { text: 'The plan is active.' }));
+    const claimed = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: claims, tools: stubTools() }));
+    expect(claimed.results.find((r) => r.id === 'hot-grandpa')).toMatchObject({ trajectory: true, answer: false, pass: false });
+    const reference = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: new FakeModel(referencePolicy), tools: stubTools() }));
+    expect(reference.results.find((r) => r.id === 'hot-grandpa')).toMatchObject({ pass: true });
+  });
+
   it('catches a reckless model: it applies plans and invents numbers', async () => {
     const reckless = new FakeModel((call) => (call.toolResults.length === 0 ? { toolUse: { name: 'apply_plan', input: { planId: 'p-1' } } } : { text: 'Done, battery at 99%.' }));
     const report = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: reckless, tools: stubTools() }));

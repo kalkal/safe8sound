@@ -4,6 +4,7 @@ import { GUARANTEE_IDS, GuaranteeResultSchema } from './guarantees.js';
 import { HvacModeSchema } from './home.js';
 import { ErrorCodeSchema } from './errors.js';
 import { DataOriginSchema } from './origin.js';
+import { CorrelationIdSchema } from './correlation.js';
 import { CounterfactualSchema } from './counterfactual.js';
 import { NightRecoverySchema, PlanWarningSchema } from './night-recovery.js';
 import { LevelSchema, levelRank } from './pacing.js';
@@ -93,6 +94,8 @@ export const PlanSchema = z
      * and this is the refusal it answers, its code and message (optional, additive, approved in #202).
      */
     refusedProposal: z.strictObject({ code: ErrorCodeSchema, message: z.string().min(1).max(300) }).optional(),
+    /** The turn that proposed the plan (#230, optional, additive, approved in #230): apply_plan by the agent in that same turn is refused. */
+    proposedInTurn: CorrelationIdSchema.optional(),
     /**
      * Present when no plan keeps the safe room within its limits until the next recharge: this is the safest
      * one, proposed so the person hears until when the room is safe and why (optional, added 2026-10-01,

@@ -11,7 +11,7 @@ exports[`"What's my battery level?" through the agent and the local MCP server >
     "name": "plan_comfort",
   },
   {
-    "description": "Applies a proposed plan by its planId after the person confirmed it. The guard checks it again on the current state. Safe to retry: a plan already applied returns the same outcome. On the real home it is advice with manual steps.",
+    "description": "Applies a proposed plan by its planId after the person confirmed it. Never in the same turn as plan_comfort: tell the person the plan and wait for their yes. The guard checks it again on the current state. Safe to retry: a plan already applied returns the same outcome. On the real home it is advice with manual steps.",
     "name": "apply_plan",
   },
   {

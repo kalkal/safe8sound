@@ -199,4 +199,17 @@ describe('withCorrelationHeader: x-correlation-id on every MCP HTTP request of t
       ['Bearer t', null],
     ]);
   });
+
+  it('names the turn too (#230): the same id in the turn header, only when it is a well-formed turn id', async () => {
+    const seen: Headers[] = [];
+    let current: string | undefined = '3f6c1a9e-8b2d-4c7e-9a1f-2b3c4d5e6f70';
+    const fetchFn = withCorrelationHeader((_url, init) => {
+      seen.push(new Headers(init?.headers));
+      return Promise.resolve(new Response('{}'));
+    }, () => current);
+    await fetchFn('http://127.0.0.1:3316/mcp', {});
+    current = 'c-1';
+    await fetchFn('http://127.0.0.1:3316/mcp', {});
+    expect(seen.map((h) => h.get('x-cold-reserve-turn'))).toEqual(['3f6c1a9e-8b2d-4c7e-9a1f-2b3c4d5e6f70', null]);
+  });
 });

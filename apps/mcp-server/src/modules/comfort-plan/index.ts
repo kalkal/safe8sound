@@ -43,7 +43,8 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
         name: 'apply_plan',
         title: 'Apply plan',
         description:
-          'Applies a proposed plan by its planId after the person confirmed it. The guard checks it again on the current state. ' +
+          'Applies a proposed plan by its planId after the person confirmed it. Never in the same turn as plan_comfort: tell the person the plan and wait for their yes. ' +
+          'The guard checks it again on the current state. ' +
           'Safe to retry: a plan already applied returns the same outcome. On the real home it is advice with manual steps.',
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         input: ApplyPlanInputSchema,

@@ -47,6 +47,8 @@ describe('error catalog (docs/error-handling.md §2)', () => {
 
   it('maps codes to the categories of the taxonomy', () => {
     expect(categoryOf('invalid_setpoint')).toBe('validation');
+    // apply_plan in the turn that proposed the plan (#230): the person has not answered yet.
+    expect(categoryOf('confirmation_required')).toBe('validation');
     expect(categoryOf('storm_reserve_violated')).toBe('guard_rejection');
     // SSM timeout or 5xx at startup: transient, retried (#112).
     expect(categoryOf('config_unavailable')).toBe('dependency_unavailable');

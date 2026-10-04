@@ -32,6 +32,8 @@ export const ERROR_CATALOG = {
   /** apply_plan got a last-resort token that is wrong, expired or already used (approved in #160). */
   last_resort_token_invalid: { category: 'validation' },
   safety_threshold_out_of_range: { category: 'validation' },
+  /** apply_plan by the agent in the turn that proposed the plan: the person has not confirmed yet (approved in #230). */
+  confirmation_required: { category: 'validation' },
   // HTTP transport (MCP server, F3): sent with their own status through toProblemDetails
   method_not_allowed: { category: 'validation' },
   payload_too_large: { category: 'validation' },

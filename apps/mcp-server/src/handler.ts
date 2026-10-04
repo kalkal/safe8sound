@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto';
 import {
   CORRELATION_ID_HEADER,
   HOME_HEADER,
+  TURN_HEADER,
   PROBLEM_JSON_CONTENT_TYPE,
   SandboxHomeIdSchema,
   correlationIdFrom,
+  turnIdFrom,
   toProblemDetails,
   toolError,
   type ErrorCategory,
@@ -301,7 +303,13 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       homeId = sandbox.data;
     }
 
-    const ctx: ToolContext = { correlationId, clientId: grant.clientId, homeId };
+    // The turn of the conversation (#230): the agent names it, a card tap does not. A malformed one is refused.
+    const turn = turnIdFrom(req.headers.get(TURN_HEADER));
+    if (!turn.ok) {
+      record(turn.error, correlationId, { clientId: grant.clientId });
+      return problem(turn.error, correlationId);
+    }
+    const ctx: ToolContext = { correlationId, clientId: grant.clientId, homeId, ...(turn.value === undefined ? {} : { turnId: turn.value }) };
     const server = buildServer(ctx);
     // Stateless: no sessionIdGenerator (the documented `undefined` breaks exactOptionalPropertyTypes).
     const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });

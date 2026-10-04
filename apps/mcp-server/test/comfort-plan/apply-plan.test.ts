@@ -2,6 +2,7 @@ import { ApplyPlanOutputSchema, PlanIdSchema, PreferencesSchema, celsius, err, p
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
+import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
 import { sha256Hex } from '../../src/modules/comfort-plan/confirm-token.js';
 import { planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { applySummary } from '../../src/modules/comfort-plan/summaries.js';
@@ -35,6 +36,56 @@ describe('apply_plan (two-phase: confirm)', () => {
     const r = await applyPlan(w.deps, { planId: plan.id }, w.ctx);
     expect(r.ok && ApplyPlanOutputSchema.parse(r.value)).toMatchObject({ alreadyApplied: false, advisoryOnly: false, manualInstructions: [], plan: { id: plan.id, status: 'applied' } });
     expect(await statusOf(w, plan)).toBe('applied');
+  });
+
+  describe('the person confirms before the agent applies (#230)', () => {
+    const turn = '3f6c1a9e-8b2d-4c7e-9a1f-2b3c4d5e6f70';
+    const later = '9a1f2b3c-4d5e-4f70-8b2d-3f6c1a9e4c7e';
+
+    it('tells the model: never in the turn that proposed the plan', () => {
+      const tool = comfortPlanModule(world('heatwave', 14).deps).tools.find((t) => t.name === 'apply_plan');
+      expect(tool?.description).toContain('Never in the same turn as plan_comfort: tell the person the plan and wait for their yes.');
+    });
+
+    it('records the turn that proposed the plan', async () => {
+      const w = world('heatwave', 14);
+      const r = await planComfort(w.deps, { goal: 'cool' }, { ...w.ctx, turnId: turn });
+      if (!r.ok) throw new Error(r.error.message);
+      expect(r.value.proposedInTurn).toBe(turn);
+      const stored = await w.store.getPlan(r.value.id);
+      expect(stored.ok && stored.value.proposedInTurn).toBe(turn);
+    });
+
+    it('same turn: refused, nothing applied, and the model is told to ask the person first', async () => {
+      const w = world('heatwave', 14);
+      const r = await planComfort(w.deps, { goal: 'cool' }, { ...w.ctx, turnId: turn });
+      if (!r.ok) throw new Error(r.error.message);
+      const applied = await applyPlan(w.deps, { planId: r.value.id }, { ...w.ctx, turnId: turn });
+      expect(applied.ok).toBe(false);
+      if (applied.ok) return;
+      expect(applied.error).toMatchObject({ code: 'confirmation_required', category: 'validation' });
+      expect(applied.error.message).toMatch(/ask/i);
+      expect(await statusOf(w, r.value)).toBe('proposed');
+      // Logged once, with the correlation id: the model tried to apply without the person's yes.
+      const lines = w.logger.lines.filter((l) => l.code === 'confirmation_required');
+      expect(lines).toEqual([expect.objectContaining({ level: 'warn', correlationId: 'test-correlation', details: expect.objectContaining({ event: 'apply_without_confirmation' }) as unknown })]);
+    });
+
+    it('a later turn of the conversation: applied as before', async () => {
+      const w = world('heatwave', 14);
+      const r = await planComfort(w.deps, { goal: 'cool' }, { ...w.ctx, turnId: turn });
+      if (!r.ok) throw new Error(r.error.message);
+      const applied = await applyPlan(w.deps, { planId: r.value.id }, { ...w.ctx, turnId: later });
+      expect(applied.ok && applied.value.plan.status).toBe('applied');
+    });
+
+    it('a card tap (no turn header, even with the same correlation id): applied as before', async () => {
+      const w = world('heatwave', 14);
+      const r = await planComfort(w.deps, { goal: 'cool' }, { ...w.ctx, correlationId: turn, turnId: turn });
+      if (!r.ok) throw new Error(r.error.message);
+      const applied = await applyPlan(w.deps, { planId: r.value.id }, { ...w.ctx, correlationId: turn });
+      expect(applied.ok && applied.value.plan.status).toBe('applied');
+    });
   });
 
   it('is idempotent by planId: a repeat returns the stored outcome', async () => {

@@ -6,6 +6,8 @@ export interface ToolContext {
   readonly clientId: string;
   /** Derived from the bearer token, never from the arguments. */
   readonly homeId: HomeId;
+  /** The conversation turn (TURN_HEADER, #230): set by the agent on its calls, never by a card tap. */
+  readonly turnId?: string;
 }
 
 /** MCP tool annotations: every tool states them explicitly (plan §4). */

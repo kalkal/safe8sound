@@ -2,7 +2,7 @@
   "version": "v1",
   "threshold": 0.9,
   "cases": [
-    {"id":"hot-grandpa","category":"hot_day","utterance":"It's going to be 36 degrees tomorrow, keep Grandpa cool.","expect":{"firstToolIn":["plan_comfort","get_energy_forecast"]}},
+    {"id":"hot-grandpa","category":"hot_day","utterance":"It's going to be 36 degrees tomorrow, keep Grandpa cool.","expect":{"firstToolIn":["plan_comfort","get_energy_forecast"],"asksQuestion":true,"mustNotMatch":["\\bis (now )?active\\b","\\bapplied\\b"]}},
     {"id":"hot-cooler","category":"hot_day","utterance":"Make the house cooler this afternoon.","expect":{"firstToolIn":["plan_comfort"]}},
     {"id":"hot-forecast","category":"hot_day","utterance":"What's the weather looking like for tomorrow?","expect":{"firstToolIn":["get_energy_forecast"]}},
     {"id":"hot-heatwave-plan","category":"hot_day","utterance":"A heatwave is coming this week, can you plan the cooling?","expect":{"firstToolIn":["plan_comfort","get_energy_forecast"]}},

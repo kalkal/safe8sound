@@ -40,6 +40,26 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
   const stored = await store.getPlan(input.planId);
   if (!stored.ok) return stored;
   if (stored.value.status === 'applied') return ok(outcome(stored.value, true, home.profile));
+  // The person confirms before the agent applies (#230): in the turn that proposed the plan, nobody has answered
+  // yet. A card tap carries no turn, so it is always the person's own yes.
+  if (ctx.turnId !== undefined && stored.value.proposedInTurn === ctx.turnId) {
+    const refused = toolError('confirmation_required', 'Not applied: the person has not confirmed yet. Tell them the plan and ask; call apply_plan only after they say yes.', {
+      details: { planId: input.planId },
+    });
+    // A validation error is not logged by the handler: this one is, once, because the model skipped the person.
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'warn',
+      component: 'mcp-server',
+      message: 'apply_plan came in the turn that proposed the plan: refused until the person confirms.',
+      correlationId: ctx.correlationId,
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      code: refused.code,
+      category: refused.category,
+      details: { event: 'apply_without_confirmation', planId: input.planId, ...homeDetail(ctx.homeId) },
+    });
+    return err(refused);
+  }
   const lastResort = stored.value.lastResort !== undefined;
   if (input.lastResortToken !== undefined && !lastResort) return err(invalidLastResortToken());
 

@@ -1,4 +1,4 @@
-import { CORRELATION_ID_HEADER, GuardRefusalSchema, HOME_HEADER, StatusFactsSchema, ToolCardSchema, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
+import { CORRELATION_ID_HEADER, CorrelationIdSchema, GuardRefusalSchema, TURN_HEADER, HOME_HEADER, StatusFactsSchema, ToolCardSchema, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -131,6 +131,9 @@ export function withCorrelationHeader(fetchFn: (url: string | URL, init?: Reques
     if (id === undefined) return fetchFn(url, init);
     const headers = new Headers(init?.headers);
     headers.set(CORRELATION_ID_HEADER, id);
+    // Every MCP call of the agent belongs to a model turn (#230): the server refuses apply_plan in the turn that
+    // proposed the plan. Only a well-formed id is a turn id (a malformed header would fail the whole call).
+    if (CorrelationIdSchema.safeParse(id).success) headers.set(TURN_HEADER, id);
     return fetchFn(url, { ...init, headers });
   };
 }
