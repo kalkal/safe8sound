@@ -31,11 +31,14 @@ export interface SimApiStackProps extends StackProps {
  * least-privilege IAM (one runtime, quota keys only), JSON logs, alarms on errors and p95.
  */
 export class SimApiStack extends Stack {
+  /** The Function URL, for the web stack's /api origin (K1, #242). */
+  readonly functionUrl: string;
+
   constructor(scope: Construct, id: string, props: SimApiStackProps) {
     super(scope, id, props);
     const { stage, simApi, state, table } = props;
     const parameter = (name: string) => name.replace('{stage}', stage);
-    const parameters = [simApi.demoCodesParameter, simApi.tokenKeysParameter, simApi.mcpTokenParameter].map(parameter);
+    const parameters = [simApi.demoCodesParameter, simApi.tokenKeysParameter, simApi.mcpTokenParameter, simApi.originSecretParameter, simApi.originSecretPreviousParameter].map(parameter);
 
     const logGroup = new LogGroup(this, 'Logs', { retention: simApi.logRetentionDays, removalPolicy: RemovalPolicy.DESTROY });
     // Own role instead of AWSLambdaBasicExecutionRole: logs only to this group.
@@ -93,6 +96,9 @@ export class SimApiStack extends Stack {
         SIM_DEMO_CODES_PARAMETER: parameter(simApi.demoCodesParameter),
         SIM_TOKEN_KEYS_PARAMETER: parameter(simApi.tokenKeysParameter),
         SIM_MCP_TOKEN_PARAMETER: parameter(simApi.mcpTokenParameter),
+        // Only requests that came through the web stack's distribution (#243).
+        SIM_ORIGIN_SECRET_PARAMETER: parameter(simApi.originSecretParameter),
+        SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER: parameter(simApi.originSecretPreviousParameter),
         SSM_TIMEOUT_MS: String(simApi.ssmTimeoutMs),
         AGENT_RUNTIME_ARN: props.runtimeArn,
         SIM_AGENT_TIMEOUT_MS: String(simApi.agentTimeoutMs),
@@ -137,6 +143,7 @@ export class SimApiStack extends Stack {
     // OPTIONS included, for the exact origins in SIM_ALLOWED_ORIGINS.
     const url = fn.addFunctionUrl({ authType: FunctionUrlAuthType.NONE });
     new CfnOutput(this, 'SimApiUrl', { value: url.url });
+    this.functionUrl = url.url;
 
     fn.metricErrors({ period: Duration.minutes(5), statistic: 'Sum' }).createAlarm(this, 'Errors', {
       alarmDescription: 'The sim-api Lambda failed at least once in 5 minutes.',

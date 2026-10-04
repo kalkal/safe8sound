@@ -1,0 +1,3 @@
+{
+  "contentSecurityPolicy": "default-src 'self'; script-src 'self' 'sha256-FIXTURE'; frame-ancestors 'none'"
+}

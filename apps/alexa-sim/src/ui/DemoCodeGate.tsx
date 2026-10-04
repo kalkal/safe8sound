@@ -75,6 +75,8 @@ export function DemoCodeGate({ session }: { session: DemoSession }) {
           {t('demo.start')}
         </button>
       </div>
+      {/* The CloudFront access logs keep the visitor's IP for 30 days (K1, #244): said before anything is sent. */}
+      <p className="notice">{t('demo.privacy')}</p>
     </form>
   );
 }

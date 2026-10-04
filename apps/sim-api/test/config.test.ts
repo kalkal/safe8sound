@@ -36,6 +36,24 @@ describe('loadSimApiConfig (only hashes of codes and key ids reach logs; values 
     for (const value of ['maybe', 'off', '0']) expect(loadSimApiConfig({ ...ENV, SIM_DEMO_ENABLED: value })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
+  it('takes no allowed origin behind the CloudFront proxy: same-origin calls carry none, any other Origin is refused (#244)', () => {
+    expect(loadSimApiConfig({ ...ENV, SIM_ALLOWED_ORIGINS: '' })).toMatchObject({ ok: true, value: { allowedOrigins: [] } });
+    expect(loadSimApiConfig({ ...ENV, SIM_ALLOWED_ORIGINS: undefined })).toMatchObject({ ok: true, value: { allowedOrigins: [] } });
+  });
+
+  it('reads the origin secret of the CloudFront distribution, and the previous one during a rotation (#243)', () => {
+    const current = 'c'.repeat(32);
+    const previous = 'p'.repeat(32);
+    expect(loadSimApiConfig(ENV)).toMatchObject({ ok: true, value: { originSecrets: [] } });
+    expect(loadSimApiConfig({ ...ENV, SIM_ORIGIN_SECRET: current })).toMatchObject({ ok: true, value: { originSecrets: [current] } });
+    expect(loadSimApiConfig({ ...ENV, SIM_ORIGIN_SECRET: current, SIM_ORIGIN_SECRET_PREVIOUS: previous })).toMatchObject({ ok: true, value: { originSecrets: [current, previous] } });
+    // `none`: the previous parameter exists but holds no secret (outside a rotation).
+    expect(loadSimApiConfig({ ...ENV, SIM_ORIGIN_SECRET: current, SIM_ORIGIN_SECRET_PREVIOUS: 'none' })).toMatchObject({ ok: true, value: { originSecrets: [current] } });
+    const short = loadSimApiConfig({ ...ENV, SIM_ORIGIN_SECRET: 'tiny-origin-value' }); // gitleaks:allow (a dummy too short to be valid)
+    expect(short).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    expect(JSON.stringify(short)).not.toContain('tiny-origin-value');
+  });
+
   it('switches the demo off with SIM_DEMO_ENABLED=false (kill switch)', () => {
     expect(loadSimApiConfig({ ...ENV, SIM_DEMO_ENABLED: 'false' })).toMatchObject({ ok: true, value: { demoEnabled: false } });
   });
@@ -47,7 +65,7 @@ describe('loadSimApiConfig (only hashes of codes and key ids reach logs; values 
     ['a key shorter than 32 bytes', { ...ENV, SIM_TOKEN_KEYS: `k1:${Buffer.alloc(16).toString('base64url')}` }],
     ['a key without a kid', { ...ENV, SIM_TOKEN_KEYS: KEY }],
     ['two keys with the same kid', { ...ENV, SIM_TOKEN_KEYS: `k1:${KEY},k1:${KEY}` }],
-    ['no allowed origin', { ...ENV, SIM_ALLOWED_ORIGINS: '' }],
+    ['an allowed origin that is not a URL', { ...ENV, SIM_ALLOWED_ORIGINS: 'sim.example' }],
     ['a non-numeric limit', { ...ENV, SIM_LIMIT_TURNS_PER_CODE: 'many' }],
     ['a token lifetime over one hour', { ...ENV, SIM_TOKEN_TTL_S: '7200' }],
   ])('fails with invalid_config on %s, without echoing secrets', (_name, env) => {

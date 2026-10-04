@@ -41,6 +41,8 @@
       "demoCodesParameter": "/cold-reserve/{stage}/sim-api/demo-codes",
       "tokenKeysParameter": "/cold-reserve/{stage}/sim-api/token-keys",
       "mcpTokenParameter": "/cold-reserve/{stage}/sim-api/mcp-token",
+      "originSecretParameter": "/cold-reserve/{stage}/sim-api/origin-secret",
+      "originSecretPreviousParameter": "/cold-reserve/{stage}/sim-api/origin-secret-previous",
       "memoryMb": 512,
       "timeoutSeconds": 32,
       "logRetentionDays": 14,

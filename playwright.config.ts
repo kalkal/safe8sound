@@ -8,6 +8,8 @@ const CI = process.env['CI'] !== undefined;
 
 export default defineConfig({
   testDir: 'e2e',
+  // The built site has its own run with its own servers: pnpm e2e:site (playwright.site.config.ts).
+  testIgnore: 'site/**',
   workers: 1,
   retries: CI ? 1 : 0,
   timeout: 20_000,

@@ -72,6 +72,12 @@ export const SimApiConfigSchema = z
     demoCodesParameter: simApiParameter,
     tokenKeysParameter: simApiParameter,
     mcpTokenParameter: simApiParameter,
+    /**
+     * The origin secret CloudFront adds to every /api request, and the previous one during a rotation (#243). SSM
+     * String parameters (CloudFront cannot resolve ssm-secure; Secrets Manager would cost money): created by the owner.
+     */
+    originSecretParameter: simApiParameter,
+    originSecretPreviousParameter: simApiParameter,
     /** Optional, as for the MCP server: a new account cannot reserve any until the quota is raised. */
     reservedConcurrency: z.strictObject({ dev: positiveInt, demo: positiveInt }).optional(),
     memoryMb: z.number().int().min(128).max(10_240),
@@ -81,7 +87,7 @@ export const SimApiConfigSchema = z
     ssmTimeoutMs: positiveInt,
     agentTimeoutMs: z.number().int().min(100).max(30_000),
     mcpTimeoutMs: z.number().int().min(100).max(30_000),
-    /** The simulator's origins; empty until the web stack lands (the function then answers invalid_config). */
+    /** Extra origins allowed to call sim-api directly (CORS). Empty on AWS: the site calls it same-origin at /api (K1, #244). */
     allowedOrigins: z.array(origin),
     /** Kill switch per stage (plan §13.2.4). */
     demoEnabled: z.strictObject({ dev: z.boolean(), demo: z.boolean() }),

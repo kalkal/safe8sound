@@ -17,7 +17,15 @@ export interface SimApiConfig {
   /** Replies spoken by Polly (F8d, #25, approved in #25): off unless switched on; one voice. */
   readonly speech: { readonly enabled: boolean; readonly engine: SpeechEngine; readonly voice: string };
   readonly maxBodyBytes: number;
+  /**
+   * The origin secrets (#243): the CloudFront distribution adds the current one to every /api request. Non-empty on
+   * AWS, where a request without one is refused, so the Function URL is not usable directly; the previous one is
+   * accepted too during a rotation. Empty locally: no check, and the socket IP counts.
+   */
+  readonly originSecrets: readonly string[];
 }
+
+const MIN_ORIGIN_SECRET = 32;
 
 const invalid = (message: string) => err(toolError('invalid_config', message));
 
@@ -56,14 +64,16 @@ function entries(raw: string | undefined): [string, string][] {
 }
 
 /** The settings that are not secrets: they can be checked before any secret is read (Copilot on #156). */
-export type PlainSimApiSettings = Omit<SimApiConfig, 'demoCodes' | 'keys'>;
+export type PlainSimApiSettings = Omit<SimApiConfig, 'demoCodes' | 'keys' | 'originSecrets'>;
 
 export function loadPlainSimApiSettings(env: Readonly<Record<string, string | undefined>>): Result<PlainSimApiSettings, ErrorEnvelope> {
   const allowedOrigins = (env['SIM_ALLOWED_ORIGINS'] ?? '')
     .split(',')
     .map((o) => o.trim())
     .filter((o) => o.length > 0);
-  if (allowedOrigins.length === 0 || !allowedOrigins.every((o) => z.url().safeParse(o).success)) return invalid('SIM_ALLOWED_ORIGINS must list the simulator origin.');
+  // Empty behind the CloudFront proxy (K1, #244): the site calls /api on its own origin, the distribution drops that
+  // Origin and refuses any other, so a request that still carries one is refused here too. Local dev lists its origin.
+  if (!allowedOrigins.every((o) => z.url().safeParse(o).success)) return invalid('SIM_ALLOWED_ORIGINS lists origins, each a URL.');
 
   const numbers = NumbersSchema.safeParse({
     tokenTtlS: env['SIM_TOKEN_TTL_S'] ?? '3600',
@@ -112,6 +122,11 @@ export function loadSimApiConfig(env: Readonly<Record<string, string | undefined
   }
   if (keys.length === 0) return invalid('SIM_TOKEN_KEYS is not set.');
 
+  // `none` marks an empty previous parameter (it exists so a rotation needs no new IAM grant).
+  const originSecrets = [env['SIM_ORIGIN_SECRET'], env['SIM_ORIGIN_SECRET_PREVIOUS']].filter((v): v is string => v !== undefined && v.trim() !== '' && v.trim() !== 'none').map((v) => v.trim());
+  if (originSecrets.some((v) => v.length < MIN_ORIGIN_SECRET)) return invalid(`An origin secret is shorter than ${String(MIN_ORIGIN_SECRET)} characters.`);
+  if (env['SIM_ORIGIN_SECRET_PREVIOUS'] !== undefined && env['SIM_ORIGIN_SECRET'] === undefined) return invalid('SIM_ORIGIN_SECRET_PREVIOUS needs SIM_ORIGIN_SECRET.');
+
   const plain = loadPlainSimApiSettings(env);
-  return plain.ok ? ok({ demoCodes, keys, ...plain.value }) : plain;
+  return plain.ok ? ok({ demoCodes, keys, originSecrets, ...plain.value }) : plain;
 }

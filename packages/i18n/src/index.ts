@@ -53,6 +53,7 @@ const enUS = {
   'demo.expired': 'Session expired: enter the demo code again.',
   'demo.again': 'Enter the demo code again to continue.',
   'demo.disabled': 'The demo is switched off for now.',
+  'demo.privacy': 'This demo keeps your IP address in its access logs for 30 days, for security.',
   'status.battery': 'Battery',
   'surface.failed': 'This part of the screen stopped working. Reload the page to try again.',
   'config.invalid': 'The simulator is not configured correctly. Check its settings and reload the page.',

@@ -233,7 +233,54 @@ describe('POST /v1/tools/call: card actions, the MCP token stays here', () => {
   });
 });
 
+// #243: on AWS the Function URL is reachable only through the CloudFront distribution, which adds the origin secret.
+// The visitor's IP then comes from the distribution (x-viewer-ip), never from the client or CloudFront's edge.
+describe('the origin secret: only requests that came through CloudFront (#243)', () => {
+  const SECRET = 's'.repeat(40);
+  const PREVIOUS = 'q'.repeat(40);
+  const through = (secret: string, viewerIp?: string) => ({ 'x-origin-verify': secret, ...(viewerIp === undefined ? {} : { 'x-viewer-ip': viewerIp }) });
+
+  it('refuses a request without it, or with a wrong one: 403, logged with its reason, never with the value', async () => {
+    const { send, logs } = setup({ SIM_ORIGIN_SECRET: SECRET, SIM_ALLOWED_ORIGINS: '' });
+    await problem(await send('/v1/session', { body: { code: CODE }, origin: null }), 403, 'origin_not_allowed');
+    await problem(await send('/v1/session', { body: { code: CODE }, origin: null, headers: through('x'.repeat(40)) }), 403, 'origin_not_allowed');
+    expect(logs.filter((l) => l.code === 'origin_not_allowed').map((l) => l.details?.['reason'])).toEqual(['origin_secret_missing', 'origin_secret_wrong']);
+    expect(JSON.stringify(logs)).not.toContain('x'.repeat(40));
+    expect(JSON.stringify(logs)).not.toContain(SECRET);
+  });
+
+  it('serves a request with the current secret, and with the previous one during a rotation', async () => {
+    const { send } = setup({ SIM_ORIGIN_SECRET: SECRET, SIM_ORIGIN_SECRET_PREVIOUS: PREVIOUS, SIM_ALLOWED_ORIGINS: '' });
+    expect((await send('/v1/session', { body: { code: CODE }, origin: null, headers: through(SECRET) })).status).toBe(200);
+    expect((await send('/v1/session', { body: { code: CODE }, origin: null, headers: through(PREVIOUS) })).status).toBe(200);
+  });
+
+  it("caps wrong codes per visitor IP as CloudFront names it: one visitor's guesses never lock out another", async () => {
+    const { send } = setup({ SIM_ORIGIN_SECRET: SECRET, SIM_ALLOWED_ORIGINS: '' });
+    const wrong = (ip: string) => send('/v1/session', { body: { code: 'not-the-demo-code-at-all' }, origin: null, headers: through(SECRET, ip) });
+    for (let i = 0; i < 3; i++) await problem(await wrong('198.51.100.1'), 401, 'invalid_demo_code');
+    await problem(await send('/v1/session', { body: { code: CODE }, origin: null, headers: through(SECRET, '198.51.100.1') }), 429, 'demo_quota_exceeded');
+    // Same edge (the same source IP for the function), another visitor: their own budget.
+    expect((await send('/v1/session', { body: { code: CODE }, origin: null, headers: through(SECRET, '198.51.100.2') })).status).toBe(200);
+  });
+
+  it('never trusts x-viewer-ip without the secret (the local entry): the socket IP counts', async () => {
+    const { send } = setup();
+    const wrong = (ip: string) => send('/v1/session', { body: { code: 'not-the-demo-code-at-all' }, headers: { 'x-viewer-ip': ip } });
+    for (const ip of ['198.51.100.1', '198.51.100.2', '198.51.100.3']) await problem(await wrong(ip), 401, 'invalid_demo_code');
+    await problem(await send('/v1/session', { body: { code: CODE }, headers: { 'x-viewer-ip': '198.51.100.9' } }), 429, 'demo_quota_exceeded');
+  });
+});
+
 describe('transport rules', () => {
+  it('behind the CloudFront proxy (no allowed origin): serves a call without Origin, refuses any Origin (#244)', async () => {
+    const { send } = setup({ SIM_ALLOWED_ORIGINS: '' });
+    const res = await send('/v1/session', { body: { code: CODE }, origin: null });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+    await problem(await send('/v1/session', { body: { code: CODE }, origin: ORIGIN }), 403, 'origin_not_allowed');
+  });
+
   it('refuses a foreign Origin with 403 and no CORS headers', async () => {
     const { send } = setup();
     const res = await send('/v1/session', { body: { code: CODE }, origin: 'https://evil.example' });

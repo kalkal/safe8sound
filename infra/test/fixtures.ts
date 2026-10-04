@@ -1,4 +1,9 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { InfraConfig } from '../src/index.js';
+
+/** A tiny built site (K1, #242): index.html, a hashed asset, a source map that must never ship, and its headers. */
+export const SITE_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'site');
 
 /** The values of cdk.json, as tests expect them. */
 export const exampleConfig = (): InfraConfig => ({
@@ -26,6 +31,8 @@ export const exampleConfig = (): InfraConfig => ({
     demoCodesParameter: '/cold-reserve/{stage}/sim-api/demo-codes',
     tokenKeysParameter: '/cold-reserve/{stage}/sim-api/token-keys',
     mcpTokenParameter: '/cold-reserve/{stage}/sim-api/mcp-token',
+    originSecretParameter: '/cold-reserve/{stage}/sim-api/origin-secret',
+    originSecretPreviousParameter: '/cold-reserve/{stage}/sim-api/origin-secret-previous',
     memoryMb: 512,
     timeoutSeconds: 32,
     logRetentionDays: 14,

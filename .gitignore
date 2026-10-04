@@ -6,6 +6,8 @@
 # dependencies and builds
 node_modules/
 dist/
+dist-e2e/
+dist-e2e-aws/
 build/
 coverage/
 cdk.out/

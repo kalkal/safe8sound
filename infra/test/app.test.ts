@@ -3,7 +3,7 @@ import { Template } from 'aws-cdk-lib/assertions';
 import { Bucket } from 'aws-cdk-lib/aws-s3';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { applyGuardrails, buildApp, loadInfraConfig, type InfraConfig } from '../src/index.js';
-import { exampleConfig } from './fixtures.js';
+import { SITE_DIR, exampleConfig } from './fixtures.js';
 
 const config: InfraConfig = exampleConfig();
 // Bundling the Lambda is left to `pnpm synth`; tests synthesize the templates only.
@@ -33,34 +33,34 @@ describe('buildApp', () => {
   // (issue #53), while later synths take well under 2 s. Pay that once here, with its own timeout,
   // so the assertions below keep the normal test timeout.
   beforeAll(() => {
-    buildApp(newApp(), config).synth();
+    buildApp(newApp(), config, SITE_DIR).synth();
   }, 90_000);
 
   it('creates one foundation stack per stage, in the configured region', () => {
-    const app = buildApp(newApp(), { ...config, region: 'eu-south-1' });
+    const app = buildApp(newApp(), { ...config, region: 'eu-south-1' }, SITE_DIR);
     const stacks = stacksOf(app);
     expect(stacks.map((s) => s.stackName).filter((n) => n.endsWith('-foundation')).sort()).toEqual(['cold-reserve-demo-foundation', 'cold-reserve-dev-foundation']);
     expect(stacks.every((s) => s.region === 'eu-south-1')).toBe(true);
   });
 
   it('protects the demo stage from deletion, not dev', () => {
-    const stacks = stacksOf(buildApp(newApp(), config));
+    const stacks = stacksOf(buildApp(newApp(), config, SITE_DIR));
     const byName = Object.fromEntries(stacks.map((s) => [s.stackName, s.terminationProtection]));
     expect(byName).toMatchObject({ 'cold-reserve-dev-foundation': false, 'cold-reserve-demo-foundation': true, 'cold-reserve-dev-mcp': false, 'cold-reserve-demo-data': true });
   });
 
   it('tags every stack with the project and the stage', () => {
-    const app = buildApp(newApp(), config);
+    const app = buildApp(newApp(), config, SITE_DIR);
     const dev = stacksOf(app).find((s) => s.stackName === 'cold-reserve-dev-foundation');
     expect(dev?.tags.tagValues()).toMatchObject({ project: 'cold-reserve', stage: 'dev' });
   });
 
   it('synthesizes with the cdk-nag AwsSolutions checks passing', () => {
-    expect(() => buildApp(newApp(), config).synth()).not.toThrow();
+    expect(() => buildApp(newApp(), config, SITE_DIR).synth()).not.toThrow();
   });
 
   it('keeps every stack deployable (CloudFormation needs at least one resource)', () => {
-    for (const stack of stacksOf(buildApp(newApp(), config))) {
+    for (const stack of stacksOf(buildApp(newApp(), config, SITE_DIR))) {
       const template = Template.fromStack(stack).toJSON() as { Resources?: Record<string, unknown> };
       expect(Object.keys(template.Resources ?? {})).not.toHaveLength(0);
     }

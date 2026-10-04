@@ -2,7 +2,7 @@ import { App, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { InfraConfigSchema, SimApiConfigSchema, SimApiStack, applyGuardrails, buildApp, loadInfraConfig, type SimApiConfig } from '../src/index.js';
-import { exampleConfig } from './fixtures.js';
+import { SITE_DIR, exampleConfig } from './fixtures.js';
 
 // Template assertions for the sim-api stack (#17): the demo API behind a Function URL. Bundling is skipped
 // here (`aws:cdk:bundling-stacks: []`); `pnpm synth` bundles the Lambda for real.
@@ -59,6 +59,8 @@ describe('sim-api stack (#17)', () => {
       SIM_DEMO_CODES_PARAMETER: '/cold-reserve/dev/sim-api/demo-codes',
       SIM_TOKEN_KEYS_PARAMETER: '/cold-reserve/dev/sim-api/token-keys',
       SIM_MCP_TOKEN_PARAMETER: '/cold-reserve/dev/sim-api/mcp-token',
+      SIM_ORIGIN_SECRET_PARAMETER: '/cold-reserve/dev/sim-api/origin-secret',
+      SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER: '/cold-reserve/dev/sim-api/origin-secret-previous',
       AGENT_RUNTIME_ARN: RUNTIME_ARN,
       SIM_MCP_URL: 'https://mcp.lambda-url.us-east-1.on.aws/mcp',
       SIM_AGENT_TIMEOUT_MS: '9000',
@@ -100,11 +102,11 @@ describe('sim-api stack (#17)', () => {
     ]);
   });
 
-  it('may read its three SSM parameters and nothing else', () => {
+  it('may read its SSM parameters (the origin secrets of #243 included) and nothing else', () => {
     const ssm = statementsOf(t).filter((s) => actions(s).some((a) => a.startsWith('ssm:')));
     expect(ssm).toHaveLength(1);
     expect(ssm[0]?.Action).toBe('ssm:GetParameter');
-    expect(JSON.stringify(ssm[0]?.Resource)).toMatch(/parameter\/cold-reserve\/dev\/sim-api\/demo-codes.*token-keys.*mcp-token/);
+    expect(JSON.stringify(ssm[0]?.Resource)).toMatch(/parameter\/cold-reserve\/dev\/sim-api\/demo-codes.*token-keys.*mcp-token.*origin-secret.*origin-secret-previous/);
   });
 
   it('has its own role with no managed policies, and keeps its logs 14 days', () => {
@@ -205,7 +207,7 @@ describe('SimApiConfigSchema', () => {
 });
 
 describe('the app wires the sim-api stack in every stage', () => {
-  const app = buildApp(new App({ context: { 'aws:cdk:bundling-stacks': [] } }), exampleConfig());
+  const app = buildApp(new App({ context: { 'aws:cdk:bundling-stacks': [] } }), exampleConfig(), SITE_DIR);
   const stacks = app.node.findAll().filter((c): c is Stack => Stack.isStack(c));
   const sim = (stage: string) => {
     const stack = stacks.find((x) => x.stackName === `cold-reserve-${stage}-sim-api`);

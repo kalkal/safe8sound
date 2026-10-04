@@ -11,15 +11,20 @@ import { memoryQuotaStore } from '../src/quota.js';
 
 const CODE = 'judges-demo-code-2026';
 const KEY = Buffer.alloc(32, 7).toString('base64url');
+const ORIGIN_SECRET = 'o'.repeat(40);
 const SECRETS: Record<string, string> = {
   '/cold-reserve/dev/sim/demo-codes': `judges:${createHash('sha256').update(CODE).digest('hex')}`,
   '/cold-reserve/dev/sim/token-keys': `k1:${KEY}`,
   '/cold-reserve/dev/sim/mcp-token': 'm'.repeat(40),
+  '/cold-reserve/dev/sim/origin-secret': ORIGIN_SECRET,
+  '/cold-reserve/dev/sim/origin-secret-previous': 'none',
 };
 const ENV = {
   SIM_DEMO_CODES_PARAMETER: '/cold-reserve/dev/sim/demo-codes',
   SIM_TOKEN_KEYS_PARAMETER: '/cold-reserve/dev/sim/token-keys',
   SIM_MCP_TOKEN_PARAMETER: '/cold-reserve/dev/sim/mcp-token',
+  SIM_ORIGIN_SECRET_PARAMETER: '/cold-reserve/dev/sim/origin-secret',
+  SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER: '/cold-reserve/dev/sim/origin-secret-previous',
   SIM_ALLOWED_ORIGINS: 'https://sim.example',
   AGENT_RUNTIME_ARN: 'arn:aws:bedrock-agentcore:us-east-1:111122223333:runtime/cold_reserve_dev_agent-AbCdEf1234',
   SIM_AGENT_TIMEOUT_MS: '7500',
@@ -57,11 +62,19 @@ function deps(overrides: { read?: (name: string) => Promise<Result<string, Error
   };
 }
 
-const session = (handler: (req: Request, meta: { clientIp: string }) => Promise<Response>, code: string) =>
-  handler(new Request('https://abc.lambda-url.us-east-1.on.aws/v1/session', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://sim.example' }, body: JSON.stringify({ code }) }), { clientIp: '203.0.113.7' });
+/** A session request as CloudFront forwards it (#243): with the origin secret, unless a test leaves it out. */
+const session = (handler: (req: Request, meta: { clientIp: string }) => Promise<Response>, code: string, secret: string | null = ORIGIN_SECRET) =>
+  handler(
+    new Request('https://abc.lambda-url.us-east-1.on.aws/v1/session', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'https://sim.example', ...(secret === null ? {} : { 'x-origin-verify': secret }) },
+      body: JSON.stringify({ code }),
+    }),
+    { clientIp: '203.0.113.7' },
+  );
 
 describe('loadSimApiLambda', () => {
-  it('reads the three secrets from SSM, uses the shared table for the caps, and serves a session with the demo code', async () => {
+  it('reads the secrets from SSM, uses the shared table for the caps, and serves a session with the demo code', async () => {
     const { asked, tables, deps: d } = deps();
     const built = await loadSimApiLambda(ENV, d);
     expect(built.ok).toBe(true);
@@ -70,6 +83,42 @@ describe('loadSimApiLambda', () => {
     expect(tables).toEqual(['ColdReserve-dev']);
     expect((await session(built.value, CODE)).status).toBe(200);
     expect((await session(built.value, 'a-wrong-demo-code-0000')).status).toBe(401);
+  });
+
+  it('refuses a request that did not come through CloudFront: the Function URL is not usable directly (#243)', async () => {
+    const { deps: d } = deps();
+    const built = await loadSimApiLambda(ENV, d);
+    if (!built.ok) throw new Error('expected ok');
+    expect((await session(built.value, CODE, null)).status).toBe(403);
+    expect((await session(built.value, CODE, 'w'.repeat(40))).status).toBe(403);
+    // A plain env secret is never taken: only the SSM one opens the door.
+    const plainEnv = await loadSimApiLambda({ ...ENV, SIM_ORIGIN_SECRET: 'e'.repeat(40) }, d);
+    if (!plainEnv.ok) throw new Error('expected ok');
+    expect((await session(plainEnv.value, CODE, 'e'.repeat(40))).status).toBe(403);
+  });
+
+  it('fails closed when the current origin secret holds none or nothing: the check is never silently off (#244 round 2)', async () => {
+    for (const value of ['none', '', '  ']) {
+      const { deps: d } = deps({
+        read: (name) => Promise.resolve(ok(name.endsWith('/origin-secret') ? value : (SECRETS[name] ?? ''))),
+      });
+      const built = await loadSimApiLambda(ENV, d);
+      expect(built).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    }
+  });
+
+  it('says once that the origin secret check is on, never the value', async () => {
+    const { deps: d, logs } = deps();
+    expect((await loadSimApiLambda(ENV, d)).ok).toBe(true);
+    expect(logs.filter((l) => l.details?.['event'] === 'origin_secret_check')).toMatchObject([{ level: 'info', details: { check: 'on' } }]);
+    expect(JSON.stringify(logs)).not.toContain(ORIGIN_SECRET);
+  });
+
+  it('needs both origin secret parameters on AWS (the previous one holds none outside a rotation)', async () => {
+    for (const name of ['SIM_ORIGIN_SECRET_PARAMETER', 'SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER']) {
+      const { deps: d } = deps();
+      expect(await loadSimApiLambda({ ...ENV, [name]: undefined }, d)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    }
   });
 
   it('never takes a secret from plain env, even when one is there', async () => {
@@ -87,7 +136,8 @@ describe('loadSimApiLambda', () => {
   });
 
   it('checks the plain settings (origins, caps, TTL, kill switch) before any SSM read (Copilot on #156)', async () => {
-    for (const broken of [{ SIM_ALLOWED_ORIGINS: 'not a url' }, { SIM_ALLOWED_ORIGINS: undefined }, { SIM_LIMIT_TURNS_PER_CODE: 'many' }, { SIM_TOKEN_TTL_S: '5' }, { SIM_DEMO_ENABLED: 'maybe' }]) {
+    // An empty origin list is valid behind the CloudFront proxy (#244); a malformed one is not.
+    for (const broken of [{ SIM_ALLOWED_ORIGINS: 'not a url' }, { SIM_LIMIT_TURNS_PER_CODE: 'many' }, { SIM_TOKEN_TTL_S: '5' }, { SIM_DEMO_ENABLED: 'maybe' }]) {
       const { asked, deps: d } = deps();
       const built = await loadSimApiLambda({ ...ENV, ...broken }, d);
       expect(built).toMatchObject({ ok: false, error: { code: 'invalid_config' } });

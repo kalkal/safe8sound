@@ -27,6 +27,11 @@ describe('DemoCodeGate: the demo code field (remote mode, no token)', () => {
     expect(field().type).toBe('password');
   });
 
+  it('says, before the code is entered, that the access logs keep the IP address for 30 days (#244)', () => {
+    render(<DemoCodeGate session={fakeSession(vi.fn())} />);
+    expect(screen.getByText('This demo keeps your IP address in its access logs for 30 days, for security.')).toBeTruthy();
+  });
+
   it('exchanges the code and empties the field right after', async () => {
     const start = vi.fn(() => Promise.resolve(ok(undefined)));
     render(<DemoCodeGate session={fakeSession(start)} />);

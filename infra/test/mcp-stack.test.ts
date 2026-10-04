@@ -2,14 +2,14 @@ import { App, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { buildApp, loadInfraConfig, type InfraConfig } from '../src/index.js';
-import { exampleConfig } from './fixtures.js';
+import { SITE_DIR, exampleConfig } from './fixtures.js';
 
 // Template assertions for the data and mcp stacks (issue #70). Bundling is skipped here
 // (`aws:cdk:bundling-stacks: []`); `pnpm synth` bundles the Lambda for real.
 const config: InfraConfig = exampleConfig();
 let templates: Record<string, Template>;
 
-const synthApp = (cfg: InfraConfig) => buildApp(new App({ context: { 'aws:cdk:bundling-stacks': [] } }), cfg);
+const synthApp = (cfg: InfraConfig) => buildApp(new App({ context: { 'aws:cdk:bundling-stacks': [] } }), cfg, SITE_DIR);
 const templatesOf = (app: App) =>
   Object.fromEntries(
     app.node

@@ -6,8 +6,9 @@ import { AgentStack } from './agent-stack.js';
 import { DataStack } from './data-stack.js';
 import { McpStack } from './mcp-stack.js';
 import { SimApiStack } from './sim-api-stack.js';
+import { WebStack } from './web-stack.js';
 
-/** Placeholder for the shared resources; F5/F8 add the web and agent stacks. */
+/** Placeholder for the shared resources (the web, agent and data stacks have their own). */
 export class FoundationStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps) {
     super(scope, id, props);
@@ -18,7 +19,7 @@ export class FoundationStack extends Stack {
 }
 
 export class ColdReserveStage extends Stage {
-  constructor(scope: Construct, stageName: StageName, config: InfraConfig) {
+  constructor(scope: Construct, stageName: StageName, config: InfraConfig, siteDir: string) {
     super(scope, stageName, { env: { region: config.region } });
     const common = (name: string) => ({
       stackName: `cold-reserve-${stageName}-${name}`,
@@ -30,7 +31,7 @@ export class ColdReserveStage extends Stage {
     const data = new DataStack(this, 'data', { ...common('data'), retain: stageName === 'demo' });
     const mcp = new McpStack(this, 'mcp', { ...common('mcp'), stage: stageName, mcp: config.mcp, state: config.state, table: data.table });
     const agent = new AgentStack(this, 'agent', { ...common('agent'), stage: stageName, agent: config.agent, mcpFunctionUrl: mcp.functionUrl });
-    new SimApiStack(this, 'sim-api', {
+    const simApi = new SimApiStack(this, 'sim-api', {
       ...common('sim-api'),
       stage: stageName,
       simApi: config.simApi,
@@ -38,6 +39,14 @@ export class ColdReserveStage extends Stage {
       table: data.table,
       mcpFunctionUrl: mcp.functionUrl,
       runtimeArn: agent.runtimeArn,
+    });
+    // The simulator website (K1, #242), with sim-api behind it at /api.
+    new WebStack(this, 'web', {
+      ...common('web'),
+      stage: stageName,
+      siteDir,
+      simApiUrl: simApi.functionUrl,
+      originSecretParameter: config.simApi.originSecretParameter.replace('{stage}', stageName),
     });
   }
 }
@@ -48,7 +57,8 @@ export function applyGuardrails(app: App): App {
   return app;
 }
 
-export function buildApp(app: App, config: InfraConfig): App {
-  for (const stage of config.stages) new ColdReserveStage(app, stage, config);
+/** `siteDir`: the built simulator (`pnpm --filter @cold-reserve/alexa-sim build:aws`), uploaded by each stage's web stack. */
+export function buildApp(app: App, config: InfraConfig, siteDir: string): App {
+  for (const stage of config.stages) new ColdReserveStage(app, stage, config, siteDir);
   return applyGuardrails(app);
 }

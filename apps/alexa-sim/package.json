@@ -9,7 +9,10 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5318 --strictPort",
-    "build": "vite build"
+    "build": "vite build",
+    "build:aws": "vite build --mode aws && tsx scripts/site-headers.ts dist",
+    "build:e2e": "vite build --outDir dist-e2e --emptyOutDir && tsx scripts/site-headers.ts dist-e2e",
+    "preview:e2e": "vite preview --outDir dist-e2e --host 127.0.0.1 --port 5319 --strictPort"
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",
@@ -32,6 +35,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "jsdom": "30.1.1",
+    "tsx": "4.23.15",
     "vite": "8.3.1"
   }
 }

@@ -33,6 +33,12 @@ describe('simulator config', () => {
     expect(parseConfig({ VITE_PHONE: 'sms' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
+  it('the AWS build (K1, #242): the remote agent on the same origin, sim-api at /api through CloudFront', () => {
+    // The values vite.config.ts sets for `--mode aws`: no secret, no absolute URL in the bundle.
+    const parsed = parseConfig({ VITE_AGENT: 'remote', VITE_SIM_API_URL: '/api' }, '?agent=scripted', false);
+    expect(parsed).toMatchObject({ ok: true, value: { agent: 'remote', simApiUrl: '/api' } });
+  });
+
   it('reads the remote agent settings from the environment', () => {
     const env = { VITE_AGENT: 'remote', VITE_SIM_API_URL: 'https://sim.example.test', VITE_AGENT_TIMEOUT_MS: '4000', VITE_TURN_BUDGET_MS: '6000' };
     expect(parseConfig(env, '', false)).toMatchObject({ ok: true, value: { agent: 'remote', simApiUrl: 'https://sim.example.test', agentTimeoutMs: 4000 } });

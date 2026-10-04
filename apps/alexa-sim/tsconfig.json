@@ -4,5 +4,5 @@
   "compilerOptions": {
     "jsx": "react-jsx"
   },
-  "include": ["src", "test", "vite.config.ts", "vite.phone-proxy.ts"]
+  "include": ["src", "test", "scripts", "vite.config.ts", "vite.phone-proxy.ts", "vite.cloudfront-preview.ts"]
 }

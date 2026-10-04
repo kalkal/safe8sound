@@ -1,4 +1,5 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
 import {
   PROBLEM_JSON_CONTENT_TYPE,
   SessionRequestSchema,
@@ -187,7 +188,28 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
 
     // Last resort: a throw from a port, the quota store or the body never escapes as a raw 500.
     let codeIdOfRequest: string | undefined;
+    // #243: on AWS only CloudFront may call: it adds the origin secret, and names the visitor's IP. Without a
+    // configured secret (the local entry) there is no check and the socket IP counts.
+    const presented = req.headers.get(ORIGIN_SECRET_HEADER);
+    const viaCloudFront = config.originSecrets.length > 0 && presented !== null && config.originSecrets.some((s) => sameSecret(s, presented));
+    const viewerIp = req.headers.get('x-viewer-ip');
+    const clientIp = viaCloudFront && viewerIp !== null && isIp(viewerIp) ? viewerIp : meta.clientIp;
+
     const route = async (): Promise<Response> => {
+      if (config.originSecrets.length > 0 && !viaCloudFront) {
+        // The reason, never the value presented.
+        deps.logger.log({
+          ts: new Date(deps.clock.now()).toISOString(),
+          level: 'warn',
+          component: 'sim-api',
+          message: 'origin_not_allowed',
+          correlationId,
+          code: 'origin_not_allowed',
+          category: 'forbidden',
+          details: { reason: presented === null ? 'origin_secret_missing' : 'origin_secret_wrong' },
+        });
+        return fail(toolError('origin_not_allowed', 'The demo answers through its website only.'));
+      }
       const path = new URL(req.url).pathname;
       if (!ROUTES.has(path)) return fail(toolError('route_not_found', 'Unknown endpoint.'), 404);
       if (origin !== null && allowedOrigin === undefined) return fail(toolError('origin_not_allowed', 'This origin may not call the demo.'));
@@ -213,7 +235,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         // One atomic count per attempt BEFORE the code is compared (review of #110): concurrent wrong
         // codes cannot slip past the cap between a check and a later count. A right code gives its attempt
         // back, so only wrong codes count (review of #139).
-        const attempt = await quota.codeAttempt(meta.clientIp);
+        const attempt = await quota.codeAttempt(clientIp);
         if (!attempt.ok) return fail(attempt.error);
         if (!attempt.value.allowed) return fail(quota.tooManyAttempts());
         const codeId = config.demoCodes.get(createHash('sha256').update(request.data.code).digest('hex'));
@@ -287,3 +309,15 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
     }
   };
 }
+
+/** The header CloudFront adds to every /api request (#243): the origin secret, read from SSM at deploy. */
+export const ORIGIN_SECRET_HEADER = 'x-origin-verify';
+
+/** Constant time over equal-length digests: the comparison never tells how much of a guess was right. */
+function sameSecret(expected: string, presented: string): boolean {
+  const digest = (v: string) => createHash('sha256').update(v, 'utf8').digest();
+  return timingSafeEqual(digest(expected), digest(presented));
+}
+
+/** An IPv4 or IPv6 address as CloudFront writes it, nothing else (it becomes a quota key). */
+const isIp = (v: string): boolean => isIP(v) !== 0;

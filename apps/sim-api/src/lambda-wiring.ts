@@ -14,6 +14,9 @@ const SettingsSchema = z.object({
   SIM_DEMO_CODES_PARAMETER: z.string().regex(/^\/[\w./-]+$/),
   SIM_TOKEN_KEYS_PARAMETER: z.string().regex(/^\/[\w./-]+$/),
   SIM_MCP_TOKEN_PARAMETER: z.string().regex(/^\/[\w./-]+$/),
+  /** The origin secret CloudFront adds to every /api request, and the previous one during a rotation (#243). */
+  SIM_ORIGIN_SECRET_PARAMETER: z.string().regex(/^\/[\w./-]+$/),
+  SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER: z.string().regex(/^\/[\w./-]+$/),
   AGENT_RUNTIME_ARN: z.string().regex(/^arn:aws[\w-]*:bedrock-agentcore:[a-z0-9-]+:\d{12}:runtime\/[\w-]+$/),
   SIM_AGENT_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(7500),
   SIM_MCP_URL: z.url(),
@@ -58,14 +61,36 @@ export async function loadSimApiLambda(env: Readonly<Record<string, string | und
   if (!plain.ok) return plain;
   if (plain.value.speech.enabled && s.SIM_SPEECH_BUCKET === undefined) return err(toolError('invalid_config', 'SIM_SPEECH_ENABLED needs SIM_SPEECH_BUCKET, the cache of spoken replies.'));
 
-  const [demoCodes, tokenKeys, mcpToken] = await Promise.all([deps.read(s.SIM_DEMO_CODES_PARAMETER), deps.read(s.SIM_TOKEN_KEYS_PARAMETER), deps.read(s.SIM_MCP_TOKEN_PARAMETER)]);
+  const [demoCodes, tokenKeys, mcpToken, originSecret, previousSecret] = await Promise.all([
+    deps.read(s.SIM_DEMO_CODES_PARAMETER),
+    deps.read(s.SIM_TOKEN_KEYS_PARAMETER),
+    deps.read(s.SIM_MCP_TOKEN_PARAMETER),
+    deps.read(s.SIM_ORIGIN_SECRET_PARAMETER),
+    deps.read(s.SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER),
+  ]);
   if (!demoCodes.ok) return demoCodes;
   if (!tokenKeys.ok) return tokenKeys;
   if (!mcpToken.ok) return mcpToken;
+  if (!originSecret.ok) return originSecret;
+  if (!previousSecret.ok) return previousSecret;
+  // Fail closed (#244 round 2): `none` means "no previous secret", never "no check". A current parameter that holds
+  // none or nothing (a rotation slip, the two parameters swapped) stops the start instead of opening the door.
+  const current = originSecret.value.trim();
+  if (current === '' || current === 'none') return err(toolError('invalid_config', 'The origin secret parameter holds no secret: sim-api does not start without its check.'));
   if (mcpToken.value.length < 32) return err(toolError('invalid_config', 'The MCP token parameter holds fewer than 32 characters.'));
 
-  const config = loadSimApiConfig({ ...env, SIM_DEMO_CODES: demoCodes.value, SIM_TOKEN_KEYS: tokenKeys.value });
+  // On AWS the origin check is always on (#243): a request without the secret never reaches a route.
+  const config = loadSimApiConfig({
+    ...env,
+    SIM_DEMO_CODES: demoCodes.value,
+    SIM_TOKEN_KEYS: tokenKeys.value,
+    SIM_ORIGIN_SECRET: originSecret.value, // gitleaks:allow (read from SSM at runtime, no value here)
+    SIM_ORIGIN_SECRET_PREVIOUS: previousSecret.value,
+  });
   if (!config.ok) return config;
+  if (config.value.originSecrets.length === 0) return err(toolError('invalid_config', 'No origin secret: sim-api does not start without its check.'));
+  // Said once per container, never the value: after a deploy the log shows the check took.
+  deps.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'info', component: 'sim-api', message: 'Origin secret check: on.', correlationId: 'startup', details: { event: 'origin_secret_check', check: 'on' } });
 
   return ok(
     createSimApiHandler(config.value, {

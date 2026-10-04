@@ -45,6 +45,8 @@ afterAll(async () => {
   });
 });
 
+const ORIGIN_SECRET = 'o'.repeat(40);
+
 function lambda(turnsPerCode: number) {
   const logs: LogEntry[] = [];
   const log = (entry: LogEntry) => logs.push(entry);
@@ -52,11 +54,15 @@ function lambda(turnsPerCode: number) {
     '/cold-reserve/dev/sim-api/demo-codes': `judges:${createHash('sha256').update(CODE).digest('hex')}`,
     '/cold-reserve/dev/sim-api/token-keys': `k1:${Buffer.alloc(32, 9).toString('base64url')}`,
     '/cold-reserve/dev/sim-api/mcp-token': 'm'.repeat(40),
+    '/cold-reserve/dev/sim-api/origin-secret': ORIGIN_SECRET,
+    '/cold-reserve/dev/sim-api/origin-secret-previous': 'none',
   };
   const env = {
     SIM_DEMO_CODES_PARAMETER: '/cold-reserve/dev/sim-api/demo-codes',
     SIM_TOKEN_KEYS_PARAMETER: '/cold-reserve/dev/sim-api/token-keys',
     SIM_MCP_TOKEN_PARAMETER: '/cold-reserve/dev/sim-api/mcp-token',
+    SIM_ORIGIN_SECRET_PARAMETER: '/cold-reserve/dev/sim-api/origin-secret',
+    SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER: '/cold-reserve/dev/sim-api/origin-secret-previous',
     SIM_ALLOWED_ORIGINS: ORIGIN,
     SIM_LIMIT_TURNS_PER_CODE: String(turnsPerCode),
     AGENT_RUNTIME_ARN: ARN,
@@ -76,7 +82,8 @@ function lambda(turnsPerCode: number) {
 const post = (path: string, body: unknown, token?: string): FunctionUrlEvent => ({
   rawPath: path,
   rawQueryString: '',
-  headers: { 'content-type': 'application/json', origin: ORIGIN, ...(token === undefined ? {} : { authorization: `Bearer ${token}` }) },
+  // As CloudFront forwards it (#243): with the origin secret it adds.
+  headers: { 'content-type': 'application/json', origin: ORIGIN, 'x-origin-verify': ORIGIN_SECRET, ...(token === undefined ? {} : { authorization: `Bearer ${token}` }) },
   body: JSON.stringify(body),
   isBase64Encoded: false,
   requestContext: { domainName: 'abc.lambda-url.us-east-1.on.aws', http: { method: 'POST', sourceIp: '203.0.113.7' } },

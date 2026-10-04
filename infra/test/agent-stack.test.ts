@@ -2,7 +2,7 @@ import { App, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { buildApp, loadInfraConfig, type InfraConfig } from '../src/index.js';
-import { exampleConfig } from './fixtures.js';
+import { SITE_DIR, exampleConfig } from './fixtures.js';
 
 // G1b (#17): the agent on AgentCore Runtime. Code deployment of the CommonJS bundle (Node 22), IAM/SigV4
 // inbound auth only (decided in #17), idle sessions end after 120 s, least-privilege role. Bundling is
@@ -12,7 +12,7 @@ const config: InfraConfig = exampleConfig();
 let templates: Record<string, Template>;
 
 beforeAll(() => {
-  const app = buildApp(new App({ context: { 'aws:cdk:bundling-stacks': [] } }), config);
+  const app = buildApp(new App({ context: { 'aws:cdk:bundling-stacks': [] } }), config, SITE_DIR);
   templates = Object.fromEntries(
     app.node
       .findAll()

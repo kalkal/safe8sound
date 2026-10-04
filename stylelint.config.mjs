@@ -4,7 +4,7 @@
 /** @type {import('stylelint').Config} */
 export default {
   plugins: ['stylelint-declaration-strict-value'],
-  ignoreFiles: ['**/node_modules/**', '**/generated/**', '**/dist/**', '**/cdk.out/**', 'spikes/**'],
+  ignoreFiles: ['**/node_modules/**', '**/generated/**', '**/dist/**', '**/dist-e2e/**', '**/dist-e2e-aws/**', '**/cdk.out/**', 'spikes/**'],
   rules: {
     'color-no-hex': true,
     'color-named': 'never',

@@ -51,7 +51,7 @@ export const i18nSrcCastRule = ['error', ...UNIT_CASTS, ...NEVER_CASTS];
 
 export default defineConfig(
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/cdk.out/**', '**/generated/**', '**/coverage/**', 'spikes/**', 'tooling/test/fixtures/**'],
+    ignores: ['**/node_modules/**', '**/dist/**', '**/dist-e2e/**', '**/dist-e2e-aws/**', '**/cdk.out/**', '**/generated/**', '**/coverage/**', 'spikes/**', 'tooling/test/fixtures/**'],
   },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,

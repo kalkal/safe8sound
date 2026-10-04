@@ -64,6 +64,9 @@ const server = createServer(nodeListener(handler, { maxBodyBytes: config.value.m
 server.listen(Number(process.env['PORT'] ?? 3341), '127.0.0.1', () => {
   const { port } = server.address() as AddressInfo;
   log({ ts: new Date().toISOString(), level: 'info', component: 'sim-api', message: `listening on http://127.0.0.1:${String(port)}`, correlationId: 'none' });
+  // #243: said once, never the value. Off locally unless SIM_ORIGIN_SECRET is set; always on in the Lambda.
+  const check = config.value.originSecrets.length > 0 ? 'on' : 'off';
+  log({ ts: new Date().toISOString(), level: 'info', component: 'sim-api', message: `Origin secret check: ${check}.`, correlationId: 'startup', details: { event: 'origin_secret_check', check } });
 });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {

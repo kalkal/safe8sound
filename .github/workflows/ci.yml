@@ -48,5 +48,7 @@ jobs:
       # The demo script and the fault-injection scenarios (ScriptedAgent, no network, no LLM).
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
+      # The built site (K1): under its CloudFront CSP, and behind the CloudFront Function in front of the real local chain.
+      - run: pnpm e2e:site
       - name: cdk synth + cdk-nag
         run: pnpm synth
