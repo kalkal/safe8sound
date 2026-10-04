@@ -1,5 +1,7 @@
 import {
+  AdminSettingsSchema,
   InboxMessageSchema,
+  SandboxSettingsSchema,
   IsoDateTimeSchema,
   PlanSchema,
   PreferencesSchema,
@@ -9,6 +11,7 @@ import {
   err,
   ok,
   toolError,
+  type AdminSettings,
   type ConfigChange,
   type ErrorEnvelope,
   type HomeId,
@@ -18,6 +21,7 @@ import {
   type PlanId,
   type Preferences,
   type Result,
+  type SandboxSettings,
   type StormSession,
   type StoredSchema,
 } from '@cold-reserve/contracts';
@@ -207,6 +211,51 @@ class MemoryStateStore implements StateStore {
       .slice(0, Math.max(0, limit))
       .map(([, item]) => structuredClone(item.value));
     return Promise.resolve(this.#readAll(newest, InboxMessageSchema, 'INBOX#'));
+  }
+
+  getSandboxSettings(): Promise<Result<SandboxSettings, ErrorEnvelope>> {
+    return Promise.resolve(this.#readSettings(this.#partition(), 'SETTINGS', SandboxSettingsSchema));
+  }
+
+  putSandboxSettings(settings: SandboxSettings, expectedVersion: number | undefined): Promise<Result<void, ErrorEnvelope>> {
+    return Promise.resolve(this.#writeSettings(this.#partition(), 'SETTINGS', SandboxSettingsSchema, settings, expectedVersion));
+  }
+
+  getAdminConfig(): Promise<Result<AdminSettings, ErrorEnvelope>> {
+    return Promise.resolve(this.#readSettings(this.#adminPartition(), 'CONFIG', AdminSettingsSchema));
+  }
+
+  putAdminConfig(config: AdminSettings, expectedVersion: number | undefined): Promise<Result<void, ErrorEnvelope>> {
+    return Promise.resolve(this.#writeSettings(this.#adminPartition(), 'CONFIG', AdminSettingsSchema, config, expectedVersion));
+  }
+
+  /** The admin config is one for every home (C1): its own partition, ADMIN#CONFIG. */
+  #adminPartition(): Map<string, Item> {
+    let partition = this.#options.backing.partitions.get('ADMIN#CONFIG');
+    if (!partition) {
+      partition = new Map();
+      this.#options.backing.partitions.set('ADMIN#CONFIG', partition);
+    }
+    return partition;
+  }
+
+  #readSettings<T>(partition: Map<string, Item>, sk: string, schema: StoredSchema<T>): Result<T, ErrorEnvelope> {
+    const item = partition.get(sk);
+    if (item === undefined) return err(toolError('settings_not_found', 'No settings are stored yet.'));
+    const parsed = readStored(schema, item.value);
+    return parsed.success ? ok(parsed.data) : err(toolError('unexpected_error', `Stored item ${sk} does not match its schema.`));
+  }
+
+  /** The same conditional write as store-dynamodb: only against the version read, and only the next version. */
+  #writeSettings<T extends { version: number }>(partition: Map<string, Item>, sk: string, schema: StoredSchema<T>, value: T, expectedVersion: number | undefined): Result<void, ErrorEnvelope> {
+    const parsed = schema.safeParse(value);
+    if (!parsed.success) return err(toolError('invalid_input', 'The settings do not match their schema.'));
+    if (value.version !== (expectedVersion ?? 0) + 1) return err(toolError('invalid_input', 'The settings must carry the version after the one read.', { details: { field: 'version' } }));
+    const stored = partition.get(sk)?.value as { version?: unknown } | undefined;
+    const current = typeof stored?.version === 'number' ? stored.version : undefined;
+    if (current !== expectedVersion) return err(toolError('settings_version_conflict', 'The settings changed since they were read: read them again.'));
+    partition.set(sk, { value: structuredClone(value) });
+    return ok(undefined);
   }
 
   #partition(): Map<string, Item> {

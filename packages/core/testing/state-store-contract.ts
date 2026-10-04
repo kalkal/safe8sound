@@ -1,5 +1,9 @@
 import {
+  AdminSettingsSchema,
   ConfigChangeSchema,
+  SandboxSettingsSchema,
+  type AdminSettings,
+  type SandboxSettings,
   HomeIdSchema,
   InboxMessageSchema,
   PlanIdSchema,
@@ -430,6 +434,62 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
           error: { code: 'invalid_input', details: { field: 'at' } },
         });
         expect(await store.listGuardRejections()).toEqual({ ok: true, value: [] });
+      });
+    });
+
+    describe('sandbox settings (C1, approved in #214)', () => {
+      const settings = (version: number, at: string): SandboxSettings =>
+        SandboxSettingsSchema.parse({ version, updatedAt: at, scenarioId: 'heatwave', locationId: 'turin', units: 'C', household: 'older-woman' });
+
+      it('answers settings_not_found before the first write, then the stored settings, from any store instance', async () => {
+        const { harness, homeA, at } = setup();
+        const store = harness.factory(homeA);
+        expect(await store.getSandboxSettings()).toMatchObject({ ok: false, error: { code: 'settings_not_found', category: 'not_found' } });
+        expect(await store.putSandboxSettings(settings(1, at(0)), undefined)).toEqual({ ok: true, value: undefined });
+        expect(await harness.factory(homeA).getSandboxSettings()).toEqual({ ok: true, value: settings(1, at(0)) });
+      });
+
+      it('writes only against the version it read: a stale or repeated first write is settings_version_conflict, as a value', async () => {
+        const { harness, homeA, at } = setup();
+        const store = harness.factory(homeA);
+        expect((await store.putSandboxSettings(settings(1, at(0)), undefined)).ok).toBe(true);
+        expect((await store.putSandboxSettings(settings(2, at(1)), 1)).ok).toBe(true);
+        expect(await store.putSandboxSettings({ ...settings(2, at(2)), units: 'F' }, 1)).toMatchObject({ ok: false, error: { code: 'settings_version_conflict', category: 'conflict' } });
+        expect(await store.putSandboxSettings(settings(1, at(3)), undefined)).toMatchObject({ ok: false, error: { code: 'settings_version_conflict' } });
+        expect(await store.getSandboxSettings()).toEqual({ ok: true, value: settings(2, at(1)) });
+      });
+
+      it('refuses settings whose version is not the one after the version read, and keeps homes apart', async () => {
+        const { harness, homeA, homeB, at } = setup();
+        const store = harness.factory(homeA);
+        expect(await store.putSandboxSettings(settings(3, at(0)), undefined)).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+        expect((await store.putSandboxSettings(settings(1, at(0)), undefined)).ok).toBe(true);
+        expect(await harness.factory(homeB).getSandboxSettings()).toMatchObject({ ok: false, error: { code: 'settings_not_found' } });
+      });
+    });
+
+    describe('admin config (C1, approved in #214)', () => {
+      const admin = (version: number, at: string, sandboxDefaults: SandboxSettings): AdminSettings =>
+        AdminSettingsSchema.parse({
+          version,
+          updatedAt: at,
+          demoEnabled: true,
+          caps: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10, sandboxesPerDay: 50, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000 },
+          sandboxDefaults,
+        });
+
+      it('is one config for every home: written against the version read, a stale write is settings_version_conflict', async () => {
+        const { harness, homeA, homeB, at } = setup();
+        const defaults = SandboxSettingsSchema.parse({ version: 1, updatedAt: at(0), scenarioId: 'clear-day', locationId: 'reference', units: 'C', household: 'no-one-at-risk' });
+        const store = harness.factory(homeA);
+        // On a shared backend the config may already exist: write against what is there.
+        const current = await store.getAdminConfig();
+        const read = current.ok ? current.value.version : undefined;
+        if (!current.ok) expect(current.error.code).toBe('settings_not_found');
+        const next = admin((read ?? 0) + 1, at(0), defaults);
+        expect(await store.putAdminConfig(next, read)).toEqual({ ok: true, value: undefined });
+        expect(await harness.factory(homeB).getAdminConfig()).toEqual({ ok: true, value: next });
+        expect(await store.putAdminConfig({ ...next, demoEnabled: false }, read)).toMatchObject({ ok: false, error: { code: 'settings_version_conflict' } });
       });
     });
   });

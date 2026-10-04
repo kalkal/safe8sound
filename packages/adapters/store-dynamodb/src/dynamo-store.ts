@@ -1,4 +1,5 @@
 import {
+  AdminSettingsSchema,
   ConfigChangeSchema,
   GuaranteeIdSchema,
   InboxMessageSchema,
@@ -8,11 +9,13 @@ import {
   PlanIdSchema,
   PlanSchema,
   PreferencesSchema,
+  SandboxSettingsSchema,
   StormSessionSchema,
   epochMs,
   err,
   ok,
   toolError,
+  type AdminSettings,
   type ConfigChange,
   type ErrorEnvelope,
   type HomeId,
@@ -21,6 +24,7 @@ import {
   type PlanId,
   type Preferences,
   type Result,
+  type SandboxSettings,
   type StormSession,
 } from '@cold-reserve/contracts';
 import {
@@ -86,6 +90,9 @@ export const dynamoStateStoreFactory =
     new DynamoStateStore(homeId, options, scope);
 
 /** An expected outcome carried out of a #run body; converted back to a Result there. */
+/** The partition of the admin config, shared by every home (C1). */
+const ADMIN_PK = 'ADMIN#CONFIG';
+
 class Failure extends Error {
   constructor(readonly error: ErrorEnvelope) {
     super(error.message);
@@ -152,6 +159,37 @@ class DynamoStateStore implements StateStore {
         throw new Failure(toolError('invalid_input', `Plan ${plan.id} already exists; a plan id is written once.`, { details: { planId: plan.id } }));
       }
     });
+  }
+
+  getSandboxSettings() {
+    return this.#run('getSandboxSettings', async () => this.#readSettings(this.#pk, 'SETTINGS', SandboxSettingsSchema));
+  }
+
+  putSandboxSettings(settings: SandboxSettings, expectedVersion: number | undefined) {
+    return this.#run('putSandboxSettings', async () => this.#writeSettings(this.#pk, 'SETTINGS', SandboxSettingsSchema, settings, expectedVersion));
+  }
+
+  /** The admin config is one for every home (C1, approved in #214): its own item, ADMIN#CONFIG. */
+  getAdminConfig() {
+    return this.#run('getAdminConfig', async () => this.#readSettings(ADMIN_PK, 'CONFIG', AdminSettingsSchema));
+  }
+
+  putAdminConfig(config: AdminSettings, expectedVersion: number | undefined) {
+    return this.#run('putAdminConfig', async () => this.#writeSettings(ADMIN_PK, 'CONFIG', AdminSettingsSchema, config, expectedVersion));
+  }
+
+  async #readSettings<T>(pk: string, sk: string, schema: z.ZodType<T>): Promise<T> {
+    const item = await this.#table.get(pk, sk);
+    return item ? parse(schema, item) : fail(toolError('settings_not_found', 'No settings are stored yet.'));
+  }
+
+  /** One conditional put: only against the version read (none stored yet when undefined), and only the next version. */
+  async #writeSettings<T extends { version: number }>(pk: string, sk: string, schema: z.ZodType<T>, value: T, expectedVersion: number | undefined): Promise<void> {
+    if (!schema.safeParse(value).success) fail(toolError('invalid_input', 'The settings do not match their schema.'));
+    if (value.version !== (expectedVersion ?? 0) + 1) fail(toolError('invalid_input', 'The settings must carry the version after the one read.', { details: { field: 'version' } }));
+    const item: TableItem = { PK: pk, SK: sk, schemaVersion: SCHEMA_VERSION, data: value, version: value.version };
+    const outcome = await this.#table.put(item, expectedVersion === undefined ? [{ attr: 'PK', op: 'not_exists' }] : [{ attr: 'version', op: '=', value: expectedVersion }]);
+    if (outcome === 'condition_failed') fail(toolError('settings_version_conflict', 'The settings changed since they were read: read them again.'));
   }
 
   getPlan(planId: PlanId) {

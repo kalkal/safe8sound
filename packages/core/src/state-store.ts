@@ -2,6 +2,7 @@ import {
   IsoDateTimeSchema,
   PlanIdSchema,
   toolError,
+  type AdminSettings,
   type ConfigChange,
   type ErrorEnvelope,
   type GuaranteeId,
@@ -10,6 +11,7 @@ import {
   type NewInboxMessage,
   type Plan,
   type PlanId,
+  type SandboxSettings,
   type Preferences,
   type Result,
   type StormSession,
@@ -114,6 +116,17 @@ export interface StateStore {
   saveInboxMessage(message: NewInboxMessage): Promise<Result<void, ErrorEnvelope>>;
   /** The family messages still retained, newest first, at most `limit`. */
   listInbox(limit: number): Promise<Result<InboxMessage[], ErrorEnvelope>>;
+  /** This sandbox's settings (C1, approved in #214); `settings_not_found` before the first write. */
+  getSandboxSettings(): Promise<Result<SandboxSettings, ErrorEnvelope>>;
+  /**
+   * Writes the settings only if the stored version is still `expectedVersion` (undefined: none stored yet), and
+   * `settings.version` is the next one. A stale or repeated write is `settings_version_conflict`, as a value.
+   */
+  putSandboxSettings(settings: SandboxSettings, expectedVersion: number | undefined): Promise<Result<void, ErrorEnvelope>>;
+  /** The demo's admin config, one for every home (C1); `settings_not_found` before the first write. */
+  getAdminConfig(): Promise<Result<AdminSettings, ErrorEnvelope>>;
+  /** Same conditional write as the sandbox settings. */
+  putAdminConfig(config: AdminSettings, expectedVersion: number | undefined): Promise<Result<void, ErrorEnvelope>>;
 }
 
 /** What a store knows of the request it serves: its failures are logged with this correlation id (#111). */

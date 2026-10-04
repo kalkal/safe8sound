@@ -47,6 +47,8 @@ export const ERROR_CATALOG = {
   // not_found
   plan_not_found: { category: 'not_found' },
   home_not_found: { category: 'not_found' },
+  /** A sandbox or the admin config has no settings stored yet (C1, approved in #214). */
+  settings_not_found: { category: 'not_found' },
   // unauthorized / forbidden: configuration
   missing_token: { category: 'unauthorized' },
   wrong_client: { category: 'unauthorized' },
@@ -62,6 +64,8 @@ export const ERROR_CATALOG = {
   simulated_plan_on_real_home: { category: 'forbidden' },
   // conflict: idempotent success, return the original outcome
   plan_already_applied: { category: 'conflict' },
+  /** Settings written against a version that is no longer current: re-read and retry (C1, approved in #214). */
+  settings_version_conflict: { category: 'conflict' },
   // dependency_unavailable: transient, retry with backoff then degrade
   home_data_stale: { category: 'dependency_unavailable' },
   split_cloud_unreachable: { category: 'dependency_unavailable' },

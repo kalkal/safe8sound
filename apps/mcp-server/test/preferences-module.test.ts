@@ -97,6 +97,10 @@ describe('preferences module (MCP tools)', () => {
         getLatestStormSession: () => base.getLatestStormSession(),
         saveInboxMessage: (m) => base.saveInboxMessage(m),
         listInbox: (n) => base.listInbox(n),
+        getSandboxSettings: () => base.getSandboxSettings(),
+        putSandboxSettings: (s, v) => base.putSandboxSettings(s, v),
+        getAdminConfig: () => base.getAdminConfig(),
+        putAdminConfig: (c, v) => base.putAdminConfig(c, v),
       };
     };
     const set = await call(deps({ storeFor }), 'set_preferences', { language: 'it-IT', confirmed: true });
@@ -155,6 +159,10 @@ describe('preferences module (MCP tools)', () => {
       getLatestStormSession: () => Promise.reject(new Error('not used')),
       saveInboxMessage: () => Promise.reject(new Error('not used')),
       listInbox: () => Promise.reject(new Error('not used')),
+      getSandboxSettings: () => Promise.reject(new Error('not used')),
+      putSandboxSettings: () => Promise.reject(new Error('not used')),
+      getAdminConfig: () => Promise.reject(new Error('not used')),
+      putAdminConfig: () => Promise.reject(new Error('not used')),
     };
     expect(await call(deps({ storeFor: () => failing }), 'get_preferences', {})).toMatchObject({
       isError: true,

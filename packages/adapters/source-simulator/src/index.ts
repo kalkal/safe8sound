@@ -1,5 +1,5 @@
 /** HomeDataSource from the seeded simulator, with the built-in scenarios and the demo home. */
-import { HomeProfileSchema, type ErrorEnvelope, type HomeProfile, type Result } from '@cold-reserve/contracts';
+import { HomeProfileSchema, ScenarioIdSchema, type ErrorEnvelope, type HomeProfile, type Result, type ScenarioId } from '@cold-reserve/contracts';
 import demoHome from '../data/demo-home.json' with { type: 'json' };
 import simulatorParams from '../data/simulator-params.json' with { type: 'json' };
 import clearDay from '../scenarios/clear-day.json' with { type: 'json' };
@@ -15,8 +15,9 @@ export { ScenarioSchema, inputsAt, parseScenario, type Scenario } from './scenar
 export { SimulatorSource, type SimulatorSourceOptions } from './simulator-source.js';
 export { createSimulatedDevices, type SimulatedDevices } from './devices.js';
 
-export const SCENARIO_IDS = ['clear-day', 'heatwave', 'storm-blackout'] as const;
-export type ScenarioId = (typeof SCENARIO_IDS)[number];
+/** The built-in scenarios: their ids live in contracts (C1, approved in #214), so sandbox settings can name them. */
+export const SCENARIO_IDS = ScenarioIdSchema.options;
+export type { ScenarioId };
 
 const RAW_SCENARIOS: Record<ScenarioId, unknown> = { 'clear-day': clearDay, heatwave, 'storm-blackout': stormBlackout };
 
