@@ -2,9 +2,9 @@ import '@cold-reserve/design-tokens/tokens.css';
 import './app.css';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode, Suspense, lazy, useEffect, useState } from 'react';
+import { StrictMode, Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { Agent } from './agent/agent.js';
+import type { Agent, AgentAnswer } from './agent/agent.js';
 import { buildAgent, buildSession, type DemoSession } from './agent/index.js';
 import { parseConfig, type SimConfig } from './config.js';
 import { cardDocument } from './host/card-documents.js';
@@ -14,7 +14,9 @@ import { configErrorEvent, log, logUnhandled } from './log.js';
 import { createInboxPhone } from './phone/inbox-phone.js';
 import { createScriptedPhone, type PhoneFeed } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
+import { EchoFrame } from './ui/EchoFrame.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
+import { skyFor, type Sky } from './ui/sky.js';
 import { t } from './ui/text.js';
 import type { StudioVoice } from './voice/use-voice.js';
 import { createRemoteSynthesize, createSpeechTickets } from './voice/studio-voice.js';
@@ -67,8 +69,22 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       delete document.documentElement.dataset['demo'];
     };
   }, [config.demo]);
+  // The sky follows the weather the answers show (sky.ts); it starts on a mild day.
+  const [sky, setSky] = useState<Sky>('mild');
+  const onAnswer = useCallback(
+    (answer: AgentAnswer) => {
+      setSky((previous) => skyFor(answer.cards ?? [], config.homeTimeZone, previous));
+    },
+    [config.homeTimeZone],
+  );
+  const phonePanel = (config.agent === 'scripted' || config.phone === 'inbox') && (
+    <ErrorBoundary>
+      <PhonePanel feed={phone} timeZone={config.homeTimeZone} />
+    </ErrorBoundary>
+  );
   return (
-    <>
+    <EchoFrame sky={sky} aside={phonePanel}>
+      <Title />
       <button
         type="button"
         className="link-button theme-toggle"
@@ -81,35 +97,47 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       </button>
       <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo }}>
         <QueryClientProvider client={queryClient}>
-          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} demo={config.demo} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />
+          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} demo={config.demo} onAnswer={onAnswer} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />
         </QueryClientProvider>
       </CardHostProvider>
-      {(config.agent === 'scripted' || config.phone === 'inbox') && (
-        <ErrorBoundary>
-          <PhonePanel feed={phone} timeZone={config.homeTimeZone} />
-        </ErrorBoundary>
-      )}
-    </>
+    </EchoFrame>
+  );
+}
+
+function Title() {
+  return (
+    <header>
+      <h1>{t('sim.title')}</h1>
+    </header>
+  );
+}
+
+/** The gallery and the configuration error: the plain page, without the device. */
+function Plain({ children }: { children: ReactNode }) {
+  return (
+    <main className="surface">
+      <Title />
+      {children}
+    </main>
   );
 }
 
 createRoot(container).render(
   <StrictMode>
-    <main className="surface">
-      <header>
-        <h1>{t('sim.title')}</h1>
-      </header>
-      <ErrorBoundary>
-        {Gallery !== null ? (
+    <ErrorBoundary>
+      {Gallery !== null ? (
+        <Plain>
           <Suspense fallback={null}>
             <Gallery />
           </Suspense>
-        ) : config.ok && agent.ok ? (
-          <Simulator agent={agent.value} config={config.value} session={session} studioVoice={studioVoice} />
-        ) : (
+        </Plain>
+      ) : config.ok && agent.ok ? (
+        <Simulator agent={agent.value} config={config.value} session={session} studioVoice={studioVoice} />
+      ) : (
+        <Plain>
           <p role="alert">{t('config.invalid')}</p>
-        )}
-      </ErrorBoundary>
-    </main>
+        </Plain>
+      )}
+    </ErrorBoundary>
   </StrictMode>,
 );

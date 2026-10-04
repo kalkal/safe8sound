@@ -43,6 +43,15 @@ export const TOKEN_NAMES = [
   "level-essential",
   "level-on",
   "cube-edge",
-  "cube-fill"
+  "sky-veil",
+  "sky-sun",
+  "sky-glow",
+  "sky-cloud",
+  "frame-bezel",
+  "cube-fill",
+  "sky-mild",
+  "sky-hot",
+  "sky-dusk",
+  "sky-storm"
 ] as const;
 export type TokenName = (typeof TOKEN_NAMES)[number];

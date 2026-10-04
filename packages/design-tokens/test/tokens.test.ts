@@ -41,6 +41,22 @@ describe('buildTokens (Style Dictionary 5, DTCG 2025.10)', () => {
     expect(root).toMatch(/--cube-fill: linear-gradient\(145deg, light-dark\(oklch\([^)]*\), oklch\([^)]*\)\) 0%, /);
   });
 
+  it('gives the Echo Show frame four skies, a sun, clouds, a veil and the bezel, the same in both schemes (the frame never changes theme)', async () => {
+    const root = block(await css(), ':root');
+    for (const sky of ['sky-mild', 'sky-hot', 'sky-dusk', 'sky-storm']) {
+      const line = root.split('\n').find((l) => l.includes(`--${sky}: linear-gradient(135deg, `)) ?? '';
+      const stops = [...line.matchAll(/light-dark\((oklch\([^)]*\)), (oklch\([^)]*\))\)/g)];
+      expect(stops.length, sky).toBe(3);
+      for (const [, light, dark] of stops) expect(light, sky).toBe(dark);
+    }
+    for (const name of ['sky-veil', 'sky-sun', 'sky-glow', 'sky-cloud', 'frame-bezel']) {
+      const line = root.split('\n').find((l) => l.includes(`--${name}: `)) ?? '';
+      const [, light, dark] = /light-dark\((oklch\([^)]*\)), (oklch\([^)]*\))\);/.exec(line) ?? [];
+      expect(light, name).toBeDefined();
+      expect(light, name).toBe(dark);
+    }
+  });
+
   it('lets the storm theme redefine only its own tokens', async () => {
     const storm = block(await css(), ':root.theme-storm');
     const names = [...storm.matchAll(/--([a-z0-9-]+):/g)].map((m) => m[1]);

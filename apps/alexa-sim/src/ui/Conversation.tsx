@@ -29,9 +29,11 @@ export interface ConversationProps {
   studioVoice?: StudioVoice;
   /** Demo mode for recording the video (`?demo=1`): "You said" caption and the light bar. */
   demo?: boolean;
+  /** Each answer as it arrives: the frame reads its cards for the sky. */
+  onAnswer?: (answer: AgentAnswer) => void;
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false }: ConversationProps) {
+export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false, onAnswer }: ConversationProps) {
   const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
@@ -81,6 +83,10 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
   const listening = snapshot.matches('listening');
   const speaking = snapshot.matches('speaking');
   const turn = useQuery<TurnResult>({ queryKey: turnKey(turnId), queryFn: skipToken });
+  const answer = turn.data?.ok === true ? turn.data.value : undefined;
+  useEffect(() => {
+    if (answer !== undefined) onAnswer?.(answer);
+  }, [answer, onAnswer]);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const micRef = useRef<HTMLButtonElement>(null);

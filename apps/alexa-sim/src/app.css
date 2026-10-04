@@ -381,6 +381,146 @@
   }
 }
 
+/* The Echo Show frame (design analysis G1, G2; plan §11.1): the page is the screen of a device whose wallpaper is
+   a sky that follows the weather (data-sky, from sky.ts), with the family phone beside it. The frame keeps its
+   dark bezel in both card themes; the content column stays on the solid card surface, so text never sits on
+   the sky and keeps its AA contrast. Below the device width the bezel goes and the sky stays behind the column. */
+@layer surfaces {
+  .echo-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+    min-block-size: 100dvh;
+    background: var(--frame-bezel);
+  }
+
+  .echo-screen {
+    position: relative;
+    /* clip, not hidden: a hidden box is still scrolled by scrollIntoView, which would move the sky with it. */
+    overflow: clip;
+    isolation: isolate;
+  }
+
+  .echo-scroll {
+    position: relative;
+    padding: var(--space-4) var(--space-3);
+  }
+
+  /* On a phone the family phone panel follows the device, inside the page margins. */
+  .echo-stage > .phone {
+    margin: 0 var(--space-3) var(--space-6);
+  }
+
+  .echo-screen .surface {
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+  }
+
+  .sky,
+  .sky-layer {
+    position: absolute;
+    inset: 0;
+  }
+
+  .sky {
+    z-index: -1;
+
+    /* The veil keeps the sky calm behind the cards (mockup B+, rev. 1: 0.55). */
+    &::after {
+      position: absolute;
+      inset: 0;
+      background: var(--sky-veil);
+      content: "";
+    }
+  }
+
+  .sky-layer {
+    opacity: 0;
+    /* A change of weather fades in one second; with reduced motion it changes at once (overrides layer). */
+    transition: opacity 1s ease-in-out;
+
+    &[data-shown="true"] {
+      opacity: 1;
+    }
+
+    /* Sun: a clear day, the sun high in the corner. */
+    &[data-layer="mild"] {
+      background-image: radial-gradient(circle at 92% 6%, var(--sky-sun), transparent 30%), var(--sky-mild);
+    }
+
+    /* Heat haze: a bigger sun and a warm haze rising from the bottom. */
+    &[data-layer="hot"] {
+      background-image:
+        radial-gradient(circle at 92% 6%, var(--sky-sun), transparent 42%),
+        radial-gradient(ellipse 120% 45% at 50% 100%, var(--sky-glow), transparent 70%),
+        var(--sky-hot);
+    }
+
+    /* A heatwave evening: the last light low on the horizon. */
+    &[data-layer="dusk"] {
+      background-image: radial-gradient(circle at 88% 96%, var(--sky-glow), transparent 40%), var(--sky-dusk);
+    }
+
+    /* Storm clouds: grey masses across the top of a dark violet sky. */
+    &[data-layer="storm"] {
+      background-image:
+        radial-gradient(ellipse 60% 35% at 18% 0%, var(--sky-cloud), transparent 70%),
+        radial-gradient(ellipse 55% 30% at 70% 6%, var(--sky-cloud), transparent 70%),
+        radial-gradient(ellipse 45% 25% at 95% 22%, var(--sky-cloud), transparent 70%),
+        var(--sky-storm);
+    }
+  }
+
+  /* The device: from a laptop screen up, a bezel around a 16:10 screen that fits the window. */
+  @media (width >= 64rem) {
+    .echo-stage {
+      place-items: center;
+      align-content: center;
+      padding: var(--space-6);
+    }
+
+    .echo-device {
+      padding: calc(var(--space-6) + var(--space-2));
+      border: var(--border-thin) solid var(--surface-card-line);
+      border-radius: calc(var(--radius-card) * 2);
+      background: var(--frame-bezel);
+    }
+
+    .echo-stage > .phone {
+      margin: 0;
+    }
+
+    .echo-screen {
+      /* A containing block for fixed children: a card at full screen covers the screen, not the window. */
+      transform: translateZ(0);
+      /* 16:10 like the Echo Show 15, as large as the window allows. */
+      inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5) * 1.6), 80rem);
+      aspect-ratio: 16 / 10;
+      /* Keeps the 16:10 box whatever the content: the content scrolls inside it. */
+      min-block-size: 0;
+      border-radius: var(--radius-card);
+    }
+
+    .echo-scroll {
+      block-size: 100%;
+      overflow: auto;
+      padding: var(--space-6);
+    }
+  }
+
+  /* Wide enough for the phone too: it stands beside the device. */
+  @media (width >= 100rem) {
+    .echo-stage {
+      grid-template-columns: auto 24rem;
+      justify-content: center;
+    }
+
+    .echo-screen {
+      inline-size: min(calc(100vw - 24rem - var(--space-6) * 8), calc((100dvh - var(--space-6) * 5) * 1.6), 80rem);
+    }
+  }
+}
+
 /* Calm by default (plan §11.2 p.13, issue #24): with reduced motion nothing moves. In the overrides
    layer, so no component rule, whatever its specificity, can bring motion back. */
 @layer overrides {
