@@ -8,17 +8,17 @@ export interface Counter {
   release(key: string, amount?: number): Promise<void>;
 }
 
+/** An amount is a positive integer: anything else is a bug of ours, never sent to DynamoDB (review of #180). */
+function checkAmount(amount: number): void {
+  if (!Number.isInteger(amount) || amount < 1) throw new RangeError('A counter amount must be a positive integer.');
+}
+
 /**
  * Quota counters on the single table (#17, the sim-api stack, decided in #17): one atomic conditional ADD per
  * use, so a cap holds with any number of Lambda instances. Items live under `DEMO#<key>` and expire with
  * their window (TTL). At the cap the condition fails and nothing is counted; any other failure goes to the
  * caller, which logs it.
  */
-/** An amount is a positive integer: anything else is a bug of ours, never sent to DynamoDB (review of #180). */
-function checkAmount(amount: number): void {
-  if (!Number.isInteger(amount) || amount < 1) throw new RangeError('A counter amount must be a positive integer.');
-}
-
 export function dynamoCounter(options: { tableName: string; sender: DocumentSender }): Counter {
   return {
     async consume(key, limit, expiresAtMs, amount = 1) {

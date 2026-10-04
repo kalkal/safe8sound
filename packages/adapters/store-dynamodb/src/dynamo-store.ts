@@ -45,8 +45,11 @@ import { z } from 'zod';
 import type { TableClient, TableItem } from './table.js';
 
 // StateStore on the single table (plan §3.2): PK = HOME#<homeId>; SK = PREFS | PLAN#<id> |
-// EVENT#<ts>#<n> | GUARD#<ts>#<n> | CONFIRM#<planId>. Every item carries schemaVersion; logs and plans carry the
-// DynamoDB TTL attribute `ttl` (epoch seconds). TTL deletion is lazy, so reads skip expired items.
+// EVENT#<ts>#<n> | GUARD#<ts>#<n> | CONFIRM#<planId> | STORM#… | INBOX#… | SETTINGS (a sandbox's settings, C1,
+// with a top-level `version` for the conditional write). One item outside the homes: PK = ADMIN#CONFIG,
+// SK = CONFIG, the demo's admin config read by every home (C1, same conditional write). The sim-api's quota
+// counters live under DEMO#… (counter.ts). Every item carries schemaVersion; logs and plans carry the DynamoDB TTL
+// attribute `ttl` (epoch seconds); settings never expire. TTL deletion is lazy, so reads skip expired items.
 
 const SCHEMA_VERSION = 1;
 const DAY_MS = 24 * 60 * 60_000;
@@ -89,10 +92,10 @@ export const dynamoStateStoreFactory =
   (homeId, scope) =>
     new DynamoStateStore(homeId, options, scope);
 
-/** An expected outcome carried out of a #run body; converted back to a Result there. */
 /** The partition of the admin config, shared by every home (C1). */
 const ADMIN_PK = 'ADMIN#CONFIG';
 
+/** An expected outcome carried out of a #run body; converted back to a Result there. */
 class Failure extends Error {
   constructor(readonly error: ErrorEnvelope) {
     super(error.message);

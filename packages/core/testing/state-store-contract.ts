@@ -35,6 +35,11 @@ export interface StateStoreHarness {
   setNow(ms: number): void;
   /** Base time of the fixtures (epoch ms, whole seconds). Use Date.now() on a real backend. */
   readonly startMs?: number;
+  /**
+   * The backend is a real table other things use (the dev table, after a deploy): the suite then skips the
+   * admin config test, which would overwrite the one config every home reads (review of #216).
+   */
+  readonly sharedBackend?: boolean;
 }
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -468,7 +473,7 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
       });
     });
 
-    describe('admin config (C1, approved in #214)', () => {
+    describe.skipIf(makeHarness().sharedBackend === true)('admin config (C1, approved in #214)', () => {
       const admin = (version: number, at: string, sandboxDefaults: SandboxSettings): AdminSettings =>
         AdminSettingsSchema.parse({
           version,

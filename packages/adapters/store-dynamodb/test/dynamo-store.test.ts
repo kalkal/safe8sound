@@ -1,4 +1,4 @@
-import { HomeIdSchema, PlanSchema, PreferencesSchema, StormSessionSchema, epochMs } from '@cold-reserve/contracts';
+import { AdminSettingsSchema, HomeIdSchema, PlanSchema, PreferencesSchema, SandboxSettingsSchema, StormSessionSchema, epochMs } from '@cold-reserve/contracts';
 import { examplePlan, examplePreferences } from '@cold-reserve/contracts/fixtures';
 import { seededRng, type Rng } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
@@ -100,6 +100,22 @@ describe('store-dynamodb failures (docs/error-handling.md)', () => {
       expect(result).toMatchObject({ ok: false, error: { code: 'store_unavailable', retryable: true } });
     }
     expect(errors[0]).toMatchObject({ code: 'store_unavailable', operation: 'getPreferences', cause });
+  });
+
+  it('turns a table failure into store_unavailable for the settings too, never a conflict or a miss (review of #216)', async () => {
+    const cause = sdkError('ThrottlingException');
+    const { store, errors } = setup(failing(cause));
+    const sandbox = SandboxSettingsSchema.parse({ version: 1, updatedAt: '2026-10-04T08:00:00Z', scenarioId: 'heatwave', locationId: 'turin', units: 'C', household: 'older-woman' });
+    const admin = AdminSettingsSchema.parse({
+      version: 1,
+      updatedAt: '2026-10-04T08:00:00Z',
+      demoEnabled: true,
+      caps: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10, sandboxesPerDay: 50, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000 },
+      sandboxDefaults: sandbox,
+    });
+    const results = [await store.getSandboxSettings(), await store.putSandboxSettings(sandbox, undefined), await store.getAdminConfig(), await store.putAdminConfig(admin, undefined)];
+    for (const result of results) expect(result).toMatchObject({ ok: false, error: { code: 'store_unavailable', retryable: true } });
+    expect(errors.map((e) => e.operation)).toEqual(['getSandboxSettings', 'putSandboxSettings', 'getAdminConfig', 'putAdminConfig']);
   });
 
   it('reports the correlation id of the request the store serves, so the failure is found with its request (#111)', async () => {
