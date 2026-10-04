@@ -44,7 +44,9 @@ export function CardFrame({ card, turnId }: { card: ToolCard; turnId: string }) 
 }
 
 function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind; turnId: string }) {
-  const { agent, documentFor, theme, timeZone, demo = false } = useCardHost();
+  const { agent, documentFor, theme, timeZone, demo = false, onCardAction } = useCardHost();
+  const onCardActionRef = useRef(onCardAction);
+  onCardActionRef.current = onCardAction;
   const document = useMemo(() => documentFor(kind), [documentFor, kind]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -82,7 +84,11 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
     });
     // Each frame keeps its own last-resort confirmation: a token never crosses frames.
     const confirmation = confirmationFor(card);
-    bridge.oncalltool = ({ name, arguments: args }) => answerCardCall({ name, arguments: args }, card, { agent, turnId, log, confirmation });
+    bridge.oncalltool = async ({ name, arguments: args }) => {
+      const result = await answerCardCall({ name, arguments: args }, card, { agent, turnId, log, confirmation });
+      if (result.isError !== true) onCardActionRef.current?.(name);
+      return result;
+    };
     const transport = new FrameTransport(frame, window, (reason) => {
       log({ level: 'warn', code: 'frame_message_rejected', correlationId: turnId, details: { reason, card: card.tool } });
     });

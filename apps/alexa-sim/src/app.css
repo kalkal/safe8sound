@@ -521,6 +521,28 @@
   }
 }
 
+/* "Show my home" (#204): one button; the panel opens under it, full width, with the home card. */
+@layer surfaces {
+  .home-panel {
+    display: grid;
+    gap: var(--space-3);
+    justify-items: start;
+  }
+
+  .home-panel-body {
+    justify-self: stretch;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    overflow: hidden;
+    inline-size: 1px;
+    block-size: 1px;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /* Calm by default (plan §11.2 p.13, issue #24): with reduced motion nothing moves. In the overrides
    layer, so no component rule, whatever its specificity, can bring motion back. */
 @layer overrides {

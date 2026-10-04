@@ -1,8 +1,9 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import './app.css';
+import type { HomeStatus } from '@cold-reserve/contracts';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode, Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { StrictMode, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Agent, AgentAnswer } from './agent/agent.js';
 import { buildAgent, buildSession, type DemoSession } from './agent/index.js';
@@ -14,7 +15,10 @@ import { configErrorEvent, log, logUnhandled } from './log.js';
 import { createInboxPhone } from './phone/inbox-phone.js';
 import { createScriptedPhone, type PhoneFeed } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
+import { CardFrame } from './host/CardFrame.js';
 import { EchoFrame } from './ui/EchoFrame.js';
+import { homeAfterApply, homeFor, initialHome } from './ui/home.js';
+import { HomePanel } from './ui/HomePanel.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { skyFor, type Sky } from './ui/sky.js';
 import { t } from './ui/text.js';
@@ -53,6 +57,9 @@ const Gallery =
     ? lazy(() => import('./dev/Gallery.js').then((m) => ({ default: () => <m.Gallery hostTheme={galleryTheme} /> })))
     : null;
 
+/** The correlation id of the home panel's card: one per page, as it is not part of a turn. */
+const HOME_PANEL_TURN = crypto.randomUUID();
+
 /** The simulated Alexa+ host: its theme is the hostContext.theme every card frame receives. */
 function Simulator({ agent, config, session, studioVoice }: { agent: Agent; config: SimConfig; session: DemoSession | undefined; studioVoice: StudioVoice | undefined }) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -71,11 +78,21 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   }, [config.demo]);
   // The sky follows the weather the answers show (sky.ts); it starts on a mild day.
   const [sky, setSky] = useState<Sky>('mild');
+  // "Show my home" (#204): the home the answers and the card actions describe (home.ts).
+  const homeMode = config.agent === 'scripted' ? 'scripted' : 'remote';
+  const [home, setHome] = useState(() => initialHome(homeMode));
   const onAnswer = useCallback(
     (answer: AgentAnswer) => {
       setSky((previous) => skyFor(answer.cards ?? [], config.homeTimeZone, previous));
+      setHome((previous) => homeFor(answer.cards ?? [], previous, homeMode));
     },
-    [config.homeTimeZone],
+    [config.homeTimeZone, homeMode],
+  );
+  const onCardAction = useCallback(
+    (name: string) => {
+      if (name === 'apply_plan') setHome((previous) => homeAfterApply(previous, homeMode));
+    },
+    [homeMode],
   );
   const phonePanel = (config.agent === 'scripted' || config.phone === 'inbox') && (
     <ErrorBoundary>
@@ -95,13 +112,20 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       >
         {t('theme.toggle')}
       </button>
-      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo }}>
+      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, onCardAction }}>
+        <HomePanel status={home} renderCard={(status) => <HomeCard status={status} />} />
         <QueryClientProvider client={queryClient}>
           <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} demo={config.demo} onAnswer={onAnswer} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />
         </QueryClientProvider>
       </CardHostProvider>
     </EchoFrame>
   );
+}
+
+/** The home panel's card: the same object while the home is unchanged, so the frame is not reloaded. */
+function HomeCard({ status }: { status: HomeStatus }) {
+  const card = useMemo(() => ({ tool: 'get_home_status' as const, result: status }), [status]);
+  return <CardFrame card={card} turnId={HOME_PANEL_TURN} />;
 }
 
 function Title() {

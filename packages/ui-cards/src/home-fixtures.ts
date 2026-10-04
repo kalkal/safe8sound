@@ -26,3 +26,31 @@ export function homeInStorm(): HomeStatus {
     homeLink: 'ok',
   });
 }
+
+/**
+ * The same home on a sunny afternoon (#204, "Show my home"): grid up and exporting, the safe room cooled, the
+ * other rooms switched off by the family. Parsed by the contract schema.
+ */
+export function homeCalm(): HomeStatus {
+  return HomeStatusSchema.parse({
+    homeId: 'demo',
+    ts: '2026-07-15T14:00:00+02:00',
+    batterySocPct: 78,
+    pvW: 3200,
+    loadW: 1300,
+    gridW: -1100,
+    gridAvailable: true,
+    level: 'comfort',
+    levelReason: 'weather',
+    levelChangedAt: '2026-07-15T12:00:00+02:00',
+    controlAvailability: 'ok',
+    rooms: [
+      { roomId: 'bedroom-1', tempC: 24.6, humidityPct: 52, occupants: ['grandpa'], state: 'served' },
+      { roomId: 'bedroom-2', tempC: 27.9, occupants: [], state: 'waiting', waitingReason: 'user_off' },
+      { roomId: 'living', tempC: 26.2, occupants: ['daughter'], state: 'served' },
+      { roomId: 'study', tempC: 28.3, occupants: [], state: 'waiting', waitingReason: 'user_off' },
+    ],
+    origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated', scenario: 'heatwave' },
+    homeLink: 'ok',
+  });
+}

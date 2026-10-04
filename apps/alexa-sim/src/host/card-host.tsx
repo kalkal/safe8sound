@@ -13,6 +13,8 @@ export interface CardHost {
   timeZone: string;
   /** Demo mode for the video (`?demo=1`): the cards mark each tap inside their frame. */
   demo?: boolean;
+  /** A card action that succeeded (its tool name): the page may update what it shows, e.g. the home panel. */
+  onCardAction?: (name: string) => void;
 }
 
 const CardHostContext = createContext<CardHost | null>(null);

@@ -56,6 +56,11 @@ const enUS = {
   'demo.privacy': 'This demo keeps your IP address in its access logs for 30 days, for security.',
   // Demo mode for recording the video (?demo=1): what the person said, as a caption.
   'demoMode.youSaid': 'You said: “{said}”',
+  // "Show my home" (#204): the floor plan and the energy behind one button.
+  'home.show': 'Show my home',
+  'home.hide': 'Hide my home',
+  'home.title': 'My home',
+  'home.empty': 'Ask about your rooms or the storm to see your home here.',
   'status.battery': 'Battery',
   'surface.failed': 'This part of the screen stopped working. Reload the page to try again.',
   'config.invalid': 'The simulator is not configured correctly. Check its settings and reload the page.',
@@ -214,6 +219,15 @@ const enUS = {
   'floor.rooms': 'Rooms',
   'floor.gridDown': 'Grid down: the battery feeds the safe room only.',
   'floor.served': 'Served',
+  // The energy beside the rooms (#204, "Show my home"): words, never colour alone.
+  'floor.energy': 'Energy',
+  'floor.battery': 'Battery {pct}%',
+  'floor.solar': 'Solar {kw} kW',
+  'floor.gridDownShort': 'Grid down',
+  'floor.gridTaking': 'Grid: taking {kw} kW',
+  'floor.gridSending': 'Grid: sending {kw} kW',
+  'floor.gridIdle': 'Grid: connected, nothing flowing',
+  'floor.level': 'Level: {level} ({reason})',
   'floor.waiting.inverter_limit': 'Waiting: inverter limit, safe room first',
   'floor.waiting.pacing_level': 'Waiting: the level cools fewer rooms right now',
   'floor.waiting.user_off': 'Waiting: switched off by you',

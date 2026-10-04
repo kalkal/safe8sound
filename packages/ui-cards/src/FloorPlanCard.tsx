@@ -11,6 +11,12 @@ export function FloorPlanCard({ status }: { status: HomeStatus }) {
   return (
     <CardShell title={t('floor.title')} origin={status.origin.rooms}>
       {!status.gridAvailable && <p className="advice">{t('floor.gridDown')}</p>}
+      <ul className="facts energy-facts" aria-label={t('floor.energy')}>
+        <li>{t('floor.battery', { pct: String(Math.round(status.batterySocPct)) })}</li>
+        <li>{t('floor.solar', { kw: (status.pvW / 1000).toFixed(1) })}</li>
+        <li>{gridText(status)}</li>
+        <li>{t('floor.level', { level: t(`level.${status.level}`), reason: t(`reason.${status.levelReason}`) })}</li>
+      </ul>
       <ul className="floor-plan" aria-label={t('floor.rooms')}>
         {status.rooms.map((room) => {
           const name = roomLabel(room.roomId);
@@ -26,4 +32,12 @@ export function FloorPlanCard({ status }: { status: HomeStatus }) {
       </ul>
     </CardShell>
   );
+}
+
+/** The grid in words: down, taking from it, sending to it, or connected with nothing flowing. */
+function gridText(status: HomeStatus): string {
+  if (!status.gridAvailable) return t('floor.gridDownShort');
+  const kw = (Math.abs(status.gridW) / 1000).toFixed(1);
+  if (kw === '0.0') return t('floor.gridIdle');
+  return t(status.gridW > 0 ? 'floor.gridTaking' : 'floor.gridSending', { kw });
 }

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import { HomeStatusSchema } from '@cold-reserve/contracts';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FloorPlanCard } from '../src/FloorPlanCard.js';
-import { homeInStorm } from '../src/home-fixtures.js';
+import { homeCalm, homeInStorm } from '../src/home-fixtures.js';
 
 afterEach(cleanup);
 
@@ -29,6 +30,23 @@ describe('FloorPlanCard (signature element 3: the thermal floor plan, generated 
     cleanup();
     render(<FloorPlanCard status={{ ...homeInStorm(), gridAvailable: true }} />);
     expect(screen.queryByText(/Grid down/)).toBeNull();
+  });
+
+  it('#204: lists the battery, the solar, the grid and the level in words, beside the rooms', () => {
+    render(<FloorPlanCard status={homeInStorm()} />);
+    const energy = screen.getByRole('list', { name: 'Energy' });
+    expect(within(energy).getAllByRole('listitem').map((i) => i.textContent)).toEqual(['Battery 48%', 'Solar 0.0 kW', 'Grid down', 'Level: Essential (storm)']);
+    cleanup();
+    render(<FloorPlanCard status={homeCalm()} />);
+    expect(within(screen.getByRole('list', { name: 'Energy' })).getAllByRole('listitem').map((i) => i.textContent)).toEqual([
+      'Battery 78%',
+      'Solar 3.2 kW',
+      'Grid: sending 1.1 kW',
+      'Level: Comfort (weather)',
+    ]);
+    cleanup();
+    render(<FloorPlanCard status={HomeStatusSchema.parse({ ...homeCalm(), gridW: 400 })} />);
+    expect(screen.getByText('Grid: taking 0.4 kW')).toBeTruthy();
   });
 
   it('shows the data origin', () => {
