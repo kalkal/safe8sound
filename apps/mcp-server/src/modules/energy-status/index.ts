@@ -1,5 +1,5 @@
 import { HomeStatusSchema, err, ok, toolError, type HomeId, type HomeProfile, type HomeStatus } from '@cold-reserve/contracts';
-import type { HomeDataSource } from '@cold-reserve/core';
+import type { Clock, HomeDataSource } from '@cold-reserve/core';
 import { z } from 'zod';
 import type { CapabilityModule } from '../../registry.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
@@ -14,6 +14,8 @@ export interface HomeEntry {
   readonly profile: HomeProfile;
   readonly readOnly: boolean;
   readonly levelSince: string;
+  /** The home's own scenario clock (C2a, Refs #222): its simulator runs on it. */
+  readonly clock?: Clock;
 }
 
 export interface EnergyStatusDeps {

@@ -3,7 +3,7 @@ import { nightWindowHours } from '@cold-reserve/guard';
 import type { CapabilityModule } from '../../registry.js';
 import { defineTool } from '../../tool.js';
 import { applyPlan } from './apply-plan.js';
-import type { ComfortPlanDeps } from './deps.js';
+import { atHome, type ComfortPlanDeps } from './deps.js';
 import { planComfort } from './plan-comfort.js';
 import { reserveOutlook } from './reserve-outlook.js';
 import { applySummary, outlookSummary, planSummary } from './summaries.js';
@@ -37,7 +37,7 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
         input: PlanComfortInputSchema,
         output: PlanSchema,
         summarize: (plan) => planSummary(plan, { ...summaryOptions, timeZone: deps.homes(plan.homeId)?.profile.location.tz ?? 'UTC' }),
-        handler: (args, ctx) => planComfort(deps, args, ctx),
+        handler: (args, ctx) => planComfort(atHome(deps, ctx.homeId), args, ctx),
       }),
       defineTool({
         name: 'apply_plan',
@@ -49,7 +49,7 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
         input: ApplyPlanInputSchema,
         output: ApplyPlanOutputSchema,
         summarize: applySummary,
-        handler: (args, ctx) => applyPlan(deps, args, ctx),
+        handler: (args, ctx) => applyPlan(atHome(deps, ctx.homeId), args, ctx),
       }),
       defineTool({
         name: 'get_reserve_outlook',
@@ -60,7 +60,7 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
         input: ReserveOutlookInputSchema,
         output: ReserveOutlookSchema,
         summarize: outlookSummary,
-        handler: (_args, ctx) => reserveOutlook(deps, {}, ctx),
+        handler: (_args, ctx) => reserveOutlook(atHome(deps, ctx.homeId), {}, ctx),
       }),
     ],
   };

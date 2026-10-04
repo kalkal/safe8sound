@@ -11,6 +11,17 @@ export interface ComfortHome {
   readonly profile: HomeProfile;
   /** The real home during the hackathon: plans are advice, and never built on simulated data. */
   readonly readOnly: boolean;
+  /**
+   * The home's own scenario clock (C2a, Refs #222), when the composition root runs domain times on scenario
+   * time: a sandbox playing another scenario then plans on its own time. Absent: the module's clock.
+   */
+  readonly clock?: Clock;
+}
+
+/** The deps a tool call on `homeId` runs with: the home's own clock when it has one, else the module's. */
+export function atHome<D extends { readonly clock: Clock; readonly homes: (homeId: HomeId) => ComfortHome | undefined }>(deps: D, homeId: HomeId): D {
+  const clock = deps.homes(homeId)?.clock;
+  return clock === undefined ? deps : { ...deps, clock };
 }
 
 /** Everything the comfort-plan module needs; built per server by the composition root (plan §9.2). */

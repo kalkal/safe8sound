@@ -6,6 +6,7 @@ import { withCardResources, type CardDocuments } from './cards.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
 import type { ComfortPlanWiring } from './comfort-plan-config.js';
+import { atHome } from './modules/comfort-plan/deps.js';
 import { comfortPlanModule } from './modules/comfort-plan/index.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
 import { stormModeModule, type StormModeDeps } from './modules/storm-mode/index.js';
@@ -48,12 +49,40 @@ export interface AppOptions {
 export function scenarioClockFor(env: Readonly<Record<string, string | undefined>>, wall: Clock): Result<Clock, ErrorEnvelope> {
   const start = scenarioStartFor(env);
   if (!start.ok) return start;
+  const timeline = scenarioTimelineFor(env, wall);
+  if (!timeline.ok) return timeline;
+  // The zone of the place the scenario is played in (L1, #217): the reference place until sandboxes choose theirs (C2).
+  return timeline.value.clockFor({ startAt: start.value.scenario.startAt, tz: builtInPlace('reference').tz });
+}
+
+/** What every home's scenario clock shares: the anchor rule, the speed and the start hour (C2a, Refs #222). */
+export interface ScenarioTimeline {
+  /** The scenario clock of a home playing a scenario that starts at `startAt` in a place of zone `tz`. */
+  clockFor(play: { readonly startAt: string; readonly tz: string }): Result<Clock, ErrorEnvelope>;
+}
+
+/**
+ * One timeline per process: the same anchor (MCP_SCENARIO_ANCHOR, read once at start), speed and start hour
+ * for every home, so every container and every home agree on how wall time maps to scenario time; each home
+ * gets the clock of its own scenario start and its own place's midnight (a Houston sandbox reads Houston time).
+ */
+export function scenarioTimelineFor(env: Readonly<Record<string, string | undefined>>, wall: Clock): Result<ScenarioTimeline, ErrorEnvelope> {
   const speed = number(env, 'MCP_SCENARIO_SPEED', 1);
   if (!speed.ok) return speed;
-  // The zone of the place the scenario is played in (L1, #217): the reference place until sandboxes choose theirs (C2).
-  const anchor = scenarioAnchor(env['MCP_SCENARIO_ANCHOR'], wall.now(), builtInPlace('reference').tz);
-  if (!anchor.ok) return anchor;
-  return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: start.value.startMs, speed: speed.value }));
+  const startH = number(env, 'MCP_SCENARIO_START_H', 0);
+  if (!startH.ok) return startH;
+  const raw = env['MCP_SCENARIO_ANCHOR'];
+  const startedAtMs = wall.now();
+  // Validate the anchor rule once, on the reference place, so a bad setting fails at start.
+  const check = scenarioAnchor(raw, startedAtMs, builtInPlace('reference').tz);
+  if (!check.ok) return check;
+  return ok({
+    clockFor: ({ startAt, tz }) => {
+      const anchor = scenarioAnchor(raw, startedAtMs, tz);
+      if (!anchor.ok) return anchor;
+      return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: Date.parse(startAt) + startH.value * HOUR_MS, speed: speed.value }));
+    },
+  });
 }
 
 /** The scenario and the instant the server starts in it (its start plus MCP_SCENARIO_START_H): one definition. */
@@ -214,8 +243,8 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   warnMissingEpsLoad([demo, home], opts.logger);
   logMetadataMode(config.value, opts.logger);
   const homes = new Map<HomeId, HomeEntry>([
-    [DEMO, { source: demoSim, profile: demo, readOnly: false, levelSince }],
-    [HOME, { source: new FallbackSource({ primary: noLiveHome, fallback: homeSim, clock, onEvent: logSourceEvent(opts.logger, HOME) }), profile: home, readOnly: true, levelSince }],
+    [DEMO, { source: demoSim, profile: demo, readOnly: false, levelSince, clock }],
+    [HOME, { source: new FallbackSource({ primary: noLiveHome, fallback: homeSim, clock, onEvent: logSourceEvent(opts.logger, HOME) }), profile: home, readOnly: true, levelSince, clock }],
   ]);
   // TODO(#15): the cached Open-Meteo forecast; until then every home plans on the scenario weather.
   const forecasts = new Map<HomeId, () => ReturnType<SimulatorSource['forecast']>>([
@@ -229,7 +258,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     maxNewPerDay: sandboxMaxNew.value,
     create: (homeId) => {
       const sim = simulator(HomeProfileSchema.parse({ ...demo, homeId }));
-      return { entry: { source: sim, profile: demo, readOnly: false, levelSince } satisfies HomeEntry, forecast: () => sim.forecast() };
+      return { entry: { source: sim, profile: demo, readOnly: false, levelSince, clock } satisfies HomeEntry, forecast: () => sim.forecast() };
     },
   });
   const sandboxFor = (homeId: HomeId) => (SandboxHomeIdSchema.safeParse(homeId).success ? sandboxes.get(homeId) : undefined);
@@ -243,7 +272,10 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const planningHome = (homeId: HomeId) => {
     const entry = homeFor(homeId);
     const forecast = forecasts.get(homeId) ?? sandboxFor(homeId)?.forecast;
-    return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly } : undefined;
+    // The home's clock goes to the modules only where domain times already run on scenario time (the local entry,
+    // which passes scenarioClock); on Lambda the modules keep their wall clock until #175.
+    const homeClock = opts.scenarioClock !== undefined && entry?.clock !== undefined ? { clock: entry.clock } : {};
+    return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly, ...homeClock } : undefined;
   };
 
   const stormDeps: StormModeDeps | undefined = opts.stormMode === undefined ? undefined : { ...opts.stormMode, model: params, homes: planningHome, logger: opts.logger };
@@ -260,6 +292,6 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     config: config.value,
     registry: registry.value,
     handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes, ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }) }),
-    ...(stormDeps === undefined ? {} : { familyReply: (input, ctx) => familyReply(stormDeps, input, ctx) }),
+    ...(stormDeps === undefined ? {} : { familyReply: (input, ctx) => familyReply(atHome(stormDeps, ctx.homeId), input, ctx) }),
   });
 }

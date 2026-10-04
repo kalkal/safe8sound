@@ -2,6 +2,7 @@ import { NotifyFamilyInputSchema, NotifyFamilyOutputSchema, SafeRoomStatusSchema
 import { z } from 'zod';
 import type { CapabilityModule } from '../../registry.js';
 import { defineTool } from '../../tool.js';
+import { atHome } from '../comfort-plan/deps.js';
 import type { StormModeDeps } from './deps.js';
 import { notifySummary, safeRoomSummary, startSummary } from './summaries.js';
 import { notifyFamily, safeRoomStatus, startStormMode } from './tools.js';
@@ -28,7 +29,7 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         input: StartStormModeInputSchema,
         output: StartStormModeOutputSchema,
         summarize: startSummary,
-        handler: (args, ctx) => startStormMode(deps, args, ctx),
+        handler: (args, ctx) => startStormMode(atHome(deps, ctx.homeId), args, ctx),
       }),
       defineTool({
         name: 'get_safe_room_status',
@@ -39,7 +40,7 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         input: z.strictObject({}),
         output: SafeRoomStatusSchema,
         summarize: safeRoomSummary,
-        handler: (_args, ctx) => safeRoomStatus(deps, ctx),
+        handler: (_args, ctx) => safeRoomStatus(atHome(deps, ctx.homeId), ctx),
       }),
       defineTool({
         name: 'notify_family',
@@ -51,7 +52,7 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         input: NotifyFamilyInputSchema,
         output: NotifyFamilyOutputSchema,
         summarize: notifySummary,
-        handler: (args, ctx) => notifyFamily(deps, args, ctx),
+        handler: (args, ctx) => notifyFamily(atHome(deps, ctx.homeId), args, ctx),
       }),
     ],
   };

@@ -1,6 +1,6 @@
 import { HomeStatusSchema } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { createApp, scenarioAnchor } from '../src/app.js';
+import { createApp, scenarioAnchor, scenarioClockFor, scenarioTimelineFor } from '../src/app.js';
 import { settableClock } from './comfort-plan/support.js';
 import { TOKEN, callTool, post, toolResult } from './helpers.js';
 
@@ -70,5 +70,35 @@ describe('scenario anchor (MCP_SCENARIO_ANCHOR)', () => {
   it('refuses any other value with invalid_config', () => {
     const app = createApp({ MCP_CLIENTS: `agent@demo=${TOKEN}`, MCP_SCENARIO_ANCHOR: 'tomorrow' }, { wallClock: settableClock(0), logger: { log: () => undefined } });
     expect(app).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+});
+
+describe('the scenario timeline (C2a, Refs #222): one anchor and speed, a clock per scenario start and place', () => {
+  const wall = (ms: number) => ({ now: () => ms });
+
+  it('gives the scenario clock of the env scenario exactly as before, through clockFor', () => {
+    const env = { MCP_SCENARIO: 'heatwave', MCP_SCENARIO_ANCHOR: 'daily' };
+    const timeline = scenarioTimelineFor(env, wall(at('2026-10-01T10:00:00Z')));
+    const before = scenarioClockFor(env, wall(at('2026-10-01T10:00:00Z')));
+    if (!timeline.ok || !before.ok) throw new Error('config');
+    const clock = timeline.value.clockFor({ startAt: '2026-07-16T00:00:00+02:00', tz: 'Europe/Rome' });
+    expect(clock.ok && clock.value.now()).toBe(before.value.now());
+  });
+
+  it('plays two scenarios side by side: the same wall instant is each scenario own time', () => {
+    const timeline = scenarioTimelineFor({ MCP_SCENARIO_ANCHOR: 'daily' }, wall(at('2026-10-01T10:00:00Z')));
+    if (!timeline.ok) throw new Error('config');
+    const rome = timeline.value.clockFor({ startAt: '2026-07-16T00:00:00+02:00', tz: 'Europe/Rome' });
+    const houston = timeline.value.clockFor({ startAt: '2024-07-08T00:00:00-05:00', tz: 'America/Chicago' });
+    if (!rome.ok || !houston.ok) throw new Error('clock');
+    // 10:00 UTC is 12:00 in Rome and 05:00 in Houston: each scenario day reads its own local hour.
+    expect(new Date(rome.value.now()).toISOString()).toBe('2026-07-16T10:00:00.000Z');
+    expect(new Date(houston.value.now()).toISOString()).toBe('2024-07-08T10:00:00.000Z');
+  });
+
+  it('refuses a place zone that is not IANA (daily anchor)', () => {
+    const timeline = scenarioTimelineFor({ MCP_SCENARIO_ANCHOR: 'daily' }, wall(0));
+    if (!timeline.ok) throw new Error('config');
+    expect(timeline.value.clockFor({ startAt: '2026-07-16T00:00:00+02:00', tz: 'Mars/Olympus' })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 });
