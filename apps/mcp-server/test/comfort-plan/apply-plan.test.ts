@@ -30,6 +30,19 @@ const statusOf = async (w: ReturnType<typeof world>, plan: Plan) => {
 };
 
 describe('apply_plan (two-phase: confirm)', () => {
+  it('judges the expiry on the home clock while the store keeps its wall clock for retention (#175)', async () => {
+    // The module plans on a scenario day; the store is months later in real time, as on the Lambda.
+    const w = world('heatwave', 14, { storeWallMs: Date.parse('2026-09-30T10:00:00Z') + 400 * 24 * 60 * MIN });
+    const plan = await proposed(w);
+    const r = await applyPlan(w.deps, { planId: plan.id }, w.ctx);
+    expect(r.ok && r.value.plan.status).toBe('applied');
+    w.clock.set(Date.parse(plan.expiresAt));
+    const late = await proposed(w);
+    w.clock.set(Date.parse(late.expiresAt));
+    const refused = await applyPlan(w.deps, { planId: late.id }, w.ctx);
+    expect(!refused.ok && refused.error.code).toBe('plan_expired');
+  });
+
   it('applies a proposed plan once the guard revalidates it', async () => {
     const w = world('heatwave', 14);
     const plan = await proposed(w);
@@ -256,11 +269,11 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
     const w = stormAt(30);
     const plan = await lastResort(w);
     const token = `lr_${'y'.repeat(32)}`;
-    const saved = await w.store.saveLastResortConfirmation({ planId: plan.id, tokenHash: sha256Hex(token), planHash: 'f'.repeat(64), expiresAt: new Date(w.clock.now() + 5 * MIN).toISOString() });
+    const saved = await w.store.saveLastResortConfirmation({ planId: plan.id, tokenHash: sha256Hex(token), planHash: 'f'.repeat(64), expiresAt: new Date(w.clock.now() + 5 * MIN).toISOString() }, w.clock.now());
     expect(saved.ok).toBe(true);
     const r = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
     expect(!r.ok && r.error.code).toBe('last_resort_token_invalid');
-    expect(await w.store.consumeLastResortConfirmation(plan.id, sha256Hex(token))).toMatchObject({ ok: false });
+    expect(await w.store.consumeLastResortConfirmation(plan.id, sha256Hex(token), w.clock.now())).toMatchObject({ ok: false });
     expect(await statusOf(w, plan)).toBe('proposed');
   });
 

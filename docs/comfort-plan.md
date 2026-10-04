@@ -48,7 +48,7 @@ Input: `planId`.
 1. An already applied plan returns the stored outcome (`alreadyApplied: true`): agents and bridges may retry safely.
 2. On the real home, a plan built on simulated data is refused (`simulated_plan_on_real_home`, forbidden; plan §9.4).
 3. The guard revalidates the plan on the current state, in the same frame as propose: the season from the plan's goal and the current forecast (an `auto` plan made for heating keeps the heating minimum), and the night mode from who is in the safe room now. A refusal writes nothing and is logged.
-4. The conditional write `status = proposed AND now < expiresAt` applies it once (F5's StateStore); otherwise the result is `plan_expired`.
+4. The conditional write `status = proposed AND now < expiresAt` applies it once (F5's StateStore); otherwise the result is `plan_expired`. `now` is the home's domain time (its scenario clock), passed with the call (#175).
 5. On the real home the plan is advice only (read-only during the hackathon): the answer lists the manual setting per room.
 
 ## What the model reads
@@ -87,6 +87,8 @@ The reserve counted in hours for the ice-cube card, with the semantics agreed in
 
 ## Wiring
 - **Composition.** `comfortPlanWiring` (`apps/mcp-server/src/comfort-plan-config.ts`) loads the shipped configs (comfort plan and guard), reads the saved or default preferences, and makes fresh plan ids. `createApp` registers the module over the same homes as `get_home_status`.
+- **Clocks (#175).** On both entries (`local-app.ts`, `lambda-app.ts`) the plans, storm sessions, family messages and preferences log run on the scenario clock, so plan times and safe-until fall on the scenario day. The store keeps the wall clock for retention only: every TTL counts from the write, never from the domain times in the item. A plan and a last-resort token also keep their own lifetime on the wall clock from their write, so a scenario day that replays (anchor `daily`) never makes an old plan or token valid again. Log lines carry the wall time, with the scenario time in `details.scenarioTs`.
+  - **Known limitation.** With `MCP_SCENARIO_ANCHOR=daily` (the AWS setting) the scenario day replays every day, and storm sessions and family messages are keyed by domain time. From the second day, a session or message from an earlier replay can look like the latest one on the long-lived `demo` home; a sandbox starts fresh. Follow-up: #234.
 - **Weather.** Until #15, the forecast is the scenario's.
 - **Refusal log.** Refusals go to F5's log (queue item 5). A refusal caused only by an unmet night has no failed guarantee, so it is not logged there.
 

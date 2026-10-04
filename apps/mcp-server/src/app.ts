@@ -272,8 +272,8 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const planningHome = (homeId: HomeId) => {
     const entry = homeFor(homeId);
     const forecast = forecasts.get(homeId) ?? sandboxFor(homeId)?.forecast;
-    // The home's clock goes to the modules only where domain times already run on scenario time (the local entry,
-    // which passes scenarioClock); on Lambda the modules keep their wall clock until #175.
+    // The home's clock goes to the modules where their domain runs on scenario time: both entries pass scenarioClock
+    // (local-app, lambda-app, #175). A test composing modules on another clock passes none and keeps it.
     const homeClock = opts.scenarioClock !== undefined && entry?.clock !== undefined ? { clock: entry.clock } : {};
     return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly, ...homeClock } : undefined;
   };

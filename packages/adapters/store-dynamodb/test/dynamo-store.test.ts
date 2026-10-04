@@ -53,6 +53,20 @@ describe('store-dynamodb item layout (plan §3.2)', () => {
     expect(guard).toMatchObject({ ttl: createdS + 90 * DAY_S });
   });
 
+  it('counts the TTL from the write on the wall clock, and keeps expiresAtMs in domain time (#175)', async () => {
+    const table = createFakeTable();
+    const wallMs = createdMs + 400 * DAY_S * 1000;
+    const store = dynamoStateStoreFactory({ table, clock: { now: () => wallMs }, rng: seededRng(7) })(HOME);
+    await store.savePlan(plan);
+    await store.saveLastResortConfirmation({ planId: plan.id, tokenHash: 'a'.repeat(64), planHash: 'c'.repeat(64), expiresAt: plan.expiresAt }, createdMs);
+
+    const wallS = wallMs / 1000;
+    // The plan's lifetime also runs on the wall clock from the write: a replayed scenario day never revives it.
+    const lifetimeMs = epochMs(plan.expiresAt) - createdMs;
+    expect(await table.get(`HOME#${HOME}`, `PLAN#${plan.id}`)).toMatchObject({ ttl: wallS + 30 * DAY_S, expiresAtMs: epochMs(plan.expiresAt), wallDeadlineMs: wallMs + lifetimeMs });
+    expect(await table.get(`HOME#${HOME}`, `CONFIRM#${plan.id}`)).toMatchObject({ ttl: wallS + 30 * DAY_S, expiresAtMs: epochMs(plan.expiresAt), wallDeadlineMs: wallMs + lifetimeMs, used: 0 });
+  });
+
   it('builds log sort keys from the injected clock and Rng, never Math.random()', async () => {
     const { table, store } = setup(createFakeTable(), { next: () => 0.5 });
     await store.recordGuardRejection({ at: plan.createdAt, failed: ['storm_reserve'] });

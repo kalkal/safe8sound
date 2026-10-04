@@ -39,14 +39,15 @@ export function comfortConfig() {
 }
 
 /** A simulator scenario at hour `atH`, with every dependency of the module. */
-export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean; notifier?: Notifier } = {}) {
+export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean; notifier?: Notifier; storeWallMs?: number } = {}) {
   const profile = demoProfile();
   const scenario = builtInScenario(id);
   const startMs = Date.parse(scenario.startAt);
   const scenarioMs = startMs + atH * H;
   const clock = settableClock(Date.parse('2026-09-30T10:00:00Z'));
   const sim = new SimulatorSource({ profile, scenario, params: defaultSimParams(), clock: fixedClock(scenarioMs) });
-  const memory = memoryStateStoreFactory({ backing: createMemoryBacking(), clock });
+  // The store's own wall clock (#175): the same as the modules' unless a test sets the wall apart from the domain.
+  const memory = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: over.storeWallMs === undefined ? clock : fixedClock(over.storeWallMs) });
   const scopes: (StoreScope | undefined)[] = [];
   // Records what each store was opened for; optionally fails the refusal log, for fault injection.
   const storeFor: StateStoreFactory = (h, scope) => {

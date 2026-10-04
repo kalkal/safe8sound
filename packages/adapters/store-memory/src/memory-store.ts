@@ -46,6 +46,8 @@ import {
 interface Item {
   readonly value: unknown;
   readonly expiresAtMs?: number;
+  /** Plans and confirmations: the wall instant their lifetime runs out, whatever scenario time says (#175 review). */
+  readonly wallDeadlineMs?: number;
 }
 
 /** The shared "table": one per process, reached by every store built on it. */
@@ -58,6 +60,7 @@ export const createMemoryBacking = (): MemoryBacking => ({ partitions: new Map()
 
 export interface MemoryStateStoreOptions {
   readonly backing: MemoryBacking;
+  /** The wall clock: it drives only the retention. Domain expiry is judged on the `now` each call passes (#175). */
   readonly clock: Clock;
   readonly ttl?: StateStoreTtl;
 }
@@ -97,7 +100,7 @@ class MemoryStateStore implements StateStore {
     this.#put('PREFS', { value: preferences });
     for (const change of changes) {
       const sk = `EVENT#${change.ts}#${String(this.#next())}`;
-      this.#put(sk, { value: change, expiresAtMs: epochMs(change.ts) + this.#ttl.configChangeDays * DAY_MS });
+      this.#put(sk, { value: change, expiresAtMs: this.#retainedFor(this.#ttl.configChangeDays) });
     }
     return Promise.resolve(ok(undefined));
   }
@@ -112,7 +115,8 @@ class MemoryStateStore implements StateStore {
     if (this.#get(sk) !== undefined) {
       return Promise.resolve(err(toolError('invalid_input', `Plan ${plan.id} already exists; a plan id is written once.`, { details: { planId: plan.id } })));
     }
-    this.#put(sk, { value: plan, expiresAtMs: epochMs(plan.createdAt) + this.#ttl.planDays * DAY_MS });
+    const wallDeadlineMs = this.#options.clock.now() + (epochMs(plan.expiresAt) - epochMs(plan.createdAt));
+    this.#put(sk, { value: plan, expiresAtMs: this.#retainedFor(this.#ttl.planDays), wallDeadlineMs });
     return Promise.resolve(ok(undefined));
   }
 
@@ -122,7 +126,7 @@ class MemoryStateStore implements StateStore {
     return Promise.resolve(plan.value ? ok(plan.value) : err(notFound(planId)));
   }
 
-  applyPlan(planId: PlanId): Promise<Result<PlanApplication, ErrorEnvelope>> {
+  applyPlan(planId: PlanId, now: number): Promise<Result<PlanApplication, ErrorEnvelope>> {
     // Synchronous from read to write: the in-memory equivalent of a conditional update.
     const sk = `PLAN#${planId}`;
     const read = this.#read(sk, PlanSchema);
@@ -130,30 +134,33 @@ class MemoryStateStore implements StateStore {
     const plan = read.value;
     if (!plan) return Promise.resolve(err(notFound(planId)));
     if (plan.status === 'applied') return Promise.resolve(ok({ plan, alreadyApplied: true }));
-    if (plan.status !== 'proposed' || this.#options.clock.now() >= epochMs(plan.expiresAt)) {
+    const stored = this.#partition().get(sk);
+    if (plan.status !== 'proposed' || now >= epochMs(plan.expiresAt) || !this.#beforeWallDeadline(stored)) {
       return Promise.resolve(err(toolError('plan_expired', 'This plan has expired; ask for a new one.', { details: { planId } })));
     }
     const applied: Plan = { ...plan, status: 'applied' };
-    const stored = this.#partition().get(sk);
-    this.#put(sk, { value: applied, ...(stored?.expiresAtMs === undefined ? {} : { expiresAtMs: stored.expiresAtMs }) });
+    this.#put(sk, { ...stored, value: applied });
     return Promise.resolve(ok({ plan: structuredClone(applied), alreadyApplied: false }));
   }
 
-  saveLastResortConfirmation(confirmation: LastResortConfirmation): Promise<Result<void, ErrorEnvelope>> {
+  saveLastResortConfirmation(confirmation: LastResortConfirmation, now: number): Promise<Result<void, ErrorEnvelope>> {
     const problem = lastResortConfirmationProblem(confirmation);
     if (problem !== undefined) return Promise.resolve(err(problem));
     // One per plan, like store-dynamodb: a new confirmation replaces the earlier one.
-    this.#put(`CONFIRM#${confirmation.planId}`, { value: { confirmation, used: false }, expiresAtMs: epochMs(confirmation.expiresAt) });
+    const wallDeadlineMs = this.#options.clock.now() + (epochMs(confirmation.expiresAt) - now);
+    this.#put(`CONFIRM#${confirmation.planId}`, { value: { confirmation, used: false }, expiresAtMs: this.#retainedFor(this.#ttl.planDays), wallDeadlineMs });
     return Promise.resolve(ok(undefined));
   }
 
-  consumeLastResortConfirmation(planId: PlanId, tokenHash: string): Promise<Result<LastResortConfirmation, ErrorEnvelope>> {
+  consumeLastResortConfirmation(planId: PlanId, tokenHash: string, now: number): Promise<Result<LastResortConfirmation, ErrorEnvelope>> {
     // Synchronous from read to write: the in-memory equivalent of a conditional update.
     const sk = `CONFIRM#${planId}`;
     const item = this.#partition().get(sk);
     if (!this.#live(item)) return Promise.resolve(err(invalidLastResortToken()));
     const stored = item.value as { confirmation: LastResortConfirmation; used: boolean };
-    if (stored.used || stored.confirmation.tokenHash !== tokenHash) return Promise.resolve(err(invalidLastResortToken()));
+    if (stored.used || stored.confirmation.tokenHash !== tokenHash || now >= epochMs(stored.confirmation.expiresAt) || !this.#beforeWallDeadline(item)) {
+      return Promise.resolve(err(invalidLastResortToken()));
+    }
     this.#put(sk, { ...item, value: { ...stored, used: true } });
     return Promise.resolve(ok(structuredClone(stored.confirmation)));
   }
@@ -166,7 +173,7 @@ class MemoryStateStore implements StateStore {
       return Promise.resolve(err(toolError('invalid_input', 'A guard rejection needs an ISO 8601 time.', { details: { field: 'at' } })));
     }
     const sk = `GUARD#${rejection.at}#${String(this.#next())}`;
-    this.#put(sk, { value: rejection, expiresAtMs: epochMs(rejection.at) + this.#ttl.guardRejectionDays * DAY_MS });
+    this.#put(sk, { value: rejection, expiresAtMs: this.#retainedFor(this.#ttl.guardRejectionDays) });
     return Promise.resolve(ok(undefined));
   }
 
@@ -181,7 +188,7 @@ class MemoryStateStore implements StateStore {
     }
     // Same key as store-dynamodb: the start time in UTC, then the id.
     const sk = `STORM#${new Date(session.startedAt).toISOString()}#${session.id}`;
-    this.#put(sk, { value: session, expiresAtMs: epochMs(session.startedAt) + this.#ttl.stormSessionDays * DAY_MS });
+    this.#put(sk, { value: session, expiresAtMs: this.#retainedFor(this.#ttl.stormSessionDays) });
     return Promise.resolve(ok(undefined));
   }
 
@@ -200,7 +207,7 @@ class MemoryStateStore implements StateStore {
     }
     // Same key as store-dynamodb: the time in UTC, then a sequence, so two messages at once are both kept.
     const sk = `INBOX#${new Date(message.at).toISOString()}#${String(this.#next()).padStart(12, '0')}`;
-    this.#put(sk, { value: parsed.data, expiresAtMs: epochMs(message.at) + this.#ttl.inboxDays * DAY_MS });
+    this.#put(sk, { value: parsed.data, expiresAtMs: this.#retainedFor(this.#ttl.inboxDays) });
     return Promise.resolve(ok(undefined));
   }
 
@@ -266,6 +273,16 @@ class MemoryStateStore implements StateStore {
       this.#options.backing.partitions.set(pk, partition);
     }
     return partition;
+  }
+
+  /** An item without a deadline (written before it existed) has none to miss; plans and confirmations always get one. */
+  #beforeWallDeadline(item: Item | undefined): boolean {
+    return item?.wallDeadlineMs === undefined || this.#options.clock.now() < item.wallDeadlineMs;
+  }
+
+  /** Retention from the write on the wall clock, never from the item's domain times (#175). */
+  #retainedFor(days: number): number {
+    return this.#options.clock.now() + days * DAY_MS;
   }
 
   #live(item: Item | undefined): item is Item {

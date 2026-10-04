@@ -70,7 +70,10 @@ export function lastResortConfirmationProblem(c: LastResortConfirmation): ErrorE
 export const invalidLastResortToken = (): ErrorEnvelope =>
   toolError('last_resort_token_invalid', 'This confirmation is not valid any more: ask for the plan again and confirm it twice.');
 
-/** Retention of what the store writes, in days (plan §3.2); from config. */
+/**
+ * Retention of what the store writes, in days (plan §3.2); from config. It counts from the write on the store's
+ * wall clock, never from the domain times in the item: those may be a scenario day months ago (#175).
+ */
 export interface StateStoreTtl {
   readonly planDays: number;
   readonly configChangeDays: number;
@@ -90,21 +93,29 @@ export interface StateStore {
   putPreferences(preferences: Preferences, changes: readonly ConfigChange[]): Promise<Result<void, ErrorEnvelope>>;
   /** Config changes still retained, oldest first. */
   listConfigChanges(): Promise<Result<ConfigChange[], ErrorEnvelope>>;
-  /** Stores a new proposed plan; a plan id is written once. */
+  /**
+   * Stores a new proposed plan; a plan id is written once. Its lifetime (`expiresAt - createdAt`) also runs on the
+   * wall clock from the write: a scenario day that replays rewinds domain time, never the wall (#175 review).
+   */
   savePlan(plan: Plan): Promise<Result<void, ErrorEnvelope>>;
   getPlan(planId: PlanId): Promise<Result<Plan, ErrorEnvelope>>;
   /**
-   * Marks a proposed, unexpired plan as applied (conditional write). Applying it again returns
-   * the stored outcome with `alreadyApplied: true`.
+   * Marks a proposed plan as applied (conditional write) if `now` is before its `expiresAt` and its lifetime on the
+   * wall clock has not run out. Applying it again
+   * returns the stored outcome with `alreadyApplied: true`. `now` is the home's domain time (epoch ms): on a
+   * scenario clock it is not the wall clock, which drives only the retention (#175).
    */
-  applyPlan(planId: PlanId): Promise<Result<PlanApplication, ErrorEnvelope>>;
-  /** Stores the confirmation of a last-resort plan; it replaces an earlier one of the same plan. */
-  saveLastResortConfirmation(confirmation: LastResortConfirmation): Promise<Result<void, ErrorEnvelope>>;
+  applyPlan(planId: PlanId, now: number): Promise<Result<PlanApplication, ErrorEnvelope>>;
   /**
-   * Uses the confirmation once (conditional write): a wrong, expired, used or unknown token is
-   * `last_resort_token_invalid`, never which of them.
+   * Stores the confirmation of a last-resort plan, kept as long as a plan; it replaces an earlier one of the same
+   * plan. `now` is the domain time it is issued at: its lifetime (`expiresAt - now`) also runs on the wall clock.
    */
-  consumeLastResortConfirmation(planId: PlanId, tokenHash: string): Promise<Result<LastResortConfirmation, ErrorEnvelope>>;
+  saveLastResortConfirmation(confirmation: LastResortConfirmation, now: number): Promise<Result<void, ErrorEnvelope>>;
+  /**
+   * Uses the confirmation once (conditional write) if `now` (domain time, as in applyPlan) is before its
+   * `expiresAt` and its wall-clock lifetime has not run out: a wrong, expired, used or unknown token is `last_resort_token_invalid`, never which of them.
+   */
+  consumeLastResortConfirmation(planId: PlanId, tokenHash: string, now: number): Promise<Result<LastResortConfirmation, ErrorEnvelope>>;
   recordGuardRejection(rejection: GuardRejection): Promise<Result<void, ErrorEnvelope>>;
   /** Rejections still retained, newest first. */
   listGuardRejections(): Promise<Result<GuardRejection[], ErrorEnvelope>>;

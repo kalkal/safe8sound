@@ -49,7 +49,7 @@ import type { TableClient, TableItem } from './table.js';
 // with a top-level `version` for the conditional write). One item outside the homes: PK = ADMIN#CONFIG,
 // SK = CONFIG, the demo's admin config read by every home (C1, same conditional write). The sim-api's quota
 // counters live under DEMO#… (counter.ts). Every item carries schemaVersion; logs and plans carry the DynamoDB TTL
-// attribute `ttl` (epoch seconds); settings never expire. TTL deletion is lazy, so reads skip expired items.
+// attribute `ttl` (epoch seconds, from the write on the wall clock, #175); settings never expire. TTL deletion is lazy, so reads skip expired items.
 
 const SCHEMA_VERSION = 1;
 const DAY_MS = 24 * 60 * 60_000;
@@ -71,6 +71,7 @@ const ConfirmationSchema = z.strictObject({
 
 export interface DynamoStateStoreOptions {
   readonly table: TableClient;
+  /** The wall clock: it drives only the retention (TTL). Domain expiry is judged on the `now` each call passes (#175). */
   readonly clock: Clock;
   readonly ttl?: StateStoreTtl;
   /** Randomness for unique log keys: injected, like the clock. */
@@ -141,7 +142,7 @@ class DynamoStateStore implements StateStore {
       }
       // The log entries and the preferences land together or not at all.
       const events = changes.map((change) =>
-        this.#item(`EVENT#${change.ts}#${this.#suffix()}`, change, epochMs(change.ts) + this.#ttl.configChangeDays * DAY_MS),
+        this.#item(`EVENT#${change.ts}#${this.#suffix()}`, change, this.#retainedFor(this.#ttl.configChangeDays)),
       );
       await this.#table.transactPut([...events, this.#item('PREFS', preferences)]);
     });
@@ -156,7 +157,9 @@ class DynamoStateStore implements StateStore {
 
   savePlan(plan: Plan) {
     return this.#run('savePlan', async () => {
-      const item = { ...this.#item(`PLAN#${plan.id}`, plan, epochMs(plan.createdAt) + this.#ttl.planDays * DAY_MS), status: plan.status, expiresAtMs: epochMs(plan.expiresAt) };
+      // `expiresAtMs` is domain time; `wallDeadlineMs` the same lifetime on the wall clock, which never rewinds (#175 review).
+      const wallDeadlineMs = this.#clock.now() + (epochMs(plan.expiresAt) - epochMs(plan.createdAt));
+      const item = { ...this.#item(`PLAN#${plan.id}`, plan, this.#retainedFor(this.#ttl.planDays)), status: plan.status, expiresAtMs: epochMs(plan.expiresAt), wallDeadlineMs };
       const outcome = await this.#table.put(item, [{ attr: 'PK', op: 'not_exists' }]);
       if (outcome === 'condition_failed') {
         throw new Failure(toolError('invalid_input', `Plan ${plan.id} already exists; a plan id is written once.`, { details: { planId: plan.id } }));
@@ -199,17 +202,17 @@ class DynamoStateStore implements StateStore {
     return this.#run('getPlan', async () => (await this.#readPlan(planId)) ?? fail(notFound(planId)));
   }
 
-  applyPlan(planId: PlanId): Promise<Result<PlanApplication, ErrorEnvelope>> {
+  applyPlan(planId: PlanId, now: number): Promise<Result<PlanApplication, ErrorEnvelope>> {
     return this.#run('applyPlan', async () => {
       const plan = (await this.#readPlan(planId)) ?? fail(notFound(planId));
       if (plan.status === 'applied') return { plan, alreadyApplied: true };
-      const nowMs = this.#clock.now();
-      if (plan.status !== 'proposed' || nowMs >= epochMs(plan.expiresAt)) return fail(expired(planId));
+      if (plan.status !== 'proposed' || now >= epochMs(plan.expiresAt)) return fail(expired(planId));
 
       const applied: Plan = { ...plan, status: 'applied' };
       const outcome = await this.#table.update(this.#pk, `PLAN#${planId}`, { status: 'applied', data: applied }, [
         { attr: 'status', op: '=', value: 'proposed' },
-        { attr: 'expiresAtMs', op: '>', value: nowMs },
+        { attr: 'expiresAtMs', op: '>', value: now },
+        { attr: 'wallDeadlineMs', op: '>', value: this.#clock.now() },
       ]);
       if (outcome === 'ok') return { plan: applied, alreadyApplied: false };
       // Lost the race or the plan changed meanwhile: report what is stored now.
@@ -218,17 +221,19 @@ class DynamoStateStore implements StateStore {
     });
   }
 
-  saveLastResortConfirmation(confirmation: LastResortConfirmation) {
+  saveLastResortConfirmation(confirmation: LastResortConfirmation, now: number) {
     return this.#run('saveLastResortConfirmation', async () => {
       const problem = lastResortConfirmationProblem(confirmation);
       if (problem !== undefined) fail(problem);
-      const expiresAtMs = epochMs(confirmation.expiresAt);
-      // One per plan: a new confirmation replaces the earlier one. The conditions of the use read these top-level attributes.
-      await this.#table.put({ ...this.#item(`CONFIRM#${confirmation.planId}`, confirmation, expiresAtMs), tokenHash: confirmation.tokenHash, used: 0, expiresAtMs });
+      // One per plan, kept as long as a plan: a new confirmation replaces the earlier one. The conditions of the use
+      // read these top-level attributes; `expiresAtMs` is domain time, the TTL is the wall clock's (#175).
+      const item = this.#item(`CONFIRM#${confirmation.planId}`, confirmation, this.#retainedFor(this.#ttl.planDays));
+      const wallDeadlineMs = this.#clock.now() + (epochMs(confirmation.expiresAt) - now);
+      await this.#table.put({ ...item, tokenHash: confirmation.tokenHash, used: 0, expiresAtMs: epochMs(confirmation.expiresAt), wallDeadlineMs });
     });
   }
 
-  consumeLastResortConfirmation(planId: PlanId, tokenHash: string) {
+  consumeLastResortConfirmation(planId: PlanId, tokenHash: string, now: number) {
     return this.#run('consumeLastResortConfirmation', async () => {
       const sk = `CONFIRM#${planId}`;
       const item = await this.#table.get(this.#pk, sk);
@@ -238,7 +243,8 @@ class DynamoStateStore implements StateStore {
       const outcome = await this.#table.update(this.#pk, sk, { used: 1 }, [
         { attr: 'tokenHash', op: '=', value: tokenHash },
         { attr: 'used', op: '=', value: 0 },
-        { attr: 'expiresAtMs', op: '>', value: this.#clock.now() },
+        { attr: 'expiresAtMs', op: '>', value: now },
+        { attr: 'wallDeadlineMs', op: '>', value: this.#clock.now() },
       ]);
       return outcome === 'ok' ? confirmation : fail(invalidLastResortToken());
     });
@@ -252,7 +258,7 @@ class DynamoStateStore implements StateStore {
       if (!IsoDateTimeSchema.safeParse(rejection.at).success) {
         fail(toolError('invalid_input', 'A guard rejection needs an ISO 8601 time.', { details: { field: 'at' } }));
       }
-      await this.#table.put(this.#item(`GUARD#${rejection.at}#${this.#suffix()}`, rejection, epochMs(rejection.at) + this.#ttl.guardRejectionDays * DAY_MS));
+      await this.#table.put(this.#item(`GUARD#${rejection.at}#${this.#suffix()}`, rejection, this.#retainedFor(this.#ttl.guardRejectionDays)));
     });
   }
 
@@ -271,14 +277,14 @@ class DynamoStateStore implements StateStore {
       if (session.homeId !== this.homeId) {
         fail(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } }));
       }
-      await this.#table.put(this.#item(stormKey(session), session, epochMs(session.startedAt) + this.#ttl.stormSessionDays * DAY_MS));
+      await this.#table.put(this.#item(stormKey(session), session, this.#retainedFor(this.#ttl.stormSessionDays)));
     });
   }
 
   getLatestStormSession() {
     return this.#run('getLatestStormSession', async () => {
       // SK = STORM#<startedAt in UTC>#<id>: the newest session is the highest key, one item read.
-      // If it has expired, every older one has too.
+      // Retention counts from the write and sessions are written in the order they start: if it has expired, every older one has too.
       const [latest] = await this.#table.query(this.#pk, 'STORM#', { newestFirst: true, limit: 1 });
       return latest && this.#isLive(latest) ? parse(StormSessionSchema, latest) : undefined;
     });
@@ -292,14 +298,14 @@ class DynamoStateStore implements StateStore {
       }
       // SK = INBOX#<at in UTC>#<suffix>: newest first is the reverse key order; two messages at once are both kept.
       const sk = `INBOX#${new Date(message.at).toISOString()}#${this.#suffix()}`;
-      await this.#table.put(this.#item(sk, message, epochMs(message.at) + this.#ttl.inboxDays * DAY_MS));
+      await this.#table.put(this.#item(sk, message, this.#retainedFor(this.#ttl.inboxDays)));
     });
   }
 
   listInbox(limit: number) {
     return this.#run('listInbox', async () => {
       if (limit <= 0) return [];
-      // Expired messages are the oldest ones, so the live ones are a prefix of the newest-first page.
+      // Messages are written in time order and kept from the write, so the live ones are a prefix of the newest-first page.
       const newest = await this.#table.query(this.#pk, 'INBOX#', { newestFirst: true, limit });
       return newest.filter((item) => this.#isLive(item)).map((item) => parse(InboxMessageSchema, item));
     });
@@ -312,6 +318,11 @@ class DynamoStateStore implements StateStore {
 
   async #live(prefix: string): Promise<TableItem[]> {
     return (await this.#table.query(this.#pk, prefix)).filter((item) => this.#isLive(item));
+  }
+
+  /** Retention from the write on the wall clock, never from the item's domain times (#175). */
+  #retainedFor(days: number): number {
+    return this.#clock.now() + days * DAY_MS;
   }
 
   #isLive(item: TableItem): boolean {

@@ -95,7 +95,7 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
 
   if (lastResort && !home.readOnly) {
     if (input.lastResortToken === undefined) return issueConfirmation(deps, store, stored.value, profile, ctx);
-    const used = await store.consumeLastResortConfirmation(stored.value.id, sha256Hex(input.lastResortToken));
+    const used = await store.consumeLastResortConfirmation(stored.value.id, sha256Hex(input.lastResortToken), deps.clock.now());
     if (!used.ok) {
       // A used token on a plan applied meanwhile (a retry, a concurrent second yes): the idempotent outcome.
       const now = await store.getPlan(stored.value.id);
@@ -105,7 +105,8 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
     logLastResort(deps, ctx, stored.value, 'last_resort_confirmed', 'Last-resort plan confirmed by a second yes.');
   }
 
-  const applied = await store.applyPlan(input.planId);
+  // Expiry on the home's domain time (its scenario clock); the store's own clock keeps only the retention (#175).
+  const applied = await store.applyPlan(input.planId, deps.clock.now());
   if (!applied.ok) return applied;
   if (lastResort && !applied.value.alreadyApplied) {
     logLastResort(deps, ctx, applied.value.plan, 'last_resort_applied', 'Last-resort plan applied.');
@@ -153,7 +154,7 @@ async function issueConfirmation(deps: ComfortPlanDeps, store: StateStore, plan:
   const expiresAtMs = Math.floor(Math.min(epochMs(plan.expiresAt), nowMs + deps.config.lastResortConfirmMinutes * 60_000) / 1000) * 1000;
   if (expiresAtMs <= nowMs) return err(toolError('plan_expired', 'This plan has expired; ask for a new one.', { details: { planId: plan.id } }));
   const token = newLastResortToken();
-  const saved = await store.saveLastResortConfirmation({ planId: plan.id, tokenHash: sha256Hex(token), planHash: planHash(plan), expiresAt: new Date(expiresAtMs).toISOString() });
+  const saved = await store.saveLastResortConfirmation({ planId: plan.id, tokenHash: sha256Hex(token), planHash: planHash(plan), expiresAt: new Date(expiresAtMs).toISOString() }, nowMs);
   if (!saved.ok) return saved;
   logLastResort(deps, ctx, plan, 'last_resort_confirmation_issued', 'Last-resort plan: first yes, confirmation issued.');
   return ok({ plan, alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: localIso(expiresAtMs, profile.location.tz) } });

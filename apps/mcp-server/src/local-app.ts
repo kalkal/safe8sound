@@ -5,13 +5,14 @@ import { createApp, scenarioClockFor, type App } from './app.js';
 import type { CardDocuments } from './cards.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules } from './compose.js';
+import { wallStamped } from './log-clock.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 import { stormModeWiring, type StormModeWiring } from './storm-mode-config.js';
 
-// The local entry's composition (#160, the end-to-end acceptance test): the simulator, the plans, the storm sessions, the
-// preferences log and the in-memory store all run on ONE scenario clock, so "now" is the same everywhere and a
-// plan made now expires ten scenario minutes later. (On Lambda the store keeps the wall clock, which DynamoDB's
-// TTL needs: domain times in scenario time there are a follow-up.)
+// The local entry's composition (#160, the end-to-end acceptance test): the simulator, the plans, the storm sessions and
+// the preferences log all run on ONE scenario clock, so "now" is the same everywhere and a plan made now expires
+// ten scenario minutes later. The in-memory store keeps the wall clock, for retention only. The Lambda entry
+// (lambda-app.ts) runs its domain on the same scenario clock, and its DynamoDB store on the wall clock (#175).
 
 export interface LocalApp {
   readonly app: App;
@@ -27,26 +28,6 @@ export function localStartSocPct(env: Readonly<Record<string, string | undefined
   return ok(value);
 }
 
-/**
- * CE-20: the domain runs on the scenario clock, but log lines line up with the sim-api's and the agent's on the
- * wall clock. Each line's `ts` becomes the wall time; the domain's own time, when it differs, moves to
- * `details.scenarioTs`. Best effort, like every logger: a sink that throws never breaks the caller.
- */
-export function wallStamped(logger: Logger, wallClock: Clock): Logger {
-  return {
-    log: (entry) => {
-      try {
-        const ts = new Date(wallClock.now()).toISOString();
-        // Under a second apart is the same time (a domain on the wall clock stamps its own millisecond).
-        const sameTime = Math.abs(Date.parse(entry.ts) - Date.parse(ts)) < 1000;
-        logger.log(sameTime ? { ...entry, ts } : { ...entry, ts, details: { ...entry.details, scenarioTs: entry.ts } });
-      } catch {
-        // Nowhere left to report it: the line is lost, the request goes on.
-      }
-    },
-  };
-}
-
 export function createLocalApp(
   env: Readonly<Record<string, string | undefined>>,
   opts: { readonly wallClock: Clock; readonly logger: Logger; readonly cardDocuments?: CardDocuments },
@@ -57,7 +38,8 @@ export function createLocalApp(
   if (!startSoc.ok) return startSoc;
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) return preferences;
-  const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: clock.value });
+  // The store's clock is the wall's: it drives only the retention; plan expiry is judged on the home's scenario time (#175).
+  const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: opts.wallClock });
   const modules = composeModules({ preferences: preferences.value, storeFor, clock: clock.value });
   if (!modules.ok) return modules;
   const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock: clock.value });

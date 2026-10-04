@@ -1,12 +1,9 @@
 import { err, ok, toolError } from '@cold-reserve/contracts';
 import { jsonLineSink, loggerTo } from '@cold-reserve/core';
 import { extensionReader } from '@cold-reserve/ssm-parameters';
-import { createApp } from './app.js';
-import { comfortPlanWiring } from './comfort-plan-config.js';
-import { composeModules, createDynamoStoreFactory } from './compose.js';
+import { createDynamoStoreFactory } from './compose.js';
 import { createLambdaHandler, installProcessHooks, storeErrorLogger, toLogEntry, type LambdaLogEntry, metricsTo } from './lambda.js';
-import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
-import { stormModeWiring } from './storm-mode-config.js';
+import { createLambdaApp } from './lambda-app.js';
 
 // Lambda entry: the client tokens come from SSM (SecureString) named by MCP_CLIENTS_PARAMETER;
 // state lives in the single DynamoDB table named by STATE_TABLE_NAME.
@@ -41,34 +38,21 @@ export const handler = createLambdaHandler(
     if (process.env['MCP_SCENARIO_START_SOC_PCT'] !== undefined) {
       logger.log({ ts: new Date().toISOString(), level: 'info', component: 'mcp-server', message: 'MCP_SCENARIO_START_SOC_PCT is for the local entry only: ignored here.', correlationId: 'startup' });
     }
-    const preferences = loadPreferencesConfig(preferencesConfigFile());
-    if (!preferences.ok) return preferences;
+    // The store keeps the wall clock (its TTL); the domain runs on the scenario clock inside createLambdaApp (#175).
     const storeFor = createDynamoStoreFactory(process.env, {
       clock: wallClock,
       onError: storeErrorLogger(log),
     });
     if (!storeFor.ok) return storeFor;
-    const modules = composeModules({ preferences: preferences.value, storeFor: storeFor.value, clock: wallClock });
-    if (!modules.ok) return modules;
-    // The family phone's inbox lives in the same table (#24); its HTTP route is not served here.
-    const stormMode = stormModeWiring({ storeFor: storeFor.value, preferences: preferences.value, clock: wallClock });
-    if (!stormMode.ok) return stormMode;
-    const comfortPlan = comfortPlanWiring({ storeFor: storeFor.value, preferences: preferences.value, clock: wallClock, notifier: stormMode.value.notifier });
-    if (!comfortPlan.ok) return comfortPlan;
-
-    // No cardDocuments yet: the built card bundle is not shipped with the function, so the Lambda serves
-    // the tools without their ui:// cards. TODO(#104): ship the card bundle with the MCP Lambda.
-    const app = createApp(
+    const app = createLambdaApp(
       { ...process.env, MCP_CLIENTS: clients.value },
       {
         wallClock,
         logger,
+        storeFor: storeFor.value,
         metrics: metricsTo((text) => {
           process.stdout.write(text);
         }),
-        modules: modules.value,
-        comfortPlan: comfortPlan.value,
-        stormMode: stormMode.value,
       },
     );
     return app.ok ? ok(app.value.handler) : app;

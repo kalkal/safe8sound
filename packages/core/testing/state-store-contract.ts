@@ -29,8 +29,9 @@ export interface StateStoreHarness {
   /** Builds a store for one home. Calling it again must reach the same backing data. */
   readonly factory: StateStoreFactory;
   /**
-   * Moves the clock injected into the adapter (epoch ms). It drives only the adapter's own
-   * checks (expiry filter on read, plan expiry on apply), not the backend's TTL deletion.
+   * Moves the wall clock injected into the adapter (epoch ms). It drives only the retention: the TTL written
+   * and the expiry filter on read, not the backend's TTL deletion. The domain "now" of a plan's or a
+   * confirmation's expiry is passed with each call instead (#175): on a scenario clock it is not the wall.
    */
   setNow(ms: number): void;
   /** Base time of the fixtures (epoch ms, whole seconds). Use Date.now() on a real backend. */
@@ -47,6 +48,13 @@ const MINUTE_MS = 60_000;
 const DEFAULT_START_MS = Date.parse('2026-07-15T12:00:00Z');
 
 const iso = (ms: number) => new Date(ms).toISOString();
+// Test-only stand-in for a rendered template (the store suite runs without @cold-reserve/i18n).
+// eslint-disable-next-line no-restricted-syntax -- the stores are tested without the templates
+const rendered = (text: string) => text as unknown as StormMessageText;
+const message = (t: { at: (offsetMs: number) => string }, offsetMs: number, text: string): NewInboxMessage => ({
+  ...InboxMessageSchema.parse({ at: t.at(offsetMs), role: 'daughter', channel: 'in_app', transition: 'storm_started', text }),
+  text: rendered(text),
+});
 const randomHome = (tag: string): HomeId => HomeIdSchema.parse(`demo#ct${tag}${Math.random().toString(36).slice(2, 12)}`);
 
 export function describeStateStoreContract(name: string, makeHarness: () => StateStoreHarness): void {
@@ -201,13 +209,6 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
       });
     });
     describe('family inbox (the phone, #24)', () => {
-      // Test-only stand-in for a rendered template (the store suite runs without @cold-reserve/i18n).
-      // eslint-disable-next-line no-restricted-syntax -- the stores are tested without the templates
-      const rendered = (text: string) => text as unknown as StormMessageText;
-      const message = (t: { at: (offsetMs: number) => string }, offsetMs: number, text: string): NewInboxMessage => ({
-        ...InboxMessageSchema.parse({ at: t.at(offsetMs), role: 'daughter', channel: 'in_app', transition: 'storm_started', text }),
-        text: rendered(text),
-      });
 
       it('lists the messages newest first, up to the limit, and keeps two sent at the same time', async () => {
         const t = setup();
@@ -264,7 +265,7 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
         expect(await b.getPreferences()).toEqual({ ok: true, value: undefined });
         expect(await b.listConfigChanges()).toEqual({ ok: true, value: [] });
         expect(await b.getPlan(t.plan.id)).toMatchObject({ ok: false, error: { code: 'plan_not_found' } });
-        expect(await b.applyPlan(t.plan.id)).toMatchObject({ ok: false, error: { code: 'plan_not_found' } });
+        expect(await b.applyPlan(t.plan.id, t.start)).toMatchObject({ ok: false, error: { code: 'plan_not_found' } });
         expect(await b.listGuardRejections()).toEqual({ ok: true, value: [] });
       });
     });
@@ -288,15 +289,15 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
         const t = setup();
         const store = t.harness.factory(t.homeA);
         await store.savePlan(t.plan);
-        expect(await store.applyPlan(t.plan.id)).toMatchObject({ ok: true, value: { alreadyApplied: false, plan: { status: 'applied' } } });
-        expect(await store.applyPlan(t.plan.id)).toMatchObject({ ok: true, value: { alreadyApplied: true, plan: { status: 'applied' } } });
+        expect(await store.applyPlan(t.plan.id, t.start)).toMatchObject({ ok: true, value: { alreadyApplied: false, plan: { status: 'applied' } } });
+        expect(await store.applyPlan(t.plan.id, t.start)).toMatchObject({ ok: true, value: { alreadyApplied: true, plan: { status: 'applied' } } });
         expect(await store.getPlan(t.plan.id)).toMatchObject({ ok: true, value: { status: 'applied' } });
       });
 
       it('lets exactly one of two concurrent applies win (conditional write)', async () => {
         const t = setup();
         await t.harness.factory(t.homeA).savePlan(t.plan);
-        const results = await Promise.all([t.harness.factory(t.homeA).applyPlan(t.plan.id), t.harness.factory(t.homeA).applyPlan(t.plan.id)]);
+        const results = await Promise.all([t.harness.factory(t.homeA).applyPlan(t.plan.id, t.start), t.harness.factory(t.homeA).applyPlan(t.plan.id, t.start)]);
         expect(results.every((r) => r.ok)).toBe(true);
         expect(results.filter((r) => r.ok && !r.value.alreadyApplied)).toHaveLength(1);
       });
@@ -305,10 +306,8 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
         const t = setup();
         const store = t.harness.factory(t.homeA);
         await store.savePlan(t.plan);
-        t.harness.setNow(Date.parse(t.plan.expiresAt));
-        expect(await store.applyPlan(t.plan.id)).toMatchObject({ ok: false, error: { code: 'plan_expired', category: 'validation' } });
-        t.harness.setNow(Date.parse(t.plan.expiresAt) - 1);
-        expect(await store.applyPlan(t.plan.id)).toMatchObject({ ok: true, value: { alreadyApplied: false } });
+        expect(await store.applyPlan(t.plan.id, Date.parse(t.plan.expiresAt))).toMatchObject({ ok: false, error: { code: 'plan_expired', category: 'validation' } });
+        expect(await store.applyPlan(t.plan.id, Date.parse(t.plan.expiresAt) - 1)).toMatchObject({ ok: true, value: { alreadyApplied: false } });
       });
 
       it('keeps plans readable until the plan retention (TTL) ends', async () => {
@@ -337,9 +336,9 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
 
       it('consumes a saved confirmation once, from any store instance, and returns it', async () => {
         const t = setup();
-        expect((await t.harness.factory(t.homeA).saveLastResortConfirmation(confirmation(t))).ok).toBe(true);
-        expect(await t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A)).toEqual({ ok: true, value: confirmation(t) });
-        expect(await t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A)).toMatchObject({
+        expect((await t.harness.factory(t.homeA).saveLastResortConfirmation(confirmation(t), t.start)).ok).toBe(true);
+        expect(await t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A, t.start)).toEqual({ ok: true, value: confirmation(t) });
+        expect(await t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A, t.start)).toMatchObject({
           ok: false,
           error: { code: 'last_resort_token_invalid', category: 'validation' },
         });
@@ -348,61 +347,59 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
       it('refuses a wrong token and keeps the right one usable', async () => {
         const t = setup();
         const store = t.harness.factory(t.homeA);
-        await store.saveLastResortConfirmation(confirmation(t));
-        expect(await store.consumeLastResortConfirmation(t.plan.id, HASH_B)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
-        expect((await store.consumeLastResortConfirmation(t.plan.id, HASH_A)).ok).toBe(true);
+        await store.saveLastResortConfirmation(confirmation(t), t.start);
+        expect(await store.consumeLastResortConfirmation(t.plan.id, HASH_B, t.start)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        expect((await store.consumeLastResortConfirmation(t.plan.id, HASH_A, t.start)).ok).toBe(true);
       });
 
       it('a new confirmation of the same plan replaces the earlier one', async () => {
         const t = setup();
         const store = t.harness.factory(t.homeA);
-        await store.saveLastResortConfirmation(confirmation(t));
-        await store.saveLastResortConfirmation(confirmation(t, { tokenHash: HASH_B }));
-        expect(await store.consumeLastResortConfirmation(t.plan.id, HASH_A)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
-        expect((await store.consumeLastResortConfirmation(t.plan.id, HASH_B)).ok).toBe(true);
+        await store.saveLastResortConfirmation(confirmation(t), t.start);
+        await store.saveLastResortConfirmation(confirmation(t, { tokenHash: HASH_B }), t.start);
+        expect(await store.consumeLastResortConfirmation(t.plan.id, HASH_A, t.start)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        expect((await store.consumeLastResortConfirmation(t.plan.id, HASH_B, t.start)).ok).toBe(true);
       });
 
       it('works until the last millisecond before it expires', async () => {
         const t = setup();
         const store = t.harness.factory(t.homeA);
-        await store.saveLastResortConfirmation(confirmation(t));
-        t.harness.setNow(t.start + 5 * MINUTE_MS);
-        expect(await store.consumeLastResortConfirmation(t.plan.id, HASH_A)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
-        t.harness.setNow(t.start + 5 * MINUTE_MS - 1);
-        expect((await store.consumeLastResortConfirmation(t.plan.id, HASH_A)).ok).toBe(true);
+        await store.saveLastResortConfirmation(confirmation(t), t.start);
+        expect(await store.consumeLastResortConfirmation(t.plan.id, HASH_A, t.start + 5 * MINUTE_MS)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        expect((await store.consumeLastResortConfirmation(t.plan.id, HASH_A, t.start + 5 * MINUTE_MS - 1)).ok).toBe(true);
       });
 
       it('lets exactly one of two concurrent uses win (conditional write)', async () => {
         const t = setup();
-        await t.harness.factory(t.homeA).saveLastResortConfirmation(confirmation(t));
+        await t.harness.factory(t.homeA).saveLastResortConfirmation(confirmation(t), t.start);
         const results = await Promise.all([
-          t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A),
-          t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A),
+          t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A, t.start),
+          t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A, t.start),
         ]);
         expect(results.filter((r) => r.ok)).toHaveLength(1);
       });
 
       it('never lets one home use the confirmation of another, and knows no confirmation for an unknown plan', async () => {
         const t = setup();
-        await t.harness.factory(t.homeA).saveLastResortConfirmation(confirmation(t));
-        expect(await t.harness.factory(t.homeB).consumeLastResortConfirmation(t.plan.id, HASH_A)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        await t.harness.factory(t.homeA).saveLastResortConfirmation(confirmation(t), t.start);
+        expect(await t.harness.factory(t.homeB).consumeLastResortConfirmation(t.plan.id, HASH_A, t.start)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
         const unknown = PlanIdSchema.parse('plan_unknown00');
-        expect(await t.harness.factory(t.homeA).consumeLastResortConfirmation(unknown, HASH_A)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
-        expect((await t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A)).ok).toBe(true);
+        expect(await t.harness.factory(t.homeA).consumeLastResortConfirmation(unknown, HASH_A, t.start)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        expect((await t.harness.factory(t.homeA).consumeLastResortConfirmation(t.plan.id, HASH_A, t.start)).ok).toBe(true);
       });
 
       it('refuses a malformed confirmation and saves nothing', async () => {
         const t = setup();
         const store = t.harness.factory(t.homeA);
-        expect(await store.saveLastResortConfirmation(confirmation(t, { tokenHash: 'lr_plain-token' }))).toMatchObject({
+        expect(await store.saveLastResortConfirmation(confirmation(t, { tokenHash: 'lr_plain-token' }), t.start)).toMatchObject({
           ok: false,
           error: { code: 'invalid_input', details: { field: 'tokenHash' } },
         });
-        expect(await store.saveLastResortConfirmation(confirmation(t, { expiresAt: 'soon' }))).toMatchObject({
+        expect(await store.saveLastResortConfirmation(confirmation(t, { expiresAt: 'soon' }), t.start)).toMatchObject({
           ok: false,
           error: { code: 'invalid_input', details: { field: 'expiresAt' } },
         });
-        expect(await store.consumeLastResortConfirmation(t.plan.id, 'lr_plain-token')).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        expect(await store.consumeLastResortConfirmation(t.plan.id, 'lr_plain-token', t.start)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
       });
     });
 
@@ -439,6 +436,95 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
           error: { code: 'invalid_input', details: { field: 'at' } },
         });
         expect(await store.listGuardRejections()).toEqual({ ok: true, value: [] });
+      });
+    });
+
+    describe('two clocks: domain times on the scenario clock, retention on the wall (#175)', () => {
+      // A scenario plays a day of another year: its times are months before the wall clock.
+      const SCENARIO_LAG_MS = 400 * DAY_MS;
+      const scenarioPlan = (t: ReturnType<typeof setup>, domainMs: number): Plan =>
+        PlanSchema.parse({
+          ...t.plan,
+          createdAt: iso(domainMs),
+          expiresAt: iso(domainMs + 10 * MINUTE_MS),
+          horizonAt: iso(domainMs + 17 * 60 * MINUTE_MS),
+          steps: t.plan.steps.map((step) => ({ ...step, ts: iso(domainMs + 60 * MINUTE_MS) })),
+        });
+
+      it('keeps a plan made at a scenario time for its retention from the write, and applies it on scenario time', async () => {
+        const t = setup();
+        const domain = t.start - SCENARIO_LAG_MS;
+        const plan = scenarioPlan(t, domain);
+        const store = t.harness.factory(t.homeA);
+        await store.savePlan(plan);
+        expect(await store.applyPlan(plan.id, domain + 10 * MINUTE_MS - 1)).toMatchObject({ ok: true, value: { alreadyApplied: false } });
+        t.harness.setNow(t.start + DEFAULT_STATE_STORE_TTL.planDays * DAY_MS - 1);
+        expect((await store.getPlan(plan.id)).ok).toBe(true);
+        t.harness.setNow(t.start + DEFAULT_STATE_STORE_TTL.planDays * DAY_MS);
+        expect(await store.getPlan(plan.id)).toMatchObject({ ok: false, error: { code: 'plan_not_found' } });
+      });
+
+      it('refuses a plan past its expiry on scenario time, whatever the wall clock says', async () => {
+        const t = setup();
+        const domain = t.start - SCENARIO_LAG_MS;
+        const plan = scenarioPlan(t, domain);
+        const store = t.harness.factory(t.homeA);
+        await store.savePlan(plan);
+        expect(await store.applyPlan(plan.id, domain + 10 * MINUTE_MS)).toMatchObject({ ok: false, error: { code: 'plan_expired' } });
+      });
+
+      it('keeps logs, storm sessions and family messages stamped at a scenario time for their retention from the write', async () => {
+        const t = setup();
+        const domain = -SCENARIO_LAG_MS;
+        const store = t.harness.factory(t.homeA);
+        await store.putPreferences(t.prefs(), [t.change(domain, 26)]);
+        await store.saveStormSession(t.storm(t.homeA, 'storm_scenario01', domain));
+        await store.recordGuardRejection({ at: t.at(domain), failed: ['pacing_on_track'] });
+        await store.saveInboxMessage(message(t, domain, 'from the scenario day'));
+        const inboxEnd = t.start + DEFAULT_STATE_STORE_TTL.inboxDays * DAY_MS;
+        t.harness.setNow(inboxEnd - 1);
+        expect(await store.listConfigChanges()).toMatchObject({ ok: true, value: [{ to: 26 }] });
+        expect(await store.getLatestStormSession()).toMatchObject({ ok: true, value: { id: 'storm_scenario01' } });
+        expect(await store.listGuardRejections()).toMatchObject({ ok: true, value: [{ failed: ['pacing_on_track'] }] });
+        expect(await store.listInbox(10)).toMatchObject({ ok: true, value: [{ text: 'from the scenario day' }] });
+        t.harness.setNow(inboxEnd);
+        expect(await store.listInbox(10)).toEqual({ ok: true, value: [] });
+        expect(await store.getLatestStormSession()).toMatchObject({ ok: true, value: { id: 'storm_scenario01' } });
+      });
+
+      it('lets a last-resort confirmation issued at a scenario time work until it expires on scenario time', async () => {
+        const t = setup();
+        const domain = t.start - SCENARIO_LAG_MS;
+        const store = t.harness.factory(t.homeA);
+        const issued: LastResortConfirmation = { planId: t.plan.id, tokenHash: 'a'.repeat(64), planHash: 'c'.repeat(64), expiresAt: iso(domain + 5 * MINUTE_MS) };
+        await store.saveLastResortConfirmation(issued, domain);
+        t.harness.setNow(t.start + MINUTE_MS);
+        expect(await store.consumeLastResortConfirmation(t.plan.id, issued.tokenHash, domain + 5 * MINUTE_MS)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        expect(await store.consumeLastResortConfirmation(t.plan.id, issued.tokenHash, domain + 5 * MINUTE_MS - 1)).toEqual({ ok: true, value: issued });
+      });
+    });
+
+    describe('a scenario day that replays (daily anchor): scenario time rewinds, the wall never does (#175 review)', () => {
+      it('a plan lives at most its own lifetime on the wall clock from its write, even if scenario time rewinds', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        await store.savePlan(t.plan);
+        // Ten wall minutes later scenario time has rewound to before the plan's expiry: the wall bound still holds.
+        t.harness.setNow(t.start + 10 * MINUTE_MS);
+        expect(await store.applyPlan(t.plan.id, t.start + 5 * MINUTE_MS)).toMatchObject({ ok: false, error: { code: 'plan_expired' } });
+        t.harness.setNow(t.start + 10 * MINUTE_MS - 1);
+        expect(await store.applyPlan(t.plan.id, t.start + 5 * MINUTE_MS)).toMatchObject({ ok: true, value: { alreadyApplied: false } });
+      });
+
+      it('a confirmation lives at most its own lifetime on the wall clock from its issue, even if scenario time rewinds', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        // Issued at scenario time start + 1 min, valid until start + 5 min: four minutes.
+        await store.saveLastResortConfirmation({ planId: t.plan.id, tokenHash: 'a'.repeat(64), planHash: 'c'.repeat(64), expiresAt: t.at(5 * MINUTE_MS) }, t.start + MINUTE_MS);
+        t.harness.setNow(t.start + 4 * MINUTE_MS);
+        expect(await store.consumeLastResortConfirmation(t.plan.id, 'a'.repeat(64), t.start + MINUTE_MS)).toMatchObject({ ok: false, error: { code: 'last_resort_token_invalid' } });
+        t.harness.setNow(t.start + 4 * MINUTE_MS - 1);
+        expect((await store.consumeLastResortConfirmation(t.plan.id, 'a'.repeat(64), t.start + MINUTE_MS)).ok).toBe(true);
       });
     });
 
