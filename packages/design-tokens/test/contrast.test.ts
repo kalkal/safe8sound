@@ -21,6 +21,11 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['level-on', 'level-balanced'],
   ['level-on', 'level-saver'],
   ['level-on', 'level-essential'],
+  // The guard receipt is paper in both themes (design analysis G4): its ink, its PASS and FAIL, on the paper.
+  ['receipt-ink', 'receipt-paper'],
+  ['receipt-ink-2', 'receipt-paper'],
+  ['receipt-pass', 'receipt-paper'],
+  ['receipt-fail', 'receipt-paper'],
 ];
 // Non-text UI (focus ring, accent marks): WCAG 1.4.11, 3:1.
 const UI_PAIRS: Array<[string, string]> = [

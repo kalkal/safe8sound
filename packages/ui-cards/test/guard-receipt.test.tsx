@@ -83,6 +83,20 @@ describe('GuardReceipt', () => {
     expect(screen.queryByText('REJECTED')).toBeNull();
   });
 
+  it('shows a long plan id shortened on the slip, and the whole id to screen readers and on hover (G4)', () => {
+    const plan = hotDayPlan();
+    render(<GuardReceipt plan={plan} />);
+    const title = screen.getByTestId('receipt-title');
+    expect(title.textContent).toBe(`Guard · plan ${plan.id.slice(0, 9)}…`);
+    expect(title.getAttribute('title')).toBe(plan.id);
+    expect(screen.getByRole('list', { name: `Guard check for plan ${plan.id}` })).toBeTruthy();
+  });
+
+  it('a short plan id is shown whole', () => {
+    render(<GuardReceipt plan={{ ...hotDayPlan(), id: 'plan_Short01' as ReturnType<typeof hotDayPlan>['id'] }} />);
+    expect(screen.getByTestId('receipt-title').textContent).toBe('Guard · plan plan_Short01');
+  });
+
   it('a plan the guard refuses is still REJECTED', () => {
     render(<GuardReceipt plan={rejectedPlan()} />);
     expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');

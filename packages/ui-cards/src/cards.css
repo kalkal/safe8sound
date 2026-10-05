@@ -301,16 +301,22 @@
     }
   }
 
+  /* The receipt is paper in both themes, with a torn, serrated edge at the top and the bottom (design analysis G4):
+     the frame that explains the guard without words. The teeth are a CSS mask, the colours its own tokens (AA on the
+     paper, tested). */
   .receipt {
+    --tooth: calc(var(--space-4) + var(--space-1));
+
     display: grid;
     gap: var(--space-2);
-    padding: var(--space-4);
-    border: var(--border-thin) dashed var(--surface-card-line);
-    border-radius: var(--radius-cube);
-    background: var(--surface-card-raised);
-    color: var(--text-primary);
+    padding: calc(var(--space-4) + var(--tooth) / 2) var(--space-4);
+    background: var(--receipt-paper);
+    color: var(--receipt-ink);
     font-family: var(--font-data);
     font-size: var(--font-size-min);
+    mask:
+      conic-gradient(from -45deg at bottom, transparent, currentcolor 1deg 89deg, transparent 90deg) bottom / var(--tooth) 51% repeat-x,
+      conic-gradient(from 135deg at top, transparent, currentcolor 1deg 89deg, transparent 90deg) top / var(--tooth) 51% repeat-x;
 
     & p {
       margin: 0;
@@ -320,12 +326,15 @@
   .receipt-title {
     font-weight: var(--font-weight-bold);
     text-align: center;
-    overflow-wrap: anywhere;
+    /* One line, like a till: a long plan id is already cut to its first characters (shortId). */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .receipt-subtitle,
   .receipt-summary {
-    color: var(--text-secondary);
+    color: var(--receipt-ink-2);
     text-align: center;
   }
 
@@ -334,7 +343,7 @@
     gap: var(--space-3);
     margin: 0;
     padding: var(--space-3) 0;
-    border-block: var(--border-thin) dashed var(--surface-card-line);
+    border-block: var(--border-thin) dashed var(--receipt-rule);
     list-style: none;
   }
 
@@ -349,33 +358,35 @@
   }
 
   .receipt-verdict {
-    color: var(--status-ok);
+    color: var(--receipt-pass);
     font-weight: var(--font-weight-bold);
   }
 
   .receipt-row[data-ok="false"] .receipt-verdict {
-    color: var(--status-alert);
+    color: var(--receipt-fail);
   }
 
   .receipt-reason,
   .receipt-numbers {
     grid-column: 1 / -1;
-    color: var(--text-secondary);
+    color: var(--receipt-ink-2);
   }
 
   .receipt-stamp {
     justify-self: center;
+    margin-block: var(--space-2);
     padding: var(--space-1) var(--space-4);
-    border: calc(var(--border-thin) * 3) solid var(--status-ok);
+    border: calc(var(--border-thin) * 4) solid var(--receipt-pass);
     border-radius: var(--radius-cube);
-    color: var(--status-ok);
-    font-size: var(--font-size-lead);
+    color: var(--receipt-pass);
+    font-size: calc(var(--font-size-lead) * 1.4);
     font-weight: var(--font-weight-bold);
+    text-align: center;
     rotate: -6deg;
 
     &[data-approved="false"] {
-      border-color: var(--status-alert);
-      color: var(--status-alert);
+      border-color: var(--receipt-fail);
+      color: var(--receipt-fail);
     }
   }
 

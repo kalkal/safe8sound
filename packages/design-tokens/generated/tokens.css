@@ -50,6 +50,12 @@
     --sky-glow: light-dark(oklch(0.8091 0.1259 55.14 / 0.55), oklch(0.8091 0.1259 55.14 / 0.55));
     --sky-cloud: light-dark(oklch(0.6821 0.0544 293.58 / 0.4), oklch(0.6821 0.0544 293.58 / 0.4));
     --frame-bezel: light-dark(oklch(0.1702 0.0240 268.48), oklch(0.1702 0.0240 268.48));
+    --receipt-paper: light-dark(oklch(0.9642 0.0152 90.23), oklch(0.9642 0.0152 90.23));
+    --receipt-ink: light-dark(oklch(0.2076 0.0135 258.37), oklch(0.2076 0.0135 258.37));
+    --receipt-ink-2: light-dark(oklch(0.4453 0.0270 254.55), oklch(0.4453 0.0270 254.55));
+    --receipt-rule: light-dark(oklch(0.2076 0.0135 258.37 / 0.16), oklch(0.2076 0.0135 258.37 / 0.16));
+    --receipt-pass: light-dark(oklch(0.5084 0.1330 151.02), oklch(0.5084 0.1330 151.02));
+    --receipt-fail: light-dark(oklch(0.5013 0.1783 28.70), oklch(0.5013 0.1783 28.70));
     --cube-fill: linear-gradient(145deg, light-dark(oklch(0.9696 0.0213 186.03), oklch(1.0000 0.0000 0.00)) 0%, light-dark(oklch(0.8686 0.0689 187.94), oklch(0.9585 0.0286 185.95)) 35%, light-dark(oklch(0.7476 0.1070 186.66), oklch(0.8686 0.0689 187.94)) 100%);
     --sky-mild: linear-gradient(135deg, light-dark(oklch(0.4641 0.2366 263.79), oklch(0.4641 0.2366 263.79)) 0%, light-dark(oklch(0.6478 0.1106 194.77), oklch(0.6478 0.1106 194.77)) 52%, light-dark(oklch(0.7968 0.1636 159.69), oklch(0.7968 0.1636 159.69)) 100%);
     --sky-hot: linear-gradient(135deg, light-dark(oklch(0.4641 0.2366 263.79), oklch(0.4641 0.2366 263.79)) 0%, light-dark(oklch(0.6478 0.1106 194.77), oklch(0.6478 0.1106 194.77)) 52%, light-dark(oklch(0.8245 0.1486 73.35), oklch(0.8245 0.1486 73.35)) 100%);

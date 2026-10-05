@@ -4,13 +4,19 @@ import { isSimulated } from './plan-model.js';
 import { formatMeasure, t } from './text.js';
 
 
+const SHORT_ID_CHARS = 9;
+
+/** A plan id as a till prints it (design analysis G4): a long one cut to its first characters and "…", never wrapped. */
+export const shortId = (id: string): string => (id.length > SHORT_ID_CHARS + 3 ? `${id.slice(0, SHORT_ID_CHARS)}…` : id);
+
 /** The guard as a till receipt (signature element 4): all five guarantees, deterministic, no AI. */
 export function GuardReceipt({ plan }: { plan: Plan }) {
   const simulated = isSimulated(plan);
   return (
     <ReceiptView
       guarantees={plan.guarantees}
-      title={t('receipt.title', { id: plan.id })}
+      title={t('receipt.title', { id: shortId(plan.id) })}
+      fullId={plan.id}
       list={t('receipt.list', { id: plan.id })}
       origin={simulated ? 'simulated' : 'live'}
       caveat={simulated && plan.homeId === REAL_HOME_ID}
@@ -42,6 +48,8 @@ export function RefusalReceipt({ refusal }: { refusal: ErrorEnvelope }) {
 interface ReceiptViewProps {
   guarantees: readonly GuaranteeResult[];
   title: string;
+  /** The whole plan id, on hover; screen readers hear it in the list name. */
+  fullId?: string;
   list: string;
   origin?: DataOriginValue;
   /** Guarantees computed on simulated data for the real home: said, never presented as about the real home. */
@@ -49,7 +57,7 @@ interface ReceiptViewProps {
   lastResort: boolean;
 }
 
-function ReceiptView({ guarantees, title, list, origin, caveat, lastResort }: ReceiptViewProps) {
+function ReceiptView({ guarantees, title, fullId, list, origin, caveat, lastResort }: ReceiptViewProps) {
   const results = GUARANTEE_IDS.map((id) => guarantees.find((g) => g.id === id)).filter((g) => g !== undefined);
   const passed = results.filter((g) => g.ok).length;
   const approved = passed === GUARANTEE_IDS.length;
@@ -66,7 +74,9 @@ function ReceiptView({ guarantees, title, list, origin, caveat, lastResort }: Re
       {/* Guarantees computed on simulated data are never presented as guarantees about the real home. */}
       {caveat && <p className="warning">{t('receipt.simulatedCaveat')}</p>}
       <div className="receipt">
-        <p className="receipt-title">{title}</p>
+        <p className="receipt-title" data-testid="receipt-title" {...(fullId === undefined ? {} : { title: fullId })}>
+          {title}
+        </p>
         <p className="receipt-subtitle">{t('receipt.subtitle')}</p>
         <ul className="receipt-rows" aria-label={list}>
           {results.map((g) => (

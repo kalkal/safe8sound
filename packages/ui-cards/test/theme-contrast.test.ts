@@ -22,6 +22,14 @@ describe('textPairs (which text colour sits on which background)', () => {
     ]);
   });
 
+  it('pairs the receipt ink (receipt-*) with the receipt paper, the surface it is printed on', () => {
+    expect(textPairs('.r-row { color: var(--receipt-ink-2); } .x { color: var(--text-primary); }')).toEqual([
+      ['receipt-ink-2', 'receipt-paper'],
+      ['text-primary', 'surface-card'],
+      ['text-primary', 'surface-card-raised'],
+    ]);
+  });
+
   it('pairs a nested block that changes only the background with the colour it inherits', () => {
     const css = '.btn { color: var(--button-primary-text); background: var(--button-primary-bg); &:hover { background: var(--button-primary-bg-hover); } }';
     expect(textPairs(css)).toContainEqual(['button-primary-text', 'button-primary-bg-hover']);

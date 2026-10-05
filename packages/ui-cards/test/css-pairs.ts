@@ -4,6 +4,8 @@
 // page text colour). Decorative pseudo-elements without text (`content: ""`) are skipped.
 
 const CARD_SURFACES = ['surface-card', 'surface-card-raised'];
+/** The guard receipt is paper in both themes: its own ink tokens (receipt-*) sit on the paper, never on the card. */
+const surfacesOf = (fg: string): string[] => (fg.startsWith('receipt-') ? ['receipt-paper'] : CARD_SURFACES);
 const PAGE_TEXT = 'text-primary';
 
 interface Block {
@@ -56,7 +58,7 @@ export function textPairs(source: string): Array<[string, string]> {
     const fg = colorOf(declarations);
     const bg = backgroundOf(declarations);
     if (fg !== undefined) {
-      for (const surface of bg === undefined ? CARD_SURFACES : [bg]) pairs.push([fg, surface]);
+      for (const surface of bg === undefined ? surfacesOf(fg) : [bg]) pairs.push([fg, surface]);
     } else if (bg !== undefined) {
       pairs.push([inheritedColor(block.parent), bg]);
     }
