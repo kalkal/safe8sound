@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { expectVoiceMatchesCards } from '../voice-screen.js';
 
 // Demo script, scene 3 (F8c, #24): the storm. The power goes out: the safe-room card and the night (the
 // storm-themed plan card) answer inside ui:// frames, and the daughter's phone gets the Mileti-style
@@ -9,22 +10,6 @@ type Page = import('@playwright/test').Page;
 async function ask(page: Page, question: string) {
   await page.getByLabel('Ask a question').fill(question);
   await page.getByRole('button', { name: 'Ask' }).click();
-}
-
-/** Numbers and times as whole tokens; a time is written HH:MM ("6:40" and "06:40" are the same time). */
-function numberTokens(text: string): Set<string> {
-  const tokens = text.match(/(?<![\d.:])\d+(?:[.:]\d+)?(?![\d.:])/g) ?? [];
-  return new Set(tokens.map((t) => (/^\d:\d\d$/.test(t) ? `0${t}` : t)));
-}
-
-/**
- * Voice and screen say the same numbers (Amazon CX guide; design review row 17): every number or time in
- * the spoken answer is a whole token of the safe-room card, the card the sentence describes.
- */
-async function expectVoiceMatchesSafeRoom(page: Page) {
-  const spoken = numberTokens(await page.getByTestId('answer').last().locator('.answer-text').innerText());
-  const shown = numberTokens(await page.frameLocator('iframe[title="Safe room card"]').locator('body').innerText());
-  for (const n of spoken) expect(shown.has(n), `"${n}" is said but not shown on the safe-room card`).toBe(true);
 }
 
 test('scene 3: power out → safe room and the night, the daughter is told; Essential; power is back', async ({ page }) => {
@@ -46,7 +31,10 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await expect(home.getByRole('listitem', { name: 'Bedroom 1' })).toContainText('Served');
   await expect(home.getByRole('listitem', { name: 'Living' })).toContainText('Waiting: the level cools fewer rooms right now');
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toContainText('keeps it safe until');
-  await expectVoiceMatchesSafeRoom(page);
+  await expectVoiceMatchesCards(page, ['Safe room card']);
+
+  await ask(page, 'How is grandpa?');
+  await expectVoiceMatchesCards(page, ['Safe room card']);
 
   await ask(page, 'Switch to essential');
   await expect(phone.getByRole('article', { name: 'Switched to Essential' })).toBeVisible();

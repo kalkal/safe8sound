@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { expectVoiceMatchesCards } from '../voice-screen.js';
 
 // The last resort by touch (#160, #24): the plan card says honestly until when the safe room stays within
 // its limits, the receipt says it is a last resort, and the plan is applied in two taps, the second one
@@ -19,6 +20,7 @@ test('last resort: honest headline, two taps to apply, the family is told', asyn
   // Every number the voice says is on the card.
   const spoken = await page.getByTestId('answer').last().locator('.answer-text').innerText();
   for (const n of ['22:00', '26.1', '03:00']) expect(spoken).toContain(n);
+  await expectVoiceMatchesCards(page, ['Plan card']);
 
   await plan.getByRole('button', { name: 'Apply the last-resort plan' }).click();
   await expect(card.getByRole('status').filter({ hasText: 'Not applied yet: this is a last resort.' })).toBeVisible();

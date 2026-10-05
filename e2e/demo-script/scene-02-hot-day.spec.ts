@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { expectVoiceMatchesCards } from '../voice-screen.js';
 
 // Demo script, scene 2 (F8b): the hot-day plan as an MCP Apps card. The person asks; the plan card and
 // the guard receipt answer inside a sandboxed ui:// frame; Apply calls apply_plan through the host
@@ -16,6 +17,7 @@ test('scene 2: a hot day → plan card with ribbon, reserve line and receipt →
   await expect(plan.getByTestId('origin-badge')).toContainText('SIMULATED');
   await expect(plan.getByRole('img', { name: 'Storm reserve 6 kWh (43%), never used for comfort.' })).toBeVisible();
   await expect(card.getByRole('region', { name: 'Guard check' }).getByTestId('receipt-stamp')).toHaveText('APPROVED');
+  await expectVoiceMatchesCards(page, ['Plan card']);
 
   await plan.getByRole('button', { name: 'Apply plan' }).click();
   await expect(card.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();

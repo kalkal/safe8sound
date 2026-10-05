@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { expectVoiceMatchesCards } from '../voice-screen.js';
 
 // Video scene 2a (#203, #227): an ordinary sunny afternoon. The plan card says where the solar surplus went instead
 // of the grid: the window, the kWh kept at home, the rooms in order by name. It reads without narration, the voice
@@ -17,6 +18,7 @@ for (const width of [375, 1280]) {
     await expect(surplus.getByRole('listitem')).toHaveText([/^Bedroom 1Safe room/, /^LivingOccupied/]);
     await expect(card.getByTestId('origin-badge').first()).toContainText('SIMULATED');
     await expect(page.getByTestId('answer').last()).toContainText('2.4 kWh between 12:00 and 16:00');
+    await expectVoiceMatchesCards(page, ['Plan card']);
     expect(await page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(width);
   });
 }

@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { expectVoiceMatchesCards } from '../voice-screen.js';
 
 // Scene 2b of the video (#186, #202): the model proposes too much and the guard refuses it, on the storm reserve,
 // the product's own promise. The answer is never only a refusal: the plan card shows the plan that holds, says what
@@ -18,6 +19,7 @@ test('a refused proposal: the storm reserve said by voice and card, the plan tha
   await expect(page.locator('iframe[title="Plan card"]')).toHaveCount(1);
   await expect(card.getByRole('alert')).toHaveCount(0);
   await expect(card.getByRole('region', { name: 'Guard check' }).getByTestId('receipt-stamp')).toHaveText('APPROVED');
+  await expectVoiceMatchesCards(page, ['Plan card']);
 
   const plan = card.getByRole('region', { name: 'Plan' });
   await plan.getByRole('button', { name: 'Apply plan' }).click();
