@@ -502,6 +502,8 @@
     }
 
     .echo-scroll {
+      /* Padding inside the 100%: a taller scroller hid its last 48 px under the bezel, out of reach (#258). */
+      box-sizing: border-box;
       block-size: 100%;
       overflow: auto;
       padding: var(--space-6);

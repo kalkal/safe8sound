@@ -1,7 +1,7 @@
 /** Shared MCP Apps card components (plan §11.1): data in, callbacks out, tokens only. */
 export const packageName = '@cold-reserve/ui-cards';
 
-export { CardApp, type CardAppProps } from './app/CardApp.js';
+export { CARD_WAITING_MIN_PX, CardApp, type CardAppProps } from './app/CardApp.js';
 export {
   BUNDLE_BUDGET_BYTES,
   CARD_KINDS,

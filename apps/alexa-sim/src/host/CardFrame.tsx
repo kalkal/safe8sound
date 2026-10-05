@@ -1,5 +1,5 @@
 import { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge';
-import { CARD_KINDS, DEMO_CONTEXT_KEY, type CardKind } from '@cold-reserve/ui-cards';
+import { CARD_KINDS, CARD_WAITING_MIN_PX, DEMO_CONTEXT_KEY, type CardKind } from '@cold-reserve/ui-cards';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ToolCard } from '../agent/wire.js';
 import { log } from '../log.js';
@@ -15,7 +15,8 @@ import { answerCardCall, confirmationFor } from './tool-calls.js';
 // color-scheme follows the card theme.
 
 const HOST_INFO = { name: 'cold-reserve-alexa-sim', version: '0.1.0' };
-const INITIAL_HEIGHT_PX = 360;
+/** The card keeps this height while it waits for its result (ui-cards), so the frame never shrinks and grows back. */
+const INITIAL_HEIGHT_PX = CARD_WAITING_MIN_PX;
 /** The modes this host can show a card in (#200): full screen only when the person asks for it. */
 const DISPLAY_MODES: ('inline' | 'fullscreen')[] = ['inline', 'fullscreen'];
 

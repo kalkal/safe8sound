@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { FakeVoiceDriver } from '../../apps/alexa-sim/src/voice/fake-voice.js';
+import { expectScreenSettled } from '../screen-settled.js';
 import { expect, test } from '../no-network.js';
 
 // The voice round trip of F8d (#25, P1): the real page and conversation machine with scripted speech
@@ -57,6 +58,7 @@ test('voice and touch together: a hot-day plan asked by voice is applied by touc
     d.finishAudio();
   });
   const card = page.frameLocator('iframe[title="Plan card"]');
+  await expectScreenSettled(page);
   await card.getByRole('button', { name: 'Apply plan' }).click();
   await expect(card.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
 });

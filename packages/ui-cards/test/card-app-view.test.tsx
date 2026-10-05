@@ -3,7 +3,7 @@ import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPubl
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CardApp } from '../src/app/CardApp.js';
+import { CARD_WAITING_MIN_PX, CardApp } from '../src/app/CardApp.js';
 import type { CardState } from '../src/app/card-kinds.js';
 import { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, safeRoomInStorm } from '../src/fixtures.js';
 import { homeInStorm } from '../src/home-fixtures.js';
@@ -20,6 +20,9 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
   it('waits calmly for the tool result', () => {
     show({ kind: 'waiting' });
     expect(screen.getByRole('status').textContent).toBe('Loading…');
+    // While it waits, the card keeps the height the host first gives its frame: it never shrinks and grows back, which
+    // moved the page under a finger (#258, #246).
+    expect(screen.getByRole('status').style.minBlockSize).toBe(`${String(CARD_WAITING_MIN_PX)}px`);
   });
 
   it('shows the plan and the guard receipt; Apply calls apply_plan through the host', () => {

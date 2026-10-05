@@ -1,3 +1,4 @@
+import { expectScreenSettled } from '../screen-settled.js';
 import { expect, test } from '../no-network.js';
 
 // Queue item 3 (#24): during the storm the daughter's phone answers by touch, "I'm on my way" or "Check status".
@@ -13,8 +14,12 @@ test('the family phone answers during the storm, by touch, on a 375 px phone', a
   await page.getByLabel('Ask a question').fill("The power's out");
   await page.getByRole('button', { name: 'Ask' }).click();
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toBeVisible();
+  // The storm's cards above the phone grow to their content first: a tap before that could land elsewhere (#246).
+  await expectScreenSettled(page);
 
   const replies = phone.getByRole('group', { name: 'Reply' });
+  // Like the person, scroll down to the phone first, then tap: the tap is never part of a scroll (#246).
+  await replies.scrollIntoViewIfNeeded();
   await replies.getByRole('button', { name: "I'm on my way" }).click();
   await expect(replies.getByRole('status')).toHaveText("Sent: they know you're on your way.");
   await replies.getByRole('button', { name: 'Check status' }).click();

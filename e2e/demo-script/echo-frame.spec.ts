@@ -22,6 +22,9 @@ test('at 1280 × 800 the device and its 16:10 screen fit the window, with no sid
   expect(box.x + box.width).toBeLessThanOrEqual(1280);
   expect(box.y + box.height).toBeLessThanOrEqual(800);
   expect(box.width / box.height).toBeCloseTo(1.6, 1);
+  // The scroller fits the screen: nothing can hide under the bezel, out of sight and out of reach (#258).
+  const scroller = await page.locator('.echo-scroll').boundingBox();
+  expect(scroller && Math.abs(scroller.y + scroller.height - (box.y + box.height))).toBeLessThan(1);
   expect(await page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(1280);
 });
 

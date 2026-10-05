@@ -13,6 +13,12 @@ import { DisplayToggle, type DisplayControl } from '../CardShell.js';
 import { CardErrorBoundary } from './CardErrorBoundary.js';
 import type { CardState } from './card-kinds.js';
 
+/**
+ * The height a host first gives a card frame, kept while the card waits for its result: a card that reported the
+ * one-line "Loading…" height and then grew made the page jump under a finger or a click (#258, #246).
+ */
+export const CARD_WAITING_MIN_PX = 360;
+
 export interface CardAppProps {
   state: CardState;
   /** IANA zone from hostContext.timeZone: on an Echo Show at home it is the home's clock. */
@@ -49,7 +55,7 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
   switch (state.kind) {
     case 'waiting':
       return (
-        <p className="muted" role="status">
+        <p className="muted" role="status" style={{ minBlockSize: `${String(CARD_WAITING_MIN_PX)}px` }}>
           {t('card.loading')}
         </p>
       );
