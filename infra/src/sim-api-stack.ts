@@ -169,9 +169,11 @@ export class SimApiStack extends Stack {
       metricNamespace: `ColdReserve/${stage}`,
       metricName: 'InternalErrors',
       metricValue: '1',
-      dimensions: { Function: 'sim-api' },
+      // A dimension value is a log field, never a constant (#275): every sim-api line carries component "sim-api".
+      // Without a dimension this metric would be the MCP server's, and each alarm would fire on the other's errors.
+      dimensions: { Component: '$.component' },
     })
-      .metric({ period: Duration.minutes(5), statistic: 'Sum', dimensionsMap: { Function: 'sim-api' } })
+      .metric({ period: Duration.minutes(5), statistic: 'Sum', dimensionsMap: { Component: 'sim-api' } })
       .createAlarm(this, 'InternalErrors', {
         alarmDescription: 'The sim-api logged an error of category "internal" (a bug or a broken configuration).',
         threshold: 0,

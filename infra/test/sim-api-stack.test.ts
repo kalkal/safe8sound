@@ -120,6 +120,11 @@ describe('sim-api stack (#17)', () => {
     t.hasResourceProperties('AWS::CloudWatch::Alarm', { MetricName: 'InternalErrors', Threshold: 0 });
   });
 
+  it('counts its internal errors under its own dimension, read from the log line, so the MCP server errors never fire its alarm (#275)', () => {
+    t.hasResourceProperties('AWS::Logs::MetricFilter', { MetricTransformations: [Match.objectLike({ MetricName: 'InternalErrors', Dimensions: [{ Key: 'Component', Value: '$.component' }] })] });
+    t.hasResourceProperties('AWS::CloudWatch::Alarm', { MetricName: 'InternalErrors', Dimensions: [{ Name: 'Component', Value: 'sim-api' }] });
+  });
+
   it('alarms on the p95 duration from config in 2 of 3 periods', () => {
     t.hasResourceProperties('AWS::CloudWatch::Alarm', { MetricName: 'Duration', ExtendedStatistic: 'p95', Threshold: 9000, EvaluationPeriods: 3, DatapointsToAlarm: 2 });
   });

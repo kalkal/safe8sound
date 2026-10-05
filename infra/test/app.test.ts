@@ -36,6 +36,17 @@ describe('buildApp', () => {
     buildApp(newApp(), config, SITE_DIR).synth();
   }, 90_000);
 
+  it('every metric filter dimension reads a log field ($.), never a constant: CloudFormation refuses a constant and synth does not catch it (#275)', () => {
+    const app = buildApp(newApp(), config, SITE_DIR);
+    const values = stacksOf(app).flatMap((stack) =>
+      Object.values(Template.fromStack(stack).findResources('AWS::Logs::MetricFilter')).flatMap((r) =>
+        ((r as { Properties: { MetricTransformations: { Dimensions?: { Value: string }[] }[] } }).Properties.MetricTransformations).flatMap((m) => (m.Dimensions ?? []).map((d) => d.Value)),
+      ),
+    );
+    expect(values.length).toBeGreaterThan(0);
+    for (const v of values) expect(v).toMatch(/^\$\./);
+  });
+
   it('creates one foundation stack per stage, in the configured region', () => {
     const app = buildApp(newApp(), { ...config, region: 'eu-south-1' }, SITE_DIR);
     const stacks = stacksOf(app);
