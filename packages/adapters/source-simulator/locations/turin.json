@@ -1,0 +1,481 @@
+{
+  "schemaVersion": 1,
+  "id": "turin",
+  "label": "Turin, Italy",
+  "latRounded": 45.1,
+  "lonRounded": 7.7,
+  "tz": "Europe/Rome",
+  "source": {
+    "name": "Weather data by Open-Meteo.com (Historical Weather API, ERA5: Copernicus Climate Change Service)",
+    "url": "https://open-meteo.com/",
+    "license": "CC BY 4.0",
+    "retrievedAt": "2026-10-04"
+  },
+  "pvYieldFactor": 1,
+  "days": {
+    "clear-day": {
+      "date": "2024-07-22",
+      "selectionRule": "Among the days of 2024-07 without precipitation, the one with the most shortwave radiation; ties: the earliest.",
+      "hourly": [
+        {
+          "tempOutC": 21.5,
+          "humidityOutPct": 71,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 21.3,
+          "humidityOutPct": 73,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 20.9,
+          "humidityOutPct": 73,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 20.6,
+          "humidityOutPct": 75,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 20.2,
+          "humidityOutPct": 79,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 19.9,
+          "humidityOutPct": 81,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 19.5,
+          "humidityOutPct": 82,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 20.2,
+          "humidityOutPct": 77,
+          "irradianceWm2": 29
+        },
+        {
+          "tempOutC": 21.9,
+          "humidityOutPct": 70,
+          "irradianceWm2": 154
+        },
+        {
+          "tempOutC": 24.3,
+          "humidityOutPct": 64,
+          "irradianceWm2": 336
+        },
+        {
+          "tempOutC": 26.2,
+          "humidityOutPct": 59,
+          "irradianceWm2": 511
+        },
+        {
+          "tempOutC": 28,
+          "humidityOutPct": 54,
+          "irradianceWm2": 666
+        },
+        {
+          "tempOutC": 29.3,
+          "humidityOutPct": 49,
+          "irradianceWm2": 795
+        },
+        {
+          "tempOutC": 30.6,
+          "humidityOutPct": 47,
+          "irradianceWm2": 844
+        },
+        {
+          "tempOutC": 31.4,
+          "humidityOutPct": 46,
+          "irradianceWm2": 829
+        },
+        {
+          "tempOutC": 32.3,
+          "humidityOutPct": 45,
+          "irradianceWm2": 687
+        },
+        {
+          "tempOutC": 32.7,
+          "humidityOutPct": 44,
+          "irradianceWm2": 647
+        },
+        {
+          "tempOutC": 32.9,
+          "humidityOutPct": 43,
+          "irradianceWm2": 581
+        },
+        {
+          "tempOutC": 32.6,
+          "humidityOutPct": 42,
+          "irradianceWm2": 463
+        },
+        {
+          "tempOutC": 31.9,
+          "humidityOutPct": 46,
+          "irradianceWm2": 301
+        },
+        {
+          "tempOutC": 30.6,
+          "humidityOutPct": 50,
+          "irradianceWm2": 175
+        },
+        {
+          "tempOutC": 28.2,
+          "humidityOutPct": 52,
+          "irradianceWm2": 40
+        },
+        {
+          "tempOutC": 26.1,
+          "humidityOutPct": 61,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 25.3,
+          "humidityOutPct": 62,
+          "irradianceWm2": 0
+        }
+      ],
+      "sun": {
+        "sunrise": [
+          "2024-07-22T06:03:00+02:00",
+          "2024-07-23T06:04:00+02:00"
+        ],
+        "sunset": [
+          "2024-07-22T21:06:00+02:00"
+        ]
+      }
+    },
+    "heatwave": {
+      "date": "2024-07-28",
+      "selectionRule": "The day of 2024-07 with the highest maximum 2 m temperature (00:00-23:00 local); ties: the earliest.",
+      "hourly": [
+        {
+          "tempOutC": 23.9,
+          "humidityOutPct": 79,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 23.7,
+          "humidityOutPct": 77,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 23.6,
+          "humidityOutPct": 77,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 23,
+          "humidityOutPct": 79,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 22.3,
+          "humidityOutPct": 82,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 22.3,
+          "humidityOutPct": 81,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 22.5,
+          "humidityOutPct": 81,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 23.6,
+          "humidityOutPct": 75,
+          "irradianceWm2": 21
+        },
+        {
+          "tempOutC": 24.2,
+          "humidityOutPct": 70,
+          "irradianceWm2": 136
+        },
+        {
+          "tempOutC": 25.8,
+          "humidityOutPct": 67,
+          "irradianceWm2": 275
+        },
+        {
+          "tempOutC": 27.8,
+          "humidityOutPct": 66,
+          "irradianceWm2": 437
+        },
+        {
+          "tempOutC": 29.8,
+          "humidityOutPct": 62,
+          "irradianceWm2": 595
+        },
+        {
+          "tempOutC": 31.4,
+          "humidityOutPct": 58,
+          "irradianceWm2": 722
+        },
+        {
+          "tempOutC": 33,
+          "humidityOutPct": 53,
+          "irradianceWm2": 827
+        },
+        {
+          "tempOutC": 33.9,
+          "humidityOutPct": 50,
+          "irradianceWm2": 804
+        },
+        {
+          "tempOutC": 35,
+          "humidityOutPct": 47,
+          "irradianceWm2": 831
+        },
+        {
+          "tempOutC": 34.8,
+          "humidityOutPct": 45,
+          "irradianceWm2": 612
+        },
+        {
+          "tempOutC": 34.7,
+          "humidityOutPct": 44,
+          "irradianceWm2": 456
+        },
+        {
+          "tempOutC": 34.5,
+          "humidityOutPct": 44,
+          "irradianceWm2": 413
+        },
+        {
+          "tempOutC": 33.5,
+          "humidityOutPct": 45,
+          "irradianceWm2": 287
+        },
+        {
+          "tempOutC": 32.3,
+          "humidityOutPct": 49,
+          "irradianceWm2": 157
+        },
+        {
+          "tempOutC": 30.1,
+          "humidityOutPct": 50,
+          "irradianceWm2": 35
+        },
+        {
+          "tempOutC": 27.5,
+          "humidityOutPct": 60,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 26.6,
+          "humidityOutPct": 65,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 26,
+          "humidityOutPct": 70,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 25.5,
+          "humidityOutPct": 71,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 25.4,
+          "humidityOutPct": 69,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 25.8,
+          "humidityOutPct": 69,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 25.6,
+          "humidityOutPct": 69,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 25.4,
+          "humidityOutPct": 71,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 24.7,
+          "humidityOutPct": 73,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 24.3,
+          "humidityOutPct": 76,
+          "irradianceWm2": 17
+        },
+        {
+          "tempOutC": 24.7,
+          "humidityOutPct": 72,
+          "irradianceWm2": 116
+        },
+        {
+          "tempOutC": 25.5,
+          "humidityOutPct": 69,
+          "irradianceWm2": 293
+        },
+        {
+          "tempOutC": 26.9,
+          "humidityOutPct": 71,
+          "irradianceWm2": 453
+        },
+        {
+          "tempOutC": 28.3,
+          "humidityOutPct": 68,
+          "irradianceWm2": 588
+        }
+      ],
+      "sun": {
+        "sunrise": [
+          "2024-07-28T06:10:00+02:00",
+          "2024-07-29T06:11:00+02:00"
+        ],
+        "sunset": [
+          "2024-07-28T21:00:00+02:00"
+        ]
+      }
+    },
+    "storm-blackout": {
+      "date": "2024-07-07",
+      "selectionRule": "The 24 hours from 12:00 in 2024-07 with the most precipitation; ties: the earliest.",
+      "hourly": [
+        {
+          "tempOutC": 23.5,
+          "humidityOutPct": 90,
+          "irradianceWm2": 262
+        },
+        {
+          "tempOutC": 24.2,
+          "humidityOutPct": 86,
+          "irradianceWm2": 189
+        },
+        {
+          "tempOutC": 24.8,
+          "humidityOutPct": 87,
+          "irradianceWm2": 211
+        },
+        {
+          "tempOutC": 25.1,
+          "humidityOutPct": 82,
+          "irradianceWm2": 239
+        },
+        {
+          "tempOutC": 24.7,
+          "humidityOutPct": 80,
+          "irradianceWm2": 361
+        },
+        {
+          "tempOutC": 24.3,
+          "humidityOutPct": 80,
+          "irradianceWm2": 183
+        },
+        {
+          "tempOutC": 23.2,
+          "humidityOutPct": 81,
+          "irradianceWm2": 250
+        },
+        {
+          "tempOutC": 21.6,
+          "humidityOutPct": 86,
+          "irradianceWm2": 102
+        },
+        {
+          "tempOutC": 20.8,
+          "humidityOutPct": 91,
+          "irradianceWm2": 61
+        },
+        {
+          "tempOutC": 20.5,
+          "humidityOutPct": 90,
+          "irradianceWm2": 25
+        },
+        {
+          "tempOutC": 20.3,
+          "humidityOutPct": 92,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 20.1,
+          "humidityOutPct": 95,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 20.1,
+          "humidityOutPct": 93,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 20,
+          "humidityOutPct": 93,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 19.9,
+          "humidityOutPct": 93,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 19.9,
+          "humidityOutPct": 93,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 19.8,
+          "humidityOutPct": 93,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 19.7,
+          "humidityOutPct": 92,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 19.7,
+          "humidityOutPct": 91,
+          "irradianceWm2": 0
+        },
+        {
+          "tempOutC": 19.9,
+          "humidityOutPct": 89,
+          "irradianceWm2": 8
+        },
+        {
+          "tempOutC": 20.4,
+          "humidityOutPct": 86,
+          "irradianceWm2": 34
+        },
+        {
+          "tempOutC": 21.2,
+          "humidityOutPct": 85,
+          "irradianceWm2": 82
+        },
+        {
+          "tempOutC": 22.3,
+          "humidityOutPct": 85,
+          "irradianceWm2": 241
+        },
+        {
+          "tempOutC": 23.4,
+          "humidityOutPct": 87,
+          "irradianceWm2": 273
+        }
+      ],
+      "sun": {
+        "sunrise": [
+          "2024-07-08T05:51:00+02:00"
+        ],
+        "sunset": [
+          "2024-07-07T21:17:00+02:00"
+        ]
+      }
+    }
+  }
+}

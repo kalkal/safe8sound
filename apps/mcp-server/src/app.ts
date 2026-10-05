@@ -303,9 +303,9 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   // start of their day, each on its own scenario clock. Before any settings are saved, today's sandbox (Q3).
   const sandboxDefaults: SandboxChoices = { scenarioId: start.value.scenarioId, locationId: 'reference', units: 'C', household: 'older-man' };
   const playSandbox = (homeId: HomeId, choices: SandboxChoices & { readonly version?: number | undefined; readonly scenarioStartedAt?: string | undefined }): Result<SandboxPlay, ErrorEnvelope> => {
-    // Only the reference place ships until L2 (C2b Q2): set_scenario refuses the others before they are stored.
-    if (choices.locationId !== 'reference') return err(toolError('invalid_config', 'The stored place is not available.', { details: { field: 'locationId' } }));
-    const place = builtInPlace(choices.locationId);
+    // Every place ships (L2, #247); a place the simulator did not know would be refused by set_scenario first.
+    const place = shippedPlace(choices.locationId);
+    if (place === undefined) return err(toolError('invalid_config', 'The stored place is not available.', { details: { field: 'locationId' } }));
     const played = withHousehold(builtInScenario(choices.scenarioId, choices.locationId), choices.household);
     const sandboxScenario = startSoc === undefined ? played : { ...played, initial: { ...played.initial, batterySocPct: pct(startSoc) } };
     const homeClock = timeline.value.clockFor({

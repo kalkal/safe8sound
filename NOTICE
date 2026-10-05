@@ -1,0 +1,7 @@
+Third-party data in this repository
+
+Weather data for Turin and Houston (packages/adapters/source-simulator/locations/turin*.json, houston*.json):
+Weather data by Open-Meteo.com (https://open-meteo.com/), licensed under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/). Historical Weather API, ERA5 reanalysis:
+Copernicus Climate Change Service (C3S). Hourly values for July 2024, fetched once on 2026-10-04 by
+packages/adapters/source-simulator/scripts/fetch-location.ts; values rounded, nothing else changed.

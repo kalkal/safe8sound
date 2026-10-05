@@ -20,6 +20,10 @@ const PlaceDaySchema = z.strictObject({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   hourly: z.array(z.strictObject({ tempOutC: CelsiusSchema, humidityOutPct: PctSchema, irradianceWm2: z.number().nonnegative() })).min(1),
   sun: z.strictObject({ sunrise: z.array(IsoDateTimeSchema), sunset: z.array(IsoDateTimeSchema) }),
+  /** How the day was chosen, in words (L2): a rule written before the data was fetched. */
+  selectionRule: z.string().min(1).max(300).optional(),
+  /** One line on what the data does not say (L2): for example that the outage hours are the script's. */
+  note: z.string().min(1).max(300).optional(),
   /** A real outage on that day, in hours from the scenario start, added to the script's own. */
   outage: z.strictObject({ fromH: z.number().nonnegative(), toH: z.number().positive(), cause: z.string().min(1).max(120) }).optional(),
 });
@@ -106,4 +110,33 @@ export function mergeScenario(rawScript: unknown, place: Place, profile: HomePro
 /** A sandbox home in a place: its location (rounded coordinates, IANA zone) is the place's. */
 export function profileAtPlace(profile: HomeProfile, place: Place): HomeProfile {
   return { ...profile, location: { latRounded: place.latRounded, lonRounded: place.lonRounded, tz: place.tz } };
+}
+
+/**
+ * A place's real month, hour by hour (L2, #247), for the nights study (D1): local times in the place's zone, every hour
+ * in order with none missing. Private to the adapter, like the place file.
+ */
+export const MonthSchema = z
+  .strictObject({
+    schemaVersion: z.literal(1),
+    id: LocationIdSchema,
+    month: z.string().regex(/^\d{4}-\d{2}$/),
+    tz: z.string().refine(isTimeZone, { message: 'An IANA time zone, like Europe/Rome' }),
+    source: z.strictObject({ name: z.string().min(1).max(120), url: z.url(), license: z.string().min(1).max(120), retrievedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
+    hourly: z.array(z.strictObject({ time: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:00$/), tempOutC: CelsiusSchema, humidityOutPct: PctSchema, irradianceWm2: z.number().nonnegative() })),
+  })
+  .superRefine((m, ctx) => {
+    const [y, mo] = m.month.split('-').map(Number) as [number, number];
+    const days = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+    const expected = Array.from({ length: days * 24 }, (_, i) => `${m.month}-${String(Math.floor(i / 24) + 1).padStart(2, '0')}T${String(i % 24).padStart(2, '0')}:00`);
+    if (m.hourly.length !== expected.length || m.hourly.some((h, i) => h.time !== expected[i])) {
+      ctx.addIssue({ code: 'custom', path: ['hourly'], message: `Every hour of ${m.month}, in order, none missing` });
+    }
+  });
+export type Month = z.infer<typeof MonthSchema>;
+
+/** Validates a month file; an invalid one names its fields, never its content. */
+export function parseMonth(raw: unknown): Result<Month, ErrorEnvelope> {
+  const parsed = MonthSchema.safeParse(raw);
+  return parsed.success ? ok(parsed.data) : err(invalidConfig('Month', zodIssues(parsed.error)));
 }

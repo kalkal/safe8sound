@@ -33,7 +33,7 @@ export interface DemoSettingsDeps {
   /** Wall clock: settings are shared by every container, so their times are real ones. */
   readonly wallClock: Clock;
   readonly defaults: SandboxChoices;
-  /** A shipped place, or undefined while it is not available (Turin and Houston come with L2). */
+  /** A shipped place (reference, Turin, Houston since L2, #247), or undefined for one the simulator does not ship. */
   readonly place: (id: LocationId) => PlaceView | undefined;
   readonly logger: Logger;
   /** Plays the new settings in this container at once; the others see them at their next request. */

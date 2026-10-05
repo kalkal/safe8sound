@@ -41,9 +41,22 @@ The 1R1C constants are in K/kW and kWh/K as in the contract.
   sunrise and sunset, and an optional real `outage` added to the script's. The scenario starts at the
   script's local hour on that day, in the place's zone. The `reference` place keeps the numbers the scenarios
   had before the split (a test compares them with a copy of the old files): its clear-day and heatwave weather
-  is the PVGIS July profile of S6 turned into irradiance. Turin and Houston come with L2. A sandbox home takes
+  is the PVGIS July profile of S6 turned into irradiance. A sandbox home takes
   its location from its place (`profileAtPlace`). An invalid place file is `invalid_config` naming its fields,
   never their content.
+- **Turin and Houston** (L2, #247) are real July 2024 days from Open-Meteo's historical archive (ERA5), fetched once
+  by `scripts/fetch-location.ts` (never in CI, tests or the demo; its logic is tested on made-up answers in
+  `test/place-from-archive.test.ts`).
+  - Coordinates are city centres rounded to one decimal.
+  - `pvYieldFactor` is 1: real irradiance already carries the place.
+  - Each day keeps the `selectionRule` that chose it, written and approved before any data was fetched; ties go to the earliest day.
+  - The rules, over July 2024 in local time:
+    - heatwave: the highest daily maximum temperature;
+    - clear-day: among the days without precipitation, the most shortwave radiation;
+    - storm-blackout: the noon-to-noon window with the most precipitation for Turin, and for Houston the window from 7 July 12:00, by name. Its `note` says that the outage hours are the script's, not the real outage.
+  - The rules can pick the same day twice: in Houston the hottest day is also the sunniest dry one (5 July).
+  - `locations/<id>.2024-07.json` holds every hour of July 2024 for the nights study (`builtInMonth`, `MonthSchema`: every hour in order, none missing).
+  - Attribution: "Weather data by Open-Meteo.com, CC BY 4.0", ERA5 by the Copernicus Climate Change Service, in each file's `source` and in `NOTICE`.
 
 ## Humidity parameters (`humidity` in `data/simulator-params.json`)
 

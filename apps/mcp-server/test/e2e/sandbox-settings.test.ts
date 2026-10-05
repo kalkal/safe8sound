@@ -95,6 +95,25 @@ describe('sandbox settings on the local entry', () => {
   });
 });
 
+describe('a sandbox in Houston (L2, #247)', () => {
+  it('replays the storm in Houston: its real July day, its plans and safe hours in Chicago time, its place in the settings', async () => {
+    const local = createLocalApp(ENV, { wallClock: settableClock(WALL), logger: memoryLogger() });
+    if (!local.ok) throw new Error(local.error.message);
+    const a = await (await serve(local.value.app))(A);
+    const set = await a.call('set_scenario', { scenarioId: 'storm-blackout', locationId: 'houston' });
+    expect(set.isError).not.toBe(true);
+    expect(SetScenarioOutputSchema.parse(set.structuredContent)).toMatchObject({ restarted: true, settings: { locationId: 'houston' } });
+
+    const settings = GetDemoSettingsOutputSchema.parse((await a.call('get_demo_settings')).structuredContent);
+    expect(settings.place).toMatchObject({ id: 'houston', label: 'Houston, Texas', tz: 'America/Chicago' });
+    // Start hour 12 + 10 on the storm day of 7 July 2024: 22:00 in Houston.
+    const plan = PlanSchema.parse((await a.call('plan_comfort', { goal: 'cool' })).structuredContent);
+    expect(plan.horizonAt).toMatch(/^2024-07-0[78]T.*-05:00$/);
+    const room = SafeRoomStatusSchema.parse((await a.call('get_safe_room_status')).structuredContent);
+    expect(room.safeUntil).toMatch(/-05:00$/);
+  });
+});
+
 describe('replaying the storm in a sandbox (#239 review, #234)', () => {
   it('storm, restart, storm again: the old storm is gone and the family is told exactly once per storm', async () => {
     const wall = settableClock(WALL);
