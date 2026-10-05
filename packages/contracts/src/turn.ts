@@ -99,10 +99,14 @@ export const TurnFailureSchema = z
   .refine((f) => categoryOf(f.code) === f.category, { message: 'The category is the one the catalogue gives the code', path: ['category'] });
 export type TurnFailure = z.infer<typeof TurnFailureSchema>;
 
-/** POST /v1/tools/call: a card action, already bound to its card by the host. Only these two exist. */
+/**
+ * POST /v1/tools/call: a card action, already bound to its card by the host, or the home panel's read of the home
+ * (#262, additive, approved by the main: read-only, no arguments; the home comes from the token). Nothing else.
+ */
 export const ToolCallRequestSchema = z.discriminatedUnion('name', [
   z.strictObject({ name: z.literal('apply_plan'), arguments: ApplyPlanInputSchema }),
   z.strictObject({ name: z.literal('set_preferences'), arguments: SetPreferencesInputSchema }),
+  z.strictObject({ name: z.literal('get_home_status'), arguments: z.strictObject({}) }),
 ]);
 export type ToolCallRequest = z.infer<typeof ToolCallRequestSchema>;
 

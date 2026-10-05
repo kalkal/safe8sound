@@ -226,6 +226,14 @@ describe('POST /v1/tools/call: card actions, the MCP token stays here', () => {
     expect(called).toEqual([{ home: 'demo#01aaaaaaaaaaaaaa', name: 'apply_plan' }]);
   });
 
+  it('#262: forwards the home panel read of get_home_status for the home in the token, never one from the body', async () => {
+    const { send, session, called } = setup();
+    const res = await send('/v1/tools/call', { token: await session(), body: { name: 'get_home_status', arguments: {} } });
+    expect(res.status).toBe(200);
+    expect(called).toEqual([{ home: 'demo#01aaaaaaaaaaaaaa', name: 'get_home_status' }]);
+    await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'get_home_status', arguments: { homeId: 'home' } } }), 400, 'invalid_input');
+  });
+
   it('refuses any tool that is not a card action', async () => {
     const { send, session, called } = setup();
     await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'notify_family', arguments: {} } }), 400, 'invalid_input');

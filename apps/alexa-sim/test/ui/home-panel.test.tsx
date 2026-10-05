@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { homeCalm } from '@cold-reserve/ui-cards';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HomePanel } from '../../src/ui/HomePanel.js';
 
 // "Show my home" (#204): behind a button, so the screen stays clean; keyboard reachable; Escape closes.
@@ -39,5 +39,22 @@ describe('HomePanel', () => {
     render(<HomePanel status={undefined} renderCard={frame} />);
     fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));
     expect(screen.getByRole('region', { name: 'My home' }).textContent).toContain('Ask about your rooms or the storm to see your home here.');
+  });
+
+  it('#262: opening it asks for the home; while it comes, says so', () => {
+    const onOpen = vi.fn();
+    render(<HomePanel status={undefined} renderCard={frame} load="loading" onOpen={onOpen} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));
+    expect(onOpen).toHaveBeenCalledOnce();
+    expect(screen.getByRole('region', { name: 'My home' }).textContent).toContain('Getting your home…');
+  });
+
+  it('#262: when the home cannot be reached, says it honestly and offers to try again', () => {
+    const onRetry = vi.fn();
+    render(<HomePanel status={undefined} renderCard={frame} load="failed" onRetry={onRetry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));
+    expect(screen.getByRole('region', { name: 'My home' }).textContent).toContain("I can't reach your home right now.");
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });

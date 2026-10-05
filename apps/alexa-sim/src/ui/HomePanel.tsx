@@ -10,9 +10,14 @@ export interface HomePanelProps {
   status: HomeStatus | undefined;
   /** Draws the home card (a ui:// frame in the simulator). */
   renderCard: (status: HomeStatus) => ReactNode;
+  /** Remote mode (#262): the read of the home on demand, while it comes or when it failed. */
+  load?: 'idle' | 'loading' | 'failed';
+  /** Called each time the panel opens: the remote home is read then. */
+  onOpen?: () => void;
+  onRetry?: () => void;
 }
 
-export function HomePanel({ status, renderCard }: HomePanelProps) {
+export function HomePanel({ status, renderCard, load = 'idle', onOpen, onRetry }: HomePanelProps) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const titleId = useId();
@@ -32,6 +37,7 @@ export function HomePanel({ status, renderCard }: HomePanelProps) {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => {
+          if (!open) onOpen?.();
           setOpen(!open);
         }}
       >
@@ -42,7 +48,21 @@ export function HomePanel({ status, renderCard }: HomePanelProps) {
           <h2 id={titleId} className="visually-hidden">
             {t('home.title')}
           </h2>
-          {status === undefined ? <p className="notice">{t('home.empty')}</p> : renderCard(status)}
+          {load === 'loading' && (
+            <p className="notice" role="status">
+              {t('home.loading')}
+            </p>
+          )}
+          {load === 'failed' && (
+            <div className="failure" role="alert">
+              <p>{t('home.failed')}</p>
+              <button type="button" className="button" onClick={() => onRetry?.()}>
+                {t('chat.retry')}
+              </button>
+            </div>
+          )}
+          {/* After a failed read the old home is not shown as if it were now. */}
+          {status === undefined || load === 'failed' ? load === 'idle' && <p className="notice">{t('home.empty')}</p> : renderCard(status)}
         </section>
       )}
     </div>

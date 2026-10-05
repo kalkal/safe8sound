@@ -17,7 +17,7 @@ import { createScriptedPhone, type PhoneFeed } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
 import { CardFrame } from './host/CardFrame.js';
 import { EchoFrame } from './ui/EchoFrame.js';
-import { homeAfterApply, homeFor, initialHome } from './ui/home.js';
+import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { HomePanel } from './ui/HomePanel.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { skyFor, type Sky } from './ui/sky.js';
@@ -88,11 +88,23 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [config.homeTimeZone, homeMode],
   );
+  // Remote mode (#262): the panel reads the home on demand, each time it opens and after a plan is applied.
+  const [homeLoad, setHomeLoad] = useState<'idle' | 'loading' | 'failed'>('idle');
+  const loadHome = useCallback(() => {
+    if (homeMode !== 'remote') return;
+    setHomeLoad('loading');
+    void fetchHome(agent, { correlationId: crypto.randomUUID() }).then((read) => {
+      if (read.ok) setHome(read.value);
+      setHomeLoad(read.ok ? 'idle' : 'failed');
+    });
+  }, [agent, homeMode]);
   const onCardAction = useCallback(
     (name: string) => {
-      if (name === 'apply_plan') setHome((previous) => homeAfterApply(previous, homeMode));
+      if (name !== 'apply_plan') return;
+      setHome((previous) => homeAfterApply(previous, homeMode));
+      loadHome();
     },
-    [homeMode],
+    [homeMode, loadHome],
   );
   const phonePanel = (config.agent === 'scripted' || config.phone === 'inbox') && (
     <ErrorBoundary>
@@ -113,7 +125,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
         {t('theme.toggle')}
       </button>
       <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, onCardAction }}>
-        <HomePanel status={home} renderCard={(status) => <HomeCard status={status} />} />
+        <HomePanel status={home} renderCard={(status) => <HomeCard status={status} />} load={homeLoad} onOpen={loadHome} onRetry={loadHome} />
         <QueryClientProvider client={queryClient}>
           <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} demo={config.demo} onAnswer={onAnswer} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />
         </QueryClientProvider>

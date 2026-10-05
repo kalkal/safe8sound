@@ -17,6 +17,17 @@ test('a visitor enters the demo code and asks: sim-api answers through /api with
   await expect(page.getByText(/Battery at \d+(\.\d+)?%/).last()).toBeVisible({ timeout: 20_000 });
 });
 
+test('#262: "Show my home" reads the sandbox home on demand through /api, read-only, marked SIMULATED', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Demo code').fill(DEMO_CODE);
+  await page.getByRole('button', { name: 'Start' }).click();
+  await page.getByRole('button', { name: 'Show my home' }).click();
+  const home = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]').getByRole('region', { name: 'The home right now' });
+  await expect(home.getByTestId('origin-badge')).toContainText('SIMULATED', { timeout: 20_000 });
+  await expect(home.getByRole('list', { name: 'Energy' })).toContainText(/Battery \d+%/);
+  await expect(home.getByRole('list', { name: 'Rooms' }).getByRole('listitem').first()).toBeVisible();
+});
+
 test('the privacy line about the access logs is readable at phone width, before the code is entered (#244)', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/');

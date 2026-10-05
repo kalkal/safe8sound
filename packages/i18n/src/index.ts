@@ -60,6 +60,8 @@ const enUS = {
   'home.show': 'Show my home',
   'home.hide': 'Hide my home',
   'home.title': 'My home',
+  'home.loading': 'Getting your home…',
+  'home.failed': "I can't reach your home right now.",
   'home.empty': 'Ask about your rooms or the storm to see your home here.',
   'status.battery': 'Battery',
   'surface.failed': 'This part of the screen stopped working. Reload the page to try again.',

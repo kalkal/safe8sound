@@ -62,6 +62,12 @@ describe('card tool calls: POST /v1/tools/call', () => {
     expect(ToolCallRequestSchema.safeParse({ name: 'apply_plan', arguments: {} }).success).toBe(false);
   });
 
+  it('#262 (approved by the main, additive): the home panel may read get_home_status, with no arguments, read-only', () => {
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_home_status', arguments: {} }).success).toBe(true);
+    // The home comes from the token, never from the request.
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_home_status', arguments: { homeId: 'home' } }).success).toBe(false);
+  });
+
   it('answers the MCP CallToolResult a card expects, tool errors included', () => {
     expect(ToolCallReplySchema.safeParse({ content: [{ type: 'text', text: 'Applied.' }], structuredContent: { ok: true } }).success).toBe(true);
     const failed = toolError('plan_expired', 'The plan expired: ask for a new one.');
