@@ -59,6 +59,31 @@ describe('FloorPlanCard (signature element 3: the thermal floor plan, generated 
     expect(screen.getByText('Battery 78%')).toBeTruthy();
   });
 
+  it('review of #286: the battery fill follows the charge (78 % and 48 % differ, in proportion)', () => {
+    const height = (status: Parameters<typeof FloorPlanCard>[0]['status']) => {
+      const { container } = render(<FloorPlanCard status={status} />);
+      const h = Number(container.querySelector('svg[data-device="battery"] [data-level]')?.getAttribute('height'));
+      cleanup();
+      return h;
+    };
+    const full = height(homeCalm());
+    const storm = height(homeInStorm());
+    expect(full).toBeCloseTo((30 * 78) / 100);
+    expect(storm).toBeCloseTo((30 * 48) / 100);
+  });
+
+  it('review of #286: no sun at 0 W of solar, and the pylon crossed out while the grid is down', () => {
+    const { container } = render(<FloorPlanCard status={homeInStorm()} />);
+    expect(container.querySelector('svg[data-device="solar"]')?.getAttribute('data-on')).toBe('false');
+    expect(container.querySelector('svg[data-device="solar"] .device-sun')).toBeNull();
+    expect(container.querySelector('svg[data-device="grid"]')?.getAttribute('data-on')).toBe('false');
+    expect(container.querySelector('svg[data-device="grid"] .device-cross')).not.toBeNull();
+    cleanup();
+    const calm = render(<FloorPlanCard status={homeCalm()} />).container;
+    expect(calm.querySelector('svg[data-device="solar"] .device-sun')).not.toBeNull();
+    expect(calm.querySelector('svg[data-device="grid"] .device-cross')).toBeNull();
+  });
+
   it('owner feedback (6 Oct): every room shows its split, blowing when the room is served and still when it waits', () => {
     const { container } = render(<FloorPlanCard status={homeCalm()} />);
     const splits = [...container.querySelectorAll('.room-tile')].map((tile) => tile.querySelector('svg[data-device="split"]')?.getAttribute('data-on'));

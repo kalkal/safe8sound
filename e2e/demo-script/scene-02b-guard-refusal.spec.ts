@@ -13,12 +13,12 @@ test('a refused proposal: the storm reserve said by voice and card, the plan tha
   await expect(page.getByTestId('answer').last()).toContainText("I can't: that would eat into the 6 kWh kept for a storm.");
   const card = page.frameLocator('iframe[title="Plan card"]');
   await expect(card.getByTestId('refused-proposal')).toHaveText(
-    'The guard refused the proposed plan: The plan takes the battery to 34 %, below the 43 % kept for a storm (6.0 kWh). Nearest allowed: 43 %. This plan holds instead.',
+    'The safety check refused the proposed plan: The plan takes the battery to 34 %, below the 43 % kept for a storm (6.0 kWh). Nearest allowed: 43 %. This plan holds instead.',
   );
   // One plan card, and no refusal card next to it.
   await expect(page.locator('iframe[title="Plan card"]')).toHaveCount(1);
   await expect(card.getByRole('alert')).toHaveCount(0);
-  await expect(card.getByRole('region', { name: 'Guard check' }).getByTestId('receipt-stamp')).toHaveText('APPROVED');
+  await expect(card.getByRole('region', { name: 'Safety check' }).getByTestId('receipt-stamp')).toHaveText('APPROVED');
   await expectVoiceMatchesCards(page, ['Plan card']);
 
   const plan = card.getByRole('region', { name: 'Plan' });

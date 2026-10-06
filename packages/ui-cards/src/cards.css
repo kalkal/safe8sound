@@ -323,6 +323,14 @@
     }
   }
 
+  .receipt-explain {
+    padding-block-end: var(--space-2);
+    border-block-end: var(--border-thin) dashed var(--receipt-rule);
+    font-family: var(--font-body);
+    font-size: var(--font-size-body);
+    text-align: center;
+  }
+
   .receipt-title {
     font-weight: var(--font-weight-bold);
     text-align: center;
@@ -592,6 +600,18 @@
 
   .device-sun {
     fill: var(--status-warn);
+  }
+
+  /* The grid down: the pylon dimmed and crossed out in the alert colour (the words say "Grid down" too). */
+  .device-off {
+    opacity: 0.45;
+  }
+
+  .device-cross {
+    fill: none;
+    stroke: var(--status-alert);
+    stroke-width: 3;
+    stroke-linecap: round;
   }
 
   .device-air {

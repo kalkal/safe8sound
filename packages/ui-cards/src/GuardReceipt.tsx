@@ -74,6 +74,9 @@ function ReceiptView({ guarantees, title, fullId, list, origin, caveat, lastReso
       {/* Guarantees computed on simulated data are never presented as guarantees about the real home. */}
       {caveat && <p className="warning">{t('receipt.simulatedCaveat')}</p>}
       <div className="receipt">
+        <p className="receipt-explain" data-testid="receipt-explain">
+          {t(lastResort ? 'receipt.explainLastResort' : 'receipt.explain')}
+        </p>
         <p className="receipt-title" data-testid="receipt-title" {...(fullId === undefined ? {} : { title: fullId })}>
           {title}
         </p>

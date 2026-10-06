@@ -90,7 +90,7 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
   });
   if (!verdict.ok && !(lastResort && holdsHardLimits(verdict))) {
     await recordRejection(store, verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId }, input.planId);
-    return err(rejectionOf(verdict) ?? toolError('unexpected_error', 'The guard refused the plan without a reason.'));
+    return err(rejectionOf(verdict) ?? toolError('unexpected_error', 'The safety check refused the plan without a reason.'));
   }
 
   if (lastResort && !home.readOnly) {

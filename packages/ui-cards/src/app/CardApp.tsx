@@ -176,8 +176,8 @@ function AppliedPlan({ result, timeZone, fromThisFrame, canConfirm, onConfirm }:
       {/* The real home is read-only during the hackathon: the splits are set by hand (plan §11.6). */}
       {advisoryOnly && manualInstructions.length > 0 && <ManualControlCard instructions={manualInstructions} reason="read_only" />}
       <PlanCard plan={plan} timeZone={timeZone} />
-      {/* A last resort keeps its receipt after the first yes (CE-22): what does not hold stays in sight. */}
-      {plan.lastResort !== undefined && <GuardReceipt plan={plan} />}
+      {/* Every plan keeps its safety check in sight once applied (owner feedback, 6 Oct; a last resort since CE-22). */}
+      <GuardReceipt plan={plan} />
     </>
   );
 }

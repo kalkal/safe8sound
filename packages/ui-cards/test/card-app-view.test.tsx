@@ -17,6 +17,12 @@ const show = (state: CardState, notice?: { ok: boolean; text: string }, canAct =
 };
 
 describe('CardApp: what the person sees inside the ui:// frame', () => {
+  it('an applied plan keeps its safety check in sight, like every plan (owner feedback, 6 Oct)', () => {
+    show({ kind: 'applied', data: { plan: { ...hotDayPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] } });
+    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
+    expect(screen.getByTestId('receipt-stamp').textContent).toBe('APPROVED');
+  });
+
   it('waits calmly for the tool result', () => {
     show({ kind: 'waiting' });
     expect(screen.getByRole('status').textContent).toBe('Loading…');
@@ -27,14 +33,14 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
 
   it('shows the plan and the guard receipt; Apply calls apply_plan through the host', () => {
     const onCallTool = show({ kind: 'plan', data: hotDayPlan() });
-    expect(screen.getByRole('region', { name: 'Guard check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Apply plan' }));
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_7Hq2mX9vK3' });
   });
 
   it('a last-resort plan is applied by touch in two steps: the first tap asks, with no token (#160)', () => {
     const onCallTool = show({ kind: 'plan', data: lastResortPlan() });
-    expect(screen.getByRole('region', { name: 'Guard check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Apply the last-resort plan' }));
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_LastResort01' });
   });
@@ -51,7 +57,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     // CE-22: the notice and its button sit in a card, and the receipt stays: the person still sees what fails.
     expect(notice.closest('.card')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Yes, apply it now' }).closest('.card')).toBe(notice.closest('.card'));
-    expect(screen.getByRole('region', { name: 'Guard check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
     // The person hears and sees where they are: focus moves to the notice.
     expect(document.activeElement).toBe(notice);
     expect(document.body.textContent).not.toContain('Plan applied.');
@@ -134,9 +140,9 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
   it('a refused plan: what the guard said, with the nearest allowed value, and the REJECTED receipt; nothing to apply (#186)', () => {
     show({ kind: 'refused', data: inverterRefusal() });
     expect(screen.getByRole('alert').textContent).toBe(
-      'The guard refused this plan: Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W.',
+      'The safety check refused this plan: Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W.',
     );
-    expect(screen.getByRole('region', { name: 'Guard check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
     expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');
     expect(screen.queryByRole('button', { name: /Apply/ })).toBeNull();
   });
@@ -145,7 +151,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     const plan = { ...hotDayPlan(), refusedProposal: { code: 'inverter_limit_exceeded' as const, message: 'Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W.' } };
     const onCallTool = show({ kind: 'plan', data: plan });
     expect(screen.getByTestId('refused-proposal').textContent).toBe(
-      'The guard refused the proposed plan: Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W. This plan holds instead.',
+      'The safety check refused the proposed plan: Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W. This plan holds instead.',
     );
     fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: plan.id });

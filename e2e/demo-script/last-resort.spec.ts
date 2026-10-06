@@ -16,7 +16,9 @@ test('last resort: honest headline, two taps to apply, the family is told', asyn
   await expect(plan.getByTestId('plan-horizon')).toHaveText('22:00');
   await expect(plan.getByTestId('last-resort-window')).toHaveText('Then up to 26.1 °C by 03:00, past the 24 °C limit.');
   await expect(plan.getByText('Comfortable at least until')).toHaveCount(0);
-  await expect(card.getByRole('region', { name: 'Guard check' }).getByTestId('receipt-stamp')).toHaveText('LAST RESORT: Safe room comfort NOT MET');
+  await expect(card.getByRole('region', { name: 'Safety check' }).getByTestId('receipt-stamp')).toHaveText('LAST RESORT: Safe room comfort NOT MET');
+  // Never "can't be applied" next to an Apply button: a last resort says how it is applied (review of #288).
+  await expect(card.getByRole('region', { name: 'Safety check' }).getByTestId('receipt-explain')).toContainText('applied only after you confirm twice');
   // Every number the voice says is on the card.
   const spoken = await page.getByTestId('answer').last().locator('.answer-text').innerText();
   for (const n of ['22:00', '26.1', '03:00']) expect(spoken).toContain(n);

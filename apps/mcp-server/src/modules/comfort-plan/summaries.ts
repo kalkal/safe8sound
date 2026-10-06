@@ -105,7 +105,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
         : `Proposed last-resort plan ${p.id}: the safe room alone, within its limits until ${localTimeText(lr.safeUntil)}`;
   // A refused proposal (#202): the first words say so and that this plan holds, so the model offers it at once.
   const refused =
-    p.refusedProposal === undefined ? [] : [`The guard refused the plan you proposed: ${p.refusedProposal.message} This plan holds instead and is ready to apply.`];
+    p.refusedProposal === undefined ? [] : [`The safety check refused the plan you proposed: ${p.refusedProposal.message} This plan holds instead and is ready to apply.`];
   const parts = [
     ...refused,
     `${head} (${commanded}), built on ${dataText(p.sourceOrigin)}.`,

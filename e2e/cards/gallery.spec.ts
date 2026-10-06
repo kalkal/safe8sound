@@ -15,12 +15,12 @@ for (const size of SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
       await page.goto(`/?gallery&theme=${theme}`);
       // The longest plan id is cut on the slip, like a till, and stays on one line (design analysis G4).
-      const slipTitle = page.getByText(`Guard · plan ${'P'.repeat(9)}…`);
+      const slipTitle = page.getByText(`Safety check · plan ${'P'.repeat(9)}…`);
       await expect(slipTitle).toBeVisible();
       await expect(slipTitle).toHaveAttribute('title', 'P'.repeat(64));
       const titleBox = await slipTitle.boundingBox();
       expect(titleBox?.height ?? 0).toBeLessThan(30);
-      for (const title of ['Plan', 'Guard check', 'Cold reserve', 'Preferences', 'Safe room · Bedroom 1']) {
+      for (const title of ['Plan', 'Safety check', 'Cold reserve', 'Preferences', 'Safe room · Bedroom 1']) {
         await expect(page.getByRole('heading', { name: title, exact: true }).first()).toBeVisible();
       }
       await expect(page.locator('html')).toHaveAttribute('data-card-theme', `pawnio-${theme}`);

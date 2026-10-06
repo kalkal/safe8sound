@@ -265,7 +265,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
       ts: new Date(deps.clock.now()).toISOString(),
       level: 'info',
       component: 'mcp-server',
-      message: `Solar surplus not used: the guard refused the plan with it (${chosen.surplusRefused.join(', ')}).`,
+      message: `Solar surplus not used: the safety check refused the plan with it (${chosen.surplusRefused.join(', ')}).`,
       correlationId: ctx.correlationId,
       ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
       details: { event: 'surplus_refused', planId: parsed.data.id, failed: [...chosen.surplusRefused], ...homeDetail(ctx.homeId) },

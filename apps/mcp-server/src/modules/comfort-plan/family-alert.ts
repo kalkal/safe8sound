@@ -1,6 +1,6 @@
 import { epochMs, toolError, type ErrorEnvelope, type HomeProfile, type Plan, type Preferences, type Snapshot } from '@cold-reserve/contracts';
 import type { Notifier } from '@cold-reserve/core';
-import { LOCALES, stormMessage, type Locale } from '@cold-reserve/i18n';
+import { stormMessage, type Locale } from '@cold-reserve/i18n';
 
 // The family alert of a last resort (#160): the fixed "battery low, please check on them" text, to the
 // registered contacts only, when the plan is really applied. Until when comes from the plan itself, so the
@@ -14,7 +14,9 @@ export interface AlertOutcome {
   readonly failure?: ErrorEnvelope;
 }
 
-const localeOf = (language: string): Locale => LOCALES.find((l) => l === language) ?? 'en-US';
+/** English only until #263 part 2 checks the Italian numbers (#284): see storm-mode/observe.ts. */
+const ALERT_LOCALES: readonly Locale[] = ['en-US'];
+export const alertLocaleOf = (language: string): Locale => ALERT_LOCALES.find((l) => l === language) ?? 'en-US';
 
 export async function alertFamily(
   notifier: Notifier,
@@ -40,7 +42,7 @@ export async function alertFamily(
   let failed = 0;
   let failure: ErrorEnvelope | undefined;
   for (const contact of preferences.familyContacts) {
-    const text = stormMessage(localeOf(preferences.language), 'last_resort_applied', contact.name, fields);
+    const text = stormMessage(alertLocaleOf(preferences.language), 'last_resort_applied', contact.name, fields);
     if (!text.ok) {
       failure ??= toolError('unexpected_error', `The last-resort alert misses ${text.error.missing.join(', ')}.`);
       failed += 1;

@@ -11,7 +11,7 @@ import { applySummary, outlookSummary, planSummary } from './summaries.js';
 export { parseComfortPlanConfig, type ComfortPlanConfig } from './config.js';
 export type { ComfortHome, ComfortPlanDeps } from './deps.js';
 
-// `comfort-plan` capability module (plan §14.1, issue #19): propose a plan the guard accepts, apply it in
+// `comfort-plan` capability module (plan §14.1, issue #19): propose a plan the safety check accepts, apply it in
 // a second step, and count the reserve in hours. On only for the homes the server knows.
 
 export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
@@ -29,10 +29,10 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
         name: 'plan_comfort',
         title: 'Plan comfort',
         description:
-          'Proposes a comfort plan for the coming hours (cool, heat, dry or auto) that the guard accepts: the five guarantees, ' +
+          'Proposes a comfort plan for the coming hours (cool, heat, dry or auto) that the safety check accepts: the five guarantees, ' +
           'the level ladder, the night recovery of the safe room and what would happen without the plan. Nothing changes in the home: ' +
-          'confirm it with apply_plan. You may propose a setpoint and rooms; the guard then checks exactly that, and a refusal says why ' +
-          'and what would be allowed. If the guard refuses your setpoint or rooms, the answer is the plan that holds instead, ready to apply, with a note of the refusal. ' +
+          'confirm it with apply_plan. You may propose a setpoint and rooms; the safety check then checks exactly that, and a refusal says why ' +
+          'and what would be allowed. If the safety check refuses your setpoint or rooms, the answer is the plan that holds instead, ready to apply, with a note of the refusal. ' +
           'If only a last resort is left, the refusal says so: call plan_comfort again with only the goal.',
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         input: PlanComfortInputSchema,
@@ -52,7 +52,7 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
         title: 'Apply plan',
         description:
           'Applies a proposed plan by its planId after the person confirmed it. Never in the same turn as plan_comfort: tell the person the plan and wait for their yes. ' +
-          'The guard checks it again on the current state. ' +
+          'The safety check checks it again on the current state. ' +
           'Safe to retry: a plan already applied returns the same outcome. On the real home it is advice with manual steps.',
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         input: ApplyPlanInputSchema,

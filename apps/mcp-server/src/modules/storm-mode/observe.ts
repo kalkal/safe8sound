@@ -20,7 +20,7 @@ import {
 } from '@cold-reserve/contracts';
 import { epsBaseLoadW, planNotifications, prepareDevices, stormReduce, type DeviceFailure, type NotificationPlan, type StateStore, type StormContext, type StormEvent } from '@cold-reserve/core';
 import { holdSafeRoom } from '@cold-reserve/guard';
-import { LOCALES, stormMessage, type Locale, type StormMessageFields } from '@cold-reserve/i18n';
+import { stormMessage, type Locale, type StormMessageFields } from '@cold-reserve/i18n';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
 import { guardFrame } from '../comfort-plan/plan-comfort.js';
@@ -92,8 +92,12 @@ export function messageFields(o: Observed, session: StormSession | undefined): S
   };
 }
 
-/** The catalog of the preferred language; English until the Italian catalog exists. */
-export const localeOf = (language: string): Locale => LOCALES.find((l) => l === language) ?? 'en-US';
+/**
+ * The catalog of the family alerts. English only until #263 part 2 checks the Italian numbers per transition (#284):
+ * the Italian page catalogue must not reach the messages a family receives yet.
+ */
+const ALERT_LOCALES: readonly Locale[] = ['en-US'];
+export const localeOf = (language: string): Locale => ALERT_LOCALES.find((l) => l === language) ?? 'en-US';
 
 export interface Delivery {
   readonly session: StormSession;

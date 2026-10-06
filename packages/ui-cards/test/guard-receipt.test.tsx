@@ -9,12 +9,27 @@ afterEach(cleanup);
 
 const CAVEAT = 'Checked on simulated data, not on the live readings of your home.';
 const rows = (plan: Plan) =>
-  within(screen.getByRole('list', { name: `Guard check for plan ${plan.id}` })).getAllByRole('listitem');
+  within(screen.getByRole('list', { name: `Safety check for plan ${plan.id}` })).getAllByRole('listitem');
 
 describe('GuardReceipt', () => {
-  it('shows who does what: the AI proposes, the guard decides, the person confirms', () => {
+  it('shows who does what: the AI proposes, the safety check decides, the person confirms', () => {
     render(<GuardReceipt plan={hotDayPlan()} />);
-    expect(screen.getByRole('list', { name: 'Who decides' }).textContent).toBe('AI proposesGuard decidesYou confirm');
+    expect(screen.getByRole('list', { name: 'Who decides' }).textContent).toBe('AI proposesSafety check decidesYou confirm');
+  });
+
+  it('says in one plain line what the safety check is, at the top of the slip (owner feedback, 6 Oct)', () => {
+    render(<GuardReceipt plan={hotDayPlan()} />);
+    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
+    expect(screen.getByTestId('receipt-explain').textContent).toBe(
+      "An automatic check — not the AI — verified this plan against 5 safety rules. If one fails, the plan can't be applied.",
+    );
+  });
+
+  it('a last resort says its own line: one rule cannot hold, and it applies only after two confirmations (review of #288)', () => {
+    render(<GuardReceipt plan={lastResortPlan()} />);
+    expect(screen.getByTestId('receipt-explain').textContent).toBe(
+      "An automatic check — not the AI — verified this plan against 5 safety rules. One can't hold tonight: this last resort is applied only after you confirm twice.",
+    );
   });
 
   it('lists all five guarantees, passed, with no AI in the check', () => {
@@ -87,14 +102,14 @@ describe('GuardReceipt', () => {
     const plan = hotDayPlan();
     render(<GuardReceipt plan={plan} />);
     const title = screen.getByTestId('receipt-title');
-    expect(title.textContent).toBe(`Guard · plan ${plan.id.slice(0, 9)}…`);
+    expect(title.textContent).toBe(`Safety check · plan ${plan.id.slice(0, 9)}…`);
     expect(title.getAttribute('title')).toBe(plan.id);
-    expect(screen.getByRole('list', { name: `Guard check for plan ${plan.id}` })).toBeTruthy();
+    expect(screen.getByRole('list', { name: `Safety check for plan ${plan.id}` })).toBeTruthy();
   });
 
   it('a short plan id is shown whole', () => {
     render(<GuardReceipt plan={{ ...hotDayPlan(), id: 'plan_Short01' as ReturnType<typeof hotDayPlan>['id'] }} />);
-    expect(screen.getByTestId('receipt-title').textContent).toBe('Guard · plan plan_Short01');
+    expect(screen.getByTestId('receipt-title').textContent).toBe('Safety check · plan plan_Short01');
   });
 
   it('a plan the guard refuses is still REJECTED', () => {
@@ -104,7 +119,7 @@ describe('GuardReceipt', () => {
 
   it('a refusal shows all five rows from its verdict, the failing one marked in words, and REJECTED (#186)', () => {
     render(<RefusalReceipt refusal={inverterRefusal()} />);
-    const list = screen.getByRole('list', { name: 'Guard check for the proposed plan' });
+    const list = screen.getByRole('list', { name: 'Safety check for the proposed plan' });
     const items = within(list).getAllByRole('listitem');
     expect(items).toHaveLength(5);
     const inverter = items.find((r) => within(r).getByTestId('guarantee-name').textContent === 'Inverter limit');
@@ -116,7 +131,7 @@ describe('GuardReceipt', () => {
 
   it('a storm-reserve refusal (scene 2b): Storm reserve FAIL with the floor kept, the other four PASS, REJECTED', () => {
     render(<RefusalReceipt refusal={stormReserveRefusal()} />);
-    const items = within(screen.getByRole('list', { name: 'Guard check for the proposed plan' })).getAllByRole('listitem');
+    const items = within(screen.getByRole('list', { name: 'Safety check for the proposed plan' })).getAllByRole('listitem');
     const failing = items.filter((r) => within(r).getByTestId('guarantee-verdict').textContent === 'FAIL');
     expect(failing.map((r) => within(r).getByTestId('guarantee-name').textContent)).toEqual(['Storm reserve']);
     expect(failing[0]?.textContent).toContain('nearest allowed 43%');

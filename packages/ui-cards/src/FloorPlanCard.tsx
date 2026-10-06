@@ -18,11 +18,11 @@ export function FloorPlanCard({ status }: { status: HomeStatus }) {
           {t('floor.battery', { pct: String(Math.round(status.batterySocPct)) })}
         </li>
         <li>
-          <DeviceIcon device="solar" />
+          <DeviceIcon device="solar" on={status.pvW > 0} />
           {t('floor.solar', { kw: (status.pvW / 1000).toFixed(1) })}
         </li>
         <li>
-          <DeviceIcon device="grid" />
+          <DeviceIcon device="grid" on={status.gridAvailable} />
           {gridText(status)}
         </li>
         <li>{t('floor.level', { level: t(`level.${status.level}`), reason: t(`reason.${status.levelReason}`) })}</li>

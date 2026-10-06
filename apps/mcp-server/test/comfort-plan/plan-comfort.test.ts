@@ -127,7 +127,7 @@ describe('plan_comfort (two-phase: propose)', () => {
 
   it('tells the model that a refused proposal comes back as the plan that holds (#202)', () => {
     const tool = comfortPlanModule(world('heatwave', 14).deps).tools.find((t) => t.name === 'plan_comfort');
-    expect(tool?.description).toContain('If the guard refuses your setpoint or rooms, the answer is the plan that holds instead, ready to apply, with a note of the refusal.');
+    expect(tool?.description).toContain('If the safety check refuses your setpoint or rooms, the answer is the plan that holds instead, ready to apply, with a note of the refusal.');
     expect(tool?.description).toContain('If only a last resort is left, the refusal says so: call plan_comfort again with only the goal.');
   });
 

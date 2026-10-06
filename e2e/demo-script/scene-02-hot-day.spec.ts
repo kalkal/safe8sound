@@ -16,7 +16,7 @@ test('scene 2: a hot day → plan card with ribbon, reserve line and receipt →
   await expect(plan.getByRole('list', { name: 'Level through the day' }).getByRole('listitem')).toHaveCount(4);
   await expect(plan.getByTestId('origin-badge')).toContainText('SIMULATED');
   await expect(plan.getByRole('img', { name: 'Storm reserve 6 kWh (43%), never used for comfort.' })).toBeVisible();
-  await expect(card.getByRole('region', { name: 'Guard check' }).getByTestId('receipt-stamp')).toHaveText('APPROVED');
+  await expect(card.getByRole('region', { name: 'Safety check' }).getByTestId('receipt-stamp')).toHaveText('APPROVED');
   await expectVoiceMatchesCards(page, ['Plan card']);
 
   await plan.getByRole('button', { name: 'Apply plan' }).click();

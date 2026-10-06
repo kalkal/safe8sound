@@ -8,8 +8,8 @@ export function DeviceIcon({ device, level, on }: { device: Device; /** Battery 
   return (
     <svg className="device-icon" data-device={device} {...(on === undefined ? {} : { 'data-on': String(on) })} viewBox="0 0 48 48" aria-hidden="true" focusable="false">
       {device === 'battery' && <Battery level={level ?? 0} />}
-      {device === 'solar' && <Solar />}
-      {device === 'grid' && <Grid />}
+      {device === 'solar' && <Solar on={on !== false} />}
+      {device === 'grid' && <Grid on={on !== false} />}
       {device === 'split' && <Split on={on === true} />}
     </svg>
   );
@@ -27,17 +27,24 @@ function Battery({ level }: { level: number }) {
   );
 }
 
-function Solar() {
+/** The sun only while the panels produce (review of #286: no sun at 0 W). */
+function Solar({ on }: { on: boolean }) {
   return (
     <>
-      <circle cx="39" cy="9" r="5" className="device-sun" />
+      {on && <circle cx="39" cy="9" r="5" className="device-sun" />}
       <path d="M5 30 L13 14 H40 L32 30 Z M9 22 H36 M19 14 L15 30 M27 14 L23 30 M22 30 V41 M14 41 H30" className="device-line" />
     </>
   );
 }
 
-function Grid() {
-  return <path d="M24 4 L13 44 M24 4 L35 44 M16 36 H32 M18 28 H30 M20 20 H28 M7 12 H41 M7 12 V17 M41 12 V17" className="device-line" />;
+/** The pylon, crossed out while the grid is down (review of #286); the words say "Grid down" too. */
+function Grid({ on }: { on: boolean }) {
+  return (
+    <>
+      <path d="M24 4 L13 44 M24 4 L35 44 M16 36 H32 M18 28 H30 M20 20 H28 M7 12 H41 M7 12 V17 M41 12 V17" className={on ? 'device-line' : 'device-line device-off'} />
+      {!on && <path d="M6 6 L42 42" className="device-cross" />}
+    </>
+  );
 }
 
 function Split({ on }: { on: boolean }) {
