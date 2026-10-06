@@ -132,6 +132,8 @@ export const SafeRoomStatusSchema = z.strictObject({
   safeHours: z.number().nonnegative(),
   safeUntil: IsoDateTimeSchema,
   stormPhase: StormPhaseSchema.optional(),
+  /** Whether the grid is up now (#273, approved in #273): then the safe hours are only what the battery alone would hold. */
+  gridAvailable: z.boolean().optional(),
   /** The family's latest reply in this storm, by role only (approved in #24). */
   lastCheckIn: FamilyReplySchema.optional(),
   origin: DataOriginSchema,

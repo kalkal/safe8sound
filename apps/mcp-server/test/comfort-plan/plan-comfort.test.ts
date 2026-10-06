@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { holdSafeRoom } from '@cold-reserve/guard';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
-import { guardFrame, loadInputs, planComfort, withHint } from '../../src/modules/comfort-plan/plan-comfort.js';
+import { guardFrame, loadInputs, planComfort, roomsText, withHint } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { REAL, preferences, world } from './support.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
@@ -135,6 +135,22 @@ describe('plan_comfort (two-phase: propose)', () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool', roomIds: ['garage'] }, w.ctx);
     expect(!r.ok && r.error).toMatchObject({ code: 'unknown_room', details: { roomId: 'garage' } });
+  });
+
+  it('the room list fits the 300-character error message: what does not fit is counted, never cut mid-name', () => {
+    const rooms = Array.from({ length: 15 }, (_, i) => ({ id: `room-${String(i)}`, name: `A long room name number ${String(i)}` }));
+    const text = roomsText(rooms, 200);
+    expect(text.length).toBeLessThanOrEqual(200);
+    expect(text).toMatch(/^A long room name number 0 \(room-0\), .*\(room-\d+\) and \d+ more$/);
+    expect(roomsText(rooms.slice(0, 2), 200)).toBe('A long room name number 0 (room-0), A long room name number 1 (room-1)');
+  });
+
+  it('a refused room id lists the rooms there are, as "Name (id)", so the model can retry with the right id (#274)', async () => {
+    const w = world('heatwave', 14);
+    const r = await planComfort(w.deps, { goal: 'cool', roomIds: ['living-room'] }, w.ctx);
+    expect(!r.ok && r.error.message).toBe(
+      'There is no room "living-room" in this home. The rooms are: Bedroom (bedroom-1), Second bedroom (bedroom-2), Study (study), Living room (living).',
+    );
   });
 
   it('a home the client is not linked to is not found', async () => {

@@ -24,12 +24,23 @@ export interface EnergyStatusDeps {
 }
 
 /** The text of get_home_status; the last live reading as the home's clock time, never an ISO stamp (#177). */
-export function homeStatusSummary(s: HomeStatus, timeZone: string): string {
+/** Rooms as "Name (id)": people hear the name, the model reads the id it must pass (#274). */
+export const roomLabel = (id: string, names: Readonly<Record<string, string>>): string => (names[id] === undefined ? id : `${names[id]} (${id})`);
+
+export function homeStatusSummary(s: HomeStatus, timeZone: string, roomNames: Readonly<Record<string, string>> = {}): string {
   const served = s.rooms.filter((r) => r.state === 'served').length;
   const data = s.origin.energy === 'simulated' ? 'simulated data' : 'live data';
   const lastLive = s.lastLiveAt === undefined ? '' : `, last live reading at ${localTimeText(localIso(Date.parse(s.lastLiveAt), timeZone))}`;
   const link = s.homeLink === 'ok' ? '' : ` Home link ${s.homeLink}${lastLive}.`;
-  return `Battery at ${s.batterySocPct}%, ${s.level} level; ${served} of ${s.rooms.length} rooms served (${data}).${link}`;
+  // The grid in words (#273): the model reads only this text, and must never guess whether the power is back.
+  const w = Math.round(Math.abs(s.gridW));
+  const grid = !s.gridAvailable
+    ? 'The grid is down: the home runs on the battery and the sun.'
+    : s.gridW < 0
+      ? `The grid is on: the home sends ${String(w)} W to it.`
+      : `The grid is on: the home draws ${String(w)} W from it.`;
+  const rooms = s.rooms.length === 0 ? '' : ` Rooms: ${s.rooms.map((r) => `${roomLabel(r.roomId, roomNames)} ${r.state}`).join(', ')}.`;
+  return `Battery at ${s.batterySocPct}%, ${s.level} level; ${served} of ${s.rooms.length} rooms served (${data}). ${grid}${rooms}${link}`;
 }
 
 export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {
@@ -45,7 +56,10 @@ export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         input: z.strictObject({}),
         output: HomeStatusSchema,
-        summarize: (s) => homeStatusSummary(s, deps.homes(s.homeId)?.profile.location.tz ?? 'UTC'),
+        summarize: (s) => {
+          const profile = deps.homes(s.homeId)?.profile;
+          return homeStatusSummary(s, profile?.location.tz ?? 'UTC', Object.fromEntries((profile?.rooms ?? []).map((r) => [r.id, r.name])));
+        },
         handler: async (_args, ctx) => {
           const home = deps.homes(ctx.homeId);
           if (!home) return err(toolError('home_not_found', 'This client is not linked to a configured home.'));

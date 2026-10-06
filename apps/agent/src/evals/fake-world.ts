@@ -33,6 +33,8 @@ const RULES: readonly [RegExp, (typeof PLAN_TOOLS)[number], Record<string, unkno
   [/how long|stay cool if/, 'get_guarantees', {}],
   // The model proposes too much (#186, scene 2b): every room at 21 °C, which the guard refuses.
   [/every room to 21/, 'plan_comfort', { goal: 'cool', setpointC: 21, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }],
+  // Scene 2b (#274): the living room by its id, as the home status lists it ("Living room (living)").
+  [/living.room/, 'plan_comfort', { goal: 'cool', roomIds: ['living'] }],
   [/\bcool|heatwave/, 'plan_comfort', { goal: 'cool' }],
   [/weather|forecast/, 'get_energy_forecast', {}],
   [/storm/, 'start_storm_mode', { mode: 'prepare' }],

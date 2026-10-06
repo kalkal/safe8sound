@@ -36,6 +36,13 @@ describe('preferences module (MCP tools)', () => {
     expect(byName['set_preferences']).toMatchObject({ readOnlyHint: false, destructiveHint: true, idempotentHint: true });
   });
 
+  it('names the safe room in the text, its id only in parentheses for the model (#274)', async () => {
+    const named = deps({ roomNameFor: (_home, id) => ({ 'bedroom-1': 'Bedroom' })[id] });
+    const result = await call(named, 'get_preferences', {});
+    const text = (result.content as { text: string }[])[0]?.text;
+    expect(text).toContain('safe room Bedroom (bedroom-1)');
+  });
+
   it('returns the defaults for a home with nothing saved, with the hard limits', async () => {
     const result = await call(deps(), 'get_preferences', {});
     expect(result.isError).toBeFalsy();

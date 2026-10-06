@@ -189,7 +189,7 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       record(error, ctx.correlationId, ctx, { tool: tool.name, issues: output.error.issues.slice(0, MAX_ISSUES).map((i) => i.path.join('.')) });
       return errorResult(error);
     }
-    const text = tool.summarize ? tool.summarize(output.data) : JSON.stringify(output.data);
+    const text = tool.summarize ? tool.summarize(output.data, ctx) : JSON.stringify(output.data);
     return { content: [{ type: 'text', text }], structuredContent: output.data as Record<string, unknown> };
   }
 

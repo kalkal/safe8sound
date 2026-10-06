@@ -47,7 +47,8 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         title: 'Notify family',
         description:
           'Sends the fixed family message for a storm transition that happened (storm_started, essential_level, power_back) to the contacts ' +
-          'registered in the app, or to some of them by role. You cannot write the text or name a recipient. A person is not told the same transition again within the configured interval (power_back: once per storm).',
+          'registered in the app, or to some of them by role. You cannot write the text or name a recipient. A person is not told the same transition again within the configured interval (power_back: once per storm). ' +
+          'Call it only when the person asks to tell the family: the storm flow already tells them when a storm starts, so never on your own.',
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         input: NotifyFamilyInputSchema,
         output: NotifyFamilyOutputSchema,

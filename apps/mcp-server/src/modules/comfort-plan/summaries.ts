@@ -122,7 +122,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   if (c !== undefined) {
     const { noPlan, naive, plan } = c.scenarios;
     parts.push(
-      `Without the plan the safe room (${c.roomId}) would peak at ${lineText(noPlan, opts.timeZone)}; ` +
+      `Without the plan the safe room${opts.roomNames?.[c.roomId] === undefined ? ` (${c.roomId})` : `, ${opts.roomNames[c.roomId]} (${c.roomId}),`} would peak at ${lineText(noPlan, opts.timeZone)}; ` +
         `with the naive plan (air conditioning until the battery dies) at ${lineText(naive, opts.timeZone)}; ` +
         `with this plan at ${lineText(plan, opts.timeZone)}.`,
     );
@@ -138,7 +138,8 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   // A last resort is applied only with two explicit yeses (#168): the first apply_plan returns what the second needs.
   parts.push(
     p.lastResort === undefined
-      ? `Say it to the person and ask to confirm; then call apply_plan with planId ${p.id}.`
+      ? // The pending plan, named, so a plain "yes" in the next turn applies it instead of planning again (#274).
+        `Say it to the person and ask to confirm. Plan ${p.id} is waiting for the person's yes: when they say yes, call apply_plan with planId ${p.id}.`
       : `Last resort: the safest plan there is, but not every guarantee holds. It can be applied only with two explicit yeses: ` +
           `read the person the risk and until when the safe room is safe (${localTimeText(p.lastResort.safeUntil)}), ask; ` +
           `if they say yes, call apply_plan with planId ${p.id} and ask again with what it returns.`,
@@ -190,8 +191,14 @@ function familyAlertText(a: NonNullable<ApplyPlanOutput['familyAlert']>): string
 }
 
 export function outlookSummary(o: ReserveOutlook): string {
+  // The grid in words, and an empty battery said as such (#273): the model only reads this text.
+  const grid = o.gridAvailable ? 'The grid is on.' : 'The grid is down.';
+  const asOf = `As of ${localTimeText(o.ts)} (${dataText(o.origin)}).`;
+  if (o.hoursAtCurrentLevel === 0 && o.hoursAtEssential === 0 && o.reserveHoursAtEssential === 0) {
+    return `The battery is empty: 0 hours on the battery, at any level, and none left in the storm reserve. ${grid} ${asOf}`;
+  }
   return (
     `On the battery alone: about ${one(o.hoursAtCurrentLevel)} hours at ${o.level} level, or ${one(o.hoursAtEssential)} hours at essential with the same energy; ` +
-    `the storm reserve alone gives ${one(o.reserveHoursAtEssential)} hours at essential. As of ${localTimeText(o.ts)} (${dataText(o.origin)}).`
+    `the storm reserve alone gives ${one(o.reserveHoursAtEssential)} hours at essential. ${grid} ${asOf}`
   );
 }

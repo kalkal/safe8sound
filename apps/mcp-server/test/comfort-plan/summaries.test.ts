@@ -17,6 +17,20 @@ const night = guardConfig().nightRecovery;
 const NIGHT = { nightWindowHours: nightWindowHours(night.windowStartHour, night.windowEndHour), nightStartHour: night.windowStartHour, nightEndHour: night.windowEndHour, timeZone: 'Europe/Rome' };
 
 describe('what the model reads', () => {
+  it('plan_comfort ends with the plan waiting for the yes, so a plain "yes" next turn applies it (#274)', () => {
+    const p = examplePlan() as Plan;
+    expect(planSummary(p, { ...NIGHT, roomNames: {} })).toMatch(new RegExp(`Plan ${p.id} is waiting for the person's yes: when they say yes, call apply_plan with planId ${p.id}\\.$`));
+  });
+
+  it('plan_comfort names the safe room in the counterfactual, its id only in parentheses (#274)', async () => {
+    const w = world('heatwave', 14);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    if (r.value.counterfactual === undefined) throw new Error('no counterfactual');
+    const text = planSummary(r.value, { ...NIGHT, roomNames: { 'bedroom-1': 'Bedroom' } });
+    expect(text).toContain('Without the plan the safe room, Bedroom (bedroom-1), would peak at');
+  });
+
   it('plan_comfort: where the solar surplus went, in order, by room name, with every number (#203)', () => {
     const surplus = {
       from: '2026-07-16T16:00:00+02:00',
@@ -326,6 +340,24 @@ describe('what the model reads', () => {
     expect(text).toContain(`${one(o.hoursAtEssential)} hours at essential`);
     expect(text).toContain(`${one(o.reserveHoursAtEssential)} hours`);
     expect(text).toContain('simulated');
+  });
+
+  it('get_reserve_outlook with the battery at its floor: says it is empty, never hours the reserve does not hold (#273)', async () => {
+    const w = world('storm-blackout', 19, { snapshot: (s) => ({ ...s, batterySocPct: pct(10) }) });
+    const r = await reserveOutlook(w.deps, {}, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toMatchObject({ hoursAtCurrentLevel: 0, hoursAtEssential: 0, reserveHoursAtEssential: 0 });
+    expect(outlookSummary(r.value)).toMatch(/^The battery is empty: 0 hours on the battery, at any level, and none left in the storm reserve\. The grid is (on|down)\. As of /);
+  });
+
+  it('get_reserve_outlook says whether the grid is on', async () => {
+    const up = await reserveOutlook(world('heatwave', 14).deps, {}, world('heatwave', 14).ctx);
+    if (!up.ok) throw new Error(up.error.message);
+    expect(outlookSummary(up.value)).toContain('The grid is on.');
+    const storm = world('storm-blackout', 3);
+    const down = await reserveOutlook(storm.deps, {}, storm.ctx);
+    if (!down.ok) throw new Error(down.error.message);
+    expect(outlookSummary(down.value)).toContain('The grid is down.');
   });
 
   it('a refused proposal: the first words say the guard refused it and why, then that this plan holds and is ready to apply (#202)', async () => {

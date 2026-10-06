@@ -24,6 +24,8 @@ export interface PreferencesModuleDeps {
   readonly limits: SafetyHardLimits;
   /** Room ids of the home profile. */
   readonly roomIdsFor: (homeId: HomeId) => readonly string[];
+  /** A room's name, said instead of its id (#274); undefined when the profile has none. */
+  readonly roomNameFor?: (homeId: HomeId, roomId: string) => string | undefined;
   /** What a home uses before anyone saved preferences (from config). */
   readonly defaultsFor: (homeId: HomeId) => Preferences;
   readonly clock: Clock;
@@ -50,8 +52,12 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
     annotations: annotations(true),
     input: z.strictObject({}),
     output: GetPreferencesOutputSchema,
-    summarize: (o) =>
-      `${o.isDefault ? 'Default' : 'Saved'} preferences: cool to ${String(o.preferences.comfortC.cooling)} C, safe room ${o.preferences.safeRoomId}.`,
+    summarize: (o, ctx) => {
+      // The name for people, the id in parentheses for the model (#274).
+      const id = o.preferences.safeRoomId;
+      const name = deps.roomNameFor?.(ctx.homeId, id);
+      return `${o.isDefault ? 'Default' : 'Saved'} preferences: cool to ${String(o.preferences.comfortC.cooling)} C, safe room ${name === undefined ? id : `${name} (${id})`}.`;
+    },
     handler: async (_args, ctx) => {
       const read = await current(ctx.homeId);
       if (!read.ok) return read;

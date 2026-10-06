@@ -67,7 +67,9 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       const text = textOf(proposed);
       expect(text).toContain(plan.id);
       expect(text).toContain('storm_reserve holds');
-      expect(text).toMatch(/Without the plan the safe room \(bedroom-1\) would peak at \d+(\.\d)? °C/);
+      // The safe room by name, its id only in parentheses (#274).
+      expect(text).toMatch(/Without the plan the safe room, Bedroom \(bedroom-1\), would peak at \d+(\.\d)? °C/);
+      expect(text).toMatch(new RegExp(`Plan ${plan.id} is waiting for the person's yes: when they say yes, call apply_plan with planId ${plan.id}\\.$`));
       expect(text).toContain('simulated data');
       // The 36-hour heatwave shows the whole night: the night-recovery guarantee is met and said with its hours.
       expect(plan.nightRecovery?.status).toBe('met');

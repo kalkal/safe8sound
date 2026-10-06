@@ -1,4 +1,4 @@
-import { HomeIdSchema, type HomeId } from '@cold-reserve/contracts';
+import { HomeIdSchema, watt, type HomeId } from '@cold-reserve/contracts';
 import { createSimulatedDevices } from '@cold-reserve/source-simulator';
 import { describe, expect, it } from 'vitest';
 import { safeRoomStatus, startStormMode } from '../../src/modules/storm-mode/tools.js';
@@ -135,6 +135,30 @@ describe('the last check-in from the family (queue item 3)', () => {
     const text = safeRoomSummary(out.value);
     expect(text).toContain('Last check-in: your daughter is on the way (9:30 PM).');
     expect(text).not.toMatch(/Giulia|phone-/);
+  });
+
+  it('with the grid back during an active storm: the grid powers the safe room, power is back, and the battery hours are only a what-if (#273)', async () => {
+    let gridBack = false;
+    const w = world(4, { snapshot: (s) => (gridBack ? { ...s, gridAvailable: true, gridW: watt(775) } : s) });
+    expect((await startStormMode(w.deps, { mode: 'active' }, w.ctx)).ok).toBe(true);
+    gridBack = true;
+    const out = await safeRoomStatus(w.deps, w.ctx);
+    if (!out.ok) throw new Error(out.error.message);
+    expect(out.value).toMatchObject({ gridAvailable: true, stormPhase: 'active' });
+    const text = safeRoomSummary(out.value);
+    expect(text).toContain('Power is back.');
+    expect(text).toMatch(/The grid powers the safe room; on the battery alone it would hold about \d+\.\d hours\./);
+    expect(text).not.toMatch(/Safe for about/);
+  });
+
+  it('with the grid down: the safe hours on the battery, as before, and no "power is back"', async () => {
+    const w = world(4);
+    await startStormMode(w.deps, { mode: 'active' }, w.ctx);
+    const out = await safeRoomStatus(w.deps, w.ctx);
+    if (!out.ok) throw new Error(out.error.message);
+    expect(out.value.gridAvailable).toBe(false);
+    expect(safeRoomSummary(out.value)).toMatch(/Safe for about \d+\.\d hours, until /);
+    expect(safeRoomSummary(out.value)).not.toContain('Power is back');
   });
 
   it('says nothing about check-ins when there are none', async () => {

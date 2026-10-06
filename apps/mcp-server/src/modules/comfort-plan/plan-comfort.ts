@@ -92,6 +92,20 @@ export function withHint(message: string, hint: string): string {
   return `${space > 0 ? head.slice(0, space) : head}… ${hint}`;
 }
 
+/** The longest error message the contract allows. */
+const MESSAGE_MAX = 300;
+
+/** The rooms as "Name (id)", as many as fit in `budget` characters; the rest are counted, never cut mid-name (#274). */
+export function roomsText(rooms: readonly { id: string; name: string }[], budget: number): string {
+  const labels = rooms.map((r) => `${r.name} (${r.id})`);
+  for (let n = labels.length; n > 0; n--) {
+    const more = labels.length - n;
+    const text = `${labels.slice(0, n).join(', ')}${more > 0 ? ` and ${String(more)} more` : ''}`;
+    if (text.length <= budget) return text;
+  }
+  return `${String(labels.length)} rooms`;
+}
+
 export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput, ctx: ToolContext): Promise<Result<Plan, ErrorEnvelope>> {
   const loaded = await loadInputs(deps, ctx);
   if (!loaded.ok) return loaded;
@@ -103,7 +117,9 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   }
   const unknown = input.roomIds?.find((id) => !profile.rooms.some((r) => r.id === id));
   if (unknown !== undefined) {
-    return err(toolError('unknown_room', `There is no room "${unknown}" in this home.`, { details: { field: 'roomIds', roomId: unknown } }));
+    // The rooms there are, as "Name (id)", so the model retries with a real id instead of guessing (#274).
+    const head = `There is no room "${unknown.slice(0, 64)}" in this home. The rooms are: `;
+    return err(toolError('unknown_room', `${head}${roomsText(profile.rooms, MESSAGE_MAX - head.length - 1)}.`, { details: { field: 'roomIds', roomId: unknown } }));
   }
 
   const { season, nightRecoveryMode } = guardFrame(deps, input.goal, loaded.value);

@@ -26,8 +26,8 @@ export interface ToolDefinition<I extends z.ZodObject = z.ZodObject, O extends z
   readonly input: I;
   readonly output: O;
   readonly handler: (args: z.output<I>, ctx: ToolContext) => Promise<Result<z.input<O>, ErrorEnvelope>>;
-  /** Short English text for `content`; defaults to the JSON of the output. */
-  readonly summarize?: (output: z.output<O>) => string;
+  /** Short English text for `content`; defaults to the JSON of the output. The context names the home (#274). */
+  readonly summarize?: (output: z.output<O>, ctx: ToolContext) => string;
   /** The MCP Apps card that shows the result (#92): a `ui://` resource of the same module. */
   readonly ui?: { readonly resourceUri: string };
 }

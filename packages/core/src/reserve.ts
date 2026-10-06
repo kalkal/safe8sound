@@ -35,7 +35,8 @@ export function hoursAtLoad(battery: BatterySpec, socPct: Pct, loadW: number, fl
  * The reserve counted in hours (ReserveOutlook, the ice cubes; semantics agreed in #21). Both level hours
  * use the same energy: on grid only what comfort may spend (above the reserve floor), off grid everything
  * down to the hardware floor, as the guard does. The reserve alone is its energy after the losses over the
- * essential load; on grid it can exceed the spendable hours, so there is no invariant between them.
+ * essential load, capped by what the battery still holds; on grid it can exceed the spendable hours, so there is
+ * no invariant between them.
  */
 export function reserveOutlookHours(input: {
   battery: BatterySpec;
@@ -50,7 +51,8 @@ export function reserveOutlookHours(input: {
   return {
     hoursAtCurrentLevel: energy / input.currentLoadW,
     hoursAtEssential: energy / input.essentialLoadW,
-    reserveHoursAtEssential: (input.reserveWh * input.battery.roundTripEff) / input.essentialLoadW,
+    // Never more than the battery holds above its hardware floor (#273): at the floor the reserve is spent too.
+    reserveHoursAtEssential: Math.min(input.reserveWh * input.battery.roundTripEff, usableWh(input.battery, input.socPct)) / input.essentialLoadW,
   };
 }
 

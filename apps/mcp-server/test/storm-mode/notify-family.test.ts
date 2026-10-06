@@ -1,6 +1,7 @@
 import { NotifyFamilyOutputSchema, err, toolError, type MODEL_NOTIFIABLE_TRANSITIONS } from '@cold-reserve/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { stormModeModule } from '../../src/modules/storm-mode/index.js';
 import { notifyFamily, startStormMode } from '../../src/modules/storm-mode/tools.js';
 import { preferences, stormConfig, world } from './support.js';
 
@@ -15,6 +16,12 @@ async function activeStorm(over: Parameters<typeof world>[1] = {}) {
 }
 
 describe('notify_family', () => {
+  it('its description tells the model to call it only when the person asks: the storm flow tells the family itself (#273)', () => {
+    const tool = stormModeModule(world(4).deps).tools.find((t) => t.name === 'notify_family');
+    expect(tool?.description).toMatch(/Call it only when the person asks to tell the family/);
+    expect(tool?.description).toMatch(/never on your own/);
+  });
+
   it('sends the essential-level message to the registered contact; the model sees roles, never names', async () => {
     const w = await activeStorm();
     const out = await notifyFamily(w.deps, { transition: 'essential_level' }, w.ctx);

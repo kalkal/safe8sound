@@ -63,7 +63,7 @@ describe('get_demo_settings', () => {
     const { get } = setup();
     const r = await get.handler({}, ctx(A));
     expect(r).toMatchObject({ ok: true, value: { settings: { scenarioId: 'clear-day', locationId: 'reference', units: 'C', household: 'older-man' }, place: { tz: 'Europe/Rome' } } });
-    const summary = r.ok ? (get.summarize?.(get.output.parse(r.value)) ?? '') : '';
+    const summary = r.ok ? (get.summarize?.(get.output.parse(r.value), ctx(A)) ?? '') : '';
     expect(summary).toMatch(/clear-day/);
     expect(summary).toMatch(/Reference home/);
     expect(summary).toMatch(/°C/);
@@ -145,7 +145,7 @@ describe('set_scenario', () => {
   it('says every value in its summary, in the units chosen', async () => {
     const { set } = setup();
     const r = await set.handler({ scenarioId: 'heatwave', units: 'F' }, ctx(A));
-    const summary = r.ok ? (set.summarize?.(set.output.parse(r.value)) ?? '') : '';
+    const summary = r.ok ? (set.summarize?.(set.output.parse(r.value), ctx(A)) ?? '') : '';
     expect(summary).toMatch(/heatwave/);
     expect(summary).toMatch(/°F/);
     expect(summary).toMatch(/version 1/);

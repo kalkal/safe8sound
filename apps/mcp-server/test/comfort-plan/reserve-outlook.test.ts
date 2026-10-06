@@ -38,11 +38,10 @@ describe('get_reserve_outlook (the ice cubes)', () => {
     expect(r.ok && r.value.gridAvailable).toBe(false);
   });
 
-  it('a battery at the reserve floor on grid has nothing left for comfort', async () => {
+  it('a battery at its hardware floor has nothing left, the storm reserve included (#273)', async () => {
     const w = world('heatwave', 14, { snapshot: (s) => ({ ...s, batterySocPct: pct(10) }) });
     const r = await reserveOutlook(w.deps, {}, w.ctx);
-    expect(r.ok && r.value).toMatchObject({ hoursAtCurrentLevel: 0, hoursAtEssential: 0 });
-    expect(r.ok && r.value.reserveHoursAtEssential).toBeGreaterThan(0);
+    expect(r.ok && r.value).toMatchObject({ hoursAtCurrentLevel: 0, hoursAtEssential: 0, reserveHoursAtEssential: 0 });
   });
 
   it('a home the client is not linked to is not found', async () => {

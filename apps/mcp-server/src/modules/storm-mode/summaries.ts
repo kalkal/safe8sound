@@ -55,9 +55,14 @@ export function safeRoomSummary(s: SafeRoomStatus): string {
     s.lastCheckIn === undefined
       ? ''
       : ` Last check-in: your ${s.lastCheckIn.role} ${s.lastCheckIn.reply === 'on_my_way' ? 'is on the way' : 'checked the status'} (${localTimeText(s.lastCheckIn.at)}).`;
+  // With the grid up the safe room is not on the battery: its hours are only a what-if (#273).
+  const hours =
+    s.gridAvailable === true
+      ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone it would hold about ${one(s.safeHours)} hours.`
+      : `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`;
   return (
     `Safe room ${s.safeRoomId}: ${one(s.tempC)} °C${humidity}, occupants: ${occupants}. Level ${s.level} (reason: ${s.levelReason}). ` +
-    `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}. ${storm}${checkIn} Home link ${s.homeLink}, ${dataText(s.origin)}.`
+    `${hours} ${storm}${checkIn} Home link ${s.homeLink}, ${dataText(s.origin)}.`
   );
 }
 

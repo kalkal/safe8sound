@@ -25,9 +25,9 @@ const byId = (id: string) => {
 };
 
 describe('eval suite v1 (plan §10.2: 20 utterances, threshold 90%)', () => {
-  it('has 20 cases with unique ids and a 0.9 threshold', () => {
-    expect(EVAL_SUITE.cases).toHaveLength(20);
-    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(20);
+  it('has 22 cases with unique ids and a 0.9 threshold (20 from plan §10.2, plus #273 "Is the power back?" and #274 scene 2b)', () => {
+    expect(EVAL_SUITE.cases).toHaveLength(22);
+    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(22);
     expect(EVAL_SUITE.threshold).toBe(0.9);
   });
 
@@ -117,9 +117,18 @@ describe('scoreCase (metrics: tool choice, trajectory, no invented numbers)', ()
 describe('runEvals on the Strands loop with the fake model (no Bedrock: cost rule)', () => {
   it('scores the reference policy at or above the threshold', async () => {
     const report = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: new FakeModel(referencePolicy), tools: stubTools() }));
-    expect(report.results).toHaveLength(20);
+    expect(report.results).toHaveLength(22);
     expect(report.passRate).toBeGreaterThanOrEqual(0.9);
     expect(report.passed).toBe(true);
+  });
+
+  it('"Is the power back?" reads the home status first, and an answer that says the power is still out fails (#273)', async () => {
+    const guess = new FakeModel((call) => (call.toolResults.length === 0 ? { toolUse: { name: 'get_home_status', input: {} } } : { text: 'The power is still out.' }));
+    const report = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: guess, tools: stubTools() }));
+    expect(report.results.find((r) => r.id === 'storm-power-back')).toMatchObject({ toolChoice: true, pass: false });
+    const reads = new FakeModel((call) => (call.toolResults.length === 0 ? { toolUse: { name: 'get_home_status', input: {} } } : { text: 'Yes, the grid is on again.' }));
+    const fine = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: reads, tools: stubTools() }));
+    expect(fine.results.find((r) => r.id === 'storm-power-back')).toMatchObject({ toolChoice: true, pass: true });
   });
 
   it('catches a model that calls the right tool first and then apply_plan', async () => {

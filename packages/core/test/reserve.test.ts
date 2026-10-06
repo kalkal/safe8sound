@@ -146,6 +146,17 @@ describe('reserveOutlookHours (the ice cubes, agreed with F8b in #21)', () => {
     expect(reserveOutlookHours({ ...base, gridAvailable: true }).reserveHoursAtEssential).toBeCloseTo((4000 * battery.roundTripEff) / 350, 9);
   });
 
+  it('the reserve alone never counts energy the battery does not hold (#273): at the hardware floor every value is 0', () => {
+    for (const gridAvailable of [true, false]) {
+      expect(reserveOutlookHours({ ...base, gridAvailable, socPct: pct(battery.minSocHwPct) })).toEqual({ hoursAtCurrentLevel: 0, hoursAtEssential: 0, reserveHoursAtEssential: 0 });
+    }
+  });
+
+  it('with less in the battery than the reserve, the reserve alone is what is left above the hardware floor', () => {
+    const low = pct(battery.minSocHwPct + 5);
+    expect(reserveOutlookHours({ ...base, gridAvailable: false, socPct: low }).reserveHoursAtEssential).toBeCloseTo(usableWh(battery, low) / 350, 9);
+  });
+
   it('on grid just above the floor the reserve can outlast the spendable energy (no false invariant)', () => {
     const o = reserveOutlookHours({ ...base, socPct: pct(41), gridAvailable: true });
     expect(o.reserveHoursAtEssential).toBeGreaterThan(o.hoursAtEssential);

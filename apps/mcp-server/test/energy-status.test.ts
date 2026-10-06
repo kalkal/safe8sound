@@ -60,6 +60,26 @@ describe('get_home_status on a visitor sandbox (#101)', () => {
 });
 
 describe('the get_home_status text', () => {
+  const status = (grid: { gridAvailable: boolean; gridW: number }) => ({ batterySocPct: 10, level: 'essential', rooms: [], origin: { energy: 'simulated' }, homeLink: 'ok', ...grid }) as unknown as HomeStatus;
+
+  it('lists every room as "Name (id)" with whether it is served or waiting, so the model never guesses an id (#274)', () => {
+    const s = {
+      batterySocPct: 100, level: 'comfort', origin: { energy: 'simulated' }, homeLink: 'ok', gridAvailable: true, gridW: 300,
+      rooms: [
+        { roomId: 'bedroom-1', state: 'served' },
+        { roomId: 'living', state: 'waiting', waitingReason: 'level' },
+      ],
+    } as unknown as HomeStatus;
+    const text = homeStatusSummary(s, 'Europe/Rome', { 'bedroom-1': 'Bedroom', living: 'Living room' });
+    expect(text).toContain('Rooms: Bedroom (bedroom-1) served, Living room (living) waiting.');
+  });
+
+  it('says whether the grid is on, in words, with what it draws or takes (#273): the model reads only the text', () => {
+    expect(homeStatusSummary(status({ gridAvailable: true, gridW: 775 }), 'Europe/Rome')).toContain('The grid is on: the home draws 775 W from it.');
+    expect(homeStatusSummary(status({ gridAvailable: true, gridW: -1200 }), 'Europe/Rome')).toContain('The grid is on: the home sends 1200 W to it.');
+    expect(homeStatusSummary(status({ gridAvailable: false, gridW: 0 }), 'Europe/Rome')).toContain('The grid is down: the home runs on the battery and the sun.');
+  });
+
   it('says the last live reading as the clock time of the home, never an ISO stamp (#177 review)', () => {
     const s = { batterySocPct: 40, level: 'essential', rooms: [], origin: { energy: 'simulated' }, homeLink: 'lost', lastLiveAt: '2026-07-17T19:30:00.000Z' } as unknown as HomeStatus;
     const text = homeStatusSummary(s, 'Europe/Rome');
