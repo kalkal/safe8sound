@@ -234,6 +234,17 @@ describe('POST /v1/tools/call: card actions, the MCP token stays here', () => {
     await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'get_home_status', arguments: { homeId: 'home' } } }), 400, 'invalid_input');
   });
 
+  it('B2: forwards the settings drawer (get_demo_settings, set_scenario) for the home in the token', async () => {
+    const { send, session, called } = setup();
+    const token = await session();
+    expect((await send('/v1/tools/call', { token, body: { name: 'get_demo_settings', arguments: {} } })).status).toBe(200);
+    expect((await send('/v1/tools/call', { token, body: { name: 'set_scenario', arguments: { scenarioId: 'storm-blackout' } } })).status).toBe(200);
+    expect(called).toEqual([
+      { home: 'demo#01aaaaaaaaaaaaaa', name: 'get_demo_settings' },
+      { home: 'demo#01aaaaaaaaaaaaaa', name: 'set_scenario' },
+    ]);
+  });
+
   it('refuses any tool that is not a card action', async () => {
     const { send, session, called } = setup();
     await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'notify_family', arguments: {} } }), 400, 'invalid_input');

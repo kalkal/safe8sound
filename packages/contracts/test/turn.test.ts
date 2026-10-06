@@ -68,6 +68,15 @@ describe('card tool calls: POST /v1/tools/call', () => {
     expect(ToolCallRequestSchema.safeParse({ name: 'get_home_status', arguments: { homeId: 'home' } }).success).toBe(false);
   });
 
+  it('B2 (approved by the main, additive): the settings drawer reads get_demo_settings and saves with set_scenario', () => {
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_demo_settings', arguments: {} }).success).toBe(true);
+    expect(ToolCallRequestSchema.safeParse({ name: 'set_scenario', arguments: { scenarioId: 'storm-blackout' } }).success).toBe(true);
+    expect(ToolCallRequestSchema.safeParse({ name: 'set_scenario', arguments: { restart: true } }).success).toBe(true);
+    // set_scenario's own rule: at least one change, or a restart.
+    expect(ToolCallRequestSchema.safeParse({ name: 'set_scenario', arguments: {} }).success).toBe(false);
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_demo_settings', arguments: { homeId: 'home' } }).success).toBe(false);
+  });
+
   it('answers the MCP CallToolResult a card expects, tool errors included', () => {
     expect(ToolCallReplySchema.safeParse({ content: [{ type: 'text', text: 'Applied.' }], structuredContent: { ok: true } }).success).toBe(true);
     const failed = toolError('plan_expired', 'The plan expired: ask for a new one.');

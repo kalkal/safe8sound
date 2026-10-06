@@ -3,7 +3,7 @@ import './app.css';
 import type { HomeStatus, SetScenarioInput } from '@cold-reserve/contracts';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { StrictMode, Suspense, lazy, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Agent, AgentAnswer } from './agent/agent.js';
 import { buildAgent, buildSession, type DemoSession } from './agent/index.js';
@@ -19,7 +19,7 @@ import { CardFrame } from './host/CardFrame.js';
 import { EchoFrame } from './ui/EchoFrame.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { HomePanel } from './ui/HomePanel.js';
-import { applyChange, scriptedDemoSettings, skyOfScenario } from './ui/demo-settings.js';
+import { SHIPPED_PLACES, applyChange, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario, type DemoSettingsView } from './ui/demo-settings.js';
 import { DemoSettingsControl } from './ui/SettingsDrawer.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { skyFor, type Sky } from './ui/sky.js';
@@ -108,15 +108,36 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [homeMode, loadHome],
   );
-  // The judge's demo settings (B1): kept in the page in scripted mode; a new scenario starts on its own sky.
-  const [demoSettings, setDemoSettings] = useState(scriptedDemoSettings);
-  const onSettingsChange = useCallback((change: SetScenarioInput) => {
-    setDemoSettings((previous) => applyChange(previous, change));
-    if (change.scenarioId !== undefined) setSky(skyOfScenario(change.scenarioId));
-    return Promise.resolve(true);
-  }, []);
+  // The judge's demo settings (B1, B2): kept in the page in scripted mode; in remote mode read from the visitor's
+  // sandbox once the demo session starts, and saved there (what is shown is what is stored). A new scenario starts on
+  // its own sky. A home that is not a sandbox has no settings: no badge.
+  const scripted = config.agent === 'scripted';
+  const [demoSettings, setDemoSettings] = useState<DemoSettingsView | undefined>(() => (scripted ? scriptedDemoSettings() : undefined));
+  const subscribeSession = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
+  const sessionToken = useSyncExternalStore(subscribeSession, () => session?.token());
+  useEffect(() => {
+    if (scripted || sessionToken === undefined) return;
+    void fetchDemoSettings(agent, { correlationId: crypto.randomUUID() }).then((read) => {
+      if (read.ok) setDemoSettings(read.value);
+    });
+  }, [agent, scripted, sessionToken]);
+  const onSettingsChange = useCallback(
+    async (change: SetScenarioInput) => {
+      if (scripted) {
+        setDemoSettings((previous) => (previous === undefined ? previous : applyChange(previous, change)));
+        if (change.scenarioId !== undefined) setSky(skyOfScenario(change.scenarioId));
+        return true;
+      }
+      const saved = await saveDemoSettings(agent, change, { correlationId: crypto.randomUUID() });
+      if (!saved.ok) return false;
+      setDemoSettings(saved.value);
+      if (change.scenarioId !== undefined || change.restart === true) setSky(skyOfScenario(saved.value.scenarioId));
+      return true;
+    },
+    [agent, scripted],
+  );
   const settingsControl =
-    config.agent === 'scripted' ? <DemoSettingsControl settings={demoSettings} availablePlaces={['reference']} onChange={onSettingsChange} /> : undefined;
+    demoSettings === undefined ? undefined : <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onSettingsChange} />;
   const phonePanel = (config.agent === 'scripted' || config.phone === 'inbox') && (
     <ErrorBoundary>
       <PhonePanel feed={phone} timeZone={config.homeTimeZone} />

@@ -1,4 +1,18 @@
-import type { Household, LocationId, ScenarioId, SetScenarioInput } from '@cold-reserve/contracts';
+import {
+  GetDemoSettingsOutputSchema,
+  SetScenarioOutputSchema,
+  err,
+  ok,
+  toolError,
+  type ErrorEnvelope,
+  type Household,
+  type LocationId,
+  type Result,
+  type ScenarioId,
+  type SetScenarioInput,
+} from '@cold-reserve/contracts';
+import type { Agent, AskContext } from '../agent/agent.js';
+import { log as defaultLog, type Log } from '../log.js';
 import type { Sky } from './sky.js';
 import { t } from './text.js';
 
@@ -42,4 +56,46 @@ export function applyChange(view: DemoSettingsView, change: SetScenarioInput): D
 export function skyOfScenario(id: ScenarioId): Sky {
   if (id === 'storm-blackout') return 'storm';
   return id === 'heatwave' ? 'hot' : 'mild';
+}
+
+/** The places the server plays (all three since #280); a place missing here shows "Not available yet". */
+export const SHIPPED_PLACES: readonly LocationId[] = ['reference', 'turin', 'houston'];
+
+async function callFor<T>(
+  agent: Agent,
+  name: 'get_demo_settings' | 'set_scenario',
+  args: Record<string, unknown>,
+  parse: (value: unknown) => { success: true; data: T } | { success: false },
+  context: AskContext,
+  logEvent: Log,
+): Promise<Result<T, ErrorEnvelope>> {
+  try {
+    const reply = await agent.callTool(name, args, context);
+    if (reply.isError !== true) {
+      const parsed = parse(reply.structuredContent);
+      if (parsed.success) return ok(parsed.data);
+    }
+    const failure = reply.isError === true ? toolError('invalid_input', 'The demo settings were refused.') : toolError('output_schema_violation', 'The demo settings came back in an unexpected format.');
+    logEvent({ level: 'warn', code: failure.code, correlationId: context.correlationId, details: { step: name } });
+    return err(failure);
+  } catch (error) {
+    const failure = toolError('agent_unavailable', 'The demo settings could not be reached.');
+    logEvent({ level: 'warn', code: failure.code, correlationId: context.correlationId, error, details: { step: name } });
+    return err(failure);
+  }
+}
+
+/** B2: the visitor's sandbox settings, read through the card tool route; a home that is not a sandbox has none. */
+export async function fetchDemoSettings(agent: Agent, context: AskContext, logEvent: Log = defaultLog): Promise<Result<DemoSettingsView, ErrorEnvelope>> {
+  const read = await callFor(agent, 'get_demo_settings', {}, (v) => GetDemoSettingsOutputSchema.safeParse(v), context, logEvent);
+  if (!read.ok) return read;
+  const { settings, place } = read.value;
+  return ok({ scenarioId: settings.scenarioId, locationId: settings.locationId, units: settings.units, household: settings.household, placeLabel: place.label });
+}
+
+/** B2: saves one change, then reads the settings back, so what is shown is what is stored (never an optimistic guess). */
+export async function saveDemoSettings(agent: Agent, change: SetScenarioInput, context: AskContext, logEvent: Log = defaultLog): Promise<Result<DemoSettingsView, ErrorEnvelope>> {
+  const saved = await callFor(agent, 'set_scenario', { ...change }, (v) => SetScenarioOutputSchema.safeParse(v), context, logEvent);
+  if (!saved.ok) return saved;
+  return fetchDemoSettings(agent, context, logEvent);
 }

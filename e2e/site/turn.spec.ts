@@ -28,6 +28,30 @@ test('#262: "Show my home" reads the sandbox home on demand through /api, read-o
   await expect(home.getByRole('list', { name: 'Rooms' }).getByRole('listitem').first()).toBeVisible();
 });
 
+test('B2: the settings drawer saves to the visitor sandbox through /api; the badge shows what the server reads back', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Demo code').fill(DEMO_CODE);
+  await page.getByRole('button', { name: 'Start' }).click();
+  // Each demo session plays its own sandbox: the badge comes from its get_demo_settings.
+  const badge = page.getByRole('button', { name: /SCENARIO/ });
+  await expect(badge).toContainText('Reference home (central Italy)', { timeout: 20_000 });
+
+  await badge.click();
+  const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+  await drawer.getByText('Storm · power outage').click();
+  // set_scenario, then get_demo_settings: the badge and the checked radio are what is stored.
+  await expect(badge).toContainText('Storm · power outage', { timeout: 20_000 });
+  await expect(drawer.getByRole('radio', { name: /Storm/ })).toBeChecked();
+  await expect(page.getByTestId('echo-screen')).toHaveAttribute('data-sky', 'storm');
+  // Turin and Houston ship with #280: a new place is saved too, and the badge names it as the server does.
+  await drawer.getByText('Houston, Texas').click();
+  await expect(badge).toContainText('Houston, Texas', { timeout: 20_000 });
+  await drawer.getByText('°F').click();
+  await expect(drawer.getByRole('radio', { name: '°F' })).toBeChecked({ timeout: 20_000 });
+  await page.keyboard.press('Escape');
+  await expect(badge).toBeFocused();
+});
+
 test('the privacy line about the access logs is readable at phone width, before the code is entered (#244)', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/');

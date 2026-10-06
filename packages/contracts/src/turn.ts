@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ApplyPlanInputSchema, ApplyPlanOutputSchema } from './comfort-plan.js';
 import { IsoDateTimeSchema } from './common.js';
+import { SetScenarioInputSchema } from './demo-settings.js';
 import { ErrorCategorySchema, ErrorCodeSchema, ErrorEnvelopeSchema, categoryOf } from './errors.js';
 import { DataOriginSchema } from './origin.js';
 import { PlanSchema } from './plan.js';
@@ -107,6 +108,9 @@ export const ToolCallRequestSchema = z.discriminatedUnion('name', [
   z.strictObject({ name: z.literal('apply_plan'), arguments: ApplyPlanInputSchema }),
   z.strictObject({ name: z.literal('set_preferences'), arguments: SetPreferencesInputSchema }),
   z.strictObject({ name: z.literal('get_home_status'), arguments: z.strictObject({}) }),
+  // B2 (additive, approved by the main): the judge's settings drawer reads and saves its own sandbox only.
+  z.strictObject({ name: z.literal('get_demo_settings'), arguments: z.strictObject({}) }),
+  z.strictObject({ name: z.literal('set_scenario'), arguments: SetScenarioInputSchema }),
 ]);
 export type ToolCallRequest = z.infer<typeof ToolCallRequestSchema>;
 

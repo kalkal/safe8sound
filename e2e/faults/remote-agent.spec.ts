@@ -106,7 +106,10 @@ test('sim-api answers 503 → the degraded mode leaves one JSON log line with th
   // The agent's side of the turn: exactly one line. The reply may also be read aloud; where the browser
   // has no voice (headless CI) that leaves its own voice line, for the same turn (see e2e/voice).
   const isVoice = (line: unknown) => typeof (line as { details?: { phase?: unknown } }).details?.phase === 'string';
-  expect(lines.filter((line) => !isVoice(line))).toEqual([
+  // Other requests of the page keep their own correlation ids and lines (B2: the settings drawer reads the sandbox
+  // settings when the session starts, and logs its own failure here): this check is about the turn.
+  const ofTheTurn = (line: unknown) => (line as { correlationId?: unknown }).correlationId === correlationId;
+  expect(lines.filter((line) => ofTheTurn(line) && !isVoice(line))).toEqual([
     expect.objectContaining({ level: 'warn', code: 'agent_unavailable', category: 'dependency_unavailable', correlationId, details: { degraded: true } }),
   ]);
   for (const line of lines.filter(isVoice)) expect(line).toMatchObject({ correlationId, details: { phase: 'speaking' } });
