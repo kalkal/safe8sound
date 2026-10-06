@@ -1,6 +1,7 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import './app.css';
 import type { HomeStatus, SetScenarioInput } from '@cold-reserve/contracts';
+import { getLocale, setLocale, subscribeLocale, type Locale } from '@cold-reserve/i18n';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, Suspense, lazy, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
@@ -21,6 +22,7 @@ import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { HomePanel } from './ui/HomePanel.js';
 import { SHIPPED_PLACES, applyChange, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario, type DemoSettingsView } from './ui/demo-settings.js';
 import { DemoSettingsControl } from './ui/SettingsDrawer.js';
+import { readLocale, saveLocale } from './ui/locale-setting.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { skyFor, type Sky } from './ui/sky.js';
 import { t } from './ui/text.js';
@@ -28,6 +30,8 @@ import type { StudioVoice } from './voice/use-voice.js';
 import { createRemoteSynthesize, createSpeechTickets } from './voice/studio-voice.js';
 
 logUnhandled(window);
+// #263: the language this viewer chose last time, before anything is drawn (English by default).
+setLocale(readLocale());
 const container = document.getElementById('root');
 if (container === null) throw new Error('Missing #root element');
 document.title = t('sim.title');
@@ -136,8 +140,20 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [agent, scripted],
   );
+  // #263: the page's language, this viewer's own setting kept in the browser; every text re-renders with it.
+  const locale = useSyncExternalStore(subscribeLocale, getLocale);
+  const onLocale = useCallback((next: Locale) => {
+    setLocale(next);
+    saveLocale(next);
+  }, []);
+  useEffect(() => {
+    document.documentElement.lang = locale.slice(0, 2);
+    document.title = t('sim.title');
+  }, [locale]);
   const settingsControl =
-    demoSettings === undefined ? undefined : <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onSettingsChange} />;
+    demoSettings === undefined ? undefined : (
+      <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onSettingsChange} locale={locale} onLocale={onLocale} />
+    );
   const phonePanel = (config.agent === 'scripted' || config.phone === 'inbox') && (
     <ErrorBoundary>
       <PhonePanel feed={phone} timeZone={config.homeTimeZone} />

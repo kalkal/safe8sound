@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '@cold-reserve/i18n';
 import { scriptedDemoSettings } from '../../src/ui/demo-settings.js';
 import { DemoSettingsControl } from '../../src/ui/SettingsDrawer.js';
 
@@ -11,8 +12,9 @@ afterEach(cleanup);
 
 const setup = () => {
   const onChange = vi.fn(() => Promise.resolve(true));
-  render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={onChange} />);
-  return { onChange, badge: screen.getByRole('button', { name: /SCENARIO/ }) };
+  const onLocale = vi.fn();
+  render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={onChange} locale="en-US" onLocale={onLocale} />);
+  return { onChange, onLocale, badge: screen.getByRole('button', { name: /SCENARIO/ }) };
 };
 
 describe('DemoSettingsControl', () => {
@@ -46,6 +48,31 @@ describe('DemoSettingsControl', () => {
     const houston = screen.getByRole('radio', { name: /Houston, Texas/ });
     expect(houston).toHaveProperty('disabled', true);
     expect(screen.getByRole('radiogroup', { name: 'Place' }).textContent).toContain('Not available yet');
+  });
+
+  it('#263: the language is a row of its own, English by default; choosing Italiano changes only the page', () => {
+    const { badge, onLocale, onChange } = setup();
+    fireEvent.click(badge);
+    const language = screen.getByRole('radiogroup', { name: 'Language' });
+    expect(within(language).getByRole('radio', { name: /English/ })).toHaveProperty('checked', true);
+    fireEvent.click(within(language).getByRole('radio', { name: /Italiano/ }));
+    expect(onLocale).toHaveBeenCalledWith('it-IT');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('#263: with Italian chosen, the drawer says honestly that the answers are still in English', () => {
+    const onLocale = vi.fn();
+    setLocale('it-IT');
+    render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={() => Promise.resolve(true)} locale="it-IT" onLocale={onLocale} />);
+    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    expect(screen.getByTestId('language-note').textContent).toBe('Alexa risponde ancora in inglese: le risposte in italiano arriveranno presto.');
+    setLocale('en-US');
+  });
+
+  it('in English there is no such note', () => {
+    const { badge } = setup();
+    fireEvent.click(badge);
+    expect(screen.queryByTestId('language-note')).toBeNull();
   });
 
   it('restart needs two taps', () => {

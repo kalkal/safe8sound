@@ -20,6 +20,12 @@ import {
 // The wire between alexa-sim and sim-api (#55, #101): one schema for both apps.
 
 describe('turn wire: POST /v1/turns', () => {
+  it('#263 (approved by the main, additive): a turn may name its language, English or Italian; English when absent', () => {
+    expect(TurnRequestSchema.safeParse({ question: 'Ciao', locale: 'it-IT' }).success).toBe(true);
+    expect(TurnRequestSchema.safeParse({ question: 'Hi' }).success).toBe(true);
+    expect(TurnRequestSchema.safeParse({ question: 'Salut', locale: 'fr-FR' }).success).toBe(false);
+  });
+
   it('accepts a trimmed question of at most 500 characters', () => {
     expect(TurnRequestSchema.parse({ question: "  What's my battery level?  " })).toEqual({ question: "What's my battery level?" });
     expect(TurnRequestSchema.safeParse({ question: '   ' }).success).toBe(false);

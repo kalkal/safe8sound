@@ -1,6 +1,7 @@
 import { useApp, type McpUiHostContext } from '@modelcontextprotocol/ext-apps/react';
 import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { isLocale, setLocale } from '@cold-reserve/i18n';
 import { installTapMarks, isDemoContext } from '../demo-taps.js';
 import { t } from '../text.js';
 import { cardThemeFor } from '../theme.js';
@@ -11,7 +12,7 @@ import { isCardKind, isStormState, parseCardResult, parseSaveResult, safeTimeZon
 // Entry of the ui:// card bundle. The document names its card (data-card); the host sends the tool
 // result and the context (theme, time zone) through the MCP Apps bridge. Covered by the host e2e tests.
 
-type Context = Pick<McpUiHostContext, 'theme' | 'timeZone' | 'displayMode' | 'availableDisplayModes'>;
+type Context = Pick<McpUiHostContext, 'theme' | 'timeZone' | 'displayMode' | 'availableDisplayModes' | 'locale'>;
 
 function Card({ kind }: { kind: CardKind }) {
   const [state, setState] = useState<CardState>({ kind: 'waiting' });
@@ -29,7 +30,9 @@ function Card({ kind }: { kind: CardKind }) {
         setState(parseCardResult(kind, result));
       });
       created.addEventListener('hostcontextchanged', (changed) => {
-        const { theme, timeZone, displayMode, availableDisplayModes } = changed;
+        const { theme, timeZone, displayMode, availableDisplayModes, locale } = changed;
+        // #263: the card speaks the host's language (standard hostContext.locale); English otherwise.
+        if (isLocale(locale)) setLocale(locale);
         if (isDemoContext(changed)) setDemo(true);
         setContext((previous) => ({
           ...previous,
@@ -37,6 +40,7 @@ function Card({ kind }: { kind: CardKind }) {
           ...(timeZone !== undefined && { timeZone }),
           ...(displayMode !== undefined && { displayMode }),
           ...(availableDisplayModes !== undefined && { availableDisplayModes }),
+          ...(locale !== undefined && { locale }),
         }));
       });
     },
@@ -50,7 +54,9 @@ function Card({ kind }: { kind: CardKind }) {
         ...(initial.timeZone !== undefined && { timeZone: initial.timeZone }),
         ...(initial.displayMode !== undefined && { displayMode: initial.displayMode }),
         ...(initial.availableDisplayModes !== undefined && { availableDisplayModes: initial.availableDisplayModes }),
+        ...(initial.locale !== undefined && { locale: initial.locale }),
       });
+      if (isLocale(initial.locale)) setLocale(initial.locale);
       setDemo(isDemoContext(initial));
     }
   }, [app]);
@@ -60,6 +66,11 @@ function Card({ kind }: { kind: CardKind }) {
   useEffect(() => {
     document.documentElement.dataset['cardTheme'] = cardThemeFor(context.theme);
   }, [context.theme]);
+
+  // Screen readers read the card in its language (#263).
+  useEffect(() => {
+    if (isLocale(context.locale)) document.documentElement.lang = context.locale.slice(0, 2);
+  }, [context.locale]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('theme-storm', isStormState(state));

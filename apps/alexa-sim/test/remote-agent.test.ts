@@ -1,3 +1,4 @@
+import { setLocale } from '@cold-reserve/i18n';
 import { ErrorEnvelopeSchema, PROBLEM_JSON_CONTENT_TYPE, toProblemDetails, toolError } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { hotDayPlan } from '@cold-reserve/ui-cards';
@@ -32,6 +33,22 @@ describe('RemoteAgent (sim-api over HTTP)', () => {
     expect(calls[0]?.init.method).toBe('POST');
     expect(new Headers(calls[0]?.init.headers).get('x-correlation-id')).toBe('turn-1');
     expect(JSON.parse(calls[0]?.init.body as string)).toEqual({ question: "What's my battery level?" });
+  });
+
+  it('#263: in Italian the turn names its language; in English it says nothing (English is the default)', async () => {
+    const bodies: unknown[] = [];
+    const a = agent((_url, init) => {
+      bodies.push(JSON.parse(init.body as string));
+      return json(reply);
+    });
+    setLocale('it-IT');
+    try {
+      await a.ask('Quanto è carica la batteria?', { correlationId: 'turn-it' });
+    } finally {
+      setLocale('en-US');
+    }
+    await a.ask("What's my battery level?", { correlationId: 'turn-en' });
+    expect(bodies).toEqual([{ question: 'Quanto è carica la batteria?', locale: 'it-IT' }, { question: "What's my battery level?" }]);
   });
 
   it('gives up after the configured timeout with agent_timeout', async () => {

@@ -22,8 +22,14 @@ export const SessionReplySchema = z.strictObject({ token: z.string().min(1).max(
 export type SessionReply = z.infer<typeof SessionReplySchema>;
 
 /** POST /v1/turns */
+/** The languages a person can choose (#263): English is the default. */
+export const LocaleSchema = z.enum(['en-US', 'it-IT']);
+export type LocaleId = z.infer<typeof LocaleSchema>;
+
 export const TurnRequestSchema = z.strictObject({
   question: z.string().trim().min(1).max(500),
+  /** The language of the answer (#263, additive, approved by the main): absent means English. */
+  locale: LocaleSchema.optional(),
 });
 export type TurnRequest = z.infer<typeof TurnRequestSchema>;
 

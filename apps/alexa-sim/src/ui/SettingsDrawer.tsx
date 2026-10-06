@@ -1,5 +1,6 @@
 import type { LocationId, SetScenarioInput } from '@cold-reserve/contracts';
 import { useEffect, useId, useRef, useState } from 'react';
+import { LOCALES, isLocale, type Locale } from '@cold-reserve/i18n';
 import { makeRestInert } from '../host/inert.js';
 import { HOUSEHOLDS, PLACES, SCENARIOS, badgeText, skyOfScenario, type DemoSettingsView } from './demo-settings.js';
 import { t } from './text.js';
@@ -56,9 +57,12 @@ export interface DemoSettingsControlProps {
   availablePlaces: readonly LocationId[];
   /** Sends one change; resolves true when it was saved. */
   onChange: (change: SetScenarioInput) => Promise<boolean>;
+  /** #263: the page's language, a setting of this viewer only (never sent to the sandbox). */
+  locale: Locale;
+  onLocale: (locale: Locale) => void;
 }
 
-export function DemoSettingsControl({ settings, availablePlaces, onChange }: DemoSettingsControlProps) {
+export function DemoSettingsControl({ settings, availablePlaces, onChange, locale, onLocale }: DemoSettingsControlProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -132,6 +136,21 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange }: Dem
             </button>
           </div>
           <p className="muted">{t('settings.intro')}</p>
+          <ChipGroup
+            label={t('settings.language')}
+            name="language"
+            value={locale}
+            options={LOCALES.map((l) => ({ value: l, label: t(`settings.language.${l}`) }))}
+            onPick={(v) => {
+              if (isLocale(v)) onLocale(v);
+            }}
+          />
+          {/* Until the agent answers in the chosen language (#263 server side), the page says so (main's decision). */}
+          {locale !== 'en-US' && (
+            <p className="notice" data-testid="language-note">
+              {t('settings.languageNote')}
+            </p>
+          )}
           <ChipGroup
             label={t('settings.scenario')}
             name="scenario"
