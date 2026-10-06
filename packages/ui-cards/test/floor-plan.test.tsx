@@ -49,6 +49,22 @@ describe('FloorPlanCard (signature element 3: the thermal floor plan, generated 
     expect(screen.getByText('Grid: taking 0.4 kW')).toBeTruthy();
   });
 
+  it('owner feedback (6 Oct): each energy device has its own big icon, the battery drawn at its level; the words stay', () => {
+    const { container } = render(<FloorPlanCard status={homeCalm()} />);
+    const devices = [...container.querySelectorAll('.energy-facts li')].map((li) => li.querySelector('svg')?.getAttribute('data-device'));
+    expect(devices).toEqual(['battery', 'solar', 'grid', undefined]);
+    expect(container.querySelector('svg[data-device="battery"] [data-level]')?.getAttribute('data-level')).toBe('78');
+    // Drawings beside words that already say everything: screen readers read the words once.
+    for (const svg of container.querySelectorAll('svg[data-device]')) expect(svg.getAttribute('aria-hidden')).toBe('true');
+    expect(screen.getByText('Battery 78%')).toBeTruthy();
+  });
+
+  it('owner feedback (6 Oct): every room shows its split, blowing when the room is served and still when it waits', () => {
+    const { container } = render(<FloorPlanCard status={homeCalm()} />);
+    const splits = [...container.querySelectorAll('.room-tile')].map((tile) => tile.querySelector('svg[data-device="split"]')?.getAttribute('data-on'));
+    expect(splits).toEqual(['true', 'false', 'true', 'false']);
+  });
+
   it('shows the data origin', () => {
     render(<FloorPlanCard status={homeInStorm()} />);
     expect(screen.getByTestId('origin-badge').textContent).toContain('SIMULATED');

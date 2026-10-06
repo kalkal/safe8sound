@@ -1,5 +1,6 @@
 import type { HomeStatus } from '@cold-reserve/contracts';
 import { CardShell } from './CardShell.js';
+import { DeviceIcon } from './DeviceIcon.js';
 import { roomLabel } from './SafeRoomCard.js';
 import { t } from './text.js';
 
@@ -12,9 +13,18 @@ export function FloorPlanCard({ status }: { status: HomeStatus }) {
     <CardShell title={t('floor.title')} origin={status.origin.rooms}>
       {!status.gridAvailable && <p className="advice">{t('floor.gridDown')}</p>}
       <ul className="facts energy-facts" aria-label={t('floor.energy')}>
-        <li>{t('floor.battery', { pct: String(Math.round(status.batterySocPct)) })}</li>
-        <li>{t('floor.solar', { kw: (status.pvW / 1000).toFixed(1) })}</li>
-        <li>{gridText(status)}</li>
+        <li>
+          <DeviceIcon device="battery" level={status.batterySocPct} />
+          {t('floor.battery', { pct: String(Math.round(status.batterySocPct)) })}
+        </li>
+        <li>
+          <DeviceIcon device="solar" />
+          {t('floor.solar', { kw: (status.pvW / 1000).toFixed(1) })}
+        </li>
+        <li>
+          <DeviceIcon device="grid" />
+          {gridText(status)}
+        </li>
         <li>{t('floor.level', { level: t(`level.${status.level}`), reason: t(`reason.${status.levelReason}`) })}</li>
       </ul>
       <ul className="floor-plan" aria-label={t('floor.rooms')}>
@@ -22,6 +32,7 @@ export function FloorPlanCard({ status }: { status: HomeStatus }) {
           const name = roomLabel(room.roomId);
           return (
             <li key={room.roomId} className="room-tile" data-state={room.state} aria-label={name}>
+              <DeviceIcon device="split" on={room.state === 'served'} />
               <span className="room-name">{name}</span>
               <span className="room-temp">{`${room.tempC.toFixed(1)} °C`}</span>
               {room.occupants.length > 0 && <span className="muted">{room.occupants.join(', ')}</span>}

@@ -567,6 +567,46 @@
 
 /* The thermal floor plan and the manual-control card (plan §11.6). */
 @layer components {
+  /* The connected devices, drawn (owner feedback, 6 Oct): big, in the text colour, the charge and the air in tokens. */
+  .device-icon {
+    flex: none;
+    inline-size: var(--target-min);
+    block-size: var(--target-min);
+  }
+
+  .device-line {
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .device-solid {
+    fill: currentcolor;
+  }
+
+  .device-charge {
+    fill: var(--status-ok);
+  }
+
+  .device-sun {
+    fill: var(--status-warn);
+  }
+
+  .device-air {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+  }
+
+  .energy-facts li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
   .floor-plan {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
