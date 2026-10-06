@@ -135,3 +135,20 @@ describe('storm (the grid is down at 15:00)', () => {
     });
   });
 });
+
+describe('humid air, not hot (#248): the plan passes with a warning, never a refusal', () => {
+  it('a proposal that keeps the safe room cool but humid is accepted, says so, and applies', async () => {
+    await withServer({ MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '15' }, async (call) => {
+      const r = await call(TOKEN, 'plan_comfort', { goal: 'cool', setpointC: 16, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
+      expect(r.isError).toBeFalsy();
+      const plan = PlanSchema.parse(r.structuredContent);
+      expect(plan.refusedProposal).toBeUndefined();
+      expect(plan.guarantees.every((g) => g.ok)).toBe(true);
+      expect(plan.warnings?.find((w) => w.code === 'humid_air')?.message).toMatch(/^The air in the Bedroom is humid \(up to \d+ %, over 60 %\): less comfortable and a risk of mould, but no heat danger at this temperature\.$/);
+      expect(textOf(r)).toContain('humid');
+      const applied = await call(TOKEN, 'apply_plan', { planId: plan.id });
+      expect(applied.isError).toBeFalsy();
+      expect(ApplyPlanOutputSchema.parse(applied.structuredContent).plan).toMatchObject({ id: plan.id, status: 'applied' });
+    });
+  });
+});

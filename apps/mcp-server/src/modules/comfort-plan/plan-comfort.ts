@@ -25,7 +25,7 @@ import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
-import { lastResortActions, lastResortWindow, loweredLimit } from './last-resort.js';
+import { lastResortActions, lastResortThen, lastResortWindow, loweredLimit } from './last-resort.js';
 import { recordRejection } from './rejections.js';
 
 // plan_comfort, the first of the two phases (plan §9.2): read-only on the home, it proposes a plan and
@@ -169,7 +169,12 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
       details: { event: 'last_resort_hold_failed', ...homeDetail(ctx.homeId) },
     });
   };
-  const fromHold = chosen === undefined && !overridden ? lastResortOf(holdAttempts(deps, guardInput, holdFailed), deps, guardInput) : undefined;
+  // Whether a last resort is needed is the candidates' (or the hold's) safe room failing (#160); once it is, the
+  // hold is the last resort even when the hold itself fails only the pace, so the plan and the storm card name
+  // the same time (#24 decision A; #248, approved in #248).
+  const holds = chosen === undefined && !overridden ? holdAttempts(deps, guardInput, holdFailed) : [];
+  const needed = [...tried, ...holds].some(needsLastResort);
+  const fromHold = needed ? lastResortOf(holds, deps, guardInput, { anyFailure: true }) : undefined;
   const safest = fromHold ?? (chosen === undefined && !overridden ? lastResortOf(tried, deps, guardInput) : undefined);
   if (chosen === undefined && safest !== undefined) chosen = safest.attempt;
   // A plan the model proposed and the guard refused (#202): when the planner's own plan holds, that plan is the
@@ -287,7 +292,15 @@ interface LastResort {
  * (storm reserve, inverter, battery power) but fail the safe room's comfort or its night recovery, the one whose safe room stays safe the
  * longest; the first, the most comfortable, on a tie. Undefined when every candidate breaks a hard limit.
  */
-function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInput: GuardInput): LastResort | undefined {
+/** A candidate that breaks no hard limit but fails the safe room's comfort or its night recovery (#160). */
+function needsLastResort(a: Attempt): boolean {
+  const guarantees = a.verdict.guarantees;
+  if (guarantees.some((g) => HARD_LIMITS.includes(g.id) && !g.ok)) return false;
+  return guarantees.some((g) => g.id === 'safe_room_comfort' && !g.ok) || a.verdict.nightRecovery?.status === 'unmet';
+}
+
+/** `anyFailure`: the hold, once a last resort is needed, qualifies on any failure that is not a hard limit. */
+function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInput: GuardInput, opts: { anyFailure?: boolean } = {}): LastResort | undefined {
   const { preferences, snapshot, profile, season } = guardInput;
   const nowMs = Date.parse(snapshot.ts);
   const stepMs = deps.guard.projection.stepMinutes * 60_000;
@@ -299,13 +312,12 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
     const guarantees = a.verdict.guarantees;
     if (guarantees.some((g) => HARD_LIMITS.includes(g.id) && !g.ok)) continue;
     // Only the safe room's own limits make a last resort (#160): a plan that fails only the pace stays a refusal.
-    const roomFails = guarantees.some((g) => g.id === 'safe_room_comfort' && !g.ok) || a.verdict.nightRecovery?.status === 'unmet';
-    if (!roomFails) continue;
+    if (opts.anyFailure !== true && !needsLastResort(a)) continue;
     const context = buildContext({ ...a.guardInput, plan: a.candidate });
     const control = controlFromSteps(a.candidate.steps, currentControls(snapshot));
     // A point is what the previous step left: the plan dried the room into it if that step was drying.
     const driesAt = (ms: number) => control(ms - stepMs).find((c) => c.id === preferences.safeRoomId)?.hvac?.mode === 'dry';
-    const end = safeUntil(context.points, { nowMs, graceMinutes: deps.guard.safeRoom.graceMinutes, roomId: preferences.safeRoomId, season, safety: preferences.safety, driesAt, coolingMaxAt: limitAt });
+    const end = safeUntil(context.points, { nowMs, graceMinutes: deps.guard.safeRoom.graceMinutes, roomId: preferences.safeRoomId, season, safety: preferences.safety, driesAt, coolingMaxAt: limitAt, elderly: guardInput.nightRecoveryMode === 'elderly' });
     // No breach inside the horizon: what fails is something else (the pace, the night), and "safe until"
     // would name a limit that is not there. Such a candidate is not a last resort.
     if (end === undefined) continue;
@@ -317,18 +329,7 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
   // In the home's time zone, as the family message and the guard's reasons say it.
   const safeUntilIso = localIso(best.untilMs, profile.location.tz);
   const room = profile.rooms.find((r) => r.id === preferences.safeRoomId)?.name ?? preferences.safeRoomId;
-  const { cooling, heating, humidity } = preferences.safety;
-  const limitThen = limitAt(best.untilMs);
-  const then =
-    limitedBy === 'battery'
-      ? 'the battery runs out'
-      : limitedBy === 'humidity'
-        ? `the humidity leaves its ${String(humidity.minPct)}-${String(humidity.maxPct)} % band`
-        : season === 'heating'
-          ? `the room drops below its ${String(heating.minC)} °C minimum`
-          : limitThen < cooling.maxC
-            ? `the room goes above ${String(limitThen)} °C, the night limit`
-            : `the room goes above its ${String(cooling.maxC)} °C maximum`;
+  const then = lastResortThen({ limitedBy, season, limitThenC: limitAt(best.untilMs), ...preferences.safety });
   // The honest window (#160): from safeUntil, how far past the limit in force the room goes and by when; the
   // summary says it (the warning keeps its 300 characters for the reason).
   const window = lastResortWindow(best.points, { untilMs: best.untilMs, roomId: preferences.safeRoomId, season, limitAt });
@@ -355,7 +356,9 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
 }
 
 function warningsOf(chosen: Attempt, safest: LastResort | undefined): PlanWarning[] {
-  return [...chosen.verdict.warnings, ...(safest === undefined ? [] : [safest.warning])];
+  // A last resort says the room leaves its limits: "no heat danger" never stands next to it (#285 review).
+  const own = safest === undefined ? chosen.verdict.warnings : chosen.verdict.warnings.filter((w) => w.code !== 'humid_air');
+  return [...own, ...(safest === undefined ? [] : [safest.warning])];
 }
 
 function withOverrides(rung: LevelStep, input: PlanComfortInput): LevelStep {

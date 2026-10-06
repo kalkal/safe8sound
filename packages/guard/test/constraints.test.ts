@@ -5,6 +5,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { CONSTRAINTS } from '../src/constraints.js';
 import { dryAirWarning } from '../src/dry-air.js';
+import { humidAirWarning } from '../src/humid-air.js';
 import type { GuardContext } from '../src/context.js';
 import { H, MIN, T0, input, plan, step } from './support.js';
 
@@ -198,11 +199,11 @@ describe('safe_room_comfort', () => {
     expect(check('safe_room_comfort', ctx({ points: [point(0, { tempC: 26 }), point(30, { tempC: 28 })] })).ok).toBe(false);
   });
 
-  it('holds at the cooling maximum and reports the range', () => {
-    expect(check('safe_room_comfort', ctx({ points: [point(60, { tempC: 25.5, rh: 45 }), point(65, { tempC: 27, rh: 60 })] }))).toEqual({
+  it('holds at the cooling maximum in air dry enough not to feel hotter, and reports the range', () => {
+    expect(check('safe_room_comfort', ctx({ points: [point(60, { tempC: 25.5, rh: 45 }), point(65, { tempC: 27, rh: 30 })] }))).toEqual({
       id: 'safe_room_comfort',
       ok: true,
-      reason: 'The safe room stays between 25.5 and 27 °C, humidity 45-60 %.',
+      reason: 'The safe room stays between 25.5 and 27 °C, humidity 30-45 %.',
       measured: 27,
       limit: 27,
       unit: 'C',
@@ -238,17 +239,35 @@ describe('safe_room_comfort', () => {
     expect(check('safe_room_comfort', ctx({ season: 'neutral', points: [point(60, { tempC: 28 })] })).ok).toBe(false);
   });
 
-  it('checks the measured humidity at both bounds', () => {
+  it('humid air alone is not a refusal (#248): above the humidity maximum the plan passes, with a warning', () => {
     expect(check('safe_room_comfort', ctx({ points: [point(60, { rh: 40 }), point(65, { rh: 60 })] })).ok).toBe(true);
-    expect(check('safe_room_comfort', ctx({ points: [point(60, { rh: 60.6 })] }))).toEqual({
+    expect(check('safe_room_comfort', ctx({ points: [point(60, { tempC: 24, rh: 69 })] }))).toMatchObject({ ok: true, reason: 'The safe room stays between 24 and 24 °C, humidity 69-69 %.' });
+    expect(humidAirWarning(ctx({ points: [point(60, { tempC: 24, rh: 69 })] }))?.code).toBe('humid_air');
+  });
+
+  it('refuses when the room would feel hotter than its maximum (#248): the NWS heat index, rounded to 0.5 °C', () => {
+    // A 26 °C maximum (an older person's preference): 26 °C at 90 % feels like 26.5 °C.
+    const older = input({ season: 'cooling', nightRecoveryMode: 'elderly', preferences: PreferencesSchema.parse({ ...examplePreferences(), safety: { ...examplePreferences().safety, cooling: { maxC: 26 } } }) });
+    expect(check('safe_room_comfort', ctx({ input: older, points: [point(60, { tempC: 26, rh: 90 })] }))).toEqual({
       id: 'safe_room_comfort',
       ok: false,
-      reason: 'Humidity in the safe room would reach 61 %, above 60 %.',
-      measured: 60.6,
-      limit: 60,
-      nearestAllowed: 60,
-      unit: '%',
+      reason: 'The safe room would feel like 26.5 °C (26 °C at 90 % humidity), above its 26 °C maximum.',
+      measured: 26.5,
+      limit: 26,
+      // No nearest allowed value for how hot it feels: the air may already be at the limit (#285 review).
+      unit: 'C',
     });
+    // Under the default 27 °C maximum the same room passes.
+    expect(check('safe_room_comfort', ctx({ points: [point(60, { tempC: 26, rh: 90 })] })).ok).toBe(true);
+  });
+
+  it('reports the point that feels hottest', () => {
+    const result = check('safe_room_comfort', ctx({ points: [point(60, { tempC: 26.5, rh: 80 }), point(65, { tempC: 26.8, rh: 85 }), point(70, { tempC: 25, rh: 50 })] }));
+    expect(result).toMatchObject({ ok: false, limit: 27 });
+    expect(result.reason).toMatch(/^The safe room would feel like \d+(\.5)? °C \(26\.8 °C at 85 % humidity\)/);
+  });
+
+  it('checks the humidity minimum where the plan dries the room', () => {
     // Below the minimum is the plan's doing only when it dries the room (#107): see the next test.
     const drying = input({ season: 'cooling', preferences: PreferencesSchema.parse(examplePreferences()), plan: plan([step({ mode: 'dry' })]) });
     expect(check('safe_room_comfort', ctx({ input: drying, points: [point(60, { rh: 39.4 })] }))).toMatchObject({
@@ -281,6 +300,17 @@ describe('safe_room_comfort', () => {
     expect(warn([point(60, { rh: 35, room: 'living' })])).toBeUndefined();
     expect(warn([point(60, { rh: 40 })])).toBeUndefined();
     expect(warn([point(60, { rh: 38 }), point(65, { rh: 35 })])?.message).toContain('down to 35 %, under 40 %');
+  });
+
+  it('humid air (#248): only after the grace period, only the safe room, strictly over the maximum, and the highest value', () => {
+    const warn = (points: ProjectionPoint[]) => humidAirWarning(ctx({ points }));
+    expect(warn([point(55, { rh: 75 })])).toBeUndefined();
+    expect(warn([point(60, { rh: 75, room: 'living' })])).toBeUndefined();
+    expect(warn([point(60, { rh: 60 })])).toBeUndefined();
+    expect(warn([point(60, { rh: 62 }), point(65, { rh: 69.4 })])).toEqual({
+      code: 'humid_air',
+      message: 'The air in the Bedroom is humid (up to 69 %, over 60 %): less comfortable and a risk of mould, but no heat danger at this temperature.',
+    });
   });
 
   it('dry air names the safe room the person chose', () => {

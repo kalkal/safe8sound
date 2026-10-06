@@ -1,6 +1,7 @@
 import type { GuaranteeId, GuaranteeResult } from '@cold-reserve/contracts';
 import { batteryCapacityWh, localHour } from '@cold-reserve/core';
 import { UNSERVED_TOLERANCE_W, driedInto, type GuardContext } from './context.js';
+import { heatDanger, heatDangerReason, type HeatDanger } from './heat-danger.js';
 
 // The five guarantees as Specification objects (plan §9.2): each reads the shared context and returns
 // its result; none can change the plan. Numbers in results are rounded for people, and the nearest
@@ -152,12 +153,26 @@ const safeRoomComfort: Constraint = {
     if (season !== 'cooling' && minT < safety.heating.minC - EPS) {
       return fail(`The safe room would drop to ${r1(minT).toString()} °C, below its ${safety.heating.minC.toString()} °C minimum.`, r1(minT), safety.heating.minC, 'C');
     }
+    // Heat danger (#248): the room feels hotter than its maximum (NWS heat index), or passes a fixed cap. The hottest
+    // feeling point is reported. Humid air alone is a warning (humidAirWarning), never a refusal.
+    if (season !== 'heating') {
+      const elderly = ctx.input.nightRecoveryMode === 'elderly';
+      const worst = readings
+        .flatMap((r) => {
+          const danger = heatDanger(r, { limitC: safety.cooling.maxC, elderly });
+          return danger === undefined ? [] : [{ r, danger }];
+        })
+        .reduce<{ r: (typeof readings)[number]; danger: HeatDanger } | undefined>((a, b) => (a === undefined || b.danger.valueC > a.danger.valueC ? b : a), undefined);
+      if (worst !== undefined) {
+        // Air above the limit has a nearest allowed value; how hot the room feels does not (the air may already be at
+        // the limit, #285 review), so the perceived-temperature rules leave it out.
+        const nearest = worst.danger.rule === 'temperature' ? { nearestAllowed: worst.danger.limitC } : {};
+        return { id: 'safe_room_comfort', ok: false, reason: heatDangerReason(worst.r, worst.danger), measured: r1(worst.danger.valueC), limit: worst.danger.limitC, ...nearest, unit: 'C' };
+      }
+    }
     const maxRh = Math.max(...rhs);
     const minRh = Math.min(...rhs);
     const minDriedRh = Math.min(...dried.map((r) => r.humidityPct));
-    if (maxRh > safety.humidity.maxPct + EPS) {
-      return fail(`Humidity in the safe room would reach ${Math.round(maxRh).toString()} %, above ${safety.humidity.maxPct.toString()} %.`, r1(maxRh), safety.humidity.maxPct, '%');
-    }
     if (minDriedRh < safety.humidity.minPct - EPS) {
       return fail(`Humidity in the safe room would drop to ${Math.round(minDriedRh).toString()} %, below ${safety.humidity.minPct.toString()} %.`, r1(minDriedRh), safety.humidity.minPct, '%');
     }

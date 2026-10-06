@@ -47,6 +47,11 @@ export const GROUPS = [
     tests: ['packages/guard/test/safe-until.test.ts', 'packages/guard/test/constraints.test.ts', 'packages/guard/test/guard.test.ts'],
   },
   { name: 'guard-hold-safe-room', mutate: ['packages/guard/src/hold-safe-room.ts'], tests: ['packages/guard/test/hold-safe-room.test.ts'] },
+  {
+    name: 'guard-heat-danger',
+    mutate: ['packages/guard/src/heat-danger.ts', 'packages/guard/src/humid-air.ts'],
+    tests: ['packages/guard/test/heat-danger.test.ts', 'packages/guard/test/constraints.test.ts', 'packages/guard/test/safe-until.test.ts', 'packages/guard/test/guard.test.ts'],
+  },
 ];
 
 /** @type {Readonly<Record<string, Counted>>} */

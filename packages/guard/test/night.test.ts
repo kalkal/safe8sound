@@ -30,7 +30,7 @@ describe('referenceProves', () => {
   // 20:00 to 08:00 in 5-minute points; the night window is 22:00 to 07:00.
   const start = T0 + 2 * H;
   const end = T0 + 11 * H;
-  const band = { minPct: 40, maxPct: 60 };
+  const band = { minPct: 40 };
   const base = projectFrom(input(), () => [], { toMs: T0 + 12 * H, dischargeFloorPct: pct(10) });
   const shaped = (rh: (ms: number, roomId: string) => number, unservedAt?: { ms: number; w: number }): ProjectionPoint[] =>
     base.map((p) => ({
@@ -43,29 +43,29 @@ describe('referenceProves', () => {
   /** Out of the band in `roomId` at exactly `ms`, in the band everywhere else. */
   const spike = (ms: number, roomId = 'bedroom-1', value = 75) => (t: number, id: string) => (t === ms && id === roomId ? value : 50);
 
-  it('proves a target when the safe room stays in its humidity band through the window', () => {
+  it('proves a target when the safe room stays above its humidity minimum through the window', () => {
     expect(proves(shaped(inBand))).toBe(true);
   });
 
-  it('accepts the edges of the band', () => {
+  it('accepts the minimum itself, and humid air: above the maximum is a warning, not a limit (#248)', () => {
     expect(proves(shaped((t) => (t < start + H ? 40 : 60)))).toBe(true);
+    expect(proves(shaped(spike(start + 3 * H)))).toBe(true);
   });
 
-  it('proves nothing if the safe room leaves the band inside the window, from its first point to its last', () => {
-    expect(proves(shaped(spike(start)))).toBe(false);
-    expect(proves(shaped(spike(end - 5 * MIN)))).toBe(false);
+  it('proves nothing if a drying reference takes the safe room under its minimum inside the window, from its first point to its last', () => {
+    expect(proves(shaped(spike(start, 'bedroom-1', 35)))).toBe(false);
+    expect(proves(shaped(spike(end - 5 * MIN, 'bedroom-1', 35)))).toBe(false);
     expect(proves(shaped(spike(start + 3 * H, 'bedroom-1', 35)))).toBe(false);
   });
 
   it('a reference that cools, not dries, is not blamed for air drier than the band (#107)', () => {
     expect(proves(shaped(spike(start + 3 * H, 'bedroom-1', 35)), true, false)).toBe(true);
-    expect(proves(shaped(spike(start + 3 * H, 'bedroom-1', 75)), true, false)).toBe(false);
   });
 
   it('ignores the hours outside the window and the other rooms', () => {
-    expect(proves(shaped(spike(start - 5 * MIN)))).toBe(true);
-    expect(proves(shaped(spike(end)))).toBe(true);
-    expect(proves(shaped(spike(start + H, 'living')))).toBe(true);
+    expect(proves(shaped(spike(start - 5 * MIN, 'bedroom-1', 35)))).toBe(true);
+    expect(proves(shaped(spike(end, 'bedroom-1', 35)))).toBe(true);
+    expect(proves(shaped(spike(start + H, 'living', 35)))).toBe(true);
   });
 
   it('off grid, proves nothing if the reference leaves load unserved (the battery ran out)', () => {

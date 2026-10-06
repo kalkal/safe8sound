@@ -10,3 +10,5 @@ export { evaluateNight, nightWindowHours } from './night.js';
 export { rejectionOf } from './rejection.js';
 export { holdSafeRoom, safeRoomLimitAt, type HeldSafeRoom, type HoldSafeRoomInput, type HoldSafeRoomOptions } from './hold-safe-room.js';
 export { nightCoolingLimit, safeUntil, type SafeLimit } from './safe-until.js';
+export { ELDERLY_CRITICAL_C, EXTREME_CAUTION_HEAT_INDEX_C, heatDanger, heatDangerReason, roundedHeatIndexC, type HeatDanger, type HeatDangerRule } from './heat-danger.js';
+export { humidAirWarning } from './humid-air.js';

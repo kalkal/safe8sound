@@ -177,6 +177,23 @@ describe('dry air (#107): the plan cannot raise the humidity', () => {
 
   it('no warning when the air stays within the band', () => {
     expect(runGuard(input()).warnings.some((x) => x.code === 'dry_air')).toBe(false);
+    expect(runGuard(input()).warnings.some((x) => x.code === 'humid_air')).toBe(false);
+  });
+
+  it('never says "no heat danger" when the safe room is in heat danger: no humid-air warning then (#285 review)', () => {
+    // A humid band that every reading leaves, on a night too hot and humid for the room to stay under its maximum.
+    const humidPrefs = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 30, maxPct: 50 } } });
+    const scorching = ForecastSchema.parse({ ...hotNight(), hourly: hotNight().hourly.map((h) => ({ ...h, tempOutC: h.tempOutC + 12, humidityOutPct: 95 })) });
+    const v = runGuard(input({ preferences: humidPrefs, forecast: scorching, plan: plan([step({ mode: 'fan_only' })]) }));
+    expect(v.guarantees.find((x) => x.id === 'safe_room_comfort')?.ok).toBe(false);
+    expect(v.warnings.some((x) => x.code === 'humid_air')).toBe(false);
+  });
+
+  it('a plan with the safe room humid but not hot is accepted, with the humid-air warning (#248)', () => {
+    const humidPrefs = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 40, maxPct: 50 } } });
+    const v = runGuard(input({ preferences: humidPrefs }));
+    expect(v.guarantees.find((x) => x.id === 'safe_room_comfort')?.ok).toBe(true);
+    expect(v.warnings.find((x) => x.code === 'humid_air')?.message).toMatch(/^The air in the Bedroom is humid \(up to \d+ %, over 50 %\): less comfortable and a risk of mould, but no heat danger at this temperature\.$/);
   });
 });
 
@@ -244,11 +261,11 @@ describe('night recovery (feature queue item 1)', () => {
     expect(v.nightRecovery?.bestAchievableHours).toBe(v.nightRecovery?.achievedHours);
   });
 
-  it('does not call a target feasible when reaching it would take the room out of its humidity band', () => {
-    // A humid night: cooling to 23.5 °C would reach the hours, with the room far above 60 % RH.
+  it('a humid night alone does not make the target unreachable (#248): cooling still reaches the hours, so missing them is a rejection', () => {
+    // Humid air is a warning, not a limit: the heat it adds is in the heat budget.
     const humid = ForecastSchema.parse({ ...hotNight(), hourly: hotNight().hourly.map((h) => ({ ...h, humidityOutPct: 95 })) });
     const v = runGuard(input({ nightRecoveryMode: 'elderly', forecast: humid, plan: plan([step({ mode: 'fan_only', targetPct: 40 })]) }));
-    expect(v.nightRecovery?.status).toBe('infeasible');
+    expect(v.nightRecovery?.status).toBe('unmet');
   });
 
   it('off grid with a full battery the target is reachable: missing it is a rejection', () => {
@@ -256,9 +273,10 @@ describe('night recovery (feature queue item 1)', () => {
     expect(v.nightRecovery?.status).toBe('unmet');
   });
 
-  it('a reference that leaves the humidity band proves nothing (tight band)', () => {
-    const tight = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, humidity: { minPct: 30, maxPct: 40 } } });
-    const v = runGuard(input({ preferences: tight, plan: plan([step({ mode: 'fan_only' })]) }));
+  it('a night too hot and humid for the air conditioner: the target is out of reach, said as the limit of the air conditioner', () => {
+    // 12 °C hotter than the hot night, at 95 % RH: even the reference cannot hold the threshold for the hours.
+    const scorching = ForecastSchema.parse({ ...hotNight(), hourly: hotNight().hourly.map((h) => ({ ...h, tempOutC: h.tempOutC + 12, humidityOutPct: 95 })) });
+    const v = runGuard(input({ forecast: scorching, plan: plan([step({ mode: 'fan_only' })]) }));
     expect(v.nightRecovery?.status).toBe('infeasible');
     // With the grid up the limit is the air conditioner, not the battery.
     expect(v.warnings[0]?.message).toMatch(/^Tonight the air conditioner can keep the Bedroom/);

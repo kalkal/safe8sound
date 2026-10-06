@@ -62,7 +62,7 @@ export const NightRecoverySchema = z
 export type NightRecovery = z.infer<typeof NightRecoverySchema>;
 
 /** Things the voice and the cards must say even when the plan is accepted. */
-export const PlanWarningCodeSchema = z.enum(['night_recovery_infeasible', 'last_resort_plan', 'dry_air']);
+export const PlanWarningCodeSchema = z.enum(['night_recovery_infeasible', 'last_resort_plan', 'dry_air', 'humid_air']);
 export type PlanWarningCode = z.infer<typeof PlanWarningCodeSchema>;
 
 export const PlanWarningSchema = z.strictObject({

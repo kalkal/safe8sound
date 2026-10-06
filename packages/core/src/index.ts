@@ -3,6 +3,7 @@ export const packageName = '@cold-reserve/core';
 
 export * from './clock.js';
 export * from './comfort.js';
+export * from './heat-index.js';
 export * from './counterfactual.js';
 export * from './energy.js';
 export * from './humidity.js';

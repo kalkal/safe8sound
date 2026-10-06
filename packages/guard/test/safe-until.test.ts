@@ -33,17 +33,38 @@ describe('safeUntil', () => {
     expect(safeUntil(shaped(fine, T0 + 7 * H), opts)).toEqual({ ms: T0 + 7 * H, limitedBy: 'battery' });
   });
 
-  it('ends where the room goes above its maximum, or out of its humidity band', () => {
+  it('ends where the room goes above its maximum, or under its humidity minimum where the plan dries it', () => {
     expect(safeUntil(shaped((ms) => ({ tempC: ms >= T0 + 5 * H ? 27.2 : 26, rh: 50 })), opts)).toEqual({ ms: T0 + 5 * H, limitedBy: 'temperature' });
-    expect(safeUntil(shaped((ms) => ({ tempC: 26, rh: ms >= T0 + 4 * H ? 61 : 50 })), opts)).toEqual({ ms: T0 + 4 * H, limitedBy: 'humidity' });
     // Under the minimum only where the plan dries the room (#107): cooling cannot raise the humidity.
     expect(safeUntil(shaped((ms) => ({ tempC: 26, rh: ms >= T0 + 4 * H ? 39 : 50 })), { ...opts, driesAt: () => true })).toEqual({ ms: T0 + 4 * H, limitedBy: 'humidity' });
     expect(safeUntil(shaped((ms) => ({ tempC: 26, rh: ms >= T0 + 4 * H ? 39 : 50 })), opts)).toBeUndefined();
   });
 
   it('accepts the limits themselves', () => {
-    expect(safeUntil(shaped(() => ({ tempC: 27, rh: 60 })), opts)).toBeUndefined();
-    expect(safeUntil(shaped(() => ({ tempC: 27, rh: 40 })), opts)).toBeUndefined();
+    expect(safeUntil(shaped(() => ({ tempC: 27, rh: 30 })), opts)).toBeUndefined();
+    expect(safeUntil(shaped(() => ({ tempC: 26, rh: 40 })), opts)).toBeUndefined();
+  });
+
+  describe('heat danger (#248)', () => {
+    it('humid air alone does not end the safe hours', () => {
+      expect(safeUntil(shaped(() => ({ tempC: 24, rh: 69 })), opts)).toBeUndefined();
+      expect(safeUntil(shaped((ms) => ({ tempC: 26, rh: ms >= T0 + 4 * H ? 61 : 50 })), opts)).toBeUndefined();
+    });
+
+    it('ends where the room feels hotter than the limit in force: 26 °C at 90 % under a 26 °C limit; 24 °C at 69 % stays safe under a 24 °C night limit for an older person', () => {
+      const night = (ms: number) => (ms >= T0 + 3 * H ? 24 : 27);
+      // 24 °C at 69 % reads 24 °C: still safe at night; 26 °C at 90 % feels like 26.5 °C.
+      expect(safeUntil(shaped(() => ({ tempC: 24, rh: 69 })), { ...opts, coolingMaxAt: night, elderly: true })).toBeUndefined();
+      expect(safeUntil(shaped(() => ({ tempC: 26, rh: 90 })), { ...opts, safety: { ...opts.safety, cooling: { maxC: 26 } } })).toEqual({ ms: T0 + H, limitedBy: 'temperature' });
+      expect(safeUntil(shaped(() => ({ tempC: 26, rh: 90 })), opts)).toBeUndefined();
+    });
+
+    it('the fixed caps end the safe hours whatever the limit', () => {
+      const lax = { ...opts, safety: { ...opts.safety, cooling: { maxC: 40 } } };
+      expect(safeUntil(shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? 30 : 26, rh: 60 })), lax)).toEqual({ ms: T0 + 2 * H, limitedBy: 'temperature' });
+      expect(safeUntil(shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? 31.1 : 26, rh: 20 })), { ...lax, elderly: true })).toEqual({ ms: T0 + 2 * H, limitedBy: 'temperature' });
+      expect(safeUntil(shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? 31.1 : 26, rh: 20 })), lax)).toBeUndefined();
+    });
   });
 
   it('gives the room its grace period to get there, but not the battery', () => {
@@ -97,7 +118,7 @@ describe('safeUntil', () => {
     });
 
     it('the temperature limits are exact, and each applies only in its season', () => {
-      const at = (t: number) => shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? t : 26, rh: 50 }));
+      const at = (t: number) => shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? t : 26, rh: 30 }));
       expect(safeUntil(at(27 + 1e-9), opts)).toBeUndefined();
       expect(safeUntil(at(27 + 2e-9), opts)?.limitedBy).toBe('temperature');
       expect(safeUntil(at(17), opts)).toBeUndefined();
@@ -107,11 +128,9 @@ describe('safeUntil', () => {
       expect(safeUntil(at(18 - 5e-10), { ...opts, season: 'neutral' })).toBeUndefined();
     });
 
-    it('the humidity limits are exact, and the minimum counts only where the plan dries', () => {
+    it('the humidity minimum is exact and counts only where the plan dries', () => {
       const at = (rh: number) => shaped((ms) => ({ tempC: 26, rh: ms >= T0 + 2 * H ? rh : 50 }));
       const drying = { ...opts, driesAt: () => true };
-      expect(safeUntil(at(60 + 1e-9), opts)).toBeUndefined();
-      expect(safeUntil(at(60 + 2e-9), opts)?.limitedBy).toBe('humidity');
       expect(safeUntil(at(40 - 1e-9), drying)).toBeUndefined();
       expect(safeUntil(at(40 - 5e-10), drying)).toBeUndefined();
       expect(safeUntil(at(40 - 2e-9), drying)?.limitedBy).toBe('humidity');

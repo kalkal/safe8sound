@@ -2,6 +2,7 @@ import type { GuaranteeResult, NightRecovery, Pct, PlanWarning } from '@cold-res
 import { CONSTRAINTS } from './constraints.js';
 import { buildContext, type GuardInput } from './context.js';
 import { dryAirWarning } from './dry-air.js';
+import { humidAirWarning } from './humid-air.js';
 import { evaluateNight } from './night.js';
 
 // "The LLM proposes, the guard decides" (plan §9.2): the guard projects the plan with the same physics
@@ -23,11 +24,15 @@ export function runGuard(input: GuardInput): GuardVerdict {
   const guarantees = CONSTRAINTS.map((c) => c.check(ctx));
   const night = evaluateNight(ctx);
   const dryAir = dryAirWarning(ctx);
+  // "No heat danger" is said only when the safe room passes its check (#285 review): never next to a refusal or a
+  // last resort built on that refusal.
+  const roomSafe = guarantees.find((g) => g.id === 'safe_room_comfort')?.ok === true;
+  const humidAir = roomSafe ? humidAirWarning(ctx) : undefined;
   return {
     ok: guarantees.every((g) => g.ok) && night.nightRecovery?.status !== 'unmet',
     guarantees,
     ...(night.nightRecovery === undefined ? {} : { nightRecovery: night.nightRecovery }),
-    warnings: [...night.warnings, ...(dryAir === undefined ? [] : [dryAir])],
+    warnings: [...night.warnings, ...(dryAir === undefined ? [] : [dryAir]), ...(humidAir === undefined ? [] : [humidAir])],
     reserveWh: ctx.reserveWh,
     reserveFloorSocPct: ctx.reserveFloorSocPct,
   };

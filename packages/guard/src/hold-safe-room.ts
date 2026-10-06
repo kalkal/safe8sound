@@ -122,6 +122,7 @@ function holdWith(input: HoldSafeRoomInput, opts: HoldSafeRoomOptions, leadMs: n
     safety: input.preferences.safety,
     coolingMaxAt: limitAt,
     driesAt,
+    elderly: input.nightRecoveryMode === 'elderly',
   });
   return { points, safeUntil: end, controlsAt, driesAt };
 }

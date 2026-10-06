@@ -6,7 +6,7 @@ import { UNSERVED_TOLERANCE_W, projectFrom, type GuardContext } from './context.
 // and packages/core/src/night.ts). The status is honest by construction:
 // - met: the plan's own projection reaches the hours and stays within the heat budget;
 // - unmet: it does not, but a reference strategy does without running the battery out before the next
-//   recharge and with the room's humidity inside its safety band all night, so the target is feasible and
+//   recharge and without drying the room under its humidity minimum, so the target is feasible and
 //   the plan is rejected;
 // - infeasible: no such strategy was found; the plan is not rejected, a warning says so with the best hours.
 // The reference spends the battery on the safe room only, and only during the night window, cooling a
@@ -94,15 +94,16 @@ export function nightMeets(m: Pick<NightMetrics, 'achievedHours' | 'heatIndexDeg
  */
 export function referenceProves(
   points: readonly ProjectionPoint[],
-  opts: { gridAvailable: boolean; window: { startMs: number; endMs: number }; roomId: string; band: { minPct: number; maxPct: number }; dries: boolean },
+  opts: { gridAvailable: boolean; window: { startMs: number; endMs: number }; roomId: string; band: { minPct: number }; dries: boolean },
 ): boolean {
   const sustainable = opts.gridAvailable || !points.some((p) => p.flows.unservedLoadW > UNSERVED_TOLERANCE_W);
-  const inBand = points
+  const aboveMinimum = points
     .filter((p) => p.ms >= opts.window.startMs && p.ms < opts.window.endMs)
     .flatMap((p) => p.rooms.filter((r) => r.id === opts.roomId))
     // Under the minimum counts only when the reference dries the room: cooling cannot raise the humidity (#107).
-    .every((r) => (!opts.dries || r.humidityPct >= opts.band.minPct) && r.humidityPct <= opts.band.maxPct);
-  return sustainable && inBand;
+    // Humid air is not a limit (#248): the heat it adds is in the heat-index budget.
+    .every((r) => !opts.dries || r.humidityPct >= opts.band.minPct);
+  return sustainable && aboveMinimum;
 }
 
 /** The reference dries only when the safe room's unit cannot cool. */

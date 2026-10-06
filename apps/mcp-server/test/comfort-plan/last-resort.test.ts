@@ -1,6 +1,6 @@
 import { LAST_RESORT_ACTIONS } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { lastResortActions, lastResortWindow, loweredLimit } from '../../src/modules/comfort-plan/last-resort.js';
+import { lastResortActions, lastResortThen, lastResortWindow, loweredLimit } from '../../src/modules/comfort-plan/last-resort.js';
 
 // The honest window of a last resort (#160): from safeUntil on, the point where the safe room is furthest past
 // the limit in force at that point (the night threshold lowers it), that limit, and when.
@@ -104,5 +104,23 @@ describe('lastResortActions', () => {
     expect(lastResortActions('cooling')).toEqual([...LAST_RESORT_ACTIONS]);
     expect(lastResortActions('neutral')).toEqual([...LAST_RESORT_ACTIONS]);
     expect(lastResortActions('heating')).toEqual([]);
+  });
+});
+
+describe('what ends the safe hours, in words (#248)', () => {
+  const limits = { cooling: { maxC: 27 }, heating: { minC: 18 }, humidity: { minPct: 40 } };
+
+  it('the temperature limit also covers a room that feels hotter (the heat index)', () => {
+    expect(lastResortThen({ limitedBy: 'temperature', season: 'cooling', limitThenC: 27, ...limits })).toBe('the room goes above, or feels hotter than, its 27 °C maximum');
+    expect(lastResortThen({ limitedBy: 'temperature', season: 'cooling', limitThenC: 24, ...limits })).toBe('the room goes above, or feels hotter than, 24 °C, the night limit');
+  });
+
+  it('humidity ends the hours only where the plan dries the room under its minimum', () => {
+    expect(lastResortThen({ limitedBy: 'humidity', season: 'cooling', limitThenC: 27, ...limits })).toBe('the humidity drops under its 40 % minimum');
+  });
+
+  it('the heating minimum and the battery', () => {
+    expect(lastResortThen({ limitedBy: 'temperature', season: 'heating', limitThenC: 18, ...limits })).toBe('the room drops below its 18 °C minimum');
+    expect(lastResortThen({ limitedBy: 'battery', season: 'cooling', limitThenC: 27, ...limits })).toBe('the battery runs out');
   });
 });

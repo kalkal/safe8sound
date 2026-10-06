@@ -80,6 +80,11 @@ describe('PlanSchema', () => {
     expect(!r.success && r.error.issues[0]?.path).toEqual(['reserveFloorSocPct']);
   });
 
+  it('may warn that the air is humid without heat danger (#248, approved in #248)', () => {
+    const warning = { code: 'humid_air', message: 'The air in the Bedroom is humid (up to 69 %, over 60 %): less comfortable and a risk of mould, but no heat danger at this temperature.' };
+    expect(PlanSchema.parse({ ...examplePlan(), warnings: [warning] }).warnings).toEqual([warning]);
+  });
+
   describe('last resort (approved in #19: proposal only)', () => {
     const failing = () => examplePlan().guarantees.map((g) => (g.id === 'safe_room_comfort' ? { ...g, ok: false, reason: 'Humidity in the safe room would reach 86 %, above 60 %.' } : g));
     const lastResort = { safeUntil: '2026-07-18T01:20:00.000Z', safeHours: 7.33, limitedBy: 'humidity' };

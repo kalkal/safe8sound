@@ -69,3 +69,24 @@ export function loweredLimit(
 export function lastResortActions(season: Season): LastResortAction[] {
   return season === 'heating' ? [] : [...LAST_RESORT_ACTIONS];
 }
+
+/**
+ * What ends a last resort's safe hours, in words. Temperature covers a room that feels hotter than its limit (the
+ * heat index, #248); humidity ends them only where the plan dries the room under its minimum.
+ */
+export function lastResortThen(o: {
+  limitedBy: 'battery' | 'temperature' | 'humidity';
+  season: Season;
+  /** The limit in force when the hours end. */
+  limitThenC: number;
+  cooling: { maxC: number };
+  heating: { minC: number };
+  humidity: { minPct: number };
+}): string {
+  if (o.limitedBy === 'battery') return 'the battery runs out';
+  if (o.limitedBy === 'humidity') return `the humidity drops under its ${String(o.humidity.minPct)} % minimum`;
+  if (o.season === 'heating') return `the room drops below its ${String(o.heating.minC)} °C minimum`;
+  return o.limitThenC < o.cooling.maxC
+    ? `the room goes above, or feels hotter than, ${String(o.limitThenC)} °C, the night limit`
+    : `the room goes above, or feels hotter than, its ${String(o.cooling.maxC)} °C maximum`;
+}
