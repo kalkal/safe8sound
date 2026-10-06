@@ -1,6 +1,6 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import './app.css';
-import type { HomeStatus } from '@cold-reserve/contracts';
+import type { HomeStatus, SetScenarioInput } from '@cold-reserve/contracts';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -19,6 +19,8 @@ import { CardFrame } from './host/CardFrame.js';
 import { EchoFrame } from './ui/EchoFrame.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { HomePanel } from './ui/HomePanel.js';
+import { applyChange, scriptedDemoSettings, skyOfScenario } from './ui/demo-settings.js';
+import { DemoSettingsControl } from './ui/SettingsDrawer.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { skyFor, type Sky } from './ui/sky.js';
 import { t } from './ui/text.js';
@@ -106,13 +108,22 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [homeMode, loadHome],
   );
+  // The judge's demo settings (B1): kept in the page in scripted mode; a new scenario starts on its own sky.
+  const [demoSettings, setDemoSettings] = useState(scriptedDemoSettings);
+  const onSettingsChange = useCallback((change: SetScenarioInput) => {
+    setDemoSettings((previous) => applyChange(previous, change));
+    if (change.scenarioId !== undefined) setSky(skyOfScenario(change.scenarioId));
+    return Promise.resolve(true);
+  }, []);
+  const settingsControl =
+    config.agent === 'scripted' ? <DemoSettingsControl settings={demoSettings} availablePlaces={['reference']} onChange={onSettingsChange} /> : undefined;
   const phonePanel = (config.agent === 'scripted' || config.phone === 'inbox') && (
     <ErrorBoundary>
       <PhonePanel feed={phone} timeZone={config.homeTimeZone} />
     </ErrorBoundary>
   );
   return (
-    <EchoFrame sky={sky} aside={phonePanel}>
+    <EchoFrame sky={sky} aside={phonePanel} {...(settingsControl === undefined ? {} : { top: settingsControl })}>
       <Title />
       <button
         type="button"

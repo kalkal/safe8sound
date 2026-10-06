@@ -501,6 +501,11 @@
       border-radius: var(--radius-card);
     }
 
+    /* With the scenario badge above the device, its row comes out of the screen's height (B1). */
+    .echo-stage:has(> .echo-top) .echo-screen {
+      inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5 - var(--target-min) - var(--space-3)) * 1.6), 80rem);
+    }
+
     .echo-scroll {
       /* Padding inside the 100%: a taller scroller hid its last 48 px under the bezel, out of reach (#258). */
       box-sizing: border-box;
@@ -519,6 +524,10 @@
 
     .echo-screen {
       inline-size: min(calc(100vw - 24rem - var(--space-6) * 8), calc((100dvh - var(--space-6) * 5) * 1.6), 80rem);
+    }
+
+    .echo-stage:has(> .echo-top) .echo-screen {
+      inline-size: min(calc(100vw - 24rem - var(--space-6) * 8), calc((100dvh - var(--space-6) * 5 - var(--target-min) - var(--space-3)) * 1.6), 80rem);
     }
   }
 }
@@ -542,6 +551,145 @@
     block-size: 1px;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+}
+
+/* The judge's demo settings (B1): the scenario badge above the device (never inside its 16:10 screen), and the
+   drawer: at the side on a wide screen, a sheet from the bottom on a phone. Rows of 56 px; the choice is marked ✓. */
+@layer surfaces {
+  .echo-top {
+    grid-column: 1 / -1;
+    justify-self: start;
+    padding: var(--space-3) var(--space-3) 0;
+  }
+
+  .scenario-badge {
+    min-block-size: var(--target-min);
+    padding-inline: var(--space-4);
+    border: var(--border-thin) dashed var(--status-neutral);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .settings-drawer {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: 20;
+    display: grid;
+    gap: var(--space-4);
+    max-block-size: 85dvh;
+    overflow: auto;
+    padding: var(--space-4);
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    background: var(--surface-card);
+    color: var(--text-primary);
+
+    & h2 {
+      margin: 0;
+      font-size: var(--font-size-lead);
+    }
+
+    & .muted {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+  }
+
+  .settings-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .chip-group {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    & legend {
+      margin-block-end: var(--space-2);
+      color: var(--text-secondary);
+    }
+  }
+
+  .chip-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-block-size: calc(var(--target-min) + var(--space-2));
+    padding-inline: var(--space-3);
+    border: var(--border-thin) solid var(--surface-card-line);
+    border-radius: var(--radius-cube);
+    background: var(--surface-card-raised);
+    cursor: pointer;
+
+    &[data-checked="true"] {
+      border-color: var(--accent);
+    }
+
+    &[data-disabled="true"] {
+      cursor: not-allowed;
+    }
+
+    & input {
+      inline-size: var(--space-6);
+      block-size: var(--space-6);
+      margin: 0;
+      accent-color: var(--accent);
+    }
+  }
+
+  .chip-text {
+    display: grid;
+    flex: 1;
+  }
+
+  .chip-hint {
+    color: var(--text-secondary);
+    font-size: var(--font-size-min);
+  }
+
+  .chip-mark {
+    color: var(--accent);
+    font-weight: var(--font-weight-bold);
+  }
+
+  /* A sample of the scenario's sky, from the same tokens as the frame. */
+  .chip-sky {
+    inline-size: var(--target-min);
+    block-size: var(--space-6);
+    border-radius: var(--radius-cube);
+
+    &[data-layer="mild"] {
+      background-image: var(--sky-mild);
+    }
+
+    &[data-layer="hot"] {
+      background-image: var(--sky-hot);
+    }
+
+    &[data-layer="storm"] {
+      background-image: var(--sky-storm);
+    }
+  }
+
+  @media (width >= 40rem) {
+    .settings-drawer {
+      inset-block: 0;
+      inset-inline: auto 0;
+      inline-size: min(25rem, 100vw);
+      max-block-size: none;
+      border-radius: 0;
+    }
   }
 }
 

@@ -11,11 +11,14 @@ export interface EchoFrameProps {
   children: ReactNode;
   /** Beside the device: the family member's phone. */
   aside?: ReactNode;
+  /** Above the device, outside its screen: the scenario badge (B1). */
+  top?: ReactNode;
 }
 
-export function EchoFrame({ sky, children, aside }: EchoFrameProps) {
+export function EchoFrame({ sky, children, aside, top }: EchoFrameProps) {
   return (
     <div className="echo-stage">
+      {top !== undefined && <div className="echo-top">{top}</div>}
       <div className="echo-device">
         <div className="echo-screen" data-testid="echo-screen" data-sky={sky}>
           <div className="sky" aria-hidden="true">
