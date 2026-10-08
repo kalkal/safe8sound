@@ -150,17 +150,17 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     document.documentElement.lang = locale.slice(0, 2);
     document.title = t('sim.title');
   }, [locale]);
-  const settingsControl =
-    demoSettings === undefined ? undefined : (
+  // The badge is always there: without demo settings it opens the language row only (#284).
+  const settingsControl = (
       <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onSettingsChange} locale={locale} onLocale={onLocale} />
-    );
+  );
   const phonePanel = (config.agent === 'scripted' || config.phone === 'inbox') && (
     <ErrorBoundary>
       <PhonePanel feed={phone} timeZone={config.homeTimeZone} />
     </ErrorBoundary>
   );
   return (
-    <EchoFrame sky={sky} aside={phonePanel} {...(settingsControl === undefined ? {} : { top: settingsControl })}>
+    <EchoFrame sky={sky} aside={phonePanel} top={settingsControl}>
       <Title />
       <button
         type="button"

@@ -53,6 +53,7 @@ export const enUS = {
   'demoMode.youSaid': 'You said: “{said}”',
   // The judge's demo settings (B1, additions plan): the scenario badge and its drawer.
   'settings.badge': 'SCENARIO · {place} · {scenario}',
+  'settings.open': 'Settings',
   'settings.title': 'Demo settings',
   'settings.intro': 'Change what this demo plays. Only your own demo home changes.',
   'settings.close': 'Close',
@@ -186,7 +187,7 @@ export const enUS = {
   // One plain line on top of every receipt (owner feedback, 6 Oct): what the check is, and that it is not the AI.
   'receipt.explain': "An automatic check — not the AI — verified this plan against 5 safety rules. If one fails, the plan can't be applied.",
   // A last resort is applied with a rule that can't hold (apply_plan's hard limits still hold): it says so (review of #288).
-  'receipt.explainLastResort': "An automatic check — not the AI — verified this plan against 5 safety rules. One can't hold tonight: this last resort is applied only after you confirm twice.",
+  'receipt.explainLastResort': "An automatic check — not the AI — verified this plan against 5 safety rules. Not every rule can hold: this last resort is applied only after you confirm twice.",
   'receipt.simulatedCaveat': 'Checked on simulated data, not on the live readings of your home.',
   'receipt.flow': 'Who decides',
   'receipt.proposes': 'AI proposes',

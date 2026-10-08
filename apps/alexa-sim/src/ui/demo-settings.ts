@@ -24,8 +24,6 @@ export interface DemoSettingsView {
   locationId: LocationId;
   units: 'C' | 'F';
   household: Household;
-  /** The place as the server names it (get_demo_settings' place.label). */
-  placeLabel: string;
 }
 
 export const SCENARIOS: readonly ScenarioId[] = ['clear-day', 'heatwave', 'storm-blackout'];
@@ -34,11 +32,12 @@ export const HOUSEHOLDS: readonly Household[] = ['older-man', 'older-woman', 'no
 
 /** The scripted sandbox: the heat-wave day of the video, at the reference home. */
 export function scriptedDemoSettings(): DemoSettingsView {
-  return { scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man', placeLabel: t('settings.place.reference') };
+  return { scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' };
 }
 
 export function badgeText(view: DemoSettingsView): string {
-  return t('settings.badge', { place: view.placeLabel, scenario: t(`settings.scenario.${view.scenarioId}`) });
+  // The place in the page's language at render time (#284), never a label kept from another language.
+  return t('settings.badge', { place: t(`settings.place.${view.locationId}`), scenario: t(`settings.scenario.${view.scenarioId}`) });
 }
 
 /** The settings after a choice: only what was chosen changes; a restart plays the same day again. */
@@ -46,7 +45,7 @@ export function applyChange(view: DemoSettingsView, change: SetScenarioInput): D
   return {
     ...view,
     ...(change.scenarioId === undefined ? {} : { scenarioId: change.scenarioId }),
-    ...(change.locationId === undefined ? {} : { locationId: change.locationId, placeLabel: t(`settings.place.${change.locationId}`) }),
+    ...(change.locationId === undefined ? {} : { locationId: change.locationId }),
     ...(change.units === undefined ? {} : { units: change.units }),
     ...(change.household === undefined ? {} : { household: change.household }),
   };
@@ -89,8 +88,8 @@ async function callFor<T>(
 export async function fetchDemoSettings(agent: Agent, context: AskContext, logEvent: Log = defaultLog): Promise<Result<DemoSettingsView, ErrorEnvelope>> {
   const read = await callFor(agent, 'get_demo_settings', {}, (v) => GetDemoSettingsOutputSchema.safeParse(v), context, logEvent);
   if (!read.ok) return read;
-  const { settings, place } = read.value;
-  return ok({ scenarioId: settings.scenarioId, locationId: settings.locationId, units: settings.units, household: settings.household, placeLabel: place.label });
+  const { settings } = read.value;
+  return ok({ scenarioId: settings.scenarioId, locationId: settings.locationId, units: settings.units, household: settings.household });
 }
 
 /** B2: saves one change, then reads the settings back, so what is shown is what is stored (never an optimistic guess). */

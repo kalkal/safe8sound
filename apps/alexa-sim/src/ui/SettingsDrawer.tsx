@@ -52,7 +52,8 @@ function ChipGroup({ label, name, options, value, onPick }: { label: string; nam
 }
 
 export interface DemoSettingsControlProps {
-  settings: DemoSettingsView;
+  /** The sandbox's settings; undefined when there are none (not a sandbox, or not read yet): language only (#284). */
+  settings: DemoSettingsView | undefined;
   /** The places this server can play now; the others say "Not available yet". */
   availablePlaces: readonly LocationId[];
   /** Sends one change; resolves true when it was saved. */
@@ -124,7 +125,7 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
         }}
       >
         <span aria-hidden="true">≈ </span>
-        {badgeText(settings)}
+        {settings === undefined ? t('settings.open') : badgeText(settings)}
         <span aria-hidden="true"> ▾</span>
       </button>
       {open && (
@@ -151,6 +152,9 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
               {t('settings.languageNote')}
             </p>
           )}
+          {/* Without demo settings (not a sandbox, or not read yet) only the language can be chosen (#284). */}
+          {settings !== undefined && (
+          <>
           <ChipGroup
             label={t('settings.scenario')}
             name="scenario"
@@ -166,7 +170,7 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
             value={settings.locationId}
             options={PLACES.map((id) => {
               const available = availablePlaces.includes(id);
-              return { value: id, label: id === settings.locationId ? settings.placeLabel : t(`settings.place.${id}`), disabled: !available, ...(available ? {} : { hint: t('settings.notYet') }) };
+              return { value: id, label: t(`settings.place.${id}`), disabled: !available, ...(available ? {} : { hint: t('settings.notYet') }) };
             })}
             onPick={(v) => {
               send({ locationId: v as LocationId });
@@ -218,6 +222,8 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
               </button>
             )}
           </div>
+          </>
+          )}
           <p className="notice" role="status">
             {saving ? t('settings.saving') : failed ? t('settings.failed') : ''}
           </p>

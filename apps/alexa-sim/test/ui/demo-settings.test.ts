@@ -1,3 +1,4 @@
+import { setLocale } from '@cold-reserve/i18n';
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '../../src/agent/agent.js';
 import { applyChange, badgeText, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario } from '../../src/ui/demo-settings.js';
@@ -6,7 +7,16 @@ import { applyChange, badgeText, fetchDemoSettings, saveDemoSettings, scriptedDe
 
 describe('demo settings', () => {
   it('starts on the heat-wave day at the reference home, in °C, with an older man at home', () => {
-    expect(scriptedDemoSettings()).toMatchObject({ scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man', placeLabel: 'Reference home (central Italy)' });
+    expect(scriptedDemoSettings()).toEqual({ scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' });
+  });
+
+  it('#284: the badge names the place in the page language at render time, not in the language it was read in', () => {
+    setLocale('it-IT');
+    try {
+      expect(badgeText(scriptedDemoSettings())).toBe('SCENARIO · Casa di riferimento (Italia centrale) · Ondata di calore');
+    } finally {
+      setLocale('en-US');
+    }
   });
 
   it('the badge names the place and the scenario; in the storm it says the power is out', () => {
@@ -48,7 +58,7 @@ describe('remote demo settings (B2): read and saved through the card tool route'
 
   it('reads the sandbox settings and the place label the server gives', async () => {
     const { agent } = agentAnswering({ get_demo_settings: reply({ settings, place }) });
-    expect(await fetchDemoSettings(agent, ctx)).toEqual({ ok: true, value: { scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man', placeLabel: 'Reference home (central Italy)' } });
+    expect(await fetchDemoSettings(agent, ctx)).toEqual({ ok: true, value: { scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' } });
   });
 
   it('a home that is not a sandbox (a tool error) has no settings to show', async () => {

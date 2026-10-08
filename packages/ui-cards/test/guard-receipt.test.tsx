@@ -25,10 +25,10 @@ describe('GuardReceipt', () => {
     );
   });
 
-  it('a last resort says its own line: one rule cannot hold, and it applies only after two confirmations (review of #288)', () => {
+  it('a last resort says its own line: not every rule can hold, and it applies only after two confirmations (review of #288)', () => {
     render(<GuardReceipt plan={lastResortPlan()} />);
     expect(screen.getByTestId('receipt-explain').textContent).toBe(
-      "An automatic check — not the AI — verified this plan against 5 safety rules. One can't hold tonight: this last resort is applied only after you confirm twice.",
+      "An automatic check — not the AI — verified this plan against 5 safety rules. Not every rule can hold: this last resort is applied only after you confirm twice.",
     );
   });
 

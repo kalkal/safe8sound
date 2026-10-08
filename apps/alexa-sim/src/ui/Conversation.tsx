@@ -1,4 +1,5 @@
 import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { getLocale } from '@cold-reserve/i18n';
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMachine } from '@xstate/react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
@@ -55,7 +56,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
           askAgent: fromPromise<Result<AskOutput, ErrorEnvelope>, AskInput>(async ({ input, signal }) => {
             const result = await queryClient.query<TurnResult>({
               queryKey: turnKey(input.turnId),
-              queryFn: () => agent.ask(input.question, { correlationId: input.turnId, signal }),
+              queryFn: () => agent.ask(input.question, { correlationId: input.turnId, signal, locale: getLocale() }),
               staleTime: Infinity,
               retry: false,
             });

@@ -75,6 +75,15 @@ describe('DemoSettingsControl', () => {
     expect(screen.queryByTestId('language-note')).toBeNull();
   });
 
+  it('#284: without demo settings (not a sandbox, or not read yet) the badge still opens the Language row, and only it', () => {
+    const onLocale = vi.fn();
+    render(<DemoSettingsControl settings={undefined} availablePlaces={['reference']} onChange={() => Promise.resolve(true)} locale="en-US" onLocale={onLocale} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(screen.getByRole('radiogroup', { name: 'Language' })).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: 'Scenario' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Restart the day' })).toBeNull();
+  });
+
   it('restart needs two taps', () => {
     const { badge, onChange } = setup();
     fireEvent.click(badge);

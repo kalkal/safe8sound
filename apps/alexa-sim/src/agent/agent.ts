@@ -1,3 +1,4 @@
+import type { Locale } from '@cold-reserve/i18n';
 import type { ErrorCode, ErrorEnvelope, Result } from '@cold-reserve/contracts';
 import type { CardSlot, StatusFacts } from './wire.js';
 
@@ -6,6 +7,8 @@ export interface AskContext {
   correlationId: string;
   /** Aborted when the user cancels the turn: the adapter rethrows, it does not report a failure. */
   signal?: AbortSignal;
+  /** The language of the turn (#263, #284): sent to sim-api when it is not English. */
+  locale?: Locale;
 }
 
 export interface AgentAnswer {

@@ -11,7 +11,6 @@ import {
   type ErrorEnvelope,
   type Result,
 } from '@cold-reserve/contracts';
-import { getLocale } from '@cold-reserve/i18n';
 import { toolErrorResult, type Agent, type AgentAnswer, type ToolCallResult } from './agent.js';
 import type { DemoSession } from './demo-session.js';
 import type { SpeechTickets } from '../voice/studio-voice.js';
@@ -77,8 +76,8 @@ export function createRemoteAgent(config: RemoteAgentConfig): Agent {
       return { content, ...(isError === undefined ? {} : { isError }), ...(structuredContent === undefined ? {} : { structuredContent }) };
     },
     ask: async (question, context) => {
-      // #263: the turn names its language only when it is not the default English.
-      const locale = getLocale();
+      // #263: the turn names its language only when it is not the default English; the caller says which (#284).
+      const locale = context.locale ?? 'en-US';
       const sent = await post('/v1/turns', { question, ...(locale === 'en-US' ? {} : { locale }) }, context.correlationId, context.signal);
       if (!sent.ok) return sent;
       return sent.value.status < 300 ? parseReply(sent.value.text, context.correlationId, config.tickets) : err(failure(sent.value.status, sent.value.text));

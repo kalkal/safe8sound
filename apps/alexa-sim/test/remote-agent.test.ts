@@ -41,13 +41,14 @@ describe('RemoteAgent (sim-api over HTTP)', () => {
       bodies.push(JSON.parse(init.body as string));
       return json(reply);
     });
+    // #284: the language travels with the turn (AskContext), never read from a page-wide store.
     setLocale('it-IT');
     try {
-      await a.ask('Quanto è carica la batteria?', { correlationId: 'turn-it' });
+      await a.ask('Quanto è carica la batteria?', { correlationId: 'turn-it', locale: 'it-IT' });
+      await a.ask("What's my battery level?", { correlationId: 'turn-en' });
     } finally {
       setLocale('en-US');
     }
-    await a.ask("What's my battery level?", { correlationId: 'turn-en' });
     expect(bodies).toEqual([{ question: 'Quanto è carica la batteria?', locale: 'it-IT' }, { question: "What's my battery level?" }]);
   });
 
