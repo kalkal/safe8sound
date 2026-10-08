@@ -63,7 +63,9 @@
         "toolCallsPerCodePerDay": 20,
         "codeAttemptsPerIpPerHour": 10,
         "speechCharsPerCodePerDay": 6000,
-        "speechCharsGlobalPerDay": 30000
+        "speechCharsGlobalPerDay": 30000,
+        "phoneReadsPerSessionPerMinute": 20,
+        "phoneReadsPerCodePerMinute": 120
       },
       "speech": {
         "enabled": {

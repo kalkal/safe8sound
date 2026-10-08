@@ -48,10 +48,11 @@ export function httpPhoneInbox(opts: {
       const problem = ProblemDetailsSchema.safeParse(body);
       if (!problem.success) return err(unavailable());
       const category = categoryOf(problem.data.code);
-      // A rate limit passes on with its own code and wait, so the panel waits as long as asked (#292); the text stays ours.
+      // A rate limit passes on with its own code and wait, so the panel waits as long as asked (#292); the text stays ours
+      // and neutral: the same code also means the demo is full for today (#294).
       if (category === 'rate_limited') {
         const wait = problem.data.retryAfterMs === undefined ? {} : { retryAfterMs: problem.data.retryAfterMs };
-        return err(toolError(problem.data.code, 'The phone is checked too often. Wait a moment.', wait));
+        return err(toolError(problem.data.code, 'The family phone cannot be read right now. It tries again by itself.', wait));
       }
       if (category === 'dependency_unavailable') return err(unavailable());
       return err(toolError('unexpected_error', 'Something went wrong on our side.'));

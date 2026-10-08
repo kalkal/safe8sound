@@ -2,7 +2,7 @@ import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import { createQuota, memoryQuotaStore, type QuotaLimits, type QuotaStore } from '../src/quota.js';
 
-const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerCodePerMinute: 2 };
+const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 2, phoneReadsPerCodePerMinute: 3 };
 // 2026-10-01 23:59:00 UTC: one minute to the daily reset.
 const NOW = Date.UTC(2026, 9, 1, 23, 59, 0);
 
@@ -163,21 +163,38 @@ describe('a failed give-back after the overall speech cap refused (review of #19
 });
 
 
-describe('phone reads per code per minute (#292)', () => {
-  it('lets a code poll up to the cap within the minute, then 429 with the wait to the next minute', async () => {
+describe('phone reads per session and per code per minute (#294)', () => {
+  it('lets a session poll up to its cap within the minute, then 429 with the wait to the next minute', async () => {
     const q = quota(Date.UTC(2026, 9, 8, 18, 30, 15));
-    expect((await q.phoneRead('judges')).ok).toBe(true);
-    expect((await q.phoneRead('judges')).ok).toBe(true);
-    expect(await q.phoneRead('judges')).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', category: 'rate_limited', retryAfterMs: 45_000 } });
-    // Another code has its own count.
-    expect((await q.phoneRead('other')).ok).toBe(true);
+    expect((await q.phoneRead('judges', 'tab-1')).ok).toBe(true);
+    expect((await q.phoneRead('judges', 'tab-1')).ok).toBe(true);
+    expect(await q.phoneRead('judges', 'tab-1')).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', category: 'rate_limited', retryAfterMs: 45_000 } });
+    // Another session on the same code has its own count (the judges may share one code).
+    expect((await q.phoneRead('judges', 'tab-2')).ok).toBe(true);
+  });
+
+  it('caps the reads of all the sessions of one code together; another code has its own count', async () => {
+    const q = quota(Date.UTC(2026, 9, 8, 18, 30, 15));
+    expect((await q.phoneRead('judges', 'tab-1')).ok).toBe(true);
+    expect((await q.phoneRead('judges', 'tab-2')).ok).toBe(true);
+    expect((await q.phoneRead('judges', 'tab-3')).ok).toBe(true);
+    expect(await q.phoneRead('judges', 'tab-4')).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', retryAfterMs: 45_000 } });
+    expect((await q.phoneRead('other', 'tab-5')).ok).toBe(true);
+  });
+
+  it("a read the session cap refuses does not use up the code's count", async () => {
+    const q = quota(Date.UTC(2026, 9, 8, 18, 30, 15));
+    // 2 reads counted, 3 refused by the session cap: the code (cap 3) still has exactly one read left.
+    for (let i = 0; i < 5; i++) await q.phoneRead('judges', 'runaway');
+    expect((await q.phoneRead('judges', 'tab-1')).ok).toBe(true);
+    expect((await q.phoneRead('judges', 'tab-2')).ok).toBe(false);
   });
 
   it('a new minute starts a new count', async () => {
     const store = memoryQuotaStore();
     const first = quota(Date.UTC(2026, 9, 8, 18, 30, 59), store);
-    await first.phoneRead('judges');
-    await first.phoneRead('judges');
-    expect((await quota(Date.UTC(2026, 9, 8, 18, 31, 0), store).phoneRead('judges')).ok).toBe(true);
+    await first.phoneRead('judges', 'tab-1');
+    await first.phoneRead('judges', 'tab-1');
+    expect((await quota(Date.UTC(2026, 9, 8, 18, 31, 0), store).phoneRead('judges', 'tab-1')).ok).toBe(true);
   });
 });

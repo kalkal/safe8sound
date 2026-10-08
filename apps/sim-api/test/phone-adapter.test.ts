@@ -41,6 +41,14 @@ describe('httpPhoneInbox (#267)', () => {
     expect(JSON.stringify(r)).not.toContain('secret detail');
   });
 
+  it('says a neutral text for any rate limit: the same code also means the demo is full for today (#294)', async () => {
+    const full = toProblemDetails(toolError('demo_quota_exceeded', 'The demo is full for today.', { retryAfterMs: 3_600_000 }), { instance: `urn:uuid:${CID}` });
+    const { inbox } = port(() => Promise.resolve(Response.json(full, { status: 429 })));
+    const r = await inbox.inbox({ home: HOME, correlationId: CID });
+    expect(r).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', retryAfterMs: 3_600_000 } });
+    expect(r.ok ? '' : r.error.message).not.toMatch(/too often/i);
+  });
+
   it('a timeout, an unreachable server and a malformed body are typed errors', async () => {
     const slow = port(() => new Promise<Response>(() => undefined), 20);
     expect(await slow.inbox.inbox({ home: HOME, correlationId: CID })).toMatchObject({ ok: false, error: { code: 'store_unavailable' } });

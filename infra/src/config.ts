@@ -102,6 +102,9 @@ export const SimApiConfigSchema = z
       /** Characters Polly may speak per demo code and overall per UTC day; cache hits are free (approved in #25). */
       speechCharsPerCodePerDay: z.number().int().min(1).max(1_000_000),
       speechCharsGlobalPerDay: z.number().int().min(1).max(10_000_000),
+      /** Phone panel reads per minute, per session and per demo code (#294): a panel polls every 5 s, 12 a minute. */
+      phoneReadsPerSessionPerMinute: z.number().int().min(1).max(600),
+      phoneReadsPerCodePerMinute: z.number().int().min(1).max(600),
     }),
     /** The studio voice (F8d, #25, approved in #25): on per stage, one voice, the S3 cache of spoken replies. */
     speech: z.strictObject({

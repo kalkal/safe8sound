@@ -23,7 +23,7 @@ Creating them is part of a deploy, reserved to the owner. A transient SSM failur
 
 ## The family phone of a sandbox (#267)
 
-`GET /v1/phone/inbox` answers the messages delivered to the visitor's sandbox family contact (the simulated daughter every sandbox starts with), newest first, at most 50 (`PhoneInboxSchema`), `cache-control: no-store`. It takes the same session token as a turn and reads only the token's own sandbox; it counts against no quota. sim-api reads the inbox from the MCP server (`GET /phone/inbox` with its `phone-token` and the sandbox in `x-cold-reserve-home`): the token stays in sim-api, never in the browser. A refusal by the MCP server is our setup (500 `unexpected_error`); an unreachable or slow inbox is 503 `store_unavailable`, and the panel keeps its last list. The message text never enters a log.
+`GET /v1/phone/inbox` answers the messages delivered to the visitor's sandbox family contact (the simulated daughter every sandbox starts with), newest first, at most 50 (`PhoneInboxSchema`), `cache-control: no-store`. It takes the same session token as a turn and reads only the token's own sandbox. Each read is counted before the inbox is read, per session (the token's `jti`) and per demo code for all its sessions together, per UTC minute (#294): a panel polls every 5 s, 12 reads a minute, and the judges may share one code. Past either cap the answer is 429 `demo_quota_exceeded` with `retryAfterMs` to the next minute in the body, and nothing is read. sim-api reads the inbox from the MCP server (`GET /phone/inbox` with its `phone-token` and the sandbox in `x-cold-reserve-home`): the token stays in sim-api, never in the browser. A rate limit of the MCP server (the same code when the demo is full for today) passes on with its code and wait and a neutral text; any other refusal by the MCP server is our setup (500 `unexpected_error`); an unreachable or slow inbox is 503 `store_unavailable`, and the panel keeps its last list. The message text never enters a log.
 
 ## Caps that hold with many instances
 
@@ -35,6 +35,8 @@ The caps live in the shared DynamoDB table, one item per key (sort key `COUNT`),
 | `DEMO#TURNS#GLOBAL#<day>` | turns for everyone | UTC day |
 | `DEMO#TOOLS#<codeId>#<day>` | card actions per demo code | UTC day |
 | `DEMO#ATTEMPT#<salted hash of the IP>#<hour>` | wrong demo codes per client IP | UTC hour |
+| `DEMO#PHONE#SESSION#<jti>#<minute>` | phone panel reads per session | UTC minute |
+| `DEMO#PHONE#CODE#<codeId>#<minute>` | phone panel reads per demo code, all its sessions | UTC minute |
 
 The client IP is personal data, and the table keeps 35 days of point-in-time backups (and is retained on `demo`): the key holds only an HMAC-SHA256 of the IP, salted with the token signing key from SSM, never the IP itself; the IP is never logged either. A key rotation only resets the current hour's attempt counts. Each use is **one atomic `UpdateItem`**: `ADD` one, on the condition that the item is new or still under the limit. At the cap the condition fails and nothing is counted.
 

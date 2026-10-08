@@ -207,7 +207,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
     const clientIp = viaCloudFront && viewerIp !== null && isIp(viewerIp) ? viewerIp : meta.clientIp;
 
     // The sandbox family phone (#267): the same origin, switch and token rules as a turn, but a read (GET, no body)
-    // of the token's own sandbox only, capped per code per minute (#292).
+    // of the token's own sandbox only, capped per session and per code per minute (#294).
     const phoneInbox = async (port: PhoneInboxPort): Promise<Response> => {
       if (origin !== null && allowedOrigin === undefined) return fail(toolError('origin_not_allowed', 'This origin may not call the demo.'));
       if (req.method === 'OPTIONS') {
@@ -221,7 +221,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       if (!claims.ok) return fail(claims.error, undefined, { 'www-authenticate': 'Bearer realm="sim-api", error="invalid_token"' });
       codeIdOfRequest = claims.value.sub;
       // Counted before the inbox is read (#292): each read reaches the MCP Lambda and DynamoDB.
-      const allowed = await quota.phoneRead(claims.value.sub);
+      const allowed = await quota.phoneRead(claims.value.sub, claims.value.jti);
       if (!allowed.ok) return fail(allowed.error, undefined, {}, claims.value.sub);
       const inbox = await port.inbox({ home: claims.value.home, correlationId });
       if (!inbox.ok) return fail(inbox.error, undefined, {}, claims.value.sub);

@@ -19,7 +19,7 @@ describe('loadSimApiConfig (only hashes of codes and key ids reach logs; values 
       skewS: 30,
       allowedOrigins: ['http://127.0.0.1:5400'],
       demoEnabled: true,
-      limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerCodePerMinute: 30 },
+      limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 20, phoneReadsPerCodePerMinute: 120 },
       speech: { enabled: false, engine: 'neural', voice: 'Joanna' },
     });
   });
@@ -27,6 +27,13 @@ describe('loadSimApiConfig (only hashes of codes and key ids reach logs; values 
   it('reads the Polly settings (F8d, #25): off unless switched on, one voice from config, true or false only', () => {
     expect(loadSimApiConfig({ ...ENV, SIM_SPEECH_ENABLED: 'true', SIM_SPEECH_VOICE: 'Matthew' })).toMatchObject({ ok: true, value: { speech: { enabled: true, engine: 'neural', voice: 'Matthew' } } });
     for (const bad of [{ SIM_SPEECH_ENABLED: 'yes' }, { SIM_SPEECH_VOICE: 'joanna; drop' }, { SIM_SPEECH_ENGINE: 'premium' }, { SIM_LIMIT_SPEECH_CHARS_PER_CODE: '0' }]) {
+      expect(loadSimApiConfig({ ...ENV, ...bad })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    }
+  });
+
+  it('reads both phone caps (#294), each a whole number from 1 to 600', () => {
+    expect(loadSimApiConfig({ ...ENV, SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE: '12', SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE: '60' })).toMatchObject({ ok: true, value: { limits: { phoneReadsPerSessionPerMinute: 12, phoneReadsPerCodePerMinute: 60 } } });
+    for (const bad of [{ SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE: '0' }, { SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE: '601' }]) {
       expect(loadSimApiConfig({ ...ENV, ...bad })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
     }
   });

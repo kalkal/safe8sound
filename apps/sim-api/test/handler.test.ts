@@ -483,14 +483,23 @@ describe('GET /v1/phone/inbox: the sandbox family phone (#267)', () => {
     expect(JSON.stringify([...logs, ...second.logs])).not.toContain('Ana');
   });
 
-  it('counts each read per code per minute, before the inbox: past the cap 429 with retryAfterMs in the body, nothing read (#292)', async () => {
+  it('counts each read per session per minute, before the inbox: past the cap 429 with retryAfterMs in the body, nothing read (#294)', async () => {
     const p = phone();
-    const { send, session } = setup({ SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE: '2' }, undefined, { phone: p.port });
+    const { send, session } = setup({ SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE: '2' }, undefined, { phone: p.port });
     const token = await session();
     for (let i = 0; i < 2; i++) expect((await send('/v1/phone/inbox', { method: 'GET', token })).status).toBe(200);
-    const res = await send('/v1/phone/inbox', { method: 'GET', token });
-    const body = await problem(res, 429, 'demo_quota_exceeded');
+    const body = await problem(await send('/v1/phone/inbox', { method: 'GET', token }), 429, 'demo_quota_exceeded');
     expect(body.retryAfterMs).toBeGreaterThan(0);
+    expect(p.read).toHaveLength(2);
+    // Another session on the same demo code still reads (the judges may share one code).
+    expect((await send('/v1/phone/inbox', { method: 'GET', token: await session() })).status).toBe(200);
+  });
+
+  it('caps the reads of all the sessions of one demo code together (#294)', async () => {
+    const p = phone();
+    const { send, session } = setup({ SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE: '2' }, undefined, { phone: p.port });
+    for (let i = 0; i < 2; i++) expect((await send('/v1/phone/inbox', { method: 'GET', token: await session() })).status).toBe(200);
+    await problem(await send('/v1/phone/inbox', { method: 'GET', token: await session() }), 429, 'demo_quota_exceeded');
     expect(p.read).toHaveLength(2);
   });
 
