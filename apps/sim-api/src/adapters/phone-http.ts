@@ -5,7 +5,8 @@ import type { PhoneInboxPort } from '../handler.js';
  * A visitor sandbox's family inbox, read from the MCP server (#267, approved in #267): GET /phone/inbox on the MCP
  * server's origin, with sim-api's own sandbox phone token and the sandbox in x-cold-reserve-home. The token stays
  * here, never in the browser. A refusal by the MCP server is our setup (token, scope, home): internal, with a fixed
- * text; a transient failure passes on, so the panel keeps its list and retries at the next poll.
+ * text; a transient failure passes on, so the panel keeps its list and retries at the next poll; a rate limit keeps
+ * its code and wait (#292).
  */
 export function httpPhoneInbox(opts: {
   mcpUrl: string;
@@ -47,7 +48,12 @@ export function httpPhoneInbox(opts: {
       const problem = ProblemDetailsSchema.safeParse(body);
       if (!problem.success) return err(unavailable());
       const category = categoryOf(problem.data.code);
-      if (category === 'dependency_unavailable' || category === 'rate_limited') return err(unavailable());
+      // A rate limit passes on with its own code and wait, so the panel waits as long as asked (#292); the text stays ours.
+      if (category === 'rate_limited') {
+        const wait = problem.data.retryAfterMs === undefined ? {} : { retryAfterMs: problem.data.retryAfterMs };
+        return err(toolError(problem.data.code, 'The phone is checked too often. Wait a moment.', wait));
+      }
+      if (category === 'dependency_unavailable') return err(unavailable());
       return err(toolError('unexpected_error', 'Something went wrong on our side.'));
     },
   };

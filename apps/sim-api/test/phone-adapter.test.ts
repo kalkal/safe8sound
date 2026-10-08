@@ -33,6 +33,14 @@ describe('httpPhoneInbox (#267)', () => {
     expect(JSON.stringify(r)).not.toContain('secret detail');
   });
 
+  it('a rate limit passes on with its own code and wait, never as a generic 503 (#292)', async () => {
+    const busy = toProblemDetails(toolError('demo_quota_exceeded', 'secret detail', { retryAfterMs: 7000 }), { instance: `urn:uuid:${CID}` });
+    const { inbox } = port(() => Promise.resolve(Response.json(busy, { status: 429 })));
+    const r = await inbox.inbox({ home: HOME, correlationId: CID });
+    expect(r).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', category: 'rate_limited', retryAfterMs: 7000 } });
+    expect(JSON.stringify(r)).not.toContain('secret detail');
+  });
+
   it('a timeout, an unreachable server and a malformed body are typed errors', async () => {
     const slow = port(() => new Promise<Response>(() => undefined), 20);
     expect(await slow.inbox.inbox({ home: HOME, correlationId: CID })).toMatchObject({ ok: false, error: { code: 'store_unavailable' } });

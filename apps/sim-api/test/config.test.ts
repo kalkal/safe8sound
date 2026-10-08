@@ -19,7 +19,7 @@ describe('loadSimApiConfig (only hashes of codes and key ids reach logs; values 
       skewS: 30,
       allowedOrigins: ['http://127.0.0.1:5400'],
       demoEnabled: true,
-      limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000 },
+      limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerCodePerMinute: 30 },
       speech: { enabled: false, engine: 'neural', voice: 'Joanna' },
     });
   });

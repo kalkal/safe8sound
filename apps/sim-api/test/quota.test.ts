@@ -2,7 +2,7 @@ import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import { createQuota, memoryQuotaStore, type QuotaLimits, type QuotaStore } from '../src/quota.js';
 
-const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000 };
+const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerCodePerMinute: 2 };
 // 2026-10-01 23:59:00 UTC: one minute to the daily reset.
 const NOW = Date.UTC(2026, 9, 1, 23, 59, 0);
 
@@ -162,3 +162,22 @@ describe('a failed give-back after the overall speech cap refused (review of #19
   });
 });
 
+
+describe('phone reads per code per minute (#292)', () => {
+  it('lets a code poll up to the cap within the minute, then 429 with the wait to the next minute', async () => {
+    const q = quota(Date.UTC(2026, 9, 8, 18, 30, 15));
+    expect((await q.phoneRead('judges')).ok).toBe(true);
+    expect((await q.phoneRead('judges')).ok).toBe(true);
+    expect(await q.phoneRead('judges')).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', category: 'rate_limited', retryAfterMs: 45_000 } });
+    // Another code has its own count.
+    expect((await q.phoneRead('other')).ok).toBe(true);
+  });
+
+  it('a new minute starts a new count', async () => {
+    const store = memoryQuotaStore();
+    const first = quota(Date.UTC(2026, 9, 8, 18, 30, 59), store);
+    await first.phoneRead('judges');
+    await first.phoneRead('judges');
+    expect((await quota(Date.UTC(2026, 9, 8, 18, 31, 0), store).phoneRead('judges')).ok).toBe(true);
+  });
+});

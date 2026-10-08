@@ -483,6 +483,37 @@ describe('GET /v1/phone/inbox: the sandbox family phone (#267)', () => {
     expect(JSON.stringify([...logs, ...second.logs])).not.toContain('Ana');
   });
 
+  it('counts each read per code per minute, before the inbox: past the cap 429 with retryAfterMs in the body, nothing read (#292)', async () => {
+    const p = phone();
+    const { send, session } = setup({ SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE: '2' }, undefined, { phone: p.port });
+    const token = await session();
+    for (let i = 0; i < 2; i++) expect((await send('/v1/phone/inbox', { method: 'GET', token })).status).toBe(200);
+    const res = await send('/v1/phone/inbox', { method: 'GET', token });
+    const body = await problem(res, 429, 'demo_quota_exceeded');
+    expect(body.retryAfterMs).toBeGreaterThan(0);
+    expect(p.read).toHaveLength(2);
+  });
+
+  it("ignores a home the browser names: only the token's sandbox is read (#292)", async () => {
+    const p = phone();
+    const { send, session } = setup({}, undefined, { phone: p.port });
+    await send('/v1/phone/inbox', { method: 'GET', token: await session(), headers: { 'x-cold-reserve-home': 'demo#ffffffffffffffff' } });
+    expect(p.read).toEqual(['demo#01aaaaaaaaaaaaaa']);
+  });
+
+  it('refuses a forged or an expired token with 401, and a disallowed origin, reading nothing (#292)', async () => {
+    const p = phone();
+    const { send } = setup({}, undefined, { phone: p.port });
+    const base = { sub: 'judges', home: 'demo#01aaaaaaaaaaaaaa' as HomeId, jti: 'j' };
+    const forged = signToken({ ...base, iat: NOW / 1000, exp: NOW / 1000 + 3600 }, { kid: 'k1', material: Buffer.alloc(32, 9) });
+    await problem(await send('/v1/phone/inbox', { method: 'GET', token: forged }), 401, 'invalid_signature');
+    const old = signToken({ ...base, iat: NOW / 1000 - 7200, exp: NOW / 1000 - 3600 }, { kid: 'k1', material: KEY });
+    await problem(await send('/v1/phone/inbox', { method: 'GET', token: old }), 401, 'signature_expired');
+    const good = signToken({ ...base, iat: NOW / 1000, exp: NOW / 1000 + 3600 }, { kid: 'k1', material: KEY });
+    await problem(await send('/v1/phone/inbox', { method: 'GET', token: good, origin: 'https://evil.example' }), 403, 'origin_not_allowed');
+    expect(p.read).toEqual([]);
+  });
+
   it('without a phone behind it the route does not exist', async () => {
     const { send, session } = setup();
     await problem(await send('/v1/phone/inbox', { method: 'GET', token: await session() }), 404, 'route_not_found');

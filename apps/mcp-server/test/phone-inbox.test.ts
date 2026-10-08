@@ -270,6 +270,23 @@ describe('GET /phone/inbox for visitor sandboxes (#267, approved in #267)', () =
     expect(read).toEqual([]);
   });
 
+  it("a sandbox phone's error lines never say demo: the sandbox as `sandbox`, never its id (#292)", async () => {
+    const logs: LogEntry[] = [];
+    const config = testConfig({ clients: new Map([...testConfig().clients, [SANDBOX_PHONE, { clientId: 'daughter', homeId: homeId('demo'), sandboxes: true as const, scope: 'phone' as const }]]) });
+    const phone = createPhoneInboxHandler(config, {
+      inbox: () => Promise.resolve(err(toolError('store_unavailable', 'Down.'))),
+      admit: () => Promise.resolve(ok(undefined)),
+      logger: { log: (e) => logs.push(e) },
+    });
+    await at(phone, { ...bearer(SANDBOX_PHONE), 'x-cold-reserve-home': SANDBOX });
+    await at(phone, { ...bearer(SANDBOX_PHONE), 'x-cold-reserve-home': 'demo' });
+    const errors = logs.filter((l) => l.level !== 'info');
+    expect(errors.map((l) => l.code)).toEqual(['store_unavailable', 'home_not_allowed']);
+    for (const line of errors) expect(line).not.toHaveProperty('homeId');
+    expect(errors[0]?.details).toMatchObject({ home: 'sandbox' });
+    expect(JSON.stringify(logs)).not.toContain(SANDBOX);
+  });
+
   it('a sandbox phone is read-only: it cannot reply', async () => {
     const { phone } = setupSandbox();
     const res = await phone(new Request(`http://127.0.0.1:3316${PHONE_REPLY_PATH}`, { method: 'POST', headers: { ...bearer(SANDBOX_PHONE), 'x-cold-reserve-home': SANDBOX, 'content-type': 'application/json' }, body: '{"reply":"on_my_way"}' }));

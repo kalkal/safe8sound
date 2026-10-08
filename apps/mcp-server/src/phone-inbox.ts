@@ -63,7 +63,8 @@ export function createPhoneInboxHandler(config: ServerConfig, deps: PhoneInboxDe
     return grant?.scope === 'phone' ? grant : null;
   }
 
-  function log(error: ErrorEnvelope, correlationId: string, grant?: ClientGrant) {
+  /** `homeId`: the home read, once known. A sandbox phone's line says `sandbox`, never the id nor `demo` (#292). */
+  function log(error: ErrorEnvelope, correlationId: string, grant?: ClientGrant, homeId?: HomeId) {
     deps.logger.log({
       ts: new Date().toISOString(),
       level: error.category === 'internal' ? 'error' : 'warn',
@@ -72,7 +73,7 @@ export function createPhoneInboxHandler(config: ServerConfig, deps: PhoneInboxDe
       category: error.category,
       message: error.message,
       correlationId,
-      ...(grant === undefined ? {} : { homeId: grant.homeId, clientId: grant.clientId }),
+      ...(grant === undefined ? {} : grant.sandboxes === true ? { clientId: grant.clientId, details: homeDetail(homeId) } : { homeId: grant.homeId, clientId: grant.clientId }),
     });
   }
 
@@ -143,7 +144,7 @@ export function createPhoneInboxHandler(config: ServerConfig, deps: PhoneInboxDe
       if (replying) return problem(toolError('route_not_found', 'No such path.'), 404);
       const admitted = await deps.admit(sandbox.data, correlationId);
       if (!admitted.ok) {
-        log(admitted.error, correlationId, grant);
+        log(admitted.error, correlationId, grant, sandbox.data);
         return problem(admitted.error);
       }
       homeId = sandbox.data;
@@ -171,7 +172,7 @@ export function createPhoneInboxHandler(config: ServerConfig, deps: PhoneInboxDe
 
     const listed = await deps.inbox(homeId);
     if (!listed.ok) {
-      log(listed.error, correlationId, grant);
+      log(listed.error, correlationId, grant, homeId);
       return problem(listed.error);
     }
     // Every read, counted, never the text; a sandbox as `sandbox`, never its id (#267).

@@ -38,6 +38,8 @@ export interface QuotaLimits {
   /** Characters spoken by Polly per demo code and overall per UTC day; cache hits are free (approved in #25). */
   readonly speechCharsPerCodePerDay: number;
   readonly speechCharsGlobalPerDay: number;
+  /** Phone panel reads per demo code per minute (#292): a poll every 5 s is 12; the cap stops a runaway loop. */
+  readonly phoneReadsPerCodePerMinute: number;
 }
 
 export type Quota = ReturnType<typeof createQuota>;
@@ -54,6 +56,9 @@ const isTransient = (e: unknown): e is Error => {
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
+/** A window's id: the day, the hour or the minute of its start (UTC). */
+const ID_LENGTH: Readonly<Record<number, number>> = { [DAY_MS]: 10, [HOUR_MS]: 13, [MINUTE_MS]: 16 };
 
 /** Daily caps reset at midnight UTC (one rule, approved in #101), checked BEFORE calling the agent. */
 export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; clock: Clock; ipSalt: Uint8Array }) {
@@ -63,7 +68,7 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
   const window = (sizeMs: number) => {
     const now = clock.now();
     const start = now - (now % sizeMs);
-    return { id: new Date(start).toISOString().slice(0, sizeMs === DAY_MS ? 10 : 13), endMs: start + sizeMs, retryAfterMs: start + sizeMs - now };
+    return { id: new Date(start).toISOString().slice(0, ID_LENGTH[sizeMs] ?? 13), endMs: start + sizeMs, retryAfterMs: start + sizeMs - now };
   };
   const over = (retryAfterMs: number, message: string): Result<never, ErrorEnvelope> => err(toolError('demo_quota_exceeded', message, { retryAfterMs }));
   const DAILY = 'The demo limit for today is reached. Come back after midnight UTC.';
@@ -87,6 +92,13 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
   };
 
   return {
+    /** One read of the sandbox family phone (#292), per code per minute, checked before the inbox is read. */
+    async phoneRead(codeId: string): Promise<Result<void, ErrorEnvelope>> {
+      const minute = window(MINUTE_MS);
+      const allowed = await counted(() => store.consume(`PHONE#${codeId}#${minute.id}`, limits.phoneReadsPerCodePerMinute, minute.endMs));
+      if (!allowed.ok) return allowed;
+      return allowed.value ? ok(undefined) : over(minute.retryAfterMs, 'The phone is checked too often. Wait a moment.');
+    },
     async turn(codeId: string): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);
       const perCode = await counted(() => store.consume(`TURNS#${codeId}#${day.id}`, limits.turnsPerCodePerDay, day.endMs));
