@@ -100,6 +100,50 @@ describe('createInboxPhone in remote mode (#267: the sandbox inbox through sim-a
     expect(calls).toHaveLength(1);
   });
 
+  it('an expired or refused session token ends the session once, like the agent: no 401 every 5 s (review of #296)', async () => {
+    for (const code of ['signature_expired', 'invalid_signature', 'missing_token'] as const) {
+      let token: string | undefined = 't-1';
+      const failures: string[] = [];
+      const calls: string[] = [];
+      const phone = createInboxPhone({
+        fetchFn: (url) => {
+          calls.push(url);
+          return Promise.resolve(json(401, { status: 401, code }));
+        },
+        pollMs: 5_000,
+        log: () => undefined,
+        newId: () => 'poll-4',
+        inboxUrl: 'https://site.test/api/v1/phone/inbox',
+        authorization: () => (token === undefined ? undefined : `Bearer ${token}`),
+        onAuthFailure: (reason) => {
+          failures.push(reason);
+          token = undefined;
+        },
+      });
+      const stop = phone.subscribe(() => undefined);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(failures).toEqual([code]);
+      expect(calls).toHaveLength(1);
+      stop();
+    }
+  });
+
+  it('another refusal (a 503) is not an auth failure: the session stays', async () => {
+    const failures: string[] = [];
+    const phone = createInboxPhone({
+      fetchFn: () => Promise.resolve(json(503, { status: 503, code: 'agent_unavailable' })),
+      pollMs: 5_000,
+      log: () => undefined,
+      newId: () => 'poll-5',
+      inboxUrl: 'https://site.test/api/v1/phone/inbox',
+      authorization: () => 'Bearer t-1',
+      onAuthFailure: (reason) => failures.push(reason),
+    });
+    phone.subscribe(() => undefined);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(failures).toEqual([]);
+  });
+
   it('a 429 without retryAfterMs waits one poll, as before', async () => {
     const { phone, calls } = remote('t-1', () => Promise.resolve(json(429, { status: 429, code: 'demo_quota_exceeded' })));
     phone.subscribe(() => undefined);

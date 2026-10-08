@@ -56,7 +56,7 @@ describe('remote demo settings (B2): read and saved through the card tool route'
     return { agent, calls };
   };
 
-  it('reads the sandbox settings and the place label the server gives', async () => {
+  it('reads the sandbox settings; the place is named at render time, never kept from the server\'s label (#284)', async () => {
     const { agent } = agentAnswering({ get_demo_settings: reply({ settings, place }) });
     expect(await fetchDemoSettings(agent, ctx)).toEqual({ ok: true, value: { scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' } });
   });

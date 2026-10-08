@@ -131,12 +131,13 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
       {open && (
         <div ref={drawerRef} className="settings-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
           <div className="settings-head">
-            <h2 id={titleId}>{t('settings.title')}</h2>
+            <h2 id={titleId}>{t(settings === undefined ? 'settings.open' : 'settings.title')}</h2>
             <button type="button" className="link-button" onClick={close}>
               {t('settings.close')}
             </button>
           </div>
-          <p className="muted">{t('settings.intro')}</p>
+          {/* Without demo settings there is no demo to change: plain "Settings", no demo intro (review of #290). */}
+          {settings !== undefined && <p className="muted">{t('settings.intro')}</p>}
           <ChipGroup
             label={t('settings.language')}
             name="language"

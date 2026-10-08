@@ -14,6 +14,8 @@ const storm = {
 };
 
 test('remote mode: the phone panel shows the sandbox inbox, read with the session token, and keeps it on a 429, waiting as asked', async ({ page }) => {
+  // Up to ~18 s of waits on the 5 s poll (the first read, the refusal, the quiet 7 s): past the 20 s default (review of #296).
+  test.setTimeout(40_000);
   const auth: string[] = [];
   let fail = false;
   await page.route('**/sim-api/v1/phone/inbox', (route) => {
@@ -42,4 +44,20 @@ test('remote mode: the phone panel shows the sandbox inbox, read with the sessio
   await page.waitForTimeout(7_000);
   expect(auth.length).toBe(afterRefusal);
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toBeVisible();
+});
+
+test('an expired session on the phone read ends the session once: the code gate is back, no 401 every poll (review of #296)', async ({ page }) => {
+  test.setTimeout(40_000);
+  let reads = 0;
+  await page.route('**/sim-api/v1/phone/inbox', (route) => {
+    reads += 1;
+    return route.fulfill({ status: 401, contentType: 'application/problem+json', body: JSON.stringify({ status: 401, code: 'signature_expired' }) });
+  });
+  await openRemote(page);
+  // The first read (the next 5 s poll) is refused: the token is forgotten and the gate says why, as for a turn.
+  await expect(page.getByRole('status').filter({ hasText: 'Session expired: enter the demo code again.' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByLabel('Demo code')).toHaveValue('');
+  const refused = reads;
+  await page.waitForTimeout(7_000);
+  expect(reads).toBe(refused);
 });

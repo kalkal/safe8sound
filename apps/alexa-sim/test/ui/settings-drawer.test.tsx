@@ -82,6 +82,9 @@ describe('DemoSettingsControl', () => {
     expect(screen.getByRole('radiogroup', { name: 'Language' })).toBeTruthy();
     expect(screen.queryByRole('radiogroup', { name: 'Scenario' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Restart the day' })).toBeNull();
+    // Not "Demo settings" with the demo intro: there is no demo to change here (review of #290).
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy();
+    expect(screen.queryByText('Change what this demo plays. Only your own demo home changes.')).toBeNull();
   });
 
   it('restart needs two taps', () => {

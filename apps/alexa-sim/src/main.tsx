@@ -60,6 +60,8 @@ const phone: PhoneFeed =
             const token = session?.token();
             return token === undefined ? undefined : `Bearer ${token}`;
           },
+          // A refused token ends the session, as the agent does: the visitor enters the code again, no 401 every poll.
+          onAuthFailure: (reason) => session?.invalidate(reason),
         }),
   });
 // The studio voice (Polly, F8d #25) needs the demo session: the agent keeps each reply's ticket, the speaker uses it.
@@ -131,7 +133,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   );
   // The judge's demo settings (B1, B2): kept in the page in scripted mode; in remote mode read from the visitor's
   // sandbox once the demo session starts, and saved there (what is shown is what is stored). A new scenario starts on
-  // its own sky. A home that is not a sandbox has no settings: no badge.
+  // its own sky. A home that is not a sandbox has no settings: the badge then opens the language row only (#284).
   const scripted = config.agent === 'scripted';
   const [demoSettings, setDemoSettings] = useState<DemoSettingsView | undefined>(() => (scripted ? scriptedDemoSettings() : undefined));
   const subscribeSession = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);

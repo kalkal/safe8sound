@@ -1,4 +1,4 @@
-import { PhoneInboxSchema, PhoneReplyOutputSchema, type InboxMessage, type PhoneReply } from '@cold-reserve/contracts';
+import { PhoneInboxSchema, PhoneReplyOutputSchema, type ErrorCode, type InboxMessage, type PhoneReply } from '@cold-reserve/contracts';
 import { z } from 'zod';
 import type { Log } from '../log.js';
 import type { PhoneFeed, PhoneReplyResult } from './phone-feed.js';
@@ -28,7 +28,16 @@ export interface InboxPhoneOptions {
   readonly authorization?: () => string | undefined;
   /** False while the page is hidden (a tab in the background): no read then (default: always visible). */
   readonly isVisible?: () => boolean;
+  /**
+   * The session token was refused (expired after 1 h, forged, missing): the session is ended, as the agent does
+   * (remote-agent.ts). With no token left, `authorization` returns undefined and the phone stops reading (review of #296).
+   */
+  readonly onAuthFailure?: (reason: AuthFailure) => void;
 }
+
+const AUTH_FAILURES = ['missing_token', 'invalid_signature', 'signature_expired'] as const satisfies readonly ErrorCode[];
+type AuthFailure = (typeof AUTH_FAILURES)[number];
+const isAuthFailure = (code: string | undefined): code is AuthFailure => AUTH_FAILURES.some((c) => c === code);
 
 const keyOf = (messages: readonly InboxMessage[]) => messages.map((m) => `${m.at}|${m.transition}|${m.role}`).join(',');
 
@@ -74,6 +83,7 @@ export function createInboxPhone(options: InboxPhoneOptions): PhoneFeed {
     const body: unknown = await response.json().catch(() => undefined);
     if (!response.ok) {
       const problem = ProblemSchema.safeParse(body).data;
+      if (isAuthFailure(problem?.code)) options.onAuthFailure?.(problem.code);
       if (response.status === 429 && problem?.retryAfterMs !== undefined) pausedUntil = Date.now() + problem.retryAfterMs;
       options.log({ level: 'warn', code: problem?.code ?? 'unexpected_error', correlationId, details: { status: response.status } });
       return;
