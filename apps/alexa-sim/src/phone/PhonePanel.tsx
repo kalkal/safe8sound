@@ -67,12 +67,27 @@ function Replies({ reply, timeZone }: { reply: NonNullable<PhoneFeed['reply']>; 
   );
 }
 
+/** Ana's phone as a connected device (owner feedback, 6 Oct): a drawing beside the title, hidden from screen readers. */
+function PhoneIcon({ alert }: { alert: boolean }) {
+  return (
+    <svg className="phone-icon" data-device="phone" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <rect x="13" y="3" width="22" height="42" rx="5" className="phone-icon-line" />
+      <path d="M20 8 H28 M21 39 H27" className="phone-icon-line" />
+      {/* A message has arrived: the dot, as on a real phone (the list says it in words). */}
+      {alert && <circle cx="33" cy="12" r="6" className="phone-icon-dot" />}
+    </svg>
+  );
+}
+
 export function PhonePanel({ feed, timeZone }: { feed: PhoneFeed; timeZone: string }) {
   const messages = useSyncExternalStore(feed.subscribe, feed.messages);
   const titleId = useId();
   return (
     <section className="phone" aria-labelledby={titleId}>
-      <h2 id={titleId}>{t('phone.title')}</h2>
+      <h2 id={titleId}>
+        <PhoneIcon alert={messages.length > 0} />
+        {t('phone.title')}
+      </h2>
       {messages.length === 0 && <p className="muted">{t('phone.empty')}</p>}
       {/* Something to answer to: the replies come with the first message. */}
       {messages.length > 0 && feed.reply !== undefined && <Replies reply={feed.reply} timeZone={timeZone} />}

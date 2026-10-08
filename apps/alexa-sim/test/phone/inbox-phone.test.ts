@@ -30,6 +30,96 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('createInboxPhone in remote mode (#267: the sandbox inbox through sim-api)', () => {
+  function remote(token: string | undefined, reply: () => Promise<Response>) {
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const phone = createInboxPhone({
+      fetchFn: (url, init) => {
+        calls.push({ url, init });
+        return reply();
+      },
+      pollMs: 5_000,
+      log: () => undefined,
+      newId: () => 'poll-2',
+      inboxUrl: 'https://site.test/api/v1/phone/inbox',
+      authorization: () => (token === undefined ? undefined : `Bearer ${token}`),
+    });
+    return { phone, calls };
+  }
+
+  it('reads GET /v1/phone/inbox with the demo session token, the home being the token\'s sandbox', async () => {
+    const { phone, calls } = remote('t-1', () => Promise.resolve(json(200, { messages: [phoneMessage('storm-started')] })));
+    phone.subscribe(() => undefined);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls[0]?.url).toBe('https://site.test/api/v1/phone/inbox');
+    expect(new Headers(calls[0]?.init?.headers).get('authorization')).toBe('Bearer t-1');
+    expect(new Headers(calls[0]?.init?.headers).get('x-correlation-id')).toBe('poll-2');
+    expect(phone.messages().map((m) => m.transition)).toEqual(['storm_started']);
+  });
+
+  it('a 429 (the per-code cap, #293) keeps the list and waits retryAfterMs before the next read: no error loop', async () => {
+    let n = 0;
+    const { phone, calls } = remote('t-1', () => {
+      n += 1;
+      if (n === 1) return Promise.resolve(json(200, { messages: [phoneMessage('storm-started')] }));
+      if (n === 2) return Promise.resolve(json(429, { status: 429, code: 'demo_quota_exceeded', retryAfterMs: 40_000 }));
+      return Promise.resolve(json(200, { messages: [phoneMessage('storm-started')] }));
+    });
+    phone.subscribe(() => undefined);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(calls).toHaveLength(2);
+    expect(phone.messages().map((m) => m.transition)).toEqual(['storm_started']);
+    // The ticks inside the 40 s wait do not call.
+    await vi.advanceTimersByTimeAsync(39_000);
+    expect(calls).toHaveLength(2);
+    // The 429 came at 5 s: the poll at 45 s reads again.
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(calls).toHaveLength(3);
+  });
+
+  it('does not read while the page is hidden (a tab in the background), and reads again once it is shown', async () => {
+    let visible = false;
+    const calls: string[] = [];
+    const phone = createInboxPhone({
+      fetchFn: (url) => {
+        calls.push(url);
+        return Promise.resolve(json(200, { messages: [] }));
+      },
+      pollMs: 5_000,
+      log: () => undefined,
+      newId: () => 'poll-3',
+      inboxUrl: 'https://site.test/api/v1/phone/inbox',
+      authorization: () => 'Bearer t-1',
+      isVisible: () => visible,
+    });
+    phone.subscribe(() => undefined);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(calls).toHaveLength(0);
+    visible = true;
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('a 429 without retryAfterMs waits one poll, as before', async () => {
+    const { phone, calls } = remote('t-1', () => Promise.resolve(json(429, { status: 429, code: 'demo_quota_exceeded' })));
+    phone.subscribe(() => undefined);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(calls).toHaveLength(3);
+  });
+
+  it('without a session (no demo code yet) it does not call at all', async () => {
+    const { phone, calls } = remote(undefined, () => Promise.resolve(json(200, { messages: [] })));
+    phone.subscribe(() => undefined);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('cannot reply until sim-api has a reply route: no reply buttons in remote mode', () => {
+    const { phone } = remote('t-1', () => Promise.resolve(json(200, { messages: [] })));
+    expect(phone.reply).toBeUndefined();
+  });
+});
+
 describe('createInboxPhone', () => {
   it('polls only while someone looks, and shows the inbox newest first', async () => {
     const { phone, calls } = setup(() => Promise.resolve(json(200, { messages: [phoneMessage('power-back'), phoneMessage('storm-started')] })));

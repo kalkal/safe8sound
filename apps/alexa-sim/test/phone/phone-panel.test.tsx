@@ -15,6 +15,14 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
     expect(screen.getByText('No messages from Safe-8-Sound yet.')).toBeTruthy();
   });
 
+  it('owner feedback (6 Oct): Ana\'s phone is a connected device with its own icon, a drawing beside the title', () => {
+    const { container } = render(<PhonePanel feed={createScriptedPhone()} timeZone="Europe/Rome" />);
+    const icon = container.querySelector('h2 svg[data-device="phone"]');
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+    // The title stays the accessible name: the icon adds nothing to it.
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe("Your daughter's phone (simulated)");
+  });
+
   it('shows each message as a notification: title in words, home time, and the full text', () => {
     const phone = createScriptedPhone();
     phone.deliver([phoneMessage('storm-started')]);

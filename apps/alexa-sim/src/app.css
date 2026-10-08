@@ -281,10 +281,34 @@
     background: var(--surface-card);
 
     & h2 {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
       margin: 0;
       font-size: var(--font-size-body);
       font-weight: var(--font-weight-medium);
     }
+  }
+
+  /* Ana's phone as a connected device (owner feedback, 6 Oct): big, in the text colour, the dot in the accent. */
+  .phone-icon {
+    flex: none;
+    inline-size: var(--target-min);
+    block-size: var(--target-min);
+  }
+
+  .phone-icon-line {
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+  }
+
+  .phone-icon-dot {
+    fill: var(--accent);
+  }
+
+  .phone {
 
     & .muted {
       margin: 0;

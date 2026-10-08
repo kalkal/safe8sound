@@ -39,12 +39,29 @@ document.title = t('sim.title');
 const config = parseConfig(import.meta.env, window.location.search, import.meta.env.DEV);
 // The family phone (surface C, #24): the scripted scene's messages, or the real inbox read through the
 // dev server's proxy, which adds the phone token (the browser never holds it).
-const scriptedPhone = config.ok && config.value.phone === 'scripted' ? createScriptedPhone() : undefined;
-const phone: PhoneFeed =
-  scriptedPhone ??
-  createInboxPhone({ fetchFn: (url, init) => fetch(url, init), pollMs: config.ok ? config.value.phonePollMs : 5_000, log, newId: () => crypto.randomUUID() });
 // The demo session of remote mode (#101): the code is exchanged for a token, never stored.
 const session = config.ok ? buildSession(config.value) : undefined;
+// In remote mode (#267) the phone reads the visitor's sandbox inbox from sim-api with that session token.
+const remoteInboxUrl = config.ok && config.value.agent === 'remote' && config.value.simApiUrl !== undefined ? `${config.value.simApiUrl}/v1/phone/inbox` : undefined;
+const scriptedPhone = config.ok && config.value.phone === 'scripted' && remoteInboxUrl === undefined ? createScriptedPhone() : undefined;
+const phone: PhoneFeed =
+  scriptedPhone ??
+  createInboxPhone({
+    fetchFn: (url, init) => fetch(url, init),
+    pollMs: config.ok ? config.value.phonePollMs : 5_000,
+    log,
+    newId: () => crypto.randomUUID(),
+    isVisible: () => document.visibilityState !== 'hidden',
+    ...(remoteInboxUrl === undefined
+      ? {}
+      : {
+          inboxUrl: remoteInboxUrl,
+          authorization: () => {
+            const token = session?.token();
+            return token === undefined ? undefined : `Bearer ${token}`;
+          },
+        }),
+  });
 // The studio voice (Polly, F8d #25) needs the demo session: the agent keeps each reply's ticket, the speaker uses it.
 const tickets = session === undefined ? undefined : createSpeechTickets();
 const agent = config.ok ? buildAgent(config.value, undefined, scriptedPhone, session, tickets) : config;
@@ -154,7 +171,8 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const settingsControl = (
       <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onSettingsChange} locale={locale} onLocale={onLocale} />
   );
-  const phonePanel = (config.agent === 'scripted' || config.phone === 'inbox') && (
+  // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
+  const phonePanel = (
     <ErrorBoundary>
       <PhonePanel feed={phone} timeZone={config.homeTimeZone} />
     </ErrorBoundary>
