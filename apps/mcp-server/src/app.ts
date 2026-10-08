@@ -128,6 +128,11 @@ export interface App {
   readonly familyReply?: PhoneReplyHandler;
   /** A home's own scenario clock, for what is composed before the app: its stores' playthrough (#234), preferences (C2b). */
   readonly homeClock: (homeId: HomeId) => Clock | undefined;
+  /**
+   * Admits a visitor sandbox and brings it up to date with its saved settings, as an MCP request does (#267): a
+   * phone read in a fresh container then reads the inbox of the sandbox's own playthrough.
+   */
+  readonly admitSandbox: (homeId: HomeId, correlationId: string) => Promise<Result<void, ErrorEnvelope>>;
 }
 
 const HOUR_MS = 3_600_000;
@@ -387,5 +392,11 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes, ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }) }),
     ...(stormDeps === undefined ? {} : { familyReply: (input, ctx) => familyReply(atHome(stormDeps, ctx.homeId), input, ctx) }),
     homeClock: (homeId) => homeFor(homeId)?.clock,
+    admitSandbox: async (homeId, correlationId) => {
+      const admitted = sandboxes.admit(homeId);
+      if (!admitted.ok) return admitted;
+      await sandboxes.refresh(homeId, correlationId);
+      return ok(undefined);
+    },
   });
 }

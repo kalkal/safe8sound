@@ -78,6 +78,8 @@ export const SimApiConfigSchema = z
      */
     originSecretParameter: simApiParameter,
     originSecretPreviousParameter: simApiParameter,
+    /** sim-api's sandbox phone token (#267): the MCP server's phone:<role>@demo#* entry, read for the visitor's phone panel. */
+    phoneTokenParameter: simApiParameter,
     /** Optional, as for the MCP server: a new account cannot reserve any until the quota is raised. */
     reservedConcurrency: z.strictObject({ dev: positiveInt, demo: positiveInt }).optional(),
     memoryMb: z.number().int().min(128).max(10_240),

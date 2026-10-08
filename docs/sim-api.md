@@ -10,15 +10,20 @@ The sim-api is the demo API the web simulator calls: it checks the demo code, si
 
 ## Secrets: SSM SecureStrings only
 
-Three SecureStrings per stage, read through the AWS Parameters and Secrets Lambda extension with an explicit timeout (`SSM_TIMEOUT_MS`). The function's environment holds only their **names**; the values never appear in env, logs or messages.
+Four SecureStrings per stage, read through the AWS Parameters and Secrets Lambda extension with an explicit timeout (`SSM_TIMEOUT_MS`). The function's environment holds only their **names**; the values never appear in env, logs or messages.
 
 | Parameter | Content |
 | --- | --- |
 | `/cold-reserve/<stage>/sim-api/demo-codes` | `<codeId>:<sha256 hex of the code>,...` (only hashes, never the codes) |
 | `/cold-reserve/<stage>/sim-api/token-keys` | `<kid>:<base64url key of 32+ bytes>,...` (the first key signs, every key verifies) |
 | `/cold-reserve/<stage>/sim-api/mcp-token` | sim-api's own bearer token for the MCP server (32+ characters) |
+| `/cold-reserve/<stage>/sim-api/phone-token` | sim-api's sandbox phone token (#267): the MCP server's `phone:daughter@demo#*` entry (32+ characters), read for the visitor's phone panel |
 
 Creating them is part of a deploy, reserved to the owner. A transient SSM failure answers 503 `config_unavailable` (retry later); a missing or malformed parameter answers a generic 500 `invalid_config`, with the setting's name (never its value) in the log.
+
+## The family phone of a sandbox (#267)
+
+`GET /v1/phone/inbox` answers the messages delivered to the visitor's sandbox family contact (the simulated daughter every sandbox starts with), newest first, at most 50 (`PhoneInboxSchema`), `cache-control: no-store`. It takes the same session token as a turn and reads only the token's own sandbox; it counts against no quota. sim-api reads the inbox from the MCP server (`GET /phone/inbox` with its `phone-token` and the sandbox in `x-cold-reserve-home`): the token stays in sim-api, never in the browser. A refusal by the MCP server is our setup (500 `unexpected_error`); an unreachable or slow inbox is 503 `store_unavailable`, and the panel keeps its last list. The message text never enters a log.
 
 ## Caps that hold with many instances
 

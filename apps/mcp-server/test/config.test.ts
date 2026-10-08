@@ -27,8 +27,12 @@ describe('loadConfig', () => {
     expect(result.ok && result.value.clients.get(AGENT)).toEqual({ clientId: 'agent', homeId: 'demo' });
   });
 
-  it('keeps the phone scope and the demo sandboxes apart: a phone client names one home (#24, #101)', () => {
-    expect(loadConfig({ MCP_CLIENTS: `phone:family@demo#*=${INSPECTOR}` })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  it('a phone client for demo#* reads the visitor sandboxes, held by sim-api (#267, approved in #267)', () => {
+    const sandbox = loadConfig({ MCP_CLIENTS: `phone:daughter@demo#*=${INSPECTOR}` });
+    expect(sandbox.ok && sandbox.value.clients.get(INSPECTOR)).toEqual({ clientId: 'daughter', homeId: 'demo', sandboxes: true, scope: 'phone' });
+  });
+
+  it('keeps the phone scope and the agent scopes apart (#24, #101)', () => {
     const both = loadConfig({ MCP_CLIENTS: `agent@demo#*=${AGENT}, phone:family@demo=${INSPECTOR}` });
     expect(both.ok && both.value.clients.get(AGENT)).toEqual({ clientId: 'agent', homeId: 'demo', sandboxes: true });
     expect(both.ok && both.value.clients.get(INSPECTOR)).toEqual({ clientId: 'family', homeId: 'demo', scope: 'phone' });

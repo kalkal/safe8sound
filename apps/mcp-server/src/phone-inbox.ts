@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import {
   CORRELATION_ID_HEADER,
+  HOME_HEADER,
   PROBLEM_JSON_CONTENT_TYPE,
   PhoneInboxSchema,
   PhoneReplyInputSchema,
   PhoneReplyOutputSchema,
+  SandboxHomeIdSchema,
   correlationIdFrom,
   toProblemDetails,
   toolError,
@@ -19,12 +21,15 @@ import {
 import { bearerAuthenticator } from './auth.js';
 import type { ClientGrant, ServerConfig } from './config.js';
 import type { Logger, McpHandler } from './handler.js';
+import { homeDetail } from './sandbox-log.js';
 import type { ToolContext } from './tool.js';
 
-// GET /phone/inbox (#24, approved by the main): the family phone reads the messages delivered to its
-// home. The messages carry the contact's name, so only a phone-scoped token opens it, never an MCP
-// client's, and no MCP tool exposes it. Served by the local entry only, not on the Lambda until a
-// separate review.
+// GET /phone/inbox (#24): the family phone reads the messages delivered to its home. The messages carry the
+// contact's name, so only a phone-scoped token opens it, never an MCP client's, and no MCP tool exposes it.
+// Visitor sandboxes (#267, approved in #267): a phone token granted for `demo#*` reads the sandbox named by
+// x-cold-reserve-home (sandbox ids only, never demo or the real home), read-only; it is held by sim-api, which
+// serves the visitor's phone panel, so the route is served on the Lambda too. Every read leaves one log line,
+// with neither the sandbox id nor any message text.
 
 export const PHONE_INBOX_PATH = '/phone/inbox';
 /** POST /phone/reply (queue item 3, #24): "I'm on my way" or "Check status", by the phone's own role. */
@@ -39,6 +44,11 @@ export interface PhoneInboxDeps {
   readonly inbox: (homeId: HomeId) => Promise<Result<InboxMessage[], ErrorEnvelope>>;
   /** Absent without the storm module: the reply path is then not served. */
   readonly reply?: PhoneReplyHandler;
+  /**
+   * Admits a visitor sandbox before its inbox is read, as an MCP request does (#267): its playthrough, hence its
+   * store scope, is known in this container. Without it a sandbox phone token reads nothing.
+   */
+  readonly admit?: (homeId: HomeId, correlationId: string) => Promise<Result<void, ErrorEnvelope>>;
   readonly logger: Logger;
 }
 
@@ -119,6 +129,30 @@ export function createPhoneInboxHandler(config: ServerConfig, deps: PhoneInboxDe
       return problem(error, undefined, { 'www-authenticate': 'Bearer realm="phone", error="invalid_token"' });
     }
 
+    // The home: the token's own, or for a sandbox phone the visitor sandbox it names (#267).
+    let homeId = grant.homeId;
+    const requested = req.headers.get(HOME_HEADER);
+    if (grant.sandboxes === true) {
+      const sandbox = SandboxHomeIdSchema.safeParse(requested);
+      if (!sandbox.success || deps.admit === undefined) {
+        const error = toolError('home_not_allowed', 'Name a visitor sandbox in x-cold-reserve-home.');
+        log(error, correlationId, grant);
+        return problem(error);
+      }
+      // Read-only: a sandbox phone never replies.
+      if (replying) return problem(toolError('route_not_found', 'No such path.'), 404);
+      const admitted = await deps.admit(sandbox.data, correlationId);
+      if (!admitted.ok) {
+        log(admitted.error, correlationId, grant);
+        return problem(admitted.error);
+      }
+      homeId = sandbox.data;
+    } else if (requested !== null && requested !== grant.homeId) {
+      const error = toolError('home_not_allowed', 'This phone may not read that home.');
+      log(error, correlationId, grant);
+      return problem(error);
+    }
+
     if (replying && reply !== undefined) {
       const input = await readReply(req);
       if (!input.ok) {
@@ -135,11 +169,20 @@ export function createPhoneInboxHandler(config: ServerConfig, deps: PhoneInboxDe
       return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...cors } });
     }
 
-    const listed = await deps.inbox(grant.homeId);
+    const listed = await deps.inbox(homeId);
     if (!listed.ok) {
       log(listed.error, correlationId, grant);
       return problem(listed.error);
     }
+    // Every read, counted, never the text; a sandbox as `sandbox`, never its id (#267).
+    deps.logger.log({
+      ts: new Date().toISOString(),
+      level: 'info',
+      component: 'mcp-server',
+      message: 'phone_inbox_read',
+      correlationId,
+      details: { clientId: grant.clientId, messages: listed.value.length, ...homeDetail(homeId) },
+    });
     const body = PhoneInboxSchema.parse({ messages: listed.value });
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...cors } });
   };

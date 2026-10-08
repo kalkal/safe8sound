@@ -38,7 +38,7 @@ export class SimApiStack extends Stack {
     super(scope, id, props);
     const { stage, simApi, state, table } = props;
     const parameter = (name: string) => name.replace('{stage}', stage);
-    const parameters = [simApi.demoCodesParameter, simApi.tokenKeysParameter, simApi.mcpTokenParameter, simApi.originSecretParameter, simApi.originSecretPreviousParameter].map(parameter);
+    const parameters = [simApi.demoCodesParameter, simApi.tokenKeysParameter, simApi.mcpTokenParameter, simApi.originSecretParameter, simApi.originSecretPreviousParameter, simApi.phoneTokenParameter].map(parameter);
 
     const logGroup = new LogGroup(this, 'Logs', { retention: simApi.logRetentionDays, removalPolicy: RemovalPolicy.DESTROY });
     // Own role instead of AWSLambdaBasicExecutionRole: logs only to this group.
@@ -99,6 +99,7 @@ export class SimApiStack extends Stack {
         // Only requests that came through the web stack's distribution (#243).
         SIM_ORIGIN_SECRET_PARAMETER: parameter(simApi.originSecretParameter),
         SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER: parameter(simApi.originSecretPreviousParameter),
+        SIM_PHONE_TOKEN_PARAMETER: parameter(simApi.phoneTokenParameter),
         SSM_TIMEOUT_MS: String(simApi.ssmTimeoutMs),
         AGENT_RUNTIME_ARN: props.runtimeArn,
         SIM_AGENT_TIMEOUT_MS: String(simApi.agentTimeoutMs),

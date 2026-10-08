@@ -6,6 +6,7 @@ import { jsonLineSink, loggerTo } from '@cold-reserve/core';
 import { z } from 'zod';
 import { httpTurnAgent } from './adapters/agent-http.js';
 import { mcpCardTools, streamableMcpCaller } from './adapters/mcp-cards.js';
+import { httpPhoneInbox } from './adapters/phone-http.js';
 import { loadSimApiConfig } from './config.js';
 import { createSimApiHandler } from './handler.js';
 import { nodeListener } from './node-listener.js';
@@ -37,6 +38,8 @@ const BackendsSchema = z.strictObject({
   mcpUrl: z.url(),
   mcpToken: z.string().min(32),
   mcpTimeoutMs: z.coerce.number().int().min(100).max(30_000),
+  /** sim-api's sandbox phone token (#267), the MCP server's phone:<role>@demo#* entry; optional locally. */
+  phoneToken: z.string().min(32).optional(),
 });
 const backends = BackendsSchema.safeParse({
   agentUrl: process.env['SIM_AGENT_URL'] ?? 'http://127.0.0.1:3340',
@@ -45,6 +48,8 @@ const backends = BackendsSchema.safeParse({
   mcpUrl: process.env['SIM_MCP_URL'] ?? 'http://127.0.0.1:3316/mcp',
   mcpToken: process.env['SIM_MCP_TOKEN'],
   mcpTimeoutMs: process.env['SIM_MCP_TIMEOUT_MS'] ?? '3000',
+  // Empty, as .env.example ships it, means no phone route.
+  phoneToken: process.env['SIM_PHONE_TOKEN'] === '' ? undefined : process.env['SIM_PHONE_TOKEN'],
 });
 if (!backends.success) fail(`Backend settings are not valid: ${backends.error.issues.map((i) => i.path.join('.')).join(', ')}.`);
 if (!config.ok || !backends.success) process.exit(1);
@@ -57,6 +62,7 @@ const handler = createSimApiHandler(config.value, {
   clock: { now: Date.now },
   randomHex: () => randomBytes(8).toString('hex'),
   logger: { log },
+  ...(b.phoneToken === undefined ? {} : { phone: httpPhoneInbox({ mcpUrl: b.mcpUrl, token: b.phoneToken, timeoutMs: b.mcpTimeoutMs }) }),
 });
 
 // Client IP from the socket only; body capped while read; a throw becomes a 500 Problem Details.

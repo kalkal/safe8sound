@@ -214,3 +214,65 @@ describe('POST /phone/reply (queue item 3, #24): the family phone answers with a
     expect(res.status).toBe(404);
   });
 });
+
+describe('GET /phone/inbox for visitor sandboxes (#267, approved in #267)', () => {
+  const SANDBOX_PHONE = 's'.repeat(32);
+  const SANDBOX = 'demo#0123456789abcdef';
+  const setupSandbox = () => {
+    const logs: LogEntry[] = [];
+    const read: HomeId[] = [];
+    const admitted: HomeId[] = [];
+    const config = testConfig({ clients: new Map([...testConfig().clients, [SANDBOX_PHONE, { clientId: 'daughter', homeId: homeId('demo'), sandboxes: true as const, scope: 'phone' as const }], [PHONE_TOKEN, { clientId: 'family', homeId: homeId('demo'), scope: 'phone' as const }]]) });
+    const phone = createPhoneInboxHandler(config, {
+      inbox: (h) => {
+        read.push(h);
+        return Promise.resolve(ok([message('2026-07-17T22:05:00+02:00', 'Storm mode is on at home for Ana.')]));
+      },
+      admit: (h) => {
+        admitted.push(h);
+        return Promise.resolve(ok(undefined));
+      },
+      logger: { log: (e) => logs.push(e) },
+    });
+    return { phone, logs, read, admitted };
+  };
+  const at = (handle: (r: Request) => Promise<Response>, headers: Record<string, string>, method = 'GET') => handle(new Request(URL_INBOX, { method, headers }));
+
+  it("reads the named sandbox's inbox, after admitting it so its playthrough is the right one; logs the read without the id or the text", async () => {
+    const { phone, logs, read, admitted } = setupSandbox();
+    const res = await at(phone, { ...bearer(SANDBOX_PHONE), 'x-cold-reserve-home': SANDBOX });
+    expect(res.status).toBe(200);
+    expect(PhoneInboxSchema.parse(await res.json()).messages).toHaveLength(1);
+    expect(read).toEqual([SANDBOX]);
+    expect(admitted).toEqual([SANDBOX]);
+    expect(logs).toContainEqual(expect.objectContaining({ level: 'info', message: 'phone_inbox_read', details: expect.objectContaining({ home: 'sandbox', messages: 1 }) as unknown }));
+    expect(JSON.stringify(logs)).not.toContain(SANDBOX);
+    expect(JSON.stringify(logs)).not.toContain('Ana');
+  });
+
+  it.each([
+    ['no home header', {}],
+    ['demo itself', { 'x-cold-reserve-home': 'demo' }],
+    ['the real home', { 'x-cold-reserve-home': 'home' }],
+    ['a malformed sandbox id', { 'x-cold-reserve-home': 'demo#xyz' }],
+  ])('a sandbox phone token refuses %s (home_not_allowed), reading nothing', async (_case, headers) => {
+    const { phone, read } = setupSandbox();
+    const res = await at(phone, { ...bearer(SANDBOX_PHONE), ...headers });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'home_not_allowed' });
+    expect(read).toEqual([]);
+  });
+
+  it("a one-home phone token may not name another home", async () => {
+    const { phone, read } = setupSandbox();
+    const res = await at(phone, { ...bearer(PHONE_TOKEN), 'x-cold-reserve-home': SANDBOX });
+    expect(res.status).toBe(403);
+    expect(read).toEqual([]);
+  });
+
+  it('a sandbox phone is read-only: it cannot reply', async () => {
+    const { phone } = setupSandbox();
+    const res = await phone(new Request(`http://127.0.0.1:3316${PHONE_REPLY_PATH}`, { method: 'POST', headers: { ...bearer(SANDBOX_PHONE), 'x-cold-reserve-home': SANDBOX, 'content-type': 'application/json' }, body: '{"reply":"on_my_way"}' }));
+    expect(res.status).toBe(404);
+  });
+});

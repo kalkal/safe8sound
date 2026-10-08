@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { LogEntrySchema, ProblemDetailsSchema, SessionReplySchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result, type ToolCallReply, type TurnReply } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { loadSimApiConfig, type SimApiConfig } from '../src/config.js';
-import { createSimApiHandler, type TurnAgentPort } from '../src/handler.js';
+import { createSimApiHandler, type PhoneInboxPort, type TurnAgentPort } from '../src/handler.js';
 import type { LogEntry } from '@cold-reserve/contracts';
 import { memoryQuotaStore, type QuotaStore } from '../src/quota.js';
 import { signToken, verifyToken } from '../src/token.js';
@@ -30,6 +30,7 @@ interface Faults {
   readonly ask?: TurnAgentPort['ask'];
   readonly toolReply?: Result<ToolCallReply, ErrorEnvelope>;
   readonly quota?: QuotaStore;
+  readonly phone?: PhoneInboxPort;
 }
 
 function setup(over: Record<string, string> = {}, agentReply?: Result<TurnReply, ErrorEnvelope>, faults: Faults = {}) {
@@ -55,6 +56,7 @@ function setup(over: Record<string, string> = {}, agentReply?: Result<TurnReply,
     clock: { now: () => NOW },
     randomHex: () => `${String(++homes).padStart(2, '0')}${'a'.repeat(14)}`,
     logger: { log: (line) => logs.push(line) },
+    ...(faults.phone === undefined ? {} : { phone: faults.phone }),
   });
   const send = (path: string, init: { method?: string; body?: unknown; token?: string; origin?: string | null; headers?: Record<string, string> } = {}) =>
     handler(
@@ -439,5 +441,50 @@ describe('log lines: the shared LogEntry of L1 (#143)', () => {
     expect(text).not.toContain(CODE);
     expect(text).not.toContain('not-the-demo-code-at-all');
     expect(text).not.toContain(token);
+  });
+});
+
+describe('GET /v1/phone/inbox: the sandbox family phone (#267)', () => {
+  const message = { at: '2026-07-17T22:05:00+02:00', role: 'daughter', channel: 'in_app' as const, transition: 'storm_started' as const, text: 'Storm mode is on at home for Ana: the safe room is ready.' };
+  const phone = (reply: Result<{ messages: (typeof message)[] }, ErrorEnvelope> = ok({ messages: [message] })) => {
+    const read: HomeId[] = [];
+    const port: PhoneInboxPort = { inbox: ({ home }) => { read.push(home); return Promise.resolve(reply as Result<never, ErrorEnvelope>); } };
+    return { port, read };
+  };
+
+  it("answers the token's own sandbox inbox, newest first, never cached", async () => {
+    const p = phone();
+    const { send, session } = setup({}, undefined, { phone: p.port });
+    const res = await send('/v1/phone/inbox', { method: 'GET', token: await session() });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.json()).toEqual({ messages: [message] });
+    expect(p.read).toEqual(['demo#01aaaaaaaaaaaaaa']);
+  });
+
+  it('needs the session token, GET only, and the demo switched on', async () => {
+    const p = phone();
+    const { send, session } = setup({}, undefined, { phone: p.port });
+    await problem(await send('/v1/phone/inbox', { method: 'GET' }), 401, 'missing_token');
+    const res = await send('/v1/phone/inbox', { method: 'POST', token: await session(), body: {} });
+    await problem(res, 405, 'method_not_allowed');
+    const off = setup({ SIM_DEMO_ENABLED: 'false' }, undefined, { phone: p.port });
+    await problem(await off.send('/v1/phone/inbox', { method: 'GET', token: 'x' }), 403, 'demo_disabled');
+    expect(p.read).toEqual([]);
+  });
+
+  it('a failing inbox is Problem Details, and the message text never reaches the logs', async () => {
+    const p = phone(err(toolError('store_unavailable', 'The inbox is not available.')));
+    const { send, session, logs } = setup({}, undefined, { phone: p.port });
+    await problem(await send('/v1/phone/inbox', { method: 'GET', token: await session() }), 503, 'store_unavailable');
+    const ok2 = phone();
+    const second = setup({}, undefined, { phone: ok2.port });
+    await second.send('/v1/phone/inbox', { method: 'GET', token: await second.session() });
+    expect(JSON.stringify([...logs, ...second.logs])).not.toContain('Ana');
+  });
+
+  it('without a phone behind it the route does not exist', async () => {
+    const { send, session } = setup();
+    await problem(await send('/v1/phone/inbox', { method: 'GET', token: await session() }), 404, 'route_not_found');
   });
 });

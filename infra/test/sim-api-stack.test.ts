@@ -61,6 +61,8 @@ describe('sim-api stack (#17)', () => {
       SIM_MCP_TOKEN_PARAMETER: '/cold-reserve/dev/sim-api/mcp-token',
       SIM_ORIGIN_SECRET_PARAMETER: '/cold-reserve/dev/sim-api/origin-secret',
       SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER: '/cold-reserve/dev/sim-api/origin-secret-previous',
+      // sim-api's sandbox phone token (#267): read from SSM at start, never a value in the template.
+      SIM_PHONE_TOKEN_PARAMETER: '/cold-reserve/dev/sim-api/phone-token',
       AGENT_RUNTIME_ARN: RUNTIME_ARN,
       SIM_MCP_URL: 'https://mcp.lambda-url.us-east-1.on.aws/mcp',
       SIM_AGENT_TIMEOUT_MS: '9000',
@@ -102,11 +104,11 @@ describe('sim-api stack (#17)', () => {
     ]);
   });
 
-  it('may read its SSM parameters (the origin secrets of #243 included) and nothing else', () => {
+  it('may read its SSM parameters (the origin secrets of #243 and the phone token of #267 included) and nothing else', () => {
     const ssm = statementsOf(t).filter((s) => actions(s).some((a) => a.startsWith('ssm:')));
     expect(ssm).toHaveLength(1);
     expect(ssm[0]?.Action).toBe('ssm:GetParameter');
-    expect(JSON.stringify(ssm[0]?.Resource)).toMatch(/parameter\/cold-reserve\/dev\/sim-api\/demo-codes.*token-keys.*mcp-token.*origin-secret.*origin-secret-previous/);
+    expect(JSON.stringify(ssm[0]?.Resource)).toMatch(/parameter\/cold-reserve\/dev\/sim-api\/demo-codes.*token-keys.*mcp-token.*origin-secret.*origin-secret-previous.*phone-token/);
   });
 
   it('has its own role with no managed policies, and keeps its logs 14 days', () => {

@@ -27,8 +27,8 @@ if (startSoc !== undefined) log({ level: 'info', message: `Local lever: the scen
 // MCP_RESOURCE_URL=auto is for Lambda only (#149): locally the canonical URL has no trustworthy source.
 orExit(forLocalEntry(app.config));
 
-// The family phone's inbox (#24): only here and in the dev stage, never on the demo Lambda.
-const phone = createPhoneInboxHandler(app.config, { inbox: stormMode.inbox, ...(app.familyReply === undefined ? {} : { reply: app.familyReply }), logger: { log } });
+// The family phone's inbox (#24); a sandbox phone token (held by sim-api) reads the visitor sandboxes (#267).
+const phone = createPhoneInboxHandler(app.config, { inbox: stormMode.inbox, admit: app.admitSandbox, ...(app.familyReply === undefined ? {} : { reply: app.familyReply }), logger: { log } });
 const server = await startNodeServer(createLocalHandler(app.handler, phone), { host: '127.0.0.1', port: Number(process.env['PORT'] ?? 3316), path: app.config.path, maxBodyBytes: app.config.maxBodyBytes });
 console.log(JSON.stringify({ level: 'info', component: 'mcp-server', message: `listening on ${server.url}` }));
 

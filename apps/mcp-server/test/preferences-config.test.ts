@@ -57,3 +57,22 @@ describe('defaultPreferencesFor', () => {
     expect(defaultPreferencesFor(config(), profile)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 });
+
+describe('the sandbox family contact (#267)', () => {
+  const config = () => {
+    const loaded = loadPreferencesConfig(preferencesConfigFile());
+    if (!loaded.ok) throw new Error(loaded.error.message);
+    return loaded.value;
+  };
+
+  it('every visitor sandbox starts with one simulated contact: the daughter, Ana, in the app', () => {
+    const result = defaultPreferencesFor(config(), demoProfile(), HomeIdSchema.parse('demo#0123456789abcdef'));
+    expect(result.ok && result.value.familyContacts).toEqual([{ role: 'daughter', name: 'Ana', channel: 'in_app', handle: 'sandbox-phone' }]);
+  });
+
+  it('demo and a home without an id keep no contact: only visitor sandboxes get one', () => {
+    expect(defaultPreferencesFor(config(), demoProfile(), HomeIdSchema.parse('demo')).ok && defaultPreferencesFor(config(), demoProfile(), HomeIdSchema.parse('demo'))).toMatchObject({ value: { familyContacts: [] } });
+    const none = defaultPreferencesFor(config(), demoProfile());
+    expect(none.ok && none.value.familyContacts).toEqual([]);
+  });
+});

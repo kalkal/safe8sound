@@ -1,6 +1,6 @@
 import type { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { SandboxHomeIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
+import { HomeIdSchema, SandboxHomeIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
 import { seededRng, type Clock, type StateStoreFactory } from '@cold-reserve/core';
 import { demoProfile } from '@cold-reserve/source-simulator';
 import {
@@ -22,6 +22,9 @@ import type { CapabilityModule } from './registry.js';
  * Profiles known to the server: the demo home for `demo` and every visitor sandbox `demo#…`.
  * The real home (`home`) has no profile until F2, so modules that need rooms stay off for it.
  */
+/** Any sandbox id: the defaults are the same for every visitor sandbox. */
+const SANDBOX_PROBE = HomeIdSchema.parse('demo#0000000000000000');
+
 export function profileFor(homeId: HomeId): HomeProfile | undefined {
   return homeId === 'demo' || SandboxHomeIdSchema.safeParse(homeId).success ? demoProfile() : undefined;
 }
@@ -38,13 +41,16 @@ export function composeModules(opts: ComposeOptions): Result<CapabilityModule[],
   // Fail at startup, not at the first call: the defaults must fit the demo home.
   const demoDefaults = defaultPreferencesFor(opts.preferences, demoProfile());
   if (!demoDefaults.ok) return demoDefaults;
+  // A visitor sandbox starts with the simulated family contact (#267).
+  const sandboxDefaults = defaultPreferencesFor(opts.preferences, demoProfile(), SANDBOX_PROBE);
+  if (!sandboxDefaults.ok) return sandboxDefaults;
 
   const preferences = preferencesModule({
     storeFor: opts.storeFor,
     limits: opts.preferences.limits,
     roomIdsFor: (homeId) => profileFor(homeId)?.rooms.map((room) => room.id) ?? [],
     roomNameFor: (homeId, roomId) => profileFor(homeId)?.rooms.find((room) => room.id === roomId)?.name,
-    defaultsFor: () => demoDefaults.value,
+    defaultsFor: (homeId) => (SandboxHomeIdSchema.safeParse(homeId).success ? sandboxDefaults.value : demoDefaults.value),
     clock: opts.clock,
     ...(opts.clockFor === undefined ? {} : { clockFor: opts.clockFor }),
   });

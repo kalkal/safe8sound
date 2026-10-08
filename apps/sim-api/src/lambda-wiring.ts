@@ -6,6 +6,7 @@ import { err, ok, toolError, type ErrorEnvelope, type LogEntry, type Result } fr
 import { z } from 'zod';
 import { agentCoreTurnAgent, type AgentCoreClientLike } from './adapters/agentcore.js';
 import { mcpCardTools, streamableMcpCaller } from './adapters/mcp-cards.js';
+import { httpPhoneInbox } from './adapters/phone-http.js';
 import { loadPlainSimApiSettings, loadSimApiConfig } from './config.js';
 import { createSimApiHandler, type SimApiHandler, type SpeechCachePort, type SpeechPort } from './handler.js';
 import type { QuotaStore } from './quota.js';
@@ -20,6 +21,8 @@ const SettingsSchema = z.object({
   AGENT_RUNTIME_ARN: z.string().regex(/^arn:aws[\w-]*:bedrock-agentcore:[a-z0-9-]+:\d{12}:runtime\/[\w-]+$/),
   SIM_AGENT_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(7500),
   SIM_MCP_URL: z.url(),
+  /** sim-api's sandbox phone token (#267): without it the visitor's phone panel has no route. */
+  SIM_PHONE_TOKEN_PARAMETER: z.string().regex(/^\/[\w./-]+$/).optional(),
   SIM_MCP_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(3000),
   /** The studio voice (F8d part 3, #25): the cache bucket, and timeouts for Polly and for each cache call. */
   SIM_SPEECH_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/).optional(),
@@ -78,6 +81,14 @@ export async function loadSimApiLambda(env: Readonly<Record<string, string | und
   const current = originSecret.value.trim();
   if (current === '' || current === 'none') return err(toolError('invalid_config', 'The origin secret parameter holds no secret: sim-api does not start without its check.'));
   if (mcpToken.value.length < 32) return err(toolError('invalid_config', 'The MCP token parameter holds fewer than 32 characters.'));
+  // The sandbox family phone (#267): its token read once at start, kept in memory only, never logged.
+  let phoneToken: string | undefined;
+  if (s.SIM_PHONE_TOKEN_PARAMETER !== undefined) {
+    const read = await deps.read(s.SIM_PHONE_TOKEN_PARAMETER);
+    if (!read.ok) return read;
+    if (read.value.length < 32) return err(toolError('invalid_config', 'The phone token parameter holds fewer than 32 characters.'));
+    phoneToken = read.value;
+  }
 
   // On AWS the origin check is always on (#243): a request without the secret never reaches a route.
   const config = loadSimApiConfig({
@@ -100,6 +111,7 @@ export async function loadSimApiLambda(env: Readonly<Record<string, string | und
       clock: deps.clock,
       randomHex: () => randomBytes(8).toString('hex'),
       logger: { log: deps.log },
+      ...(phoneToken === undefined ? {} : { phone: httpPhoneInbox({ mcpUrl: s.SIM_MCP_URL, token: phoneToken, timeoutMs: s.SIM_MCP_TIMEOUT_MS }) }),
       ...(plain.value.speech.enabled && s.SIM_SPEECH_BUCKET !== undefined && deps.speech !== undefined
         ? { speech: deps.speech({ bucket: s.SIM_SPEECH_BUCKET, pollyTimeoutMs: s.SIM_POLLY_TIMEOUT_MS, cacheTimeoutMs: s.SIM_SPEECH_CACHE_TIMEOUT_MS }) }
         : {}),

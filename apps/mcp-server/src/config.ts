@@ -64,8 +64,7 @@ export function parseClients(raw: string | undefined): Result<ReadonlyMap<string
       return invalid(`MCP_CLIENTS entry ${String(index + 1)} is not [<scope>:]<client>@<homeId>=<token>.`);
     }
     if (scope !== undefined && !SCOPES.includes(scope)) return invalid(`Client "${clientId}" has an unknown scope; the scopes are ${SCOPES.join(', ')}.`);
-    // The phone reads one home's inbox: a visitor sandbox has no phone view until a sandbox-bound token exists.
-    if (scope === 'phone' && sandboxes) return invalid(`Phone client "${clientId}" names one home: demo#* sandboxes have no phone view.`);
+    // A phone client for demo#* reads the visitor sandbox each request names (#267): held by sim-api, read-only.
     if (token.length < MIN_TOKEN_LENGTH) return invalid(`The token of client "${clientId}" is shorter than ${MIN_TOKEN_LENGTH} characters.`);
     if (clients.has(token)) return invalid(`Client "${clientId}" reuses another client's token.`);
     if (seen.has(clientId)) return invalid(`Client "${clientId}" is listed twice.`);

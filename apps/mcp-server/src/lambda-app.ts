@@ -1,10 +1,11 @@
-import type { ErrorEnvelope, Result } from '@cold-reserve/contracts';
+import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import type { Clock, Logger, StateStoreFactory } from '@cold-reserve/core';
 import { createApp, scenarioPlayFor, type App } from './app.js';
 import { comfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules } from './compose.js';
 import { wallStamped } from './log-clock.js';
 import { withPlaythrough } from './playthrough.js';
+import { createLocalHandler, createPhoneInboxHandler } from './phone-inbox.js';
 import { loadPreferencesConfig, preferencesConfigFile } from './preferences-config.js';
 import { stormModeWiring } from './storm-mode-config.js';
 
@@ -28,7 +29,8 @@ export function createLambdaApp(
   if (!preferences.ok) return preferences;
   const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId) });
   if (!modules.ok) return modules;
-  // The family phone's inbox lives in the same table (#24); its HTTP route is not served here.
+  // The family phone's inbox lives in the same table (#24); its read route is served here for the visitor sandboxes
+  // (#267): sim-api reads it with its sandbox phone token for the visitor's phone panel.
   const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock });
   if (!stormMode.ok) return stormMode;
   const comfortPlan = comfortPlanWiring({ storeFor, preferences: preferences.value, clock, notifier: stormMode.value.notifier });
@@ -46,6 +48,9 @@ export function createLambdaApp(
     stormMode: stormMode.value,
     ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }),
   });
-  if (app.ok) homeClock = app.value.homeClock;
-  return app;
+  if (!app.ok) return app;
+  homeClock = app.value.homeClock;
+  // GET /phone/inbox (#267, approved in #267): read-only here, no reply path; the MCP paths are unchanged.
+  const phone = createPhoneInboxHandler(app.value.config, { inbox: stormMode.value.inbox, admit: app.value.admitSandbox, logger: wallStamped(opts.logger, opts.wallClock) });
+  return ok({ ...app.value, handler: createLocalHandler(app.value.handler, phone) });
 }

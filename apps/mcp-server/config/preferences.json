@@ -10,5 +10,6 @@
   },
   "comfortC": { "cooling": 25, "heating": 20 },
   "autoStormOnGridLoss": true,
-  "language": "en-US"
+  "language": "en-US",
+  "sandboxFamilyContact": { "role": "daughter", "name": "Ana", "channel": "in_app", "handle": "sandbox-phone" }
 }

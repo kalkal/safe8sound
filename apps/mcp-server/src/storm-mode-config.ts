@@ -48,7 +48,7 @@ export function stormModeWiring(opts: { storeFor: StateStoreFactory; preferences
     preferencesFor: async (homeId, profile) => {
       const saved = await opts.storeFor(homeId).getPreferences();
       if (!saved.ok) return saved;
-      return saved.value === undefined ? defaultPreferencesFor(opts.preferences, profile) : ok(saved.value);
+      return saved.value === undefined ? defaultPreferencesFor(opts.preferences, profile, homeId) : ok(saved.value);
     },
     clock: opts.clock,
     config: config.value,

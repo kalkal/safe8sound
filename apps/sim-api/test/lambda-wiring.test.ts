@@ -215,3 +215,25 @@ describe('loadSimApiLambda: the studio voice (F8d part 3, #25)', () => {
     }
   });
 });
+
+describe('the sandbox family phone on the Lambda (#267)', () => {
+  const PHONE_PARAM = '/cold-reserve/dev/sim/phone-token';
+  const withPhone = (value: string) => (name: string) => Promise.resolve(name === PHONE_PARAM ? ok(value) : SECRETS[name] === undefined ? err(toolError('invalid_config', 'missing')) : ok(SECRETS[name] ?? ''));
+  const inboxRequest = (token: string) =>
+    new Request('https://abc.lambda-url.us-east-1.on.aws/v1/phone/inbox', { method: 'GET', headers: { origin: 'https://sim.example', 'x-origin-verify': ORIGIN_SECRET, authorization: `Bearer ${token}` } });
+
+  it('without SIM_PHONE_TOKEN_PARAMETER there is no phone route', async () => {
+    const d = deps();
+    const handler = await loadSimApiLambda(ENV, d.deps);
+    if (!handler.ok) throw new Error(handler.error.message);
+    const token = ((await (await session(handler.value, CODE)).json()) as { token: string }).token;
+    expect((await handler.value(inboxRequest(token), { clientIp: '203.0.113.7' })).status).toBe(404);
+  });
+
+  it('with it, the token is read from SSM and must be at least 32 characters', async () => {
+    const short = await loadSimApiLambda({ ...ENV, SIM_PHONE_TOKEN_PARAMETER: PHONE_PARAM }, deps({ read: withPhone('short') }).deps);
+    expect(short).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    const good = await loadSimApiLambda({ ...ENV, SIM_PHONE_TOKEN_PARAMETER: PHONE_PARAM }, deps({ read: withPhone('p'.repeat(40)) }).deps);
+    expect(good.ok).toBe(true);
+  });
+});

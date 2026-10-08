@@ -33,6 +33,7 @@ export const exampleConfig = (): InfraConfig => ({
     mcpTokenParameter: '/cold-reserve/{stage}/sim-api/mcp-token',
     originSecretParameter: '/cold-reserve/{stage}/sim-api/origin-secret',
     originSecretPreviousParameter: '/cold-reserve/{stage}/sim-api/origin-secret-previous',
+    phoneTokenParameter: '/cold-reserve/{stage}/sim-api/phone-token',
     memoryMb: 512,
     timeoutSeconds: 32,
     logRetentionDays: 14,

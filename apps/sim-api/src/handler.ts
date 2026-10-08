@@ -11,6 +11,7 @@ import {
   type ErrorCategory,
   type ErrorEnvelope,
   type HomeId,
+  type PhoneInbox,
   type LogEntry,
   type HttpErrorStatus,
   type Result,
@@ -72,7 +73,17 @@ export interface SimApiDeps {
   readonly logger: { log(line: LogEntry): void };
   /** Polly and its cache; without them (or with SIM_SPEECH_ENABLED off) replies carry no ticket. */
   readonly speech?: { readonly synth: SpeechPort; readonly cache: SpeechCachePort };
+  /** The sandbox family phone's inbox (#267); without it GET /v1/phone/inbox does not exist. */
+  readonly phone?: PhoneInboxPort;
 }
+
+/** The messages delivered to a sandbox's family contact, newest first (#267). Their text never enters a log. */
+export interface PhoneInboxPort {
+  inbox(input: { home: HomeId; correlationId: string }): Promise<Result<PhoneInbox, ErrorEnvelope>>;
+}
+
+/** GET: the phone panel polls it with the visitor's session token; no phone token ever reaches the browser (#267). */
+const PHONE_INBOX_PATH = '/v1/phone/inbox';
 
 export type SimApiHandler = (req: Request, meta: { clientIp: string }) => Promise<Response>;
 
@@ -195,6 +206,25 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
     const viewerIp = req.headers.get('x-viewer-ip');
     const clientIp = viaCloudFront && viewerIp !== null && isIp(viewerIp) ? viewerIp : meta.clientIp;
 
+    // The sandbox family phone (#267): the same origin, switch and token rules as a turn, but a read (GET, no body,
+    // no quota) of the token's own sandbox only.
+    const phoneInbox = async (port: PhoneInboxPort): Promise<Response> => {
+      if (origin !== null && allowedOrigin === undefined) return fail(toolError('origin_not_allowed', 'This origin may not call the demo.'));
+      if (req.method === 'OPTIONS') {
+        return respond(204, null, { 'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': 'authorization, x-correlation-id', 'access-control-max-age': '600' });
+      }
+      if (req.method !== 'GET') return fail(toolError('method_not_allowed', 'This endpoint accepts GET only.'), 405, { allow: 'GET, OPTIONS' });
+      if (!config.demoEnabled) return fail(toolError('demo_disabled', 'The demo is switched off right now.'));
+      const bearer = /^Bearer (\S+)$/.exec(req.headers.get('authorization') ?? '')?.[1];
+      if (bearer === undefined) return fail(toolError('missing_token', 'Enter the demo code first.'), undefined, { 'www-authenticate': 'Bearer realm="sim-api"' });
+      const claims = verifyToken(bearer, { keys: config.keys, nowS: deps.clock.now() / 1000, skewS: config.skewS });
+      if (!claims.ok) return fail(claims.error, undefined, { 'www-authenticate': 'Bearer realm="sim-api", error="invalid_token"' });
+      codeIdOfRequest = claims.value.sub;
+      const inbox = await port.inbox({ home: claims.value.home, correlationId });
+      if (!inbox.ok) return fail(inbox.error, undefined, {}, claims.value.sub);
+      return respond(200, inbox.value, { 'cache-control': 'no-store' });
+    };
+
     const route = async (): Promise<Response> => {
       if (config.originSecrets.length > 0 && !viaCloudFront) {
         // The reason, never the value presented.
@@ -211,6 +241,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         return fail(toolError('origin_not_allowed', 'The demo answers through its website only.'));
       }
       const path = new URL(req.url).pathname;
+      if (path === PHONE_INBOX_PATH && deps.phone !== undefined) return phoneInbox(deps.phone);
       if (!ROUTES.has(path)) return fail(toolError('route_not_found', 'Unknown endpoint.'), 404);
       if (origin !== null && allowedOrigin === undefined) return fail(toolError('origin_not_allowed', 'This origin may not call the demo.'));
       if (req.method === 'OPTIONS') {

@@ -1,4 +1,4 @@
-import { GetDemoSettingsOutputSchema, HOME_HEADER, HomeIdSchema, PlanSchema, SafeRoomStatusSchema, SetScenarioOutputSchema, toolError, type HomeId } from '@cold-reserve/contracts';
+import { GetDemoSettingsOutputSchema, PhoneInboxSchema, HOME_HEADER, HomeIdSchema, PlanSchema, SafeRoomStatusSchema, SetScenarioOutputSchema, toolError, type HomeId } from '@cold-reserve/contracts';
 import { memoryLogger, seededRng, type StateStore } from '@cold-reserve/core';
 import { dynamoStateStoreFactory } from '@cold-reserve/store-dynamodb';
 import { createFakeTable } from '@cold-reserve/store-dynamodb/testing';
@@ -190,5 +190,56 @@ describe('sandbox settings on the Lambda entry: two containers, one table', () =
     down = true;
     expect(await planDay(a.call)).toBe('2026-07-17');
     expect(logger.lines.some((l) => l.level === 'warn' && l.code === 'store_unavailable' && l.details?.['event'] === 'settings_read_failed')).toBe(true);
+  });
+});
+
+describe('the family contact of a sandbox (#267)', () => {
+  it('a visitor sandbox starts with Ana, the daughter: the storm start reaches her, notify_family too (sent 1), the model sees the role only', async () => {
+    const local = createLocalApp({ ...ENV, MCP_SCENARIO: 'storm-blackout' }, { wallClock: settableClock(WALL), logger: memoryLogger() });
+    if (!local.ok) throw new Error(local.error.message);
+    const a = await (await serve(local.value.app))(A);
+    expect((await a.call('start_storm_mode', { mode: 'prepare' })).isError).not.toBe(true);
+    // The storm flow tells her by itself when the storm starts.
+    const started = await local.value.stormMode.inbox(HomeIdSchema.parse(A));
+    expect(started.ok && started.value.map((m) => [m.role, m.transition])).toContainEqual(['daughter', 'storm_started']);
+    expect(started.ok && started.value[0]?.text).toContain('Ana');
+    // And notify_family reaches her for another transition, the model seeing her role only.
+    const sent = await a.call('notify_family', { transition: 'essential_level' });
+    expect(sent.isError).not.toBe(true);
+    expect(sent.structuredContent).toMatchObject({ sent: [{ role: 'daughter', channel: 'in_app' }] });
+    expect(JSON.stringify(sent)).not.toContain('Ana');
+    const inbox = await local.value.stormMode.inbox(HomeIdSchema.parse(A));
+    expect(inbox.ok && inbox.value.map((m) => m.transition)).toEqual(['essential_level', 'storm_started']);
+  });
+});
+
+describe('the sandbox family phone on the Lambda entry (#267, approved in #267)', () => {
+  it("a storm in a sandbox reaches Ana; another container's /phone/inbox, with sim-api's sandbox phone token, shows it", async () => {
+    const PHONE = 'f'.repeat(32);
+    const table = createFakeTable();
+    const container = (seed: number) => {
+      const wall = settableClock(WALL);
+      const app = createLambdaApp(
+        { ...ENV, MCP_CLIENTS: `${ENV.MCP_CLIENTS},phone:daughter@demo#*=${PHONE}`, MCP_SCENARIO_ANCHOR: 'daily' },
+        { wallClock: wall, logger: memoryLogger(), storeFor: dynamoStateStoreFactory({ table, clock: wall, rng: seededRng(seed) }) },
+      );
+      if (!app.ok) throw new Error(app.error.message);
+      return app.value;
+    };
+    const one = await (await serve(container(1)))(A);
+    expect((await one.call('set_scenario', { scenarioId: 'storm-blackout' })).isError).not.toBe(true);
+    expect((await one.call('start_storm_mode', { mode: 'prepare' })).isError).not.toBe(true);
+
+    const two = container(2);
+    const server = await startNodeServer(two.handler, { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: two.config.maxBodyBytes });
+    cleanup.push(() => server.close());
+    const inboxUrl = new URL('/phone/inbox', server.url);
+    const res = await fetch(inboxUrl, { headers: { authorization: `Bearer ${PHONE}`, 'x-cold-reserve-home': A } });
+    expect(res.status).toBe(200);
+    const inbox = PhoneInboxSchema.parse(await res.json());
+    expect(inbox.messages.map((m) => [m.role, m.transition])).toContainEqual(['daughter', 'storm_started']);
+    expect(inbox.messages[0]?.text).toContain('Ana');
+    // The agent's token never opens the phone.
+    expect((await fetch(inboxUrl, { headers: { authorization: `Bearer ${TOKEN}`, 'x-cold-reserve-home': A } })).status).toBe(401);
   });
 });
