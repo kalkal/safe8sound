@@ -71,7 +71,12 @@ const inNight = (hour: number, o: PlanSummaryOptions) =>
   o.nightStartHour > o.nightEndHour ? hour >= o.nightStartHour || hour < o.nightEndHour : hour >= o.nightStartHour && hour < o.nightEndHour;
 
 /** The window of a last resort (#160), every number of it, never a claim about the time before safeUntil. */
-function windowText(lr: NonNullable<Plan['lastResort']>, opts: PlanSummaryOptions): string | undefined {
+function windowText(lr: NonNullable<Plan['lastResort']>, opts: PlanSummaryOptions, horizonAt: string): string | undefined {
+  // The battery runs out but the room stays inside its limit to the end of the plan: said, not left out (#272). Its
+  // temperature limit: humidity may end a last resort, never this window.
+  if (lr.limitedBy === 'battery' && lr.worstAt === undefined) {
+    return `The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room still stays inside its temperature limit until ${localTimeText(horizonAt)}, the next recharge.`;
+  }
   if (lr.comfortLimitC === undefined || lr.worstC === undefined || lr.worstAt === undefined) return undefined;
   // The room has gone past the limit (contract): below it is the heating season.
   const heating = lr.worstC < lr.comfortLimitC;
@@ -86,6 +91,13 @@ function windowText(lr: NonNullable<Plan['lastResort']>, opts: PlanSummaryOption
     return atEnd ? `${head}: at ${until} it is at ${temp}.` : `${head}, up to ${temp} by ${by}.`;
   }
   const limit = `${String(lr.comfortLimitC)} °C${!heating && inNight(wallHour(lr.worstAt), opts) ? ' night' : ''} limit`;
+  // Both times in one sentence and no duration (#272): the battery runs out, the room holds the limit in force where
+  // it crosses it (#272 review), then warms.
+  if (lr.limitedBy === 'battery' && lr.limitCrossedAt !== undefined && !heating) {
+    const crossedC = lr.limitCrossedC ?? lr.comfortLimitC;
+    const crossedLimit = `${String(crossedC)} °C${inNight(wallHour(lr.limitCrossedAt), opts) ? ' night' : ''} limit`;
+    return `The battery lasts until ${until}; the safe room stays at or below its ${crossedLimit} until about ${localTimeText(lr.limitCrossedAt)}, then warms up to ${temp} by ${by}.`;
+  }
   const then = atEnd
     ? `at ${until} the safe room is at ${temp}, past its ${limit}.`
     : `the safe room then goes ${heating ? 'down' : 'up'} to ${temp} by ${by}, past its ${limit}.`;
@@ -115,8 +127,10 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
     `Guarantees: ${p.guarantees.map((g) => `${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`).join(' ')}`,
     `Storm reserve ${one(p.reserveWh / 1000)} kWh${p.reserveFloorSocPct === undefined ? '' : `: the battery stays at or above ${one(p.reserveFloorSocPct)} % while the grid is up`}.`,
   ];
+  // With a crossing time the window says the one end time; the night's hours (grace minutes counted) stay in
+  // nightRecovery for the card, never a second duration in the text (#272 review).
   const n = p.nightRecovery;
-  if (n !== undefined) parts.push(nightText(n, opts));
+  if (n !== undefined && lr?.limitCrossedAt === undefined) parts.push(nightText(n, opts));
   for (const w of p.warnings ?? []) parts.push(`Warning: ${w.message}`);
   const c = p.counterfactual;
   if (c !== undefined) {
@@ -127,7 +141,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
         `with this plan at ${lineText(plan, opts.timeZone)}.`,
     );
   }
-  const window = p.lastResort === undefined ? undefined : windowText(p.lastResort, opts);
+  const window = p.lastResort === undefined ? undefined : windowText(p.lastResort, opts, p.horizonAt);
   if (window !== undefined) parts.push(window);
   // What the room does once the battery is empty, said not hidden (#160 acceptance test: up to ~100 % RH on a
   // humid night). The plan's own steps say the season: a heated room gets colder, never warmer.

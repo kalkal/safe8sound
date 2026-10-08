@@ -47,6 +47,24 @@ export function lastResortWindow(points: readonly WindowPoint[], opts: WindowOpt
 }
 
 /**
+ * After the battery runs out, the room holds its temperature for a while (#272): the first point from safeUntil on
+ * whose room is past the limit in force there, once rounded as it is said, from the same projection as the window.
+ * Undefined when the room stays inside its limit to the end of the projection. With the limit crossed there (#272 review).
+ */
+export function limitCrossedAt(points: readonly WindowPoint[], opts: WindowOptions): { readonly atMs: number; readonly limitC: number } | undefined {
+  const heating = opts.season === 'heating';
+  for (const p of points) {
+    if (p.ms < opts.untilMs) continue;
+    const room = p.rooms.find((r) => r.id === opts.roomId);
+    if (room === undefined) continue;
+    const said = Math.round(room.tempC * 10) / 10;
+    const limitC = opts.limitAt(p.ms);
+    if (heating ? said < limitC : said > limitC) return { atMs: p.ms, limitC };
+  }
+  return undefined;
+}
+
+/**
  * When cooling: the limit at safeUntil if the safe hours end because it came down there (the night threshold),
  * not because the room crossed it: lower than at the step before, the room inside the earlier limit and above
  * the new one. Undefined otherwise, or without both points of the safe room.

@@ -150,9 +150,61 @@ describe('what the model reads', () => {
     const lr = r.value.lastResort;
     if (lr?.worstAt === undefined || lr.worstC === undefined || lr.comfortLimitC === undefined) throw new Error('no window');
     expect(lr.limitedBy).toBe('battery');
-    expect(planSummary(r.value, NIGHT)).toContain(
-      `The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room then goes up to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}, past its ${String(lr.comfortLimitC)} °C night limit.`,
-    );
+    if (lr.limitCrossedAt === undefined || lr.limitCrossedC === undefined) throw new Error('no crossing');
+    // One sentence, both times and no duration (#272): the battery runs out, the room holds the limit it then
+    // crosses a while longer, then warms up.
+    const text = planSummary(r.value, NIGHT);
+    expect(text).toContain(`The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room stays at or below its ${String(lr.limitCrossedC)} °C`);
+    expect(text).toContain(`limit until about ${localTimeText(lr.limitCrossedAt)}, then warms up to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}.`);
+    expect(text).not.toContain('hours from now');
+  });
+
+  it('the 22:00 storm at 17 % of the guided test: the battery at 11:40 PM, the room under 24 °C until about 2:15 AM, in one sentence (#272)', async () => {
+    // The night-recovery count (3.67 h at or below 24 °C) starts at 22:00 with the room just above 24 °C in the grace
+    // period; the room then holds 24 °C by inertia after the battery runs out, until it crosses it at 2:15 AM.
+    const w = world('storm-blackout', 10, { snapshot: (x) => ({ ...x, batterySocPct: pct(17) }) });
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(planSummary(r.value, NIGHT)).toContain('The battery lasts until 11:40 PM; the safe room stays at or below its 24 °C night limit until about 2:15 AM, then warms up to 24.7 °C by 6:20 AM.');
+  });
+
+  it('the guided storm: the whole summary has one end time and at most one hours figure for 24 °C (#272 review)', async () => {
+    const w = world('storm-blackout', 10, { snapshot: (x) => ({ ...x, batterySocPct: pct(17) }) });
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const text = planSummary(r.value, NIGHT);
+    const about24 = text.split(/(?<=\.) /).filter((s) => s.includes('24 °C'));
+    expect(about24.length).toBeGreaterThan(0);
+    expect(about24.flatMap((s) => s.match(/\d+(\.\d+)? hours/g) ?? []).length).toBeLessThanOrEqual(1);
+    // The night count (3.67 h, grace minutes included) stays in nightRecovery for the card, not in the text.
+    expect(text).not.toContain('Night recovery (');
+    expect(text).not.toContain('hours from now');
+    expect(r.value.nightRecovery?.achievedHours).toBeGreaterThan(0);
+  });
+
+  it('names the limit the room crosses, not the one at the worst point (#272 review)', () => {
+    const lr = { safeUntil: '2026-07-17T20:10:00+02:00', safeHours: 1.5, limitedBy: 'battery' as const, comfortLimitC: 24, worstC: 27.4, worstAt: '2026-07-18T03:00:00+02:00', limitCrossedAt: '2026-07-17T20:40:00+02:00', limitCrossedC: 27 };
+    const text = planSummary({ ...examplePlan(), lastResort: lr } as Plan, NIGHT);
+    expect(text).toContain('The battery lasts until 8:10 PM; the safe room stays at or below its 27 °C limit until about 8:40 PM, then warms up to 27.4 °C by 3:00 AM.');
+  });
+
+  it('the night warning and the last-resort window end at the same clock time, with no second duration (#272)', async () => {
+    const w = world('storm-blackout', 10, { snapshot: (x) => ({ ...x, batterySocPct: pct(17) }) });
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const crossed = r.value.lastResort?.limitCrossedAt;
+    if (crossed === undefined) throw new Error('no crossing');
+    const night = r.value.warnings?.find((x) => x.code === 'night_recovery_infeasible')?.message ?? '';
+    expect(night).toBe(`Tonight the Bedroom stays at or below 24 °C until about ${localTimeText(crossed)}, then it warms up.`);
+    expect(night).not.toMatch(/hours/);
+    // The hours of the night under the limit stay in the structured data, for the card.
+    expect(r.value.nightRecovery?.achievedHours).toBeGreaterThan(0);
+    expect(planSummary(r.value, NIGHT)).toContain(`until about ${localTimeText(crossed)}, then warms up`);
+  });
+
+  it('when the battery runs out but the room stays inside its limits to the next recharge, says that instead (#272)', () => {
+    const p = { ...examplePlan(), lastResort: { safeUntil: '2026-07-18T04:00:00+02:00', safeHours: 6, limitedBy: 'battery' } } as Plan;
+    expect(planSummary(p, NIGHT)).toContain(`The battery lasts until 4:00 AM; the safe room still stays inside its temperature limit until ${localTimeText(p.horizonAt)}, the next recharge.`);
   });
 
   it('a last resort opens with its honest window, never "level until" the horizon (CE-21)', () => {

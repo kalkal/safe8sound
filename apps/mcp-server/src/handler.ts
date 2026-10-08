@@ -30,7 +30,7 @@ import { bearerAuthenticator } from './auth.js';
 import type { ServerConfig } from './config.js';
 import type { ModuleRegistry, UiResource } from './registry.js';
 import type { Sandboxes } from './sandboxes.js';
-import { listTool, type ToolContext, type ToolDefinition } from './tool.js';
+import { listTool, type HintedError, type ToolContext, type ToolDefinition } from './tool.js';
 
 // One log line for every component: the shared LogEntry of contracts and the Logger port of core (#111).
 export type { LogEntry } from '@cold-reserve/contracts';
@@ -112,8 +112,11 @@ function problem(error: ErrorEnvelope, correlationId: string, status?: HttpError
   return new Response(JSON.stringify(body), { status: body.status, headers: { 'content-type': PROBLEM_JSON_CONTENT_TYPE, ...headers } });
 }
 
-function errorResult(error: ErrorEnvelope): CallToolResult {
-  return { content: [{ type: 'text', text: error.message }], structuredContent: error, isError: true };
+function errorResult(error: HintedError): CallToolResult {
+  // A hint for the model reaches its text only, never the envelope a card shows (#272).
+  const { modelHint, ...envelope } = error;
+  const text = modelHint === undefined ? envelope.message : `${envelope.message} ${modelHint}`;
+  return { content: [{ type: 'text', text }], structuredContent: envelope, isError: true };
 }
 
 function invalidInput(tool: ToolDefinition, issues: readonly z.core.$ZodIssue[]): ErrorEnvelope {

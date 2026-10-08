@@ -91,6 +91,24 @@ describe('PlanSchema', () => {
     const warning = { code: 'last_resort_plan', message: 'Safe for about 7.3 hours, until 03:20; then the humidity in the Bedroom goes above 60 %.' };
     const plan = (over: Record<string, unknown>) => ({ ...examplePlan(), guarantees: failing(), lastResort, warnings: [warning], ...over });
 
+    it('when the battery ends the safe hours, may say when the room then crosses its limit, between the two (#272, approved in #272)', () => {
+      const battery = { safeUntil: '2026-07-17T23:40:00+02:00', safeHours: 1.67, limitedBy: 'battery', comfortLimitC: 24, worstC: 26.1, worstAt: '2026-07-18T03:00:00+02:00' };
+      expect(PlanSchema.parse(plan({ lastResort: { ...battery, limitCrossedAt: '2026-07-18T01:40:00+02:00' } })).lastResort?.limitCrossedAt).toBe('2026-07-18T01:40:00+02:00');
+      // Before the battery runs out, after the worst point, without the window, or not for the battery: refused.
+      expect(PlanSchema.safeParse(plan({ lastResort: { ...battery, limitCrossedAt: '2026-07-17T23:00:00+02:00' } })).success).toBe(false);
+      expect(PlanSchema.safeParse(plan({ lastResort: { ...battery, limitCrossedAt: '2026-07-18T03:10:00+02:00' } })).success).toBe(false);
+      const noWindow = { safeUntil: battery.safeUntil, safeHours: battery.safeHours, limitedBy: battery.limitedBy };
+      expect(PlanSchema.safeParse(plan({ lastResort: { ...noWindow, limitCrossedAt: '2026-07-18T01:40:00+02:00' } })).success).toBe(false);
+      expect(PlanSchema.safeParse(plan({ lastResort: { ...battery, limitedBy: 'temperature', limitCrossedAt: '2026-07-18T01:40:00+02:00' } })).success).toBe(false);
+    });
+
+    it('carries the limit the room crosses at limitCrossedAt, only with it (#272 review)', () => {
+      const battery = { safeUntil: '2026-07-17T20:10:00+02:00', safeHours: 1.67, limitedBy: 'battery', comfortLimitC: 24, worstC: 26.1, worstAt: '2026-07-18T03:00:00+02:00' };
+      const crossed = { ...battery, limitCrossedAt: '2026-07-17T20:40:00+02:00', limitCrossedC: 27 };
+      expect(PlanSchema.parse(plan({ lastResort: crossed })).lastResort?.limitCrossedC).toBe(27);
+      expect(PlanSchema.safeParse(plan({ lastResort: { ...battery, limitCrossedC: 27 } })).success).toBe(false);
+    });
+
     it('carries until when the safe room is safe, and what limits it', () => {
       expect(PlanSchema.parse(plan({})).lastResort).toEqual(lastResort);
       expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, limitedBy: 'luck' } })).success).toBe(false);

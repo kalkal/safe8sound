@@ -10,6 +10,7 @@ import {
   type Forecast,
   type HomeProfile,
   type LevelStep,
+  type NightRecovery,
   type Plan,
   type PlanComfortInput,
   type PlanWarning,
@@ -22,10 +23,10 @@ import {
 import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, orderSurplusRooms, seasonFor, surplusWindow, withTargets, type HumidityMode } from '@cold-reserve/core';
 import { buildContext, counterfactualOf, currentControls, holdSafeRoom, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
-import type { ToolContext } from '../../tool.js';
+import { withModelHint, type ToolContext } from '../../tool.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
-import { lastResortActions, lastResortThen, lastResortWindow, loweredLimit } from './last-resort.js';
+import { lastResortActions, lastResortThen, lastResortWindow, limitCrossedAt, loweredLimit } from './last-resort.js';
 import { recordRejection } from './rejections.js';
 
 // plan_comfort, the first of the two phases (plan §9.2): read-only on the home, it proposes a plan and
@@ -81,16 +82,6 @@ export function guardFrame(
 }
 
 const LAST_RESORT_HINT = 'Call plan_comfort again with only the goal: the answer is the last resort.';
-const MAX_MESSAGE = 300;
-
-/** The guard's message and a hint after it, within the envelope's 300 characters: the message is cut at a word. */
-export function withHint(message: string, hint: string): string {
-  const room = MAX_MESSAGE - hint.length - 1;
-  if (message.length <= room) return `${message} ${hint}`;
-  const head = message.slice(0, room - 1);
-  const space = head.lastIndexOf(' ');
-  return `${space > 0 ? head.slice(0, space) : head}… ${hint}`;
-}
 
 /** The longest error message the contract allows. */
 const MESSAGE_MAX = 300;
@@ -213,18 +204,20 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     // A refused proposal when only the last resort is left: the model asks again with only the goal, so the
     // person hears the last resort and its two yeses (#202 follow-up). The hold's failure is logged by that call.
     const lastResortLeft = refused !== undefined && overridden && lastResortOf(holdAttempts(deps, guardInput, () => undefined), deps, guardInput) !== undefined;
-    const message = refused === undefined ? '' : lastResortLeft ? withHint(refused.message, LAST_RESORT_HINT) : refused.message;
+    // The hint is for the model: it reaches the text it reads, never the message a card shows (#272).
     const rejection =
       refused === undefined
         ? undefined
-        : { ...refused, message, details: { ...refused.details, origin: snapshot.origin, ...(ctx.homeId === REAL_HOME_ID ? { realHome: true as const } : {}) } };
+        : { ...refused, details: { ...refused.details, origin: snapshot.origin, ...(ctx.homeId === REAL_HOME_ID ? { realHome: true as const } : {}) } };
     if (last !== undefined) {
       await recordRejection(store, last.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId });
     }
-    return err(rejection ?? toolError('unexpected_error', 'The planner produced no candidate.'));
+    if (rejection === undefined) return err(toolError('unexpected_error', 'The planner produced no candidate.'));
+    return err(lastResortLeft ? withModelHint(rejection, LAST_RESORT_HINT) : rejection);
   }
 
   const nowMs = deps.clock.now();
+  const roomName = profile.rooms.find((r) => r.id === preferences.safeRoomId)?.name ?? preferences.safeRoomId;
   const counterfactual = counterfactualOf({ ...chosen.guardInput, plan: chosen.candidate });
   const draft = {
     schemaVersion: 1,
@@ -248,7 +241,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     sourceOrigin: snapshot.origin,
     advisoryOnly: loaded.value.home.readOnly,
     ...(chosen.verdict.nightRecovery === undefined ? {} : { nightRecovery: chosen.verdict.nightRecovery }),
-    ...(warningsOf(chosen, safest).length === 0 ? {} : { warnings: warningsOf(chosen, safest) }),
+    ...(warningsOf(chosen, safest, roomName).length === 0 ? {} : { warnings: warningsOf(chosen, safest, roomName) }),
     ...(safest === undefined ? {} : { lastResort: safest.lastResort }),
     ...(refusedProposal === undefined ? {} : { refusedProposal }),
     ...(ctx.turnId === undefined ? {} : { proposedInTurn: ctx.turnId }),
@@ -349,6 +342,9 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
   // The honest window (#160): from safeUntil, how far past the limit in force the room goes and by when; the
   // summary says it (the warning keeps its 300 characters for the reason).
   const window = lastResortWindow(best.points, { untilMs: best.untilMs, roomId: preferences.safeRoomId, season, limitAt });
+  // When the battery ends the safe hours, the room holds its limit a while by inertia: when it crosses it, from the
+  // same projection (#272), so the text says both times in one sentence, with the limit crossed there.
+  const crossed = limitedBy === 'battery' && window !== undefined ? limitCrossedAt(best.points, { untilMs: best.untilMs, roomId: preferences.safeRoomId, season, limitAt }) : undefined;
   // Decided from the data, not from the time (#166): the limit came down at safeUntil with the room above it.
   const lowered =
     window !== undefined && limitedBy === 'temperature' && season !== 'heating'
@@ -361,6 +357,7 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
       safeHours,
       limitedBy,
       ...(window === undefined ? {} : { comfortLimitC: celsius(window.comfortLimitC), worstC: celsius(window.worstC), worstAt: localIso(window.worstAtMs, profile.location.tz) }),
+      ...(crossed === undefined ? {} : { limitCrossedAt: localIso(crossed.atMs, profile.location.tz), limitCrossedC: celsius(crossed.limitC) }),
       ...(lowered === undefined ? {} : { loweredLimitC: celsius(lowered) }),
       actions: lastResortActions(season),
     },
@@ -371,10 +368,27 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
   };
 }
 
-function warningsOf(chosen: Attempt, safest: LastResort | undefined): PlanWarning[] {
-  // A last resort says the room leaves its limits: "no heat danger" never stands next to it (#285 review).
+/**
+ * Next to a last resort the battery ends, the night warning's hours variant ends at the same clock time as the
+ * window, with no second duration (#272): the person hears one end time; the night's hours stay in nightRecovery.
+ * Only when the room crosses the night threshold itself (or never crosses it); the heat-budget variant (the hours
+ * are reached) and a crossing of another limit keep the guard's words (#272 review).
+ */
+export function alignedNightWarning(w: PlanWarning, lr: Plan['lastResort'], night: NightRecovery | undefined, roomName: string): PlanWarning {
+  if (w.code !== 'night_recovery_infeasible' || lr?.limitedBy !== 'battery' || night === undefined) return w;
+  if (night.achievedHours >= night.requiredHours) return w;
+  let until: string;
+  if (lr.limitCrossedAt !== undefined && lr.limitCrossedC === night.thresholdC) until = `about ${localTimeText(lr.limitCrossedAt)}`;
+  else if (lr.limitCrossedAt === undefined && lr.worstAt === undefined) until = 'the next recharge';
+  else return w;
+  return { code: w.code, message: `Tonight the ${roomName} stays at or below ${String(night.thresholdC)} °C until ${until}, then it warms up.`.slice(0, 300) };
+}
+
+/** The plan's warnings: the night warning aligned with a last resort, and "no heat danger" never next to it (#285 review). */
+function warningsOf(chosen: Attempt, safest: LastResort | undefined, roomName: string): PlanWarning[] {
+  const night = chosen.verdict.nightRecovery;
   const own = safest === undefined ? chosen.verdict.warnings : chosen.verdict.warnings.filter((w) => w.code !== 'humid_air');
-  return [...own, ...(safest === undefined ? [] : [safest.warning])];
+  return [...own.map((w) => alignedNightWarning(w, safest?.lastResort, night, roomName)), ...(safest === undefined ? [] : [safest.warning])];
 }
 
 function withOverrides(rung: LevelStep, input: PlanComfortInput): LevelStep {

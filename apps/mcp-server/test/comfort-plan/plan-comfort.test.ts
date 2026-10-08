@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { holdSafeRoom } from '@cold-reserve/guard';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
-import { guardFrame, loadInputs, planComfort, roomsText, withHint } from '../../src/modules/comfort-plan/plan-comfort.js';
+import { alignedNightWarning, guardFrame, loadInputs, planComfort, roomsText } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { REAL, preferences, world } from './support.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
@@ -92,19 +92,12 @@ describe('plan_comfort (two-phase: propose)', () => {
     // Cooling to only 29 °C lets the safe room reach 27.8 °C, above its 27 °C maximum.
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
     if (r.ok) throw new Error('expected a refusal');
-    expect(r.error.message).toMatch(/\. Call plan_comfort again with only the goal: the answer is the last resort\.$/);
-    expect(r.error.message.length).toBeLessThanOrEqual(300);
+    // The hint is for the model only: the message a card shows stays the guard's (#272).
+    expect(r.error.message).not.toContain('plan_comfort');
+    expect((r.error as { modelHint?: string }).modelHint).toBe('Call plan_comfort again with only the goal: the answer is the last resort.');
     // And it is so: the same call with only the goal gives the last resort.
     const again = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     expect(again.ok && again.value.lastResort).toBeDefined();
-  });
-
-  it('a hint after a long guard message keeps the 300 characters: the message is cut at a word, with an ellipsis', () => {
-    const long = `Humidity ${'would reach far too much '.repeat(20)}end.`;
-    const text = withHint(long, 'Ask again.');
-    expect(text.length).toBeLessThanOrEqual(300);
-    expect(text).toMatch(/^Humidity would reach far too much .*much… Ask again\.$/);
-    expect(withHint('Short.', 'Ask again.')).toBe('Short. Ask again.');
   });
 
   it('a refusal says where its data came from; on a sandbox it carries neither the demo# id nor realHome (#198 review)', async () => {
@@ -291,6 +284,19 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(Date.parse(p.lastResort?.safeUntil ?? '')).toBeLessThan(Date.parse(p.horizonAt));
     const saved = await w.store.getPlan(p.id);
     expect(saved.ok && saved.value.status).toBe('proposed');
+  });
+
+  it('when the battery runs out but the room holds its limit to the next recharge: no window, no crossing, said so (#272 review)', async () => {
+    // A storm at 3:00 AM with 14 %: the battery ends at 3:30 AM, the room stays inside its limit until 8:00 AM.
+    const w = world('storm-blackout', 15, { snapshot: (s) => ({ ...s, batterySocPct: pct(14) }) });
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
+    const lr = PlanSchema.parse(r.value).lastResort;
+    expect(lr).toMatchObject({ limitedBy: 'battery' });
+    expect(lr?.worstAt).toBeUndefined();
+    expect(lr?.limitCrossedAt).toBeUndefined();
+    const night = r.value.warnings?.find((x) => x.code === 'night_recovery_infeasible');
+    if (night !== undefined) expect(night.message).toMatch(/until the next recharge, then it warms up\.$/);
   });
 
   it.each([16, 20, 25])('once a candidate needs a last resort, it is the hold even when the hold fails only the pace (#248, decision A): hour 6 at %i percent', async (soc) => {
@@ -568,5 +574,25 @@ describe('the guard frame (season and night mode), shared by propose and apply',
     expect((await frameIn(world('heatwave', 14), 'cool')).nightRecoveryMode).toBe('elderly');
     const empty = world('heatwave', 14, { snapshot: (s) => ({ ...s, rooms: s.rooms.map((x) => ({ ...x, occupants: x.occupants.length > 0 ? ['daughter', 'son'] : [] })) }) });
     expect((await frameIn(empty, 'cool')).nightRecoveryMode).toBe('standard');
+  });
+});
+
+describe('the night warning next to a last resort (#272)', () => {
+  const night = { roomId: 'bedroom-1', mode: 'elderly' as const, thresholdC: celsius(24), window: { start: '2026-07-17T20:00:00.000Z', end: '2026-07-18T05:00:00.000Z' }, requiredHours: 6, achievedHours: 3.67, status: 'infeasible' as const, heatIndexDegreeHoursAbove26_7: 0.03, budgetDegreeHours: 4 };
+  const hours = { code: 'night_recovery_infeasible', message: 'Tonight the battery can keep the Bedroom at or below 24 °C for about 3.67 hours, not the 6 hours of the night-recovery target.' } as const;
+  const lr = { safeUntil: '2026-07-17T23:40:00+02:00', safeHours: 1.67, limitedBy: 'battery' as const, comfortLimitC: celsius(24), worstC: celsius(24.7), worstAt: '2026-07-18T06:20:00+02:00', limitCrossedAt: '2026-07-18T02:15:00+02:00', limitCrossedC: celsius(24) };
+
+  it('the hours variant ends at the clock time the room crosses the night threshold, with no duration', () => {
+    expect(alignedNightWarning(hours, lr, night, 'Bedroom').message).toBe('Tonight the Bedroom stays at or below 24 °C until about 2:15 AM, then it warms up.');
+    const noWindow = { safeUntil: lr.safeUntil, safeHours: lr.safeHours, limitedBy: 'battery' as const };
+    expect(alignedNightWarning(hours, noWindow, night, 'Bedroom').message).toBe('Tonight the Bedroom stays at or below 24 °C until the next recharge, then it warms up.');
+  });
+
+  it('keeps the heat-budget variant, a crossing of another limit, and a last resort not ended by the battery as the guard wrote them', () => {
+    const budget = { code: 'night_recovery_infeasible', message: 'Tonight the battery cannot keep the heat in the Bedroom within the night budget: about 5 heat-index degree-hours above 26.7 °C, over the 4 allowed.' } as const;
+    expect(alignedNightWarning(budget, lr, { ...night, achievedHours: 6 }, 'Bedroom')).toEqual(budget);
+    expect(alignedNightWarning(hours, { ...lr, limitCrossedAt: '2026-07-17T23:50:00+02:00', limitCrossedC: celsius(27) }, night, 'Bedroom')).toEqual(hours);
+    expect(alignedNightWarning(hours, { safeUntil: lr.safeUntil, safeHours: lr.safeHours, limitedBy: 'temperature' as const }, night, 'Bedroom')).toEqual(hours);
+    expect(alignedNightWarning(hours, undefined, night, 'Bedroom')).toEqual(hours);
   });
 });

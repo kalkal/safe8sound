@@ -61,3 +61,11 @@ export function listTool(tool: ToolDefinition): ListedTool {
     ...(tool.ui === undefined ? {} : { _meta: { ui: { resourceUri: tool.ui.resourceUri }, 'ui/resourceUri': tool.ui.resourceUri } }),
   };
 }
+
+/**
+ * A tool error with a sentence meant for the model only (#272): the server appends it to the text the model reads
+ * and drops it from `structuredContent`, so a card never shows an instruction to the model.
+ */
+export type HintedError = ErrorEnvelope & { readonly modelHint?: string };
+
+export const withModelHint = (error: ErrorEnvelope, modelHint: string): HintedError => ({ ...error, modelHint });

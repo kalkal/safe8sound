@@ -147,6 +147,14 @@ export const PlanSchema = z
          * room inside the earlier limit and above the new one: that new limit (optional, added 2026-10-03, #166).
          */
         loweredLimitC: CelsiusSchema.optional(),
+        /**
+         * When the battery ends the safe hours: the first moment the room then goes past the limit in force, from the
+         * same projection, between `safeUntil` and `worstAt` (optional, added 2026-10-06, approved in #272). Absent with
+         * the window absent too: the room stays inside its limit until the end of the projection.
+         */
+        limitCrossedAt: IsoDateTimeSchema.optional(),
+        /** The limit in force at `limitCrossedAt`, the one the room crosses there (optional, only with it, #272 review). */
+        limitCrossedC: CelsiusSchema.optional(),
         /** Zero-energy actions for the card, from public-health guidance (optional, added 2026-10-02, approved in #160). */
         actions: z.array(LastResortActionSchema).max(LAST_RESORT_ACTIONS.length).optional(),
       })
@@ -164,6 +172,18 @@ export const PlanSchema = z
         }
         if (lr.loweredLimitC !== undefined && (lr.limitedBy !== 'temperature' || lr.worstC === undefined)) {
           ctx.addIssue({ code: 'custom', path: ['loweredLimitC'], message: 'A lowered limit ends the safe hours on temperature, with its window' });
+        }
+        if (
+          lr.limitCrossedAt !== undefined &&
+          (lr.limitedBy !== 'battery' ||
+            lr.worstAt === undefined ||
+            epochMs(lr.limitCrossedAt) < epochMs(lr.safeUntil) ||
+            epochMs(lr.limitCrossedAt) > epochMs(lr.worstAt))
+        ) {
+          ctx.addIssue({ code: 'custom', path: ['limitCrossedAt'], message: 'The crossing comes after the battery runs out and by the worst point, with its window' });
+        }
+        if (lr.limitCrossedC !== undefined && lr.limitCrossedAt === undefined) {
+          ctx.addIssue({ code: 'custom', path: ['limitCrossedC'], message: 'The limit crossed comes with the time it is crossed' });
         }
         if (lr.actions !== undefined && new Set(lr.actions).size !== lr.actions.length) {
           ctx.addIssue({ code: 'custom', path: ['actions'], message: 'Each action appears once' });

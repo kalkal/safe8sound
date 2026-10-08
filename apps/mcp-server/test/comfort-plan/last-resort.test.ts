@@ -1,6 +1,6 @@
 import { LAST_RESORT_ACTIONS } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { lastResortActions, lastResortThen, lastResortWindow, loweredLimit } from '../../src/modules/comfort-plan/last-resort.js';
+import { lastResortActions, lastResortThen, lastResortWindow, limitCrossedAt, loweredLimit } from '../../src/modules/comfort-plan/last-resort.js';
 
 // The honest window of a last resort (#160): from safeUntil on, the point where the safe room is furthest past
 // the limit in force at that point (the night threshold lowers it), that limit, and when.
@@ -122,5 +122,31 @@ describe('what ends the safe hours, in words (#248)', () => {
   it('the heating minimum and the battery', () => {
     expect(lastResortThen({ limitedBy: 'temperature', season: 'heating', limitThenC: 18, ...limits })).toBe('the room drops below its 18 °C minimum');
     expect(lastResortThen({ limitedBy: 'battery', season: 'cooling', limitThenC: 27, ...limits })).toBe('the battery runs out');
+  });
+});
+
+describe('limitCrossedAt (#272): when the room passes its limit after the battery runs out', () => {
+  it('the first point from safeUntil on past the limit in force there, from the same projection as the window', () => {
+    // The battery runs out at T0 + 1 h; the room holds 24 °C by inertia until T0 + 3 h, then warms up.
+    const elderly = () => 24;
+    expect(limitCrossedAt(points([23, 23.5, 23.8, 24.3, 25.1]), { ...opts, limitAt: elderly, untilMs: T0 + H })).toEqual({ atMs: T0 + 3 * H, limitC: 24 });
+  });
+
+  it('a point at the limit is inside it; past it once rounded as it is said', () => {
+    expect(limitCrossedAt(points([23, 24, 24.04, 24.06]), { ...opts, limitAt: () => 24, untilMs: T0 + H })).toEqual({ atMs: T0 + 3 * H, limitC: 24 });
+  });
+
+  it('undefined when the room stays inside its limit to the end of the projection', () => {
+    expect(limitCrossedAt(points([23, 23.5, 23.9]), { ...opts, limitAt: () => 24, untilMs: T0 + H })).toBeUndefined();
+  });
+
+  it('heating: the first point under the minimum', () => {
+    expect(limitCrossedAt(points([20, 19, 18.2, 17.8]), { ...opts, season: 'heating', limitAt: () => 18, untilMs: T0 + H })).toEqual({ atMs: T0 + 3 * H, limitC: 18 });
+  });
+
+  it('with the limit in force where the room crosses it, not the one at the worst point (#272 review)', () => {
+    // A 27 °C day limit until T0 + 3 h, then the 24 °C night limit: the room crosses 27 °C at T0 + 2 h.
+    const dayThenNight = (ms: number) => (ms < T0 + 3 * H ? 27 : 24);
+    expect(limitCrossedAt(points([26, 26.8, 27.2, 27.5]), { ...opts, limitAt: dayThenNight, untilMs: T0 + H })).toEqual({ atMs: T0 + 2 * H, limitC: 27 });
   });
 });

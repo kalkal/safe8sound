@@ -1,4 +1,6 @@
-import { ErrorEnvelopeSchema } from '@cold-reserve/contracts';
+import { ErrorEnvelopeSchema, err, toolError } from '@cold-reserve/contracts';
+import { z } from 'zod';
+import { defineTool, withModelHint } from '../src/tool.js';
 import { describe, expect, it } from 'vitest';
 import { callTool, makeHandler, post, toolResult, toolsList } from './helpers.js';
 
@@ -65,5 +67,26 @@ describe('tools/call failure paths', () => {
     const result = await toolResult(await post(handler, callTool('bad_output', {})));
     expect(ErrorEnvelopeSchema.parse(result.structuredContent)).toMatchObject({ code: 'output_schema_violation' });
     expect(logs.filter((l) => l.level !== 'info').map((l) => l.code)).toEqual(['output_schema_violation']);
+  });
+});
+
+describe('a hint meant for the model (#272)', () => {
+  it('reaches the text the model reads, never the structured error a card shows', async () => {
+    const hinted = defineTool({
+      name: 'hinted_refusal',
+      title: 'Hinted refusal',
+      description: 'Test tool.',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      input: z.strictObject({}),
+      output: z.strictObject({}),
+      handler: () => Promise.resolve(err(withModelHint(toolError('safe_room_comfort_violated', 'Humidity in the safe room would reach 94 %.'), 'Call plan_comfort again with only the goal.'))),
+    });
+    const { handler } = makeHandler({ modules: [{ id: 'hinted', tools: [hinted] }] });
+    const result = await toolResult(await post(handler, callTool('hinted_refusal', {})));
+    expect(result.isError).toBe(true);
+    expect((result.content as { text: string }[])[0]?.text).toBe('Humidity in the safe room would reach 94 %. Call plan_comfort again with only the goal.');
+    const envelope = ErrorEnvelopeSchema.parse(result.structuredContent);
+    expect(envelope.message).toBe('Humidity in the safe room would reach 94 %.');
+    expect(JSON.stringify(result.structuredContent)).not.toContain('plan_comfort again');
   });
 });
