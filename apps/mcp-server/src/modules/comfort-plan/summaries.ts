@@ -30,8 +30,10 @@ function rungText(r: LevelStep): string {
   return `${r.level}: setpoint ${offset}, ${r.preferredModes.join(' or ')}, fans ${r.fansOn ? 'on' : 'off'}, ${rooms}`;
 }
 
-function lineText(l: CounterfactualLine, timeZone: string): string {
-  return `${String(l.peakTempC)} °C at ${localTimeText(localIso(Date.parse(l.peakAt), timeZone))} (${one(l.heatIndexDegreeHours)} heat-index degree-hours, ${one(l.hoursAtOrBelowThreshold)} night hours at or below the threshold)`;
+/** One scenario of the counterfactual; without its night hours when the text already says one end time (#299). */
+function lineText(l: CounterfactualLine, timeZone: string, nightHours: boolean): string {
+  const night = nightHours ? `, ${one(l.hoursAtOrBelowThreshold)} night hours at or below the threshold` : '';
+  return `${String(l.peakTempC)} °C at ${localTimeText(localIso(Date.parse(l.peakAt), timeZone))} (${one(l.heatIndexDegreeHours)} heat-index degree-hours${night})`;
 }
 
 /** What the plan text needs besides the plan: the night window (guard config). */
@@ -135,10 +137,13 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   const c = p.counterfactual;
   if (c !== undefined) {
     const { noPlan, naive, plan } = c.scenarios;
+    // Next to a last resort's crossing time, no second duration for the room's threshold (#299): the night hours
+    // (grace minutes counted) stay in the structured counterfactual for the card.
+    const nightHours = lr?.limitCrossedAt === undefined;
     parts.push(
-      `Without the plan the safe room${opts.roomNames?.[c.roomId] === undefined ? ` (${c.roomId})` : `, ${opts.roomNames[c.roomId]} (${c.roomId}),`} would peak at ${lineText(noPlan, opts.timeZone)}; ` +
-        `with the naive plan (air conditioning until the battery dies) at ${lineText(naive, opts.timeZone)}; ` +
-        `with this plan at ${lineText(plan, opts.timeZone)}.`,
+      `Without the plan the safe room${opts.roomNames?.[c.roomId] === undefined ? ` (${c.roomId})` : `, ${opts.roomNames[c.roomId]} (${c.roomId}),`} would peak at ${lineText(noPlan, opts.timeZone, nightHours)}; ` +
+        `with the naive plan (air conditioning until the battery dies) at ${lineText(naive, opts.timeZone, nightHours)}; ` +
+        `with this plan at ${lineText(plan, opts.timeZone, nightHours)}.`,
     );
   }
   const window = p.lastResort === undefined ? undefined : windowText(p.lastResort, opts, p.horizonAt);

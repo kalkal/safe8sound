@@ -295,8 +295,10 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(lr).toMatchObject({ limitedBy: 'battery' });
     expect(lr?.worstAt).toBeUndefined();
     expect(lr?.limitCrossedAt).toBeUndefined();
-    const night = r.value.warnings?.find((x) => x.code === 'night_recovery_infeasible');
-    if (night !== undefined) expect(night.message).toMatch(/until the next recharge, then it warms up\.$/);
+    // The room holds the night threshold to the recharge, so the night is met and no night warning stands next to
+    // the last resort (#299 review); the "until the next recharge" wording of that warning is tested on alignedNightWarning.
+    expect(r.value.nightRecovery?.status).toBe('met');
+    expect(r.value.warnings?.map((x) => x.code)).toEqual(['last_resort_plan']);
   });
 
   it.each([16, 20, 25])('once a candidate needs a last resort, it is the hold even when the hold fails only the pace (#248, decision A): hour 6 at %i percent', async (soc) => {

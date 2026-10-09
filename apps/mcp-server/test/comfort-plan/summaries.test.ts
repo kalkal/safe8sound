@@ -176,6 +176,14 @@ describe('what the model reads', () => {
     const about24 = text.split(/(?<=\.) /).filter((s) => s.includes('24 °C'));
     expect(about24.length).toBeGreaterThan(0);
     expect(about24.flatMap((s) => s.match(/\d+(\.\d+)? hours/g) ?? []).length).toBeLessThanOrEqual(1);
+    // Every sentence that carries a duration (#299): only the battery's, both ending at 11:40 PM like the window says;
+    // none for the room's threshold, the counterfactual's night hours included.
+    const durations = text.split(/(?<=\.) /).filter((s) => /\d+(\.\d+)? (night )?(hours|min)\b/.test(s));
+    expect(durations).toEqual([
+      expect.stringMatching(/^pacing_on_track FAILS: At this pace the battery runs out at 23:40, \d+ min before the next recharge at 08:00\.$/),
+      'Warning: No plan keeps the Bedroom within its limits until the next recharge: safe for about 1.67 hours, until 11:40 PM; then the battery runs out.',
+    ]);
+    expect(text).not.toContain('night hours');
     // The night count (3.67 h, grace minutes included) stays in nightRecovery for the card, not in the text.
     expect(text).not.toContain('Night recovery (');
     expect(text).not.toContain('hours from now');
