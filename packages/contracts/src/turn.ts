@@ -28,7 +28,7 @@ export type LocaleId = z.infer<typeof LocaleSchema>;
 
 export const TurnRequestSchema = z.strictObject({
   question: z.string().trim().min(1).max(500),
-  /** The language of the answer (#263, additive, approved by the main): absent means English. */
+  /** The language of the answer (#263, additive): absent means English. */
   locale: LocaleSchema.optional(),
 });
 export type TurnRequest = z.infer<typeof TurnRequestSchema>;
@@ -108,13 +108,13 @@ export type TurnFailure = z.infer<typeof TurnFailureSchema>;
 
 /**
  * POST /v1/tools/call: a card action, already bound to its card by the host, or the home panel's read of the home
- * (#262, additive, approved by the main: read-only, no arguments; the home comes from the token). Nothing else.
+ * (#262, additive: read-only, no arguments; the home comes from the token). Nothing else.
  */
 export const ToolCallRequestSchema = z.discriminatedUnion('name', [
   z.strictObject({ name: z.literal('apply_plan'), arguments: ApplyPlanInputSchema }),
   z.strictObject({ name: z.literal('set_preferences'), arguments: SetPreferencesInputSchema }),
   z.strictObject({ name: z.literal('get_home_status'), arguments: z.strictObject({}) }),
-  // B2 (additive, approved by the main): the judge's settings drawer reads and saves its own sandbox only.
+  // B2 (additive): the judge's settings drawer reads and saves its own sandbox only.
   z.strictObject({ name: z.literal('get_demo_settings'), arguments: z.strictObject({}) }),
   z.strictObject({ name: z.literal('set_scenario'), arguments: SetScenarioInputSchema }),
 ]);

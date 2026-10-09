@@ -41,6 +41,14 @@ describe('surplusWindow', () => {
 describe('orderSurplusRooms', () => {
   const room = (id: string, tempC: number, occupied: boolean, over: { isSafe?: boolean; sleptIn?: boolean } = {}) => ({ id, tempC, occupied, isSafe: false, sleptIn: false, ...over });
 
+  it('a room with no reading gets no surplus: how far above comfort it is would be made up (review of #303)', () => {
+    const order = orderSurplusRooms(
+      [room('bedroom-1', 26, true, { isSafe: true }), { id: 'bedroom-2', tempC: undefined, occupied: false, isSafe: false, sleptIn: true }],
+      { comfortC: 25, tonight: true },
+    );
+    expect(order.map((r) => r.roomId)).toEqual(['bedroom-1']);
+  });
+
   it('the safe room first, then the rooms that are or will be occupied, the hottest above target first', () => {
     const order = orderSurplusRooms(
       [room('study', 27, true), room('bedroom-2', 31.9, false, { sleptIn: true }), room('bedroom-1', 26, true, { isSafe: true, sleptIn: true }), room('living', 30, false)],

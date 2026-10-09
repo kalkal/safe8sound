@@ -496,7 +496,7 @@ function withSurplus(
   const order = orderSurplusRooms(
     cooling.map((r) => {
       const now = snapshot.rooms.find((x) => x.id === r.id);
-      return { id: r.id, tempC: now?.tempC ?? preferences.comfortC.cooling, occupied: (now?.occupants.length ?? 0) > 0, isSafe: r.id === preferences.safeRoomId, sleptIn: r.sleptIn ?? false };
+      return { id: r.id, tempC: now?.tempC, occupied: (now?.occupants.length ?? 0) > 0, isSafe: r.id === preferences.safeRoomId, sleptIn: r.sleptIn ?? false };
     }),
     { comfortC: preferences.comfortC.cooling, tonight },
   );

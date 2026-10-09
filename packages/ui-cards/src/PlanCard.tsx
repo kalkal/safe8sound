@@ -133,7 +133,8 @@ function SurplusRouting({ surplus, timeZone }: { surplus: Surplus; timeZone: str
                 : t('plan.surplusRoom', {
                     reason: t(`surplusReason.${room.reason}`),
                     now: (surplus.comfortC + room.aboveTargetK).toFixed(1),
-                    comfort: String(surplus.comfortC),
+                    // One decimal, like now and the gap: now − comfort = gap always adds up (review of #303).
+                    comfort: surplus.comfortC.toFixed(1),
                     setpoint: String(room.setpointC),
                     delta: Math.abs(room.aboveTargetK).toFixed(1),
                     side: t(room.aboveTargetK >= 0 ? 'surplus.above' : 'surplus.below'),

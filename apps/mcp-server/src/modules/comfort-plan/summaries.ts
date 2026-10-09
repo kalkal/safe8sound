@@ -57,7 +57,7 @@ function surplusText(s: NonNullable<Plan['surplus']>, opts: PlanSummaryOptions):
     const name = opts.roomNames?.[r.roomId] ?? 'a room';
     const side = r.aboveTargetK >= 0 ? 'above' : 'below';
     const delta = `${Math.abs(r.aboveTargetK).toFixed(1)} °C ${side}`;
-    const versus = s.comfortC === undefined ? `${delta} comfort` : `now ${(s.comfortC + r.aboveTargetK).toFixed(1)} °C, ${delta} the ${String(s.comfortC)} °C comfort`;
+    const versus = s.comfortC === undefined ? `${delta} comfort` : `now ${(s.comfortC + r.aboveTargetK).toFixed(1)} °C, ${delta} the ${s.comfortC.toFixed(1)} °C comfort`;
     return `${String(i + 1)}) ${name} (${SURPLUS_REASON[r.reason]}), ${versus}, cooling to ${String(r.setpointC)} °C`;
   });
   return (

@@ -103,7 +103,7 @@ describe('answerCardCall: a card action runs under the turn that showed the card
   });
 });
 
-describe('the second yes to a last resort by touch (#160, the main\'s decision B)', () => {
+describe('the second yes to a last resort by touch (#160, decision B)', () => {
   const card: ToolCard = { tool: 'plan_comfort', result: lastResortPlan() };
   const token = `lr_${'T'.repeat(32)}`;
   const firstAnswer = {

@@ -48,9 +48,9 @@ describe('what the model reads', () => {
     // Owner feedback: "cooled to 23 °C · 6.9 °C above target" was not understood; the room now, the comfort, then the setpoint.
     expect(text).toContain(
       'Solar surplus from 4:00 PM to 8:05 PM: 3.4 kWh kept at home instead of exported to the grid. Where it went, in order: ' +
-        '1) Bedroom (safe room), now 25.0 °C, 1.0 °C above the 24 °C comfort, cooling to 24 °C; ' +
-        '2) Second bedroom (slept in tonight), now 30.9 °C, 6.9 °C above the 24 °C comfort, cooling to 23 °C; ' +
-        '3) Study (occupied), now 23.6 °C, 0.4 °C below the 24 °C comfort, cooling to 23 °C.',
+        '1) Bedroom (safe room), now 25.0 °C, 1.0 °C above the 24.0 °C comfort, cooling to 24 °C; ' +
+        '2) Second bedroom (slept in tonight), now 30.9 °C, 6.9 °C above the 24.0 °C comfort, cooling to 23 °C; ' +
+        '3) Study (occupied), now 23.6 °C, 0.4 °C below the 24.0 °C comfort, cooling to 23 °C.',
     );
     expect(text).not.toContain('target');
     // A plan without the comfort (older): no "now" figure it cannot know, and still no "target".

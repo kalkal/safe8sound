@@ -161,7 +161,6 @@ Which page is real: with `VITE_AGENT=remote` the simulator talks to the real cha
 To show only Ana's phone on a second page, next to a local MCP server, run a second dev server on its own port (5318 is `dev`, 5319 is `preview:e2e`) with the phone reading the real inbox through the dev proxy, then open `http://127.0.0.1:5328/?view=phone`. There is no question box there, so no scripted number can be taken for the real home's:
 ```bash
 # COLD_RESERVE_PHONE_TOKEN is the token of the phone:daughter@demo entry of MCP_CLIENTS (32+ characters).
-# Add http://127.0.0.1:5328 to MCP_ALLOWED_ORIGINS for the reply buttons (a POST carries the page's Origin).
 VITE_PHONE=inbox COLD_RESERVE_PHONE_URL=http://127.0.0.1:3316 COLD_RESERVE_PHONE_TOKEN=<token> pnpm --filter @cold-reserve/alexa-sim exec vite --host 127.0.0.1 --port 5328 --strictPort
 ```
 

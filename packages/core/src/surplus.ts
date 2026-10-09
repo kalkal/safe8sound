@@ -47,12 +47,14 @@ export interface SurplusRoom {
  * order (the person's room priority). Rooms nobody uses get nothing.
  */
 export function orderSurplusRooms(
-  rooms: readonly { readonly id: string; readonly tempC: number; readonly occupied: boolean; readonly isSafe: boolean; readonly sleptIn: boolean }[],
+  rooms: readonly { readonly id: string; readonly tempC: number | undefined; readonly occupied: boolean; readonly isSafe: boolean; readonly sleptIn: boolean }[],
   opts: { readonly comfortC: number; readonly tonight: boolean },
 ): SurplusRoom[] {
   const above = (tempC: number) => Math.round((tempC - opts.comfortC) * 10) / 10;
-  const safe = rooms.filter((r) => r.isSafe).map((r): SurplusRoom => ({ roomId: r.id, reason: 'safe_room', aboveTargetK: above(r.tempC) }));
-  const others = rooms
+  // A room with no reading gets nothing: how far above comfort it is would be made up (review of #303).
+  const read = rooms.flatMap((r) => (r.tempC === undefined ? [] : [{ ...r, tempC: r.tempC }]));
+  const safe = read.filter((r) => r.isSafe).map((r): SurplusRoom => ({ roomId: r.id, reason: 'safe_room', aboveTargetK: above(r.tempC) }));
+  const others = read
     .filter((r) => !r.isSafe && (r.occupied || (opts.tonight && r.sleptIn)))
     .map((r): SurplusRoom => ({ roomId: r.id, reason: r.occupied ? 'occupied' : 'occupied_tonight', aboveTargetK: above(r.tempC) }));
   // A stable sort keeps the input order on a tie.

@@ -19,8 +19,8 @@ describe('PlanCard', () => {
     const rooms = within(surplus).getByRole('list', { name: 'Where it went, in order' });
     // Owner feedback: the room now against the comfort, then the setpoint; the same words as the voice.
     expect(within(rooms).getAllByRole('listitem').map((r) => r.textContent)).toEqual([
-      'Bedroom 1Safe room · now 24.8 °C, 0.8 °C above the 24 °C comfort · cooling to 24 °C',
-      'LivingOccupied · now 23.6 °C, 0.4 °C below the 24 °C comfort · cooling to 25 °C',
+      'Bedroom 1Safe room · now 24.8 °C, 0.8 °C above the 24.0 °C comfort · cooling to 24 °C',
+      'LivingOccupied · now 23.6 °C, 0.4 °C below the 24.0 °C comfort · cooling to 25 °C',
     ]);
     // Names, never internal ids; never "target".
     expect(surplus.textContent).not.toContain('bedroom-1');

@@ -20,7 +20,7 @@ import {
 // The wire between alexa-sim and sim-api (#55, #101): one schema for both apps.
 
 describe('turn wire: POST /v1/turns', () => {
-  it('#263 (approved by the main, additive): a turn may name its language, English or Italian; English when absent', () => {
+  it('#263 (additive): a turn may name its language, English or Italian; English when absent', () => {
     expect(TurnRequestSchema.safeParse({ question: 'Ciao', locale: 'it-IT' }).success).toBe(true);
     expect(TurnRequestSchema.safeParse({ question: 'Hi' }).success).toBe(true);
     expect(TurnRequestSchema.safeParse({ question: 'Salut', locale: 'fr-FR' }).success).toBe(false);
@@ -68,13 +68,13 @@ describe('card tool calls: POST /v1/tools/call', () => {
     expect(ToolCallRequestSchema.safeParse({ name: 'apply_plan', arguments: {} }).success).toBe(false);
   });
 
-  it('#262 (approved by the main, additive): the home panel may read get_home_status, with no arguments, read-only', () => {
+  it('#262 (additive): the home panel may read get_home_status, with no arguments, read-only', () => {
     expect(ToolCallRequestSchema.safeParse({ name: 'get_home_status', arguments: {} }).success).toBe(true);
     // The home comes from the token, never from the request.
     expect(ToolCallRequestSchema.safeParse({ name: 'get_home_status', arguments: { homeId: 'home' } }).success).toBe(false);
   });
 
-  it('B2 (approved by the main, additive): the settings drawer reads get_demo_settings and saves with set_scenario', () => {
+  it('B2 (additive): the settings drawer reads get_demo_settings and saves with set_scenario', () => {
     expect(ToolCallRequestSchema.safeParse({ name: 'get_demo_settings', arguments: {} }).success).toBe(true);
     expect(ToolCallRequestSchema.safeParse({ name: 'set_scenario', arguments: { scenarioId: 'storm-blackout' } }).success).toBe(true);
     expect(ToolCallRequestSchema.safeParse({ name: 'set_scenario', arguments: { restart: true } }).success).toBe(true);
