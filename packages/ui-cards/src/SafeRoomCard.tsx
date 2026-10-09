@@ -1,7 +1,8 @@
-import type { SafeRoomStatus } from '@cold-reserve/contracts';
+import { formatTempFixed, type SafeRoomStatus } from '@cold-reserve/contracts';
 import type { CSSProperties } from 'react';
 import { CardShell } from './CardShell.js';
 import { cubeFills, cubesLabel } from './IceCubesCard.js';
+import { getTempUnit } from './temp-unit.js';
 import { formatHours, t } from './text.js';
 
 /** "06:40" from a time the server already wrote in the home's zone (with its offset): no conversion. */
@@ -22,8 +23,8 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
   const inStorm = status.stormPhase === 'active';
   const now =
     status.humidityPct === undefined
-      ? t('safeRoom.now', { tempC: status.tempC.toFixed(1) })
-      : t('safeRoom.nowRh', { tempC: status.tempC.toFixed(1), rh: String(Math.round(status.humidityPct)) });
+      ? t('safeRoom.now', { temp: formatTempFixed(status.tempC, getTempUnit()) })
+      : t('safeRoom.nowRh', { temp: formatTempFixed(status.tempC, getTempUnit()), rh: String(Math.round(status.humidityPct)) });
   const who = status.occupantRoles.length > 0 ? status.occupantRoles.join(', ') : t('safeRoom.nobody');
   return (
     <CardShell title={t('safeRoom.title', { room: roomLabel(status.safeRoomId) })} origin={status.origin.rooms}>

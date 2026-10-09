@@ -1,8 +1,9 @@
-import { epochMs, type Plan } from '@cold-reserve/contracts';
+import { epochMs, formatTemp, tempGap, type Plan } from '@cold-reserve/contracts';
 import { useId, useState } from 'react';
 import { CardShell } from './CardShell.js';
 import { homeClock, isSimulated, levelSpans, pacingGeometry } from './plan-model.js';
 import { roomLabel } from './SafeRoomCard.js';
+import { getTempUnit } from './temp-unit.js';
 import { formatMeasure, t } from './text.js';
 
 export interface PlanCardProps {
@@ -123,28 +124,40 @@ function SurplusRouting({ surplus, timeZone }: { surplus: Surplus; timeZone: str
           <li key={room.roomId}>
             <strong>{roomLabel(room.roomId)}</strong>
             <span>
-              {surplus.comfortC === undefined
-                ? t('plan.surplusRoomNoComfort', {
-                    reason: t(`surplusReason.${room.reason}`),
-                    setpoint: String(room.setpointC),
-                    delta: Math.abs(room.aboveTargetK).toFixed(1),
-                    side: t(room.aboveTargetK >= 0 ? 'surplus.above' : 'surplus.below'),
-                  })
-                : t('plan.surplusRoom', {
-                    reason: t(`surplusReason.${room.reason}`),
-                    now: (surplus.comfortC + room.aboveTargetK).toFixed(1),
-                    // One decimal, like now and the gap: now − comfort = gap always adds up (review of #303).
-                    comfort: surplus.comfortC.toFixed(1),
-                    setpoint: String(room.setpointC),
-                    delta: Math.abs(room.aboveTargetK).toFixed(1),
-                    side: t(room.aboveTargetK >= 0 ? 'surplus.above' : 'surplus.below'),
-                  })}
+              {surplusRoomText(room, surplus.comfortC)}
             </span>
           </li>
         ))}
       </ol>
     </section>
   );
+}
+
+type SurplusRoom = NonNullable<Plan['surplus']>['rooms'][number];
+
+/**
+ * A surplus room in the chosen unit (°F everywhere, owner decision, 9 Oct): now, the gap and the comfort from the
+ * rounded absolutes (now − comfort = gap adds up). Without the comfort, the gap alone, converted as a difference.
+ */
+function surplusRoomText(room: SurplusRoom, comfortC: number | undefined): string {
+  const unit = getTempUnit();
+  const reason = t(`surplusReason.${room.reason}`);
+  const setpoint = formatTemp(room.setpointC, unit);
+  if (comfortC === undefined) {
+    const gap = Math.round(Math.abs(room.aboveTargetK) * (unit === 'F' ? 1.8 : 1) * 10) / 10;
+    const side = t(room.aboveTargetK >= 0 ? 'surplus.above' : 'surplus.below');
+    return t('plan.surplusRoomNoComfort', { reason, setpoint, delta: `${gap.toFixed(1)} °${unit}`, side });
+  }
+  const g = tempGap(comfortC + room.aboveTargetK, comfortC, unit);
+  return t('plan.surplusRoom', {
+    reason,
+    setpoint,
+    now: `${g.now.toFixed(1)} °${unit}`,
+    // One decimal for all three: now − comfort = gap always adds up (review of #303).
+    comfort: `${g.ref.toFixed(1)} °${unit}`,
+    delta: `${g.gap.toFixed(1)} °${unit}`,
+    side: t(g.side === 'above' ? 'surplus.above' : 'surplus.below'),
+  });
 }
 
 type LastResort = NonNullable<Plan['lastResort']>;

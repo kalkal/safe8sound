@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { HouseholdSchema, LocationIdSchema, SandboxSettingsSchema, ScenarioIdSchema } from './sandbox-settings.js';
+import { TempUnitSchema } from './units.js';
 
 // C2b (#222, approved in #222): a visitor's sandbox settings as two tools, get_demo_settings and set_scenario. Only
 // visitor sandboxes list them; health thresholds are never among them (C1).
@@ -16,7 +17,7 @@ export const SetScenarioInputSchema = z
   .strictObject({
     scenarioId: ScenarioIdSchema.optional(),
     locationId: LocationIdSchema.optional(),
-    units: z.enum(['C', 'F']).optional(),
+    units: TempUnitSchema.optional(),
     household: HouseholdSchema.optional(),
     restart: z.boolean().optional().describe('true to play the day again from its start.'),
   })

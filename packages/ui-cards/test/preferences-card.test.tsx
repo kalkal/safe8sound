@@ -11,8 +11,12 @@ import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PreferencesCard } from '../src/PreferencesCard.js';
+import { setTempUnit } from '../src/temp-unit.js';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setTempUnit('C');
+});
 
 const rooms = [
   { id: 'bedroom-1', name: 'Bedroom' },
@@ -91,6 +95,15 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
     expect(screen.getByText('Storm reserve keeps the safe room comfortable about 10 h. Calculated, read-only.')).toBeTruthy();
     expect(screen.getByTestId('origin-badge').textContent).toContain('SIMULATED');
     expect(screen.getByText('Safety maximum 27 °C (allowed 24–30 °C)')).toBeTruthy();
+  });
+
+  it('°F everywhere (owner decision, 9 Oct): the comfort and the safety limits in the chosen unit; steps stay half a degree Celsius', () => {
+    setTempUnit('F');
+    setup();
+    expect(screen.getByTestId('comfort-value').textContent).toBe('77 °F');
+    fireEvent.click(button('Warmer'));
+    expect(screen.getByTestId('comfort-value').textContent).toBe('77.9 °F');
+    expect(screen.getByText('Safety maximum 80.6 °F (allowed 75.2–86 °F)')).toBeTruthy();
   });
 
   it('shows contacts by role and channel only, in words, never names or handles', () => {

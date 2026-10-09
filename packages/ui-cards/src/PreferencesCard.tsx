@@ -1,7 +1,8 @@
-import { SetPreferencesInputSchema, type DataOriginValue, type GetPreferencesOutput, type ReserveOutlook, type SetPreferencesInput } from '@cold-reserve/contracts';
+import { SetPreferencesInputSchema, formatTemp, toDisplayTemp, type DataOriginValue, type GetPreferencesOutput, type ReserveOutlook, type SetPreferencesInput } from '@cold-reserve/contracts';
 import { CATALOGS, type MessageKey } from '@cold-reserve/i18n';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CardShell } from './CardShell.js';
+import { getTempUnit } from './temp-unit.js';
 import { formatHours, t } from './text.js';
 
 const SETPOINT_STEP_C = 0.5;
@@ -126,7 +127,7 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave }: Prefer
             −
           </StepButton>
           <span className="stepper-value" data-testid="comfort-value" aria-live="polite">
-            {t('prefs.degrees', { value: String(cooling) })}
+            {t('prefs.degrees', { value: formatTemp(cooling, getTempUnit()) })}
           </span>
           <StepButton
             label={t('prefs.warmer')}
@@ -139,7 +140,12 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave }: Prefer
           </StepButton>
         </div>
         <p className="muted">
-          {t('prefs.safetyMax', { value: String(draft.safety.cooling.maxC), min: String(limits.cooling.maxC.min), max: String(limits.cooling.maxC.max) })}
+          {/* °F everywhere (owner decision, 9 Oct): shown in the chosen unit; the steps stay half a degree Celsius. */}
+          {t('prefs.safetyMax', {
+            value: formatTemp(draft.safety.cooling.maxC, getTempUnit()),
+            min: String(toDisplayTemp(limits.cooling.maxC.min, getTempUnit())),
+            max: formatTemp(limits.cooling.maxC.max, getTempUnit()),
+          })}
         </p>
       </fieldset>
 

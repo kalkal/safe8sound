@@ -3,6 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SafeRoomCard, clockOf, roomLabel } from '../src/SafeRoomCard.js';
 import { safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
+import { setTempUnit } from '../src/temp-unit.js';
 
 afterEach(cleanup);
 
@@ -46,6 +47,13 @@ describe('SafeRoomCard', () => {
     expect(facts.textContent).toContain('Who: grandpa');
     expect(facts.textContent).toContain('Now: 26.8 °C · 55% RH');
     expect(facts.textContent).toContain('Level: Essential (storm)');
+  });
+
+  it('°F everywhere (owner decision, 9 Oct): the measured air in the chosen unit', () => {
+    setTempUnit('F');
+    render(<SafeRoomCard status={safeRoomInStorm()} />);
+    expect(screen.getByRole('list', { name: 'In the safe room' }).textContent).toContain('Now: 80.2 °F · 55% RH');
+    setTempUnit('C');
   });
 
   it('draws the hours as ice cubes, described in words', () => {

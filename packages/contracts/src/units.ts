@@ -46,3 +46,31 @@ export const kilowattToWatt = (kw: Kilowatt): Watt => (Math.round(kw * 1_000_000
 /** Units a guarantee or an error detail may quote next to a number. */
 export const MeasureUnitSchema = z.enum(['W', 'Wh', '%', 'C', 'min']);
 export type MeasureUnit = z.infer<typeof MeasureUnitSchema>;
+
+/** The temperature unit a person chose (sandbox settings): every figure they read or hear follows it. */
+export const TempUnitSchema = z.enum(['C', 'F']);
+export type TempUnit = z.infer<typeof TempUnitSchema>;
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * An absolute temperature (°C in) as a person reads it, to one decimal: °F is ×1.8 + 32. One helper for the cards
+ * and the voice (owner decision, 9 Oct), so both say the same numbers.
+ */
+export const toDisplayTemp = (c: number, unit: TempUnit): number => round1(unit === 'F' ? c * 1.8 + 32 : c);
+
+/** "24 °C", "87.6 °F": no trailing zero. */
+export const formatTemp = (c: number, unit: TempUnit): string => `${String(toDisplayTemp(c, unit))} °${unit}`;
+
+/** "24.0 °C": always one decimal, next to other one-decimal figures. */
+export const formatTempFixed = (c: number, unit: TempUnit): string => `${toDisplayTemp(c, unit).toFixed(1)} °${unit}`;
+
+/**
+ * A temperature against a reference (the comfort, a limit), as shown: the gap is derived from the rounded absolutes,
+ * never a difference ×1.8 rounded on its own, so now − ref = gap always adds up on screen and in the voice.
+ */
+export function tempGap(nowC: number, refC: number, unit: TempUnit): { now: number; ref: number; gap: number; side: 'above' | 'below' } {
+  const now = toDisplayTemp(nowC, unit);
+  const ref = toDisplayTemp(refC, unit);
+  return { now, ref, gap: round1(Math.abs(now - ref)), side: now >= ref ? 'above' : 'below' };
+}

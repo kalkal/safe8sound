@@ -4,8 +4,12 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FloorPlanCard } from '../src/FloorPlanCard.js';
 import { homeCalm, homeInStorm } from '../src/home-fixtures.js';
+import { setTempUnit } from '../src/temp-unit.js';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setTempUnit('C');
+});
 
 describe('FloorPlanCard (signature element 3: the thermal floor plan, generated from the home)', () => {
   it('draws one tile per room, generated from the status, never by hand', () => {
@@ -22,6 +26,13 @@ describe('FloorPlanCard (signature element 3: the thermal floor plan, generated 
     expect(bedroom.textContent).toContain('grandpa');
     const living = screen.getByRole('listitem', { name: 'Living' });
     expect(living.textContent).toContain('Waiting: the level cools fewer rooms right now');
+  });
+
+  it('°F everywhere (owner decision, 9 Oct): each room in the chosen unit', () => {
+    setTempUnit('F');
+    render(<FloorPlanCard status={homeInStorm()} />);
+    expect(screen.getByRole('listitem', { name: 'Bedroom 1' }).textContent).toContain('80.2 °F');
+    expect(screen.getByRole('list', { name: 'Rooms' }).textContent).not.toContain('°C');
   });
 
   it('says the battery feeds only the safe room while the grid is down', () => {

@@ -4,8 +4,12 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { advisoryPlan, hotDayPlan, lastResortPlan, planThatHolds, rejectedPlan, stormPlan, surplusPlan } from '../src/fixtures.js';
 import { PlanCard, type PlanCardProps } from '../src/PlanCard.js';
+import { setTempUnit } from '../src/temp-unit.js';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setTempUnit('C');
+});
 
 const TZ = 'Europe/Rome';
 const show = (plan: Plan, props: Partial<PlanCardProps> = {}) => render(<PlanCard plan={plan} timeZone={TZ} {...props} />);
@@ -34,6 +38,26 @@ describe('PlanCard', () => {
     show({ ...plan, surplus: { from, to, keptKWh, rooms: surplusRooms } });
     const rooms = screen.getByRole('list', { name: 'Where it went, in order' });
     expect(within(rooms).getAllByRole('listitem')[0]?.textContent).toBe('Bedroom 1Safe room · 0.8 °C above comfort · cooling to 24 °C');
+  });
+
+  it('°F everywhere (owner decision, 9 Oct): the surplus in °F, the gap derived from the shown figures', () => {
+    setTempUnit('F');
+    show(surplusPlan());
+    const rooms = screen.getByRole('list', { name: 'Where it went, in order' });
+    expect(within(rooms).getAllByRole('listitem').map((r) => r.textContent)).toEqual([
+      'Bedroom 1Safe room · now 76.6 °F, 1.4 °F above the 75.2 °F comfort · cooling to 75.2 °F',
+      'LivingOccupied · now 74.5 °F, 0.7 °F below the 75.2 °F comfort · cooling to 77 °F',
+    ]);
+  });
+
+  it('°F without the comfort: the gap alone, converted as a difference (×1.8, no +32)', () => {
+    setTempUnit('F');
+    const plan = surplusPlan();
+    if (plan.surplus === undefined) throw new Error('no surplus');
+    const { from, to, keptKWh, rooms: surplusRooms } = plan.surplus;
+    show({ ...plan, surplus: { from, to, keptKWh, rooms: surplusRooms } });
+    const rooms = screen.getByRole('list', { name: 'Where it went, in order' });
+    expect(within(rooms).getAllByRole('listitem')[0]?.textContent).toBe('Bedroom 1Safe room · 1.4 °F above comfort · cooling to 75.2 °F');
   });
 
   it('a plan without a surplus has no surplus section', () => {
@@ -149,6 +173,10 @@ describe('PlanCard', () => {
       expect(screen.getByText('Within its limits until')).toBeTruthy();
       expect(screen.getByTestId('plan-horizon').textContent).toBe('22:00');
       expect(screen.getByTestId('last-resort-window').textContent).toBe('Then up to 26.1 °C by 03:00, past the 24 °C limit.');
+      cleanup();
+      setTempUnit('F');
+      show(lastResortPlan());
+      expect(screen.getByTestId('last-resort-window').textContent).toBe('Then up to 79 °F by 03:00, past the 75.2 °F limit.');
       // The ribbon would read as "Comfort … to 07:00": a last resort does not show it.
       expect(screen.queryByRole('list', { name: 'Level through the day' })).toBeNull();
     });

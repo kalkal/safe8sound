@@ -3,6 +3,7 @@ import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { isLocale, setLocale } from '@cold-reserve/i18n';
 import { installTapMarks, isDemoContext } from '../demo-taps.js';
+import { setTempUnit, unitOfContext } from '../temp-unit.js';
 import { t } from '../text.js';
 import { cardThemeFor } from '../theme.js';
 import { CardApp } from './CardApp.js';
@@ -20,6 +21,8 @@ function Card({ kind }: { kind: CardKind }) {
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | undefined>(undefined);
   // Demo mode for the video: only the simulator sets it; the card then marks each tap inside its frame.
   const [demo, setDemo] = useState(false);
+  // °F everywhere (owner decision, 9 Oct): the unit the host names; °C when it names none. Kept in state so the card redraws.
+  const [units, setUnits] = useState<'C' | 'F'>('C');
 
   const { app, error } = useApp({
     appInfo: { name: 'cold-reserve-cards', version: '0.1.0' },
@@ -34,6 +37,11 @@ function Card({ kind }: { kind: CardKind }) {
         // #263: the card speaks the host's language (standard hostContext.locale); English otherwise.
         if (isLocale(locale)) setLocale(locale);
         if (isDemoContext(changed)) setDemo(true);
+        const unit = unitOfContext(changed);
+        if (unit !== undefined) {
+          setTempUnit(unit);
+          setUnits(unit);
+        }
         setContext((previous) => ({
           ...previous,
           ...(theme !== undefined && { theme }),
@@ -58,10 +66,17 @@ function Card({ kind }: { kind: CardKind }) {
       });
       if (isLocale(initial.locale)) setLocale(initial.locale);
       setDemo(isDemoContext(initial));
+      const unit = unitOfContext(initial) ?? 'C';
+      setTempUnit(unit);
+      setUnits(unit);
     }
   }, [app]);
 
   useEffect(() => (demo ? installTapMarks(document) : undefined), [demo]);
+
+  useEffect(() => {
+    document.documentElement.dataset['units'] = units;
+  }, [units]);
 
   useEffect(() => {
     document.documentElement.dataset['cardTheme'] = cardThemeFor(context.theme);

@@ -1,7 +1,8 @@
-import type { HomeStatus } from '@cold-reserve/contracts';
+import { formatTempFixed, type HomeStatus } from '@cold-reserve/contracts';
 import { CardShell } from './CardShell.js';
 import { DeviceIcon } from './DeviceIcon.js';
 import { roomLabel } from './SafeRoomCard.js';
+import { getTempUnit } from './temp-unit.js';
 import { t } from './text.js';
 
 /**
@@ -34,7 +35,7 @@ export function FloorPlanCard({ status }: { status: HomeStatus }) {
             <li key={room.roomId} className="room-tile" data-state={room.state} aria-label={name}>
               <DeviceIcon device="split" on={room.state === 'served'} />
               <span className="room-name">{name}</span>
-              <span className="room-temp">{`${room.tempC.toFixed(1)} °C`}</span>
+              <span className="room-temp">{formatTempFixed(room.tempC, getTempUnit())}</span>
               {room.occupants.length > 0 && <span className="muted">{room.occupants.join(', ')}</span>}
               <span className="room-state">{room.waitingReason === undefined ? t('floor.served') : t(`floor.waiting.${room.waitingReason}`)}</span>
             </li>

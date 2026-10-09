@@ -1,5 +1,6 @@
 import { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge';
-import { CARD_KINDS, CARD_WAITING_MIN_PX, DEMO_CONTEXT_KEY, type CardKind } from '@cold-reserve/ui-cards';
+import type { TempUnit } from '@cold-reserve/contracts';
+import { CARD_KINDS, CARD_WAITING_MIN_PX, DEMO_CONTEXT_KEY, UNITS_CONTEXT_KEY, type CardKind } from '@cold-reserve/ui-cards';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { getLocale, subscribeLocale, type Locale } from '@cold-reserve/i18n';
 import type { ToolCard } from '../agent/wire.js';
@@ -22,7 +23,7 @@ const INITIAL_HEIGHT_PX = CARD_WAITING_MIN_PX;
 const DISPLAY_MODES: ('inline' | 'fullscreen')[] = ['inline', 'fullscreen'];
 
 /** The hostContext of a frame: the MCP Apps fields, plus the simulator's own demo key only in demo mode. */
-export function hostContextFor({ theme, timeZone, fullscreen, demo, locale }: { theme: 'dark' | 'light'; timeZone: string; fullscreen: boolean; demo: boolean; locale: Locale }) {
+export function hostContextFor({ theme, timeZone, fullscreen, demo, locale, units = 'C' }: { theme: 'dark' | 'light'; timeZone: string; fullscreen: boolean; demo: boolean; locale: Locale; units?: TempUnit }) {
   return {
     theme,
     timeZone,
@@ -31,6 +32,9 @@ export function hostContextFor({ theme, timeZone, fullscreen, demo, locale }: { 
     displayMode: fullscreen ? ('fullscreen' as const) : ('inline' as const),
     availableDisplayModes: DISPLAY_MODES,
     ...(demo ? { [DEMO_CONTEXT_KEY]: true } : {}),
+    // °F everywhere (owner decision, 9 Oct): always said, so a switch back to °C reaches a card already shown;
+    // a host that never names it (a real Alexa+ device) gets the cards' default, °C.
+    [UNITS_CONTEXT_KEY]: units,
   };
 }
 
@@ -48,15 +52,15 @@ export function CardFrame({ card, turnId }: { card: ToolCard; turnId: string }) 
 }
 
 function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind; turnId: string }) {
-  const { agent, documentFor, theme, timeZone, demo = false, onCardAction } = useCardHost();
+  const { agent, documentFor, theme, timeZone, demo = false, units = 'C', onCardAction } = useCardHost();
   const onCardActionRef = useRef(onCardAction);
   onCardActionRef.current = onCardAction;
   const document = useMemo(() => documentFor(kind), [documentFor, kind]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
   const locale = useSyncExternalStore(subscribeLocale, getLocale);
-  const contextRef = useRef({ theme, timeZone, demo, locale });
-  contextRef.current = { theme, timeZone, demo, locale };
+  const contextRef = useRef({ theme, timeZone, demo, locale, units });
+  contextRef.current = { theme, timeZone, demo, locale, units };
   const [height, setHeight] = useState(INITIAL_HEIGHT_PX);
   const [failed, setFailed] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -116,8 +120,8 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
   }, [agent, card, document, turnId]);
 
   useEffect(() => {
-    bridgeRef.current?.setHostContext(hostContextFor({ theme, timeZone, fullscreen, demo, locale }));
-  }, [theme, timeZone, fullscreen, demo, locale]);
+    bridgeRef.current?.setHostContext(hostContextFor({ theme, timeZone, fullscreen, demo, locale, units }));
+  }, [theme, timeZone, fullscreen, demo, locale, units]);
 
   // Full screen: Escape on the page goes back too (inside the frame the card handles it), and focus follows
   // the frame in and back, so a keyboard user is never left behind the overlay.

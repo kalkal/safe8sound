@@ -190,7 +190,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
   const phonePanel = (
     <ErrorBoundary>
-      <PhonePanel feed={phone} timeZone={config.homeTimeZone} />
+      <PhonePanel feed={phone} timeZone={config.homeTimeZone} units={demoSettings?.units ?? 'C'} />
     </ErrorBoundary>
   );
   return (
@@ -206,7 +206,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       >
         {t('theme.toggle')}
       </button>
-      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, onCardAction }}>
+      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', onCardAction }}>
         <HomePanel status={home} renderCard={(status) => <HomeCard status={status} />} load={homeLoad} onOpen={loadHome} onRetry={loadHome} />
         <QueryClientProvider client={queryClient}>
           <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} demo={config.demo} onAnswer={onAnswer} examples={examples} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />

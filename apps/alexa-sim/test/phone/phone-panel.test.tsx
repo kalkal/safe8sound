@@ -96,6 +96,16 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
       expect(screen.getByRole('status').textContent).toBe('Safe room at 25.5 °C, safe until 01:20.');
     });
 
+    it('°F everywhere (owner decision, 9 Oct): the status in the chosen unit', async () => {
+      const status = { safeRoomId: 'bedroom-1', tempC: 25.5, safeUntil: '2026-07-18T01:20:00+02:00' } as unknown as SafeRoomStatus;
+      render(<PhonePanel feed={withReply(() => Promise.resolve({ ok: true, status }))} timeZone="Europe/Rome" units="F" />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Check status' }));
+        await Promise.resolve();
+      });
+      expect(screen.getByRole('status').textContent).toBe('Safe room at 77.9 °F, safe until 01:20.');
+    });
+
     it('too soon or failed: says so in words, never a code', async () => {
       const { unmount } = render(<PhonePanel feed={withReply(() => Promise.resolve({ ok: false, code: 'family_reply_rate_limited', retryAfterMs: 19_200 }))} timeZone="Europe/Rome" />);
       await act(async () => {

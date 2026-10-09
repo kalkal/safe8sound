@@ -1,4 +1,4 @@
-import type { Result } from '@cold-reserve/contracts';
+import type { Result, TempUnit } from '@cold-reserve/contracts';
 import type { CardKind } from '@cold-reserve/ui-cards';
 import { createContext, useContext, type ReactNode } from 'react';
 import type { Agent } from '../agent/agent.js';
@@ -13,6 +13,8 @@ export interface CardHost {
   timeZone: string;
   /** Demo mode for the video (`?demo=1`): the cards mark each tap inside their frame. */
   demo?: boolean;
+  /** The temperature unit the person chose (demo settings); °C when absent. */
+  units?: TempUnit;
   /** A card action that succeeded (its tool name): the page may update what it shows, e.g. the home panel. */
   onCardAction?: (name: string) => void;
 }

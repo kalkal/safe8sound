@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TempUnitSchema,
+  formatTemp,
+  formatTempFixed,
+  tempGap,
+  toDisplayTemp,
+  type TempUnit,
   CelsiusSchema,
   KilowattSchema,
   MinutesSchema,
@@ -69,5 +75,45 @@ describe('branded units', () => {
 
   it('throws on a programming error when a constructor gets an invalid literal', () => {
     expect(() => pct(150)).toThrow();
+  });
+});
+
+// °F everywhere (owner decision, 9 Oct): one helper for the cards and the voice, so both say the same numbers.
+// Absolute temperatures convert with ×1.8 + 32 and round to one decimal; a difference is derived from the rounded
+// absolutes, never a K×1.8 rounded on its own, so now − comfort = gap always adds up on screen.
+describe('temperatures for people, in °C or °F', () => {
+  it('converts absolute temperatures to one decimal', () => {
+    const table: readonly [number, TempUnit, number][] = [
+      [30.9, 'C', 30.9],
+      [30.94, 'C', 30.9],
+      [30.9, 'F', 87.6],
+      [24, 'F', 75.2],
+      [23, 'F', 73.4],
+      [0, 'F', 32],
+      [-10, 'F', 14],
+      [26.7, 'F', 80.1],
+    ];
+    for (const [c, unit, shown] of table) expect(toDisplayTemp(c, unit)).toBe(shown);
+  });
+
+  it('writes the value with its unit; the fixed form always shows one decimal', () => {
+    expect(formatTemp(24, 'C')).toBe('24 °C');
+    expect(formatTemp(30.9, 'F')).toBe('87.6 °F');
+    expect(formatTempFixed(24, 'C')).toBe('24.0 °C');
+    expect(formatTempFixed(0, 'F')).toBe('32.0 °F');
+  });
+
+  it('a gap comes from the rounded absolutes: now − comfort = gap, in °F too', () => {
+    expect(tempGap(30.9, 24, 'F')).toEqual({ now: 87.6, ref: 75.2, gap: 12.4, side: 'above' });
+    expect(tempGap(23.6, 24, 'C')).toEqual({ now: 23.6, ref: 24, gap: 0.4, side: 'below' });
+    expect(tempGap(24, 24, 'F')).toEqual({ now: 75.2, ref: 75.2, gap: 0, side: 'above' });
+    for (const nowC of [24.03, 24.08, 24.95, 25.25, 26.35, 31.45]) {
+      const g = tempGap(nowC, 24, 'F');
+      expect(Math.round((g.now - g.ref) * 10) / 10).toBe(g.gap);
+    }
+  });
+
+  it('the unit setting is °C or °F, nothing else', () => {
+    expect(TempUnitSchema.options).toEqual(['C', 'F']);
   });
 });

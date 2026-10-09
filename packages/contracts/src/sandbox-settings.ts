@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IsoDateTimeSchema } from './common.js';
+import { TempUnitSchema } from './units.js';
 
 // C1 (#214, approved in #214): what a visitor may choose for their own sandbox home. Health thresholds are not
 // settings: the guard's limits stay in its own config. Structural bounds only.
@@ -22,7 +23,7 @@ export const SandboxSettingsSchema = z.strictObject({
   updatedAt: IsoDateTimeSchema,
   scenarioId: ScenarioIdSchema,
   locationId: LocationIdSchema,
-  units: z.enum(['C', 'F']),
+  units: TempUnitSchema,
   household: HouseholdSchema,
   /** The battery when the storm scenario starts, in %, or the configured reserve. */
   stormStartSoc: z.union([z.number().int().min(30).max(100), z.literal('from-reserve')]).optional(),
