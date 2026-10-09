@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { loadSimApiConfig } from '../src/config.js';
+import { DEFAULT_AGENT_TIMEOUT_MS, loadSimApiConfig } from '../src/config.js';
 
 const CODE = 'judges-demo-code-2026';
 const HASH = createHash('sha256').update(CODE).digest('hex');
@@ -79,5 +80,13 @@ describe('loadSimApiConfig (only hashes of codes and key ids reach logs; values 
     const result = loadSimApiConfig(env);
     expect(result).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
     expect(JSON.stringify(result)).not.toContain(KEY);
+  });
+});
+
+describe('the default wait for the agent (#270)', () => {
+  it('is the agent deadline plus its margin from the timing table in infra/cdk.json', () => {
+    const cdk = JSON.parse(readFileSync(new URL('../../../infra/cdk.json', import.meta.url), 'utf8')) as { context: Record<string, { agentDeadlineMs?: number; agentMarginMs?: number }> };
+    const t = cdk.context['cold-reserve:turnTiming'];
+    expect(DEFAULT_AGENT_TIMEOUT_MS).toBe((t?.agentDeadlineMs ?? 0) + (t?.agentMarginMs ?? 0));
   });
 });

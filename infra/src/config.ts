@@ -87,7 +87,6 @@ export const SimApiConfigSchema = z
     logRetentionDays: z.enum(RetentionDays),
     p95AlarmMs: positiveInt,
     ssmTimeoutMs: positiveInt,
-    agentTimeoutMs: z.number().int().min(100).max(30_000),
     mcpTimeoutMs: z.number().int().min(100).max(30_000),
     /** Extra origins allowed to call sim-api directly (CORS). Empty on AWS: the site calls it same-origin at /api (K1, #244). */
     allowedOrigins: z.array(origin),
@@ -116,9 +115,25 @@ export const SimApiConfigSchema = z
       cacheTimeoutMs: z.number().int().min(100).max(10_000),
       cacheDays: z.number().int().min(1).max(365),
     }),
-  })
-  .refine((c) => c.agentTimeoutMs < c.timeoutSeconds * 1000, { message: 'The agent timeout must end before the function timeout.', path: ['agentTimeoutMs'] });
+  });
 export type SimApiConfig = z.infer<typeof SimApiConfigSchema>;
+
+/**
+ * The one timing table of a turn (#270, approved in #270): every wait derives from it, so they can never cross.
+ * The agent closes its turn first; sim-api waits for it its deadline plus a margin; the browser waits for sim-api a
+ * little longer, so it reads sim-api's honest failure rather than giving up first; the turn budget covers the whole
+ * turn on screen; the sim-api function outlives them all. Sized for a cold AgentCore start (8.2 s seen on dev).
+ */
+export const TurnTimingSchema = z.strictObject({
+  agentDeadlineMs: z.number().int().min(1000).max(30_000),
+  agentMarginMs: z.number().int().min(500).max(10_000),
+  browserTimeoutMs: z.number().int().min(1000).max(60_000),
+  turnBudgetMs: z.number().int().min(1000).max(60_000),
+});
+export type TurnTiming = z.infer<typeof TurnTimingSchema>;
+
+/** How long sim-api waits for the agent: the agent's own deadline plus the margin. */
+export const simApiAgentTimeoutMs = (t: TurnTiming): number => t.agentDeadlineMs + t.agentMarginMs;
 
 export const InfraConfigSchema = z.strictObject({
   /** AWS region, e.g. us-east-1. Never hard-coded in stacks. */
@@ -128,6 +143,7 @@ export const InfraConfigSchema = z.strictObject({
   state: StateConfigSchema,
   agent: AgentConfigSchema,
   simApi: SimApiConfigSchema,
+  turnTiming: TurnTimingSchema,
 })
   .superRefine((c, ctx) => {
     // The sim-api worst case (Copilot on #156): the SSM reads at a cold start, two DynamoDB calls with every
@@ -136,7 +152,21 @@ export const InfraConfigSchema = z.strictObject({
     // A spoken reply (F8d, #25) adds its own path: the cache read and write, two counts and, when Polly fails,
     // two refunds, then Polly.
     const dynamoCallMs = c.state.maxAttempts * (c.state.connectTimeoutMs + c.state.requestTimeoutMs);
-    const turnMs = c.simApi.ssmTimeoutMs + 2 * dynamoCallMs + Math.max(c.simApi.agentTimeoutMs, c.simApi.mcpTimeoutMs) + 1000;
+    const agentMs = simApiAgentTimeoutMs(c.turnTiming);
+    // The chain of waits (#270): each one ends after the one it waits for, counted from the moment sim-api calls the
+    // agent. sim-api's own steps before it (cold start, SSM, the quota counts) take well under a second when warm,
+    // inside the 2 s between sim-api's wait and the browser's; their worst case is bounded by the function's time
+    // budget below, not by this chain: then the browser may stop first and show its own timeout (docs/agentcore.md).
+    if (!(agentMs < c.turnTiming.browserTimeoutMs)) {
+      ctx.addIssue({ code: 'custom', path: ['turnTiming', 'browserTimeoutMs'], message: `The browser must wait longer than sim-api waits for the agent (${String(agentMs)} ms).` });
+    }
+    if (!(c.turnTiming.browserTimeoutMs < c.turnTiming.turnBudgetMs)) {
+      ctx.addIssue({ code: 'custom', path: ['turnTiming', 'turnBudgetMs'], message: 'The turn budget must be longer than the browser wait.' });
+    }
+    if (!(c.turnTiming.turnBudgetMs <= c.simApi.timeoutSeconds * 1000)) {
+      ctx.addIssue({ code: 'custom', path: ['turnTiming', 'turnBudgetMs'], message: 'The turn budget must fit in the sim-api function timeout.' });
+    }
+    const turnMs = c.simApi.ssmTimeoutMs + 2 * dynamoCallMs + Math.max(agentMs, c.simApi.mcpTimeoutMs) + 1000;
     const speechMs = c.simApi.ssmTimeoutMs + 2 * c.simApi.speech.cacheTimeoutMs + 4 * dynamoCallMs + c.simApi.speech.pollyTimeoutMs + 1000;
     const worstMs = Math.max(turnMs, speechMs);
     if (worstMs > c.simApi.timeoutSeconds * 1000) {
@@ -154,6 +184,7 @@ export function loadInfraConfig(context: (key: string) => unknown): Result<Infra
     state: context('cold-reserve:state'),
     agent: context('cold-reserve:agent'),
     simApi: context('cold-reserve:simApi'),
+    turnTiming: context('cold-reserve:turnTiming'),
   });
   if (parsed.success) return ok(parsed.data);
   return err(

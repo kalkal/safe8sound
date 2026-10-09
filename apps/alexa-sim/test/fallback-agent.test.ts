@@ -16,12 +16,19 @@ describe('degraded mode: RemoteAgent down → scripted answer + notice (error-ha
     expect(await withScriptedFallback(remote, scripted).ask('q', ctx)).toEqual(ok({ text: 'Remote answer.' }));
   });
 
-  it.each<ErrorCode>(['agent_timeout', 'agent_unavailable', 'output_schema_violation'])(
+  it.each<ErrorCode>(['agent_unavailable', 'output_schema_violation'])(
     'answers from the script and says why when the remote fails with %s',
     async (code) => {
       expect(await withScriptedFallback(failing(code), scripted).ask('q', ctx)).toEqual(ok({ text: 'Scripted answer.', degradedBy: code }));
     },
   );
+
+  it('does not hide a slow turn behind the script: agent_timeout reaches the user as it is, with its own message (#270)', async () => {
+    const log = vi.fn();
+    const result = await withScriptedFallback(failing('agent_timeout'), scripted, log).ask('q', ctx);
+    expect(result).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
+    expect(log).not.toHaveBeenCalled();
+  });
 
   it('does not hide a quota or permission error behind the script', async () => {
     const result = await withScriptedFallback(failing('demo_quota_exceeded'), scripted).ask('q', ctx);
@@ -44,8 +51,8 @@ describe('degraded mode is logged with the turn correlation id (audit L6)', () =
 
   it('logs a failure the script could not replace either', async () => {
     const log = vi.fn();
-    await withScriptedFallback(failing('agent_timeout'), failing('invalid_config'), log).ask('q', { correlationId: 'turn-8' });
-    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'error', code: 'agent_timeout', correlationId: 'turn-8', details: { degraded: false, fallbackCode: 'invalid_config' } });
+    await withScriptedFallback(failing('agent_unavailable'), failing('invalid_config'), log).ask('q', { correlationId: 'turn-8' });
+    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'error', code: 'agent_unavailable', correlationId: 'turn-8', details: { degraded: false, fallbackCode: 'invalid_config' } });
   });
 
   it('logs nothing for an answer or an error the user sees as it is', async () => {

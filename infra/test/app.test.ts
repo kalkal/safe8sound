@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { App, Stack } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { Bucket } from 'aws-cdk-lib/aws-s3';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { applyGuardrails, buildApp, loadInfraConfig, type InfraConfig } from '../src/index.js';
+import { InfraConfigSchema, applyGuardrails, buildApp, loadInfraConfig, simApiAgentTimeoutMs, type InfraConfig } from '../src/index.js';
 import { SITE_DIR, exampleConfig } from './fixtures.js';
 
 const config: InfraConfig = exampleConfig();
@@ -13,13 +14,32 @@ const stacksOf = (app: App) => app.node.findAll().filter((c): c is Stack => Stac
 
 describe('loadInfraConfig (region and stages always from config)', () => {
   it('reads the cdk.json context', () => {
-    const context: Record<string, unknown> = { 'cold-reserve:region': 'us-east-1', 'cold-reserve:stages': ['dev', 'demo'], 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': config.agent, 'cold-reserve:simApi': config.simApi };
+    const context: Record<string, unknown> = { 'cold-reserve:region': 'us-east-1', 'cold-reserve:stages': ['dev', 'demo'], 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': config.agent, 'cold-reserve:simApi': config.simApi, 'cold-reserve:turnTiming': config.turnTiming };
     expect(loadInfraConfig((key) => context[key])).toEqual({ ok: true, value: config });
+  });
+
+  it('accepts the real infra/cdk.json as it is, so synth never meets a key the schema refuses (#270)', () => {
+    const cdk = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf8')) as { context: Record<string, unknown> };
+    expect(loadInfraConfig((key) => cdk.context[key])).toMatchObject({ ok: true });
   });
 
   it('rejects a missing or malformed region with invalid_config', () => {
     const result = loadInfraConfig((key) => ({ 'cold-reserve:region': 'US East', 'cold-reserve:stages': ['dev'] })[key]);
     expect(result).toMatchObject({ ok: false, error: { code: 'invalid_config', category: 'internal' } });
+  });
+
+  it('the turn timing table (#270): agent + margin = sim-api < browser < turn budget < the sim-api function; every link refused when inverted', () => {
+    expect(config.turnTiming).toEqual({ agentDeadlineMs: 12_000, agentMarginMs: 2000, browserTimeoutMs: 16_000, turnBudgetMs: 18_000 });
+    const timing = (over: Partial<InfraConfig['turnTiming']>, simApi: Partial<InfraConfig['simApi']> = {}) =>
+      InfraConfigSchema.safeParse({ ...config, turnTiming: { ...config.turnTiming, ...over }, simApi: { ...config.simApi, ...simApi } });
+    expect(timing({}).success).toBe(true);
+    for (const bad of [{ browserTimeoutMs: 14_000 }, { turnBudgetMs: 16_000 }, { agentDeadlineMs: 15_000 }]) {
+      const r = timing(bad);
+      expect(r.success, JSON.stringify(bad)).toBe(false);
+      expect(JSON.stringify(r.error?.issues)).toContain('turnTiming');
+    }
+    expect(timing({ turnBudgetMs: 33_000 }, { timeoutSeconds: 32 }).success).toBe(false);
+    expect(simApiAgentTimeoutMs(config.turnTiming)).toBe(14_000);
   });
 
   it('accepts only the dev and demo stages', () => {

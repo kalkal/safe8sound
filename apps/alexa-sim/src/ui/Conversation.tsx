@@ -9,6 +9,7 @@ import type { VoiceConfig } from '../config.js';
 import { conversationMachine, type AskInput, type AskOutput, type ConversationEvent } from '../machine.js';
 import { log, voiceFailureEvent } from '../log.js';
 import { useVoice, type StudioVoice } from '../voice/use-voice.js';
+import { useSlowTurn } from './slow-turn.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { AnswerCard } from './AnswerCard.js';
 import { DemoCodeGate } from './DemoCodeGate.js';
@@ -118,6 +119,8 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
     setDraft('');
   };
   const thinking = snapshot.matches('thinking');
+  // A cold start can take most of the browser's wait (#270): after a while the screen says so, honestly.
+  const slowTurn = useSlowTurn(thinking);
 
   return (
     <>
@@ -131,6 +134,11 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
         {notice !== null && !listening && (
           <p className="notice" role="status">
             {t(notice)}
+          </p>
+        )}
+        {slowTurn && (
+          <p className="notice" role="status">
+            {t('chat.stillWorking')}
           </p>
         )}
         {thinking && (
@@ -173,7 +181,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
         {/* A refused demo session is explained by the gate alone, not as a failed answer (review of #140). */}
         {snapshot.matches('failed') && error !== null && error.category !== 'unauthorized' && (
           <div className="failure" role="alert">
-            <p>{t(error.retryable ? 'chat.errorTransient' : 'chat.errorOther')}</p>
+            <p>{t(error.code === 'agent_timeout' ? 'chat.errorTimeout' : error.retryable ? 'chat.errorTransient' : 'chat.errorOther')}</p>
             {canRetry && (
               <button
                 type="button"

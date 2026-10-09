@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { agentCoreTurnAgent, type AgentCoreClientLike } from './adapters/agentcore.js';
 import { mcpCardTools, streamableMcpCaller } from './adapters/mcp-cards.js';
 import { httpPhoneInbox } from './adapters/phone-http.js';
-import { loadPlainSimApiSettings, loadSimApiConfig } from './config.js';
+import { DEFAULT_AGENT_TIMEOUT_MS, loadPlainSimApiSettings, loadSimApiConfig } from './config.js';
 import { createSimApiHandler, type SimApiHandler, type SpeechCachePort, type SpeechPort } from './handler.js';
 import type { QuotaStore } from './quota.js';
 
@@ -19,7 +19,7 @@ const SettingsSchema = z.object({
   SIM_ORIGIN_SECRET_PARAMETER: z.string().regex(/^\/[\w./-]+$/),
   SIM_ORIGIN_SECRET_PREVIOUS_PARAMETER: z.string().regex(/^\/[\w./-]+$/),
   AGENT_RUNTIME_ARN: z.string().regex(/^arn:aws[\w-]*:bedrock-agentcore:[a-z0-9-]+:\d{12}:runtime\/[\w-]+$/),
-  SIM_AGENT_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(7500),
+  SIM_AGENT_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(DEFAULT_AGENT_TIMEOUT_MS),
   SIM_MCP_URL: z.url(),
   /** sim-api's sandbox phone token (#267): without it the visitor's phone panel has no route. */
   SIM_PHONE_TOKEN_PARAMETER: z.string().regex(/^\/[\w./-]+$/).optional(),

@@ -8,7 +8,7 @@ import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { BlockPublicAccess, Bucket, BucketEncryption, type CfnBucket } from 'aws-cdk-lib/aws-s3';
 import { FilterPattern, LogGroup, MetricFilter, type CfnLogGroup } from 'aws-cdk-lib/aws-logs';
 import type { Construct } from 'constructs';
-import type { SimApiConfig, StageName, StateConfig } from './config.js';
+import { simApiAgentTimeoutMs, type SimApiConfig, type StageName, type StateConfig, type TurnTiming } from './config.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -16,6 +16,8 @@ export interface SimApiStackProps extends StackProps {
   readonly stage: StageName;
   readonly simApi: SimApiConfig;
   readonly state: StateConfig;
+  /** The one timing table of a turn (#270): how long sim-api waits for the agent. */
+  readonly turnTiming: TurnTiming;
   /** Only what the function needs: the name for its env, the ARN for its policy. */
   readonly table: { readonly tableArn: string; readonly tableName: string };
   /** The MCP server's Function URL (ends with `/`), for the card actions. */
@@ -102,7 +104,7 @@ export class SimApiStack extends Stack {
         SIM_PHONE_TOKEN_PARAMETER: parameter(simApi.phoneTokenParameter),
         SSM_TIMEOUT_MS: String(simApi.ssmTimeoutMs),
         AGENT_RUNTIME_ARN: props.runtimeArn,
-        SIM_AGENT_TIMEOUT_MS: String(simApi.agentTimeoutMs),
+        SIM_AGENT_TIMEOUT_MS: String(simApiAgentTimeoutMs(props.turnTiming)),
         SIM_MCP_URL: Fn.join('', [props.mcpFunctionUrl, 'mcp']),
         SIM_MCP_TIMEOUT_MS: String(simApi.mcpTimeoutMs),
         SIM_ALLOWED_ORIGINS: simApi.allowedOrigins.join(','),

@@ -6,7 +6,7 @@ import { CfnRuntime } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Asset } from 'aws-cdk-lib/aws-s3-assets';
 import type { Construct } from 'constructs';
-import type { AgentConfig, StageName } from './config.js';
+import type { AgentConfig, StageName, TurnTiming } from './config.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const AGENT = join(ROOT, 'apps', 'agent');
@@ -14,6 +14,8 @@ const AGENT = join(ROOT, 'apps', 'agent');
 export interface AgentStackProps extends StackProps {
   readonly stage: StageName;
   readonly agent: AgentConfig;
+  /** The one timing table of a turn (#270): the agent's deadline. */
+  readonly turnTiming: TurnTiming;
   /** The MCP server's Function URL (ends with `/`); the server answers on `/mcp`. */
   readonly mcpFunctionUrl: string;
 }
@@ -132,6 +134,7 @@ export class AgentStack extends Stack {
         AGENT_REGION: this.region,
         AGENT_MCP_URL: Fn.join('', [props.mcpFunctionUrl, 'mcp']),
         AGENT_MCP_TOKEN_PARAMETER: tokenParameter,
+        AGENT_TURN_DEADLINE_MS: String(props.turnTiming.agentDeadlineMs),
       },
     });
     // The role and its policy exist before the runtime starts with them.

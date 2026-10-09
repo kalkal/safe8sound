@@ -9,6 +9,7 @@ export const SITE_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'
 export const exampleConfig = (): InfraConfig => ({
   region: 'us-east-1',
   stages: ['dev', 'demo'],
+  turnTiming: { agentDeadlineMs: 12_000, agentMarginMs: 2000, browserTimeoutMs: 16_000, turnBudgetMs: 18_000 },
   mcp: {
     clientsParameter: '/cold-reserve/{stage}/mcp-server/clients',
     memoryMb: 512,
@@ -39,7 +40,6 @@ export const exampleConfig = (): InfraConfig => ({
     logRetentionDays: 14,
     p95AlarmMs: 9000,
     ssmTimeoutMs: 2000,
-    agentTimeoutMs: 9000,
     mcpTimeoutMs: 3000,
     allowedOrigins: [],
     demoEnabled: { dev: true, demo: true },

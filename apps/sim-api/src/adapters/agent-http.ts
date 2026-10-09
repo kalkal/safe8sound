@@ -1,4 +1,4 @@
-import { ProblemDetailsSchema, TurnReplySchema, categoryOf, err, isRetryableCategory, ok, toolError, type ErrorCategory, type ErrorCode, type ErrorEnvelope, type Result, type TurnReply } from '@cold-reserve/contracts';
+import { ProblemDetailsSchema, TurnFailureSchema, TurnReplySchema, categoryOf, err, isRetryableCategory, ok, toolError, type ErrorCategory, type ErrorCode, type ErrorEnvelope, type Result, type TurnReply } from '@cold-reserve/contracts';
 import type { ErrorLine, TurnAgentPort } from '../handler.js';
 
 /**
@@ -44,7 +44,11 @@ export function httpTurnAgent(opts: {
       const body = parse(text);
       if (response.ok) {
         const reply = TurnReplySchema.safeParse(body);
-        return reply.success ? ok(reply.data) : err(toolError('output_schema_violation', 'The assistant sent a reply in an unexpected format.'));
+        if (reply.success) return ok(reply.data);
+        // The agent answers its expected failures as a 200 TurnFailure, as the AgentCore adapter reads them (#270).
+        const failure = TurnFailureSchema.safeParse(body);
+        if (failure.success) return err(fromAgentFailure(failure.data, opts.log));
+        return err(toolError('output_schema_violation', 'The assistant sent a reply in an unexpected format.'));
       }
       const problem = ProblemDetailsSchema.safeParse(body);
       if (!problem.success) return err(toolError('agent_unavailable', `The assistant failed (HTTP ${String(response.status)}).`));

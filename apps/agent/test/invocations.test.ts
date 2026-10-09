@@ -41,6 +41,21 @@ async function problem(res: Response, status: number, code: string) {
 }
 
 describe('agent invocation entry (AgentCore runtime shape: POST /invocations, GET /ping)', () => {
+  it('logs one turn_end line per turn: duration, turn id and outcome, never the sandbox id (#270)', async () => {
+    const { post, logs } = setup();
+    await post({ prompt: 'Battery?', home: 'demo#0123456789abcdef', correlationId: ID });
+    const end = logs.find((l) => l.message === 'turn_end');
+    expect(end).toMatchObject({ level: 'info', component: 'agent', correlationId: ID, details: { outcome: 'answered' } });
+    expect(typeof end?.details?.['durationMs']).toBe('number');
+    expect(JSON.stringify(logs)).not.toContain('demo#0123456789abcdef');
+  });
+
+  it('a failed turn logs its turn_end with the error code as the outcome', async () => {
+    const { post, logs } = setup(() => Promise.resolve(err(toolError('agent_timeout', 'Too slow.'))));
+    await post({ prompt: 'Battery?', home: 'demo#0123456789abcdef', correlationId: ID });
+    expect(logs.find((l) => l.message === 'turn_end')).toMatchObject({ level: 'info', correlationId: ID, details: { outcome: 'agent_timeout' } });
+  });
+
   it('answers /ping as healthy without a token', async () => {
     const res = await setup().handler(new Request(`${URL_BASE}/ping`));
     expect(res.status).toBe(200);

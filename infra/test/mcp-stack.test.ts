@@ -192,6 +192,7 @@ describe('loadInfraConfig for the mcp and state settings', () => {
       'cold-reserve:state': config.state,
       'cold-reserve:agent': config.agent,
       'cold-reserve:simApi': config.simApi,
+      'cold-reserve:turnTiming': config.turnTiming,
       ...overrides,
     };
     return (key: string) => values[key];

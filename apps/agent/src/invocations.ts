@@ -44,8 +44,10 @@ export function createInvocationHandler(deps: {
   auth: InvocationAuth;
   maxBodyBytes: number;
   agentFor: (home: HomeId) => HomeAgent;
-  /** Refusals only: turn failures are logged by the agent itself. */
+  /** Refusals, and one turn_end line per turn (#270); a turn's own failures are logged by the agent itself. */
   log?: (entry: AgentLogEntry) => void;
+  /** The clock for a turn's duration; Date.now by default. */
+  now?: () => number;
   /**
    * `problem` (default, the local entry): RFC 9457 Problem Details. `envelope` (AgentCore): HTTP 200 with a
    * TurnFailure, because AgentCore turns any 4xx/5xx of the container into a 424 and the code would be lost
@@ -94,7 +96,19 @@ export function createInvocationHandler(deps: {
     if (!invocation.success) return refuse(toolError('invalid_input', 'Send {"prompt", "home"} for a sandbox home.'), correlationId);
 
     const turnId = invocation.data.correlationId ?? correlationId;
+    const now = deps.now ?? Date.now;
+    const startedMs = now();
     const reply = await deps.agentFor(invocation.data.home).ask(invocation.data.prompt, turnId);
+    // One line per turn, so the agent's share of a turn (model and tools) reads apart from sim-api's (#270).
+    // The sandbox id never enters a log line.
+    deps.log?.({
+      ts: new Date().toISOString(),
+      level: 'info',
+      component: 'agent',
+      message: 'turn_end',
+      correlationId: turnId,
+      details: { durationMs: now() - startedMs, outcome: reply.ok ? 'answered' : reply.error.code },
+    });
     return reply.ok ? json(200, reply.value) : fail(reply.error, turnId);
   };
 }

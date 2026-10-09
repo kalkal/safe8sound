@@ -30,12 +30,13 @@ export class ColdReserveStage extends Stage {
     new FoundationStack(this, 'foundation', common('foundation'));
     const data = new DataStack(this, 'data', { ...common('data'), retain: stageName === 'demo' });
     const mcp = new McpStack(this, 'mcp', { ...common('mcp'), stage: stageName, mcp: config.mcp, state: config.state, table: data.table });
-    const agent = new AgentStack(this, 'agent', { ...common('agent'), stage: stageName, agent: config.agent, mcpFunctionUrl: mcp.functionUrl });
+    const agent = new AgentStack(this, 'agent', { ...common('agent'), stage: stageName, agent: config.agent, turnTiming: config.turnTiming, mcpFunctionUrl: mcp.functionUrl });
     const simApi = new SimApiStack(this, 'sim-api', {
       ...common('sim-api'),
       stage: stageName,
       simApi: config.simApi,
       state: config.state,
+      turnTiming: config.turnTiming,
       table: data.table,
       mcpFunctionUrl: mcp.functionUrl,
       runtimeArn: agent.runtimeArn,

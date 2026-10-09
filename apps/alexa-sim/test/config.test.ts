@@ -8,8 +8,8 @@ describe('simulator config', () => {
       value: {
         agent: 'scripted',
         simApiUrl: undefined,
-        agentTimeoutMs: 8_000,
-        turnBudgetMs: 10_000,
+        agentTimeoutMs: 16_000,
+        turnBudgetMs: 18_000,
         homeTimeZone: 'Europe/Rome',
         phone: 'scripted',
         phonePollMs: 5_000,

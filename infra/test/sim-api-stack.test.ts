@@ -20,6 +20,7 @@ function synth(simApi: SimApiConfig = exampleSimApi()): Template {
     stage: 'dev',
     simApi,
     state: { connectTimeoutMs: 500, requestTimeoutMs: 1500, maxAttempts: 3 },
+    turnTiming: exampleConfig().turnTiming,
     table: { tableArn: TABLE_ARN, tableName: 'ColdReserve-dev' },
     mcpFunctionUrl: 'https://mcp.lambda-url.us-east-1.on.aws/',
     runtimeArn: RUNTIME_ARN,
@@ -65,7 +66,8 @@ describe('sim-api stack (#17)', () => {
       SIM_PHONE_TOKEN_PARAMETER: '/cold-reserve/dev/sim-api/phone-token',
       AGENT_RUNTIME_ARN: RUNTIME_ARN,
       SIM_MCP_URL: 'https://mcp.lambda-url.us-east-1.on.aws/mcp',
-      SIM_AGENT_TIMEOUT_MS: '9000',
+      // From the one timing table (#270): the agent's deadline plus its margin.
+      SIM_AGENT_TIMEOUT_MS: '14000',
       SIM_MCP_TIMEOUT_MS: '3000',
       SSM_TIMEOUT_MS: '2000',
       SIM_ALLOWED_ORIGINS: 'https://sim.example',
@@ -183,7 +185,7 @@ describe('the sim-api time budget (Copilot on #156): the caller never gets a raw
   const parse = (simApi: Partial<SimApiConfig>, state: Partial<ReturnType<typeof exampleConfig>['state']> = {}) =>
     InfraConfigSchema.safeParse({ ...exampleConfig(), simApi: { ...exampleConfig().simApi, ...simApi }, state: { ...exampleConfig().state, ...state } });
 
-  it('accepts the cdk.json values: the turn needs 24 s; a spoken reply 2 s SSM + 2 x 1 s cache + 4 x 6 s DynamoDB + 2.5 s Polly + 1 s = 31.5 s, within 32 s', () => {
+  it('accepts the cdk.json values: the turn needs 29 s (2 s SSM + 2 x 6 s DynamoDB + 14 s agent + 1 s); a spoken reply 2 s SSM + 2 x 1 s cache + 4 x 6 s DynamoDB + 2.5 s Polly + 1 s = 31.5 s, within 32 s', () => {
     expect(parse({}).success).toBe(true);
   });
 
@@ -197,7 +199,7 @@ describe('the sim-api time budget (Copilot on #156): the caller never gets a raw
     expect(result.success).toBe(false);
     expect(JSON.stringify(result.error?.issues)).toContain('timeoutSeconds');
     expect(parse({}, { maxAttempts: 5 }).success).toBe(false);
-    expect(parse({ mcpTimeoutMs: 20_000, agentTimeoutMs: 3000 }).success).toBe(false);
+    expect(parse({ mcpTimeoutMs: 20_000 }).success).toBe(false);
   });
 });
 
@@ -205,10 +207,6 @@ describe('SimApiConfigSchema', () => {
   it('accepts the example and refuses parameters outside the sim-api prefix', () => {
     expect(SimApiConfigSchema.safeParse(exampleSimApi()).success).toBe(true);
     expect(SimApiConfigSchema.safeParse({ ...exampleSimApi(), mcpTokenParameter: '/cold-reserve/{stage}/mcp-server/clients' }).success).toBe(false);
-  });
-
-  it('refuses an agent timeout that does not fit in the function timeout', () => {
-    expect(SimApiConfigSchema.safeParse({ ...exampleSimApi(), timeoutSeconds: 20, agentTimeoutMs: 25_000 }).success).toBe(false);
   });
 
   it('refuses an origin with a path (CORS matches exact origins)', () => {
@@ -239,7 +237,7 @@ describe('the app wires the sim-api stack in every stage', () => {
   it('reads its section from the CDK context, and refuses a config without it', () => {
     const config = exampleConfig();
     const context = (simApi: unknown) => (key: string) =>
-      ({ 'cold-reserve:region': config.region, 'cold-reserve:stages': config.stages, 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': config.agent, 'cold-reserve:simApi': simApi })[key];
+      ({ 'cold-reserve:region': config.region, 'cold-reserve:stages': config.stages, 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': config.agent, 'cold-reserve:simApi': simApi, 'cold-reserve:turnTiming': config.turnTiming })[key];
     expect(loadInfraConfig(context(config.simApi))).toEqual({ ok: true, value: config });
     expect(loadInfraConfig(context(undefined))).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });

@@ -17,10 +17,16 @@ describe('loadAgentConfig (cost rule caps, model from config)', () => {
         maxModelTurns: 7,
         maxToolCalls: 6,
         historyWindowMessages: 12,
-        turnDeadlineMs: 7000,
+        turnDeadlineMs: 12_000,
         mcpUrl: 'http://127.0.0.1:3316/mcp',
       },
     });
+  });
+
+  it('the default turn deadline is the agent deadline of the timing table in infra/cdk.json (#270)', () => {
+    const cdk = JSON.parse(readFileSync(new URL('../../../infra/cdk.json', import.meta.url), 'utf8')) as { context: Record<string, { agentDeadlineMs?: number }> };
+    const result = loadAgentConfig({});
+    expect(result.ok && result.value.turnDeadlineMs).toBe(cdk.context['cold-reserve:turnTiming']?.agentDeadlineMs);
   });
 
   it('takes the Bedrock model id and region only from config', () => {

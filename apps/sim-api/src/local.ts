@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { httpTurnAgent } from './adapters/agent-http.js';
 import { mcpCardTools, streamableMcpCaller } from './adapters/mcp-cards.js';
 import { httpPhoneInbox } from './adapters/phone-http.js';
-import { loadSimApiConfig } from './config.js';
+import { DEFAULT_AGENT_TIMEOUT_MS, loadSimApiConfig } from './config.js';
 import { createSimApiHandler } from './handler.js';
 import { nodeListener } from './node-listener.js';
 import { memoryQuotaStore } from './quota.js';
@@ -44,7 +44,7 @@ const BackendsSchema = z.strictObject({
 const backends = BackendsSchema.safeParse({
   agentUrl: process.env['SIM_AGENT_URL'] ?? 'http://127.0.0.1:3340',
   invokeToken: process.env['AGENT_INVOKE_TOKEN'],
-  agentTimeoutMs: process.env['SIM_AGENT_TIMEOUT_MS'] ?? '7500',
+  agentTimeoutMs: process.env['SIM_AGENT_TIMEOUT_MS'] ?? String(DEFAULT_AGENT_TIMEOUT_MS),
   mcpUrl: process.env['SIM_MCP_URL'] ?? 'http://127.0.0.1:3316/mcp',
   mcpToken: process.env['SIM_MCP_TOKEN'],
   mcpTimeoutMs: process.env['SIM_MCP_TIMEOUT_MS'] ?? '3000',

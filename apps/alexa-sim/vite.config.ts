@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 import { cloudFrontStandIn } from './vite.cloudfront-preview.js';
+import { siteTimingEnv } from './scripts/turn-timing.js';
 import { phoneProxy, requirePhoneProxy } from './vite.phone-proxy.js';
 
 /** The headers the built site is served with (scripts/site-headers.ts), so `vite preview` applies the AWS CSP too. */
@@ -20,6 +21,8 @@ export default defineConfig(({ mode }) => {
   if (mode === 'aws') {
     process.env['VITE_AGENT'] = 'remote';
     process.env['VITE_SIM_API_URL'] = '/api';
+    // The browser's waits from the one timing table of a turn (#270), never a default.
+    Object.assign(process.env, siteTimingEnv(JSON.parse(readFileSync(new URL('../../infra/cdk.json', import.meta.url), 'utf8'))));
   }
   const proxy = phoneProxy(process.env);
   requirePhoneProxy({ ...loadEnv(mode, process.cwd(), 'VITE_'), ...process.env }, proxy);

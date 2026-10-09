@@ -57,6 +57,8 @@ describe('agent stack: the agent on AgentCore Runtime (G1b)', () => {
         AGENT_REGION: 'us-east-1',
         AGENT_MCP_TOKEN_PARAMETER: '/cold-reserve/dev/agent/mcp-token',
         AGENT_MCP_URL: Match.anyValue(),
+        // From the one timing table (#270): the agent closes its turn first.
+        AGENT_TURN_DEADLINE_MS: '12000',
       }),
     });
     const text = JSON.stringify(t.toJSON());
@@ -117,7 +119,7 @@ describe('agent stack: the agent on AgentCore Runtime (G1b)', () => {
 
 describe('loadInfraConfig for the agent settings', () => {
   const context = (agent: unknown) => (key: string) =>
-    ({ 'cold-reserve:region': config.region, 'cold-reserve:stages': config.stages, 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': agent, 'cold-reserve:simApi': config.simApi })[key];
+    ({ 'cold-reserve:region': config.region, 'cold-reserve:stages': config.stages, 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': agent, 'cold-reserve:simApi': config.simApi, 'cold-reserve:turnTiming': config.turnTiming })[key];
 
   it('reads them from the CDK context', () => {
     expect(loadInfraConfig(context(config.agent))).toEqual({ ok: true, value: config });

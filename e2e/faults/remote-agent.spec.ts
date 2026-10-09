@@ -128,3 +128,47 @@ test("remote agent down → \"The power's out\" gets the honest degraded answer,
   await expect(page.locator('iframe')).toHaveCount(0);
   await expect(page.getByRole('region', { name: "Your daughter's phone (simulated)" }).getByRole('article')).toHaveCount(0);
 });
+
+test('the agent took too long → its own message and a retry, never the scripted answer (#270)', async ({ page }) => {
+  // The Problem Details sim-api answers for agent_timeout (dependency_unavailable: 503).
+  const problem = {
+    type: 'urn:cold-reserve:problem:agent_timeout',
+    title: 'Service unavailable',
+    status: 503,
+    detail: 'The assistant took too long.',
+    instance: 'c2',
+    code: 'agent_timeout',
+  };
+  await page.route('**/sim-api/v1/turns', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/problem+json', body: JSON.stringify(problem) }),
+  );
+  await openRemote(page);
+  await ask(page);
+
+  await expect(page.getByRole('alert')).toContainText('That took too long. Please try again.');
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await expect(page.getByRole('note')).toHaveCount(0);
+  await expect(page.getByTestId('answer')).toHaveCount(0);
+});
+
+test('a slow turn: after about 8 s the waiting screen says it is still working, then the answer replaces it (#270)', async ({ page }) => {
+  // A fixed 9 s answer plus the session: more than the default test timeout allows.
+  test.setTimeout(30_000);
+  const reply = {
+    text: 'Your battery is at 64 percent.',
+    status: { batterySocPct: 64, origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' }, ts: '2026-07-15T18:05:00+02:00' },
+  };
+  // Answers after 9 s, as a cold AgentCore start can (8.2 s seen on dev): within the 16 s the browser waits.
+  await page.route('**/sim-api/v1/turns', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 9000));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) });
+  });
+  await openRemote(page);
+  await ask(page);
+
+  const waking = page.getByText('Still working on it: this can take a few seconds.');
+  await expect(waking).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('battery-soc')).toHaveText('64%', { timeout: 10_000 });
+  await expect(waking).toHaveCount(0);
+  await expect(page.getByRole('note')).toHaveCount(0);
+});

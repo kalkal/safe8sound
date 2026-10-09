@@ -24,6 +24,21 @@ How the agent (`apps/agent`) runs on Amazon Bedrock AgentCore Runtime, and who m
   - one turn at a time per home;
   - the turn deadline.
 
+## Turn timing (#270)
+
+One table in `infra/cdk.json` (`cold-reserve:turnTiming`) sets every wait of a turn, so they can never cross:
+
+| Who waits | For what | Value | Set from the table as |
+|---|---|---|---|
+| The agent | its own turn | 12 s | `AGENT_TURN_DEADLINE_MS` (agent stack) |
+| sim-api | the agent | 14 s (deadline + 2 s margin) | `SIM_AGENT_TIMEOUT_MS` (sim-api stack) |
+| The browser | sim-api | 16 s | `VITE_AGENT_TIMEOUT_MS` (AWS site build) |
+| The browser | the whole turn on screen | 18 s | `VITE_TURN_BUDGET_MS` (AWS site build) |
+
+The sim-api function (32 s) outlives them all. The infra config refuses a table where a wait ends before the one it waits for, and tests keep the local defaults equal to the table. The values cover a cold AgentCore start (8.2 s seen on dev; warm turns take about 2.3 s). After 8 s the waiting screen says it is still working. A turn the agent closes at its deadline (`agent_timeout`) shows "That took too long. Please try again." with a retry, never the scripted fallback: the assistant is there, only slow. `agent_unavailable` still falls back to the scripted answer.
+
+The chain holds from the moment sim-api calls the agent. Before that, sim-api's own steps (a cold start, the SSM reads, the quota counts) are not in the table: on a warm function they take well under a second, inside the 2 s between sim-api's 14 s and the browser's 16 s. On a cold sim-api start with a slow store they can take longer (worst case 2 s SSM + 2 x 6 s DynamoDB, the function's time budget), and then the browser may stop waiting first: it shows its own honest timeout, and the 32 s function still ends the turn cleanly. Each turn leaves one `turn_end` line in the agent's log, with `durationMs`, the turn id and the outcome, so the agent's share reads apart from sim-api's `turn_answered`.
+
 ## The MCP token
 
 - The agent reaches the MCP server with its own token: an **SSM SecureString**, encrypted with the AWS-managed key (no extra cost), named by `AGENT_MCP_TOKEN_PARAMETER`.

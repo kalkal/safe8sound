@@ -8,8 +8,10 @@ const MAX_TOKENS_CEILING = 400;
 const MAX_TOOL_CALLS_CEILING = 6;
 const HISTORY_MESSAGES_CEILING = 12; // 6 turns = 6 user + 6 assistant messages
 const TURN_DEADLINE_CEILING_MS = 30_000;
-// Under sim-api's 8 s scripted fallback (plan §9.2), so the agent answers or fails first.
-const DEFAULT_TURN_DEADLINE_MS = 7_000;
+// The agent deadline of the timing table of a turn (infra/cdk.json cold-reserve:turnTiming, #270): the agent closes
+// its turn first, before sim-api and the browser stop waiting. The AgentCore stack sets it from the table; a test
+// keeps this local default equal to it.
+const DEFAULT_TURN_DEADLINE_MS = 12_000;
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
 const MIN_TOKEN_LENGTH = 32;

@@ -46,6 +46,20 @@ describe('httpTurnAgent: sim-api -> agent POST /invocations (AgentCore shape)', 
     }
   });
 
+  it.each([
+    ['agent_timeout', 'dependency_unavailable'],
+    ['agent_unavailable', 'dependency_unavailable'],
+  ] as const)('a 200 TurnFailure %s is that typed error, never a schema violation (#270)', async (code, category) => {
+    const failure = { failed: true, code, category, correlationId: CID };
+    const reply = await agent(() => Promise.resolve(Response.json(failure))).ask({ home: HOME, question: 'Hi', correlationId: CID });
+    expect(reply).toMatchObject({ ok: false, error: { code, category } });
+  });
+
+  it('a 200 body that is neither a reply nor a TurnFailure is still a schema violation', async () => {
+    const reply = await agent(() => Promise.resolve(Response.json({ nonsense: true }))).ask({ home: HOME, question: 'Hi', correlationId: CID });
+    expect(reply).toMatchObject({ ok: false, error: { code: 'output_schema_violation' } });
+  });
+
   it('passes rate limits on with their wait time', async () => {
     const busy = toProblemDetails(toolError('turn_in_progress', 'Wait.', { retryAfterMs: 7000 }), { instance: `urn:uuid:${CID}` });
     const reply = await agent(() => Promise.resolve(Response.json(busy, { status: 429 }))).ask({ home: HOME, question: 'Hi', correlationId: CID });
