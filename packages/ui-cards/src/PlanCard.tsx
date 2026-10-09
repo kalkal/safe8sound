@@ -123,12 +123,21 @@ function SurplusRouting({ surplus, timeZone }: { surplus: Surplus; timeZone: str
           <li key={room.roomId}>
             <strong>{roomLabel(room.roomId)}</strong>
             <span>
-              {t('plan.surplusRoom', {
-                reason: t(`surplusReason.${room.reason}`),
-                setpoint: String(room.setpointC),
-                delta: Math.abs(room.aboveTargetK).toFixed(1),
-                side: t(room.aboveTargetK >= 0 ? 'surplus.above' : 'surplus.below'),
-              })}
+              {surplus.comfortC === undefined
+                ? t('plan.surplusRoomNoComfort', {
+                    reason: t(`surplusReason.${room.reason}`),
+                    setpoint: String(room.setpointC),
+                    delta: Math.abs(room.aboveTargetK).toFixed(1),
+                    side: t(room.aboveTargetK >= 0 ? 'surplus.above' : 'surplus.below'),
+                  })
+                : t('plan.surplusRoom', {
+                    reason: t(`surplusReason.${room.reason}`),
+                    now: (surplus.comfortC + room.aboveTargetK).toFixed(1),
+                    comfort: String(surplus.comfortC),
+                    setpoint: String(room.setpointC),
+                    delta: Math.abs(room.aboveTargetK).toFixed(1),
+                    side: t(room.aboveTargetK >= 0 ? 'surplus.above' : 'surplus.below'),
+                  })}
             </span>
           </li>
         ))}

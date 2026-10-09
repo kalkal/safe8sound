@@ -193,6 +193,11 @@ describe('PlanSchema', () => {
       expect(bad({ rooms: [surplus.rooms[0], surplus.rooms[0]] })).toBe(false);
       expect(bad({ rooms: [{ ...surplus.rooms[0], reason: 'nice' }] })).toBe(false);
     });
+
+    it('may carry the comfort the rooms are compared with, so the card says "now 30.9 °C, 6.9 °C above the 24 °C comfort" (optional, additive)', () => {
+      expect(PlanSchema.parse({ ...examplePlan(), surplus: { ...surplus, comfortC: 24 } }).surplus?.comfortC).toBe(24);
+      expect(PlanSchema.safeParse({ ...examplePlan(), surplus: { ...surplus, comfortC: 'warm' } }).success).toBe(false);
+    });
   });
 });
 

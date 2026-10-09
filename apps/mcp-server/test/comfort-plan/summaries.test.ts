@@ -36,20 +36,28 @@ describe('what the model reads', () => {
       from: '2026-07-16T16:00:00+02:00',
       to: '2026-07-16T20:05:00+02:00',
       keptKWh: 3.4,
+      comfortC: 24,
       rooms: [
         { roomId: 'bedroom-1', setpointC: 24, reason: 'safe_room' as const, aboveTargetK: 1 },
         { roomId: 'bedroom-2', setpointC: 23, reason: 'occupied_tonight' as const, aboveTargetK: 6.9 },
-        { roomId: 'study', setpointC: 23, reason: 'occupied' as const, aboveTargetK: 2 },
+        { roomId: 'study', setpointC: 23, reason: 'occupied' as const, aboveTargetK: -0.4 },
       ],
     };
     const names = { 'bedroom-1': 'Bedroom', 'bedroom-2': 'Second bedroom', study: 'Study' };
     const text = planSummary({ ...examplePlan(), surplus } as Plan, { ...NIGHT, roomNames: names });
+    // Owner feedback: "cooled to 23 °C · 6.9 °C above target" was not understood; the room now, the comfort, then the setpoint.
     expect(text).toContain(
       'Solar surplus from 4:00 PM to 8:05 PM: 3.4 kWh kept at home instead of exported to the grid. Where it went, in order: ' +
-        '1) Bedroom (safe room), cooled to 24 °C, now 1.0 °C above target; ' +
-        '2) Second bedroom (slept in tonight), cooled to 23 °C, now 6.9 °C above target; ' +
-        '3) Study (occupied), cooled to 23 °C, now 2.0 °C above target.',
+        '1) Bedroom (safe room), now 25.0 °C, 1.0 °C above the 24 °C comfort, cooling to 24 °C; ' +
+        '2) Second bedroom (slept in tonight), now 30.9 °C, 6.9 °C above the 24 °C comfort, cooling to 23 °C; ' +
+        '3) Study (occupied), now 23.6 °C, 0.4 °C below the 24 °C comfort, cooling to 23 °C.',
     );
+    expect(text).not.toContain('target');
+    // A plan without the comfort (older): no "now" figure it cannot know, and still no "target".
+    const older = { from: surplus.from, to: surplus.to, keptKWh: surplus.keptKWh, rooms: surplus.rooms };
+    const olderText = planSummary({ ...examplePlan(), surplus: older } as Plan, { ...NIGHT, roomNames: names });
+    expect(olderText).toContain('1) Bedroom (safe room), 1.0 °C above comfort, cooling to 24 °C;');
+    expect(olderText).not.toContain('target');
     for (const id of ['bedroom-2', 'study']) expect(text.slice(text.indexOf('Solar surplus'))).not.toContain(id);
     expect(planSummary(examplePlan() as Plan, { ...NIGHT, roomNames: names })).not.toContain('Solar surplus');
   });

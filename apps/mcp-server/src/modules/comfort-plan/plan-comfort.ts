@@ -539,6 +539,8 @@ function withSurplus(
       from: localIso(window.fromMs, profile.location.tz),
       to: localIso(window.toMs, profile.location.tz),
       rooms: chosen.map((r) => ({ roomId: r.roomId, setpointC: setpointOf(r.roomId), reason: r.reason, aboveTargetK: r.aboveTargetK })),
+      // What aboveTargetK is measured from (orderSurplusRooms above): the card and the voice say it.
+      comfortC: preferences.comfortC.cooling,
     },
   };
 }

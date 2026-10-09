@@ -69,6 +69,11 @@ export const PlanSurplusSchema = z
       .array(z.strictObject({ roomId: EntityIdSchema, setpointC: CelsiusSchema, reason: SurplusReasonSchema, aboveTargetK: z.number() }))
       .min(1)
       .max(12),
+    /**
+     * The comfort each room's aboveTargetK is measured from (optional, additive): the card can say
+     * "now 30.9 °C, 6.9 °C above the 24 °C comfort", as the voice does.
+     */
+    comfortC: CelsiusSchema.optional(),
   })
   .superRefine((s, ctx) => {
     if (epochMs(s.to) <= epochMs(s.from)) ctx.addIssue({ code: 'custom', path: ['to'], message: 'The window ends after it starts' });

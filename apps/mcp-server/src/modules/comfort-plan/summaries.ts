@@ -52,10 +52,13 @@ const SURPLUS_REASON = { safe_room: 'safe room', occupied: 'occupied', occupied_
 
 /** Where the solar surplus went (#203), in order, by room name, with every number (F7): the scene reads alone. */
 function surplusText(s: NonNullable<Plan['surplus']>, opts: PlanSummaryOptions): string {
+  // Owner feedback: the room now against the comfort, then the setpoint ("cooled to 23 °C · 6.9 °C above target" was not understood).
   const rooms = s.rooms.map((r, i) => {
     const name = opts.roomNames?.[r.roomId] ?? 'a room';
     const side = r.aboveTargetK >= 0 ? 'above' : 'below';
-    return `${String(i + 1)}) ${name} (${SURPLUS_REASON[r.reason]}), cooled to ${String(r.setpointC)} °C, now ${Math.abs(r.aboveTargetK).toFixed(1)} °C ${side} target`;
+    const delta = `${Math.abs(r.aboveTargetK).toFixed(1)} °C ${side}`;
+    const versus = s.comfortC === undefined ? `${delta} comfort` : `now ${(s.comfortC + r.aboveTargetK).toFixed(1)} °C, ${delta} the ${String(s.comfortC)} °C comfort`;
+    return `${String(i + 1)}) ${name} (${SURPLUS_REASON[r.reason]}), ${versus}, cooling to ${String(r.setpointC)} °C`;
   });
   return (
     `Solar surplus from ${localTimeText(s.from)} to ${localTimeText(s.to)}: ${s.keptKWh.toFixed(1)} kWh kept at home instead of exported to the grid. ` +

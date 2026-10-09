@@ -486,6 +486,11 @@ describe('solar surplus at home instead of on the grid (#203)', () => {
     expect(p.guarantees.every((g) => g.ok)).toBe(true);
   });
 
+  it('carries the cooling comfort the rooms are measured from, so the card can say "now X °C, Y °C above the Z °C comfort"', async () => {
+    const p = await planned(sunny());
+    expect(p.surplus?.comfortC).toBe(preferences.comfortC.cooling);
+  });
+
   it('never colder than the household asked: comfort minus the offset, and less in the safe room with an elderly person', async () => {
     const p = await planned(sunny());
     const cfg = sunny().deps.config.planner.surplus;

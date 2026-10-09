@@ -153,7 +153,9 @@ export const enUS = {
   'plan.surplusKept': '{kwh} kWh',
   'plan.surplusKeptNote': 'kept at home instead of sent to the grid',
   'plan.surplusRooms': 'Where it went, in order',
-  'plan.surplusRoom': '{reason} · cooled to {setpoint} °C · {delta} °C {side} target',
+  // Owner feedback: the room now against the comfort, then the setpoint ("6.9 °C above target" was not understood).
+  'plan.surplusRoom': '{reason} · now {now} °C, {delta} °C {side} the {comfort} °C comfort · cooling to {setpoint} °C',
+  'plan.surplusRoomNoComfort': '{reason} · {delta} °C {side} comfort · cooling to {setpoint} °C',
   'surplusReason.safe_room': 'Safe room',
   'surplusReason.occupied': 'Occupied',
   'surplusReason.occupied_tonight': 'Slept in tonight',

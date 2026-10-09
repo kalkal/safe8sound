@@ -17,12 +17,23 @@ describe('PlanCard', () => {
     expect(within(surplus).getByTestId('surplus-kept').textContent).toBe('2.4 kWh');
     expect(within(surplus).getByText('kept at home instead of sent to the grid')).toBeTruthy();
     const rooms = within(surplus).getByRole('list', { name: 'Where it went, in order' });
+    // Owner feedback: the room now against the comfort, then the setpoint; the same words as the voice.
     expect(within(rooms).getAllByRole('listitem').map((r) => r.textContent)).toEqual([
-      'Bedroom 1Safe room · cooled to 24 °C · 0.8 °C above target',
-      'LivingOccupied · cooled to 25 °C · 0.4 °C below target',
+      'Bedroom 1Safe room · now 24.8 °C, 0.8 °C above the 24 °C comfort · cooling to 24 °C',
+      'LivingOccupied · now 23.6 °C, 0.4 °C below the 24 °C comfort · cooling to 25 °C',
     ]);
-    // Names, never internal ids.
+    // Names, never internal ids; never "target".
     expect(surplus.textContent).not.toContain('bedroom-1');
+    expect(surplus.textContent).not.toContain('target');
+  });
+
+  it('a plan without the comfort (older) says how far from comfort, without a "now" figure it cannot know', () => {
+    const plan = surplusPlan();
+    if (plan.surplus === undefined) throw new Error('no surplus');
+    const { from, to, keptKWh, rooms: surplusRooms } = plan.surplus;
+    show({ ...plan, surplus: { from, to, keptKWh, rooms: surplusRooms } });
+    const rooms = screen.getByRole('list', { name: 'Where it went, in order' });
+    expect(within(rooms).getAllByRole('listitem')[0]?.textContent).toBe('Bedroom 1Safe room · 0.8 °C above comfort · cooling to 24 °C');
   });
 
   it('a plan without a surplus has no surplus section', () => {

@@ -81,7 +81,7 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       const surplus = plan.surplus;
       if (surplus === undefined) throw new Error('no solar surplus on the hot day');
       expect(surplus.rooms[0]?.reason).toBe('safe_room');
-      expect(text).toMatch(/Solar surplus from \d{1,2}:\d\d [AP]M to \d{1,2}:\d\d [AP]M: [\d.]+ kWh kept at home instead of exported to the grid\. Where it went, in order: 1\) Bedroom \(safe room\), cooled to [\d.]+ °C/);
+      expect(text).toMatch(/Solar surplus from \d{1,2}:\d\d [AP]M to \d{1,2}:\d\d [AP]M: [\d.]+ kWh kept at home instead of exported to the grid\. Where it went, in order: 1\) Bedroom \(safe room\), now [\d.]+ °C, [\d.]+ °C (above|below) the [\d.]+ °C comfort, cooling to [\d.]+ °C/);
       expect(text).toContain(`${surplus.keptKWh.toFixed(1)} kWh kept at home`);
 
       // 3. The person confirms; the agent retries after a timeout: one application only.

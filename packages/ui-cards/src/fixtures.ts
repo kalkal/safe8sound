@@ -46,6 +46,7 @@ export function surplusPlan(): Plan {
       from: '2026-07-15T12:00:00+02:00',
       to: '2026-07-15T16:00:00+02:00',
       keptKWh: 2.4,
+      comfortC: 24,
       rooms: [
         { roomId: 'bedroom-1', setpointC: 24, reason: 'safe_room', aboveTargetK: 0.8 },
         { roomId: 'living', setpointC: 25, reason: 'occupied', aboveTargetK: -0.4 },
