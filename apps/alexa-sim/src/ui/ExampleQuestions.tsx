@@ -10,10 +10,32 @@ export const EXAMPLE_QUESTIONS = [
   { label: 'examples.powerCut', question: "The power's out" },
 ] as const;
 
-export function ExampleQuestions({ onPick }: { onPick: (question: string) => void }) {
+/** With the grid down (#268): what matters during a storm, never a hot-day plan. */
+export const STORM_EXAMPLE_QUESTIONS = [
+  { label: 'examples.safeRoom', question: 'How is Grandpa doing in the safe room?' },
+  // Never "battery" here: the scripted demo would answer the battery level (review of #301).
+  { label: 'examples.howLong', question: 'How long will the cold reserve last?' },
+  { label: 'examples.powerBack', question: 'Is the power back?' },
+] as const;
+
+export type ExampleQuestion = (typeof EXAMPLE_QUESTIONS)[number] | (typeof STORM_EXAMPLE_QUESTIONS)[number];
+
+/** What the simulator already knows: the home's grid (once read) and the demo scenario. */
+export interface ExampleState {
+  readonly gridAvailable?: boolean;
+  readonly scenarioId?: string;
+}
+
+/** The home read wins; before it, the scenario decides (#268). */
+export function examplesFor(state: ExampleState): readonly ExampleQuestion[] {
+  const gridDown = state.gridAvailable === undefined ? state.scenarioId === 'storm-blackout' : !state.gridAvailable;
+  return gridDown ? STORM_EXAMPLE_QUESTIONS : EXAMPLE_QUESTIONS;
+}
+
+export function ExampleQuestions({ onPick, examples = EXAMPLE_QUESTIONS }: { onPick: (question: string) => void; examples?: readonly ExampleQuestion[] }) {
   return (
     <div className="examples" role="group" aria-label={t('examples.label')}>
-      {EXAMPLE_QUESTIONS.map((example) => (
+      {examples.map((example) => (
         <button
           key={example.label}
           type="button"

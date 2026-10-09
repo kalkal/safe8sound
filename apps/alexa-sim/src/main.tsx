@@ -18,6 +18,7 @@ import { createScriptedPhone, type PhoneFeed } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
 import { CardFrame } from './host/CardFrame.js';
 import { EchoFrame } from './ui/EchoFrame.js';
+import { examplesFor } from './ui/ExampleQuestions.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { HomePanel } from './ui/HomePanel.js';
 import { SHIPPED_PLACES, applyChange, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario, type DemoSettingsView } from './ui/demo-settings.js';
@@ -106,10 +107,13 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // "Show my home" (#204): the home the answers and the card actions describe (home.ts).
   const homeMode = config.agent === 'scripted' ? 'scripted' : 'remote';
   const [home, setHome] = useState(() => initialHome(homeMode));
+  // Scripted mode (#268): whether an answer has said what the home is since the scenario was chosen.
+  const [homeTold, setHomeTold] = useState(false);
   const onAnswer = useCallback(
     (answer: AgentAnswer) => {
       setSky((previous) => skyFor(answer.cards ?? [], config.homeTimeZone, previous));
       setHome((previous) => homeFor(answer.cards ?? [], previous, homeMode));
+      if (homeFor(answer.cards ?? [], undefined, homeMode) !== undefined) setHomeTold(true);
     },
     [config.homeTimeZone, homeMode],
   );
@@ -148,7 +152,10 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     async (change: SetScenarioInput) => {
       if (scripted) {
         setDemoSettings((previous) => (previous === undefined ? previous : applyChange(previous, change)));
-        if (change.scenarioId !== undefined) setSky(skyOfScenario(change.scenarioId));
+        if (change.scenarioId !== undefined) {
+          setSky(skyOfScenario(change.scenarioId));
+          setHomeTold(false);
+        }
         return true;
       }
       const saved = await saveDemoSettings(agent, change, { correlationId: crypto.randomUUID() });
@@ -170,6 +177,13 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     document.title = t('sim.title');
   }, [locale]);
   // The badge is always there: without demo settings it opens the language row only (#284).
+  // The example buttons follow the home (#268). Remote mode: the home read from sim-api wins over the scenario.
+  // Scripted mode: the scenario decides (its home starts calm whatever the scenario) until an answer says what the
+  // home is (a storm starting, or the power coming back); that answer then wins (review of #301).
+  const examples = examplesFor({
+    ...(demoSettings === undefined ? {} : { scenarioId: demoSettings.scenarioId }),
+    ...(home === undefined || (homeMode !== 'remote' && !homeTold) ? {} : { gridAvailable: home.gridAvailable }),
+  });
   const settingsControl = (
       <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onSettingsChange} locale={locale} onLocale={onLocale} />
   );
@@ -195,7 +209,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, onCardAction }}>
         <HomePanel status={home} renderCard={(status) => <HomeCard status={status} />} load={homeLoad} onOpen={loadHome} onRetry={loadHome} />
         <QueryClientProvider client={queryClient}>
-          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} demo={config.demo} onAnswer={onAnswer} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />
+          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} demo={config.demo} onAnswer={onAnswer} examples={examples} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />
         </QueryClientProvider>
       </CardHostProvider>
     </EchoFrame>

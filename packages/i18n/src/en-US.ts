@@ -15,6 +15,10 @@ export const enUS = {
   'examples.battery': 'Battery level',
   'examples.hotDay': 'A hot day',
   'examples.powerCut': 'Power cut',
+  // With the grid down (#268): what matters during a storm.
+  'examples.safeRoom': 'Is Grandpa safe?',
+  'examples.howLong': 'How long will it last?',
+  'examples.powerBack': 'Is the power back?',
   'chat.placeholder': "What's my battery level?",
   'chat.send': 'Ask',
   'chat.thinking': 'Thinking…',

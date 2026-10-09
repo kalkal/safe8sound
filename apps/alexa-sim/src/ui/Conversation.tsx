@@ -13,7 +13,7 @@ import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { AnswerCard } from './AnswerCard.js';
 import { DemoCodeGate } from './DemoCodeGate.js';
 import { DemoOverlay } from './DemoOverlay.js';
-import { ExampleQuestions } from './ExampleQuestions.js';
+import { ExampleQuestions, type ExampleQuestion } from './ExampleQuestions.js';
 import { t } from './text.js';
 
 type TurnResult = Result<AgentAnswer, ErrorEnvelope>;
@@ -32,9 +32,11 @@ export interface ConversationProps {
   demo?: boolean;
   /** Each answer as it arrives: the frame reads its cards for the sky. */
   onAnswer?: (answer: AgentAnswer) => void;
+  /** The example buttons for the home's state (#268): storm examples with the grid down. */
+  examples?: readonly ExampleQuestion[];
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false, onAnswer }: ConversationProps) {
+export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false, onAnswer, examples }: ConversationProps) {
   const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
@@ -195,6 +197,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
           {t('chat.hint')}
         </p>
         <ExampleQuestions
+          {...(examples === undefined ? {} : { examples })}
           onPick={(question) => {
             // Only fills the field: the person reads it and presses Ask (never sent by itself).
             setDraft(question);
