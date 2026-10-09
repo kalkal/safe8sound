@@ -49,6 +49,11 @@ const ConfigSchema = z
     phonePollMs: ms,
     /** Demo mode for recording the video: tap marks, "You said" caption, light bar. Off unless `?demo=1`. */
     demo: z.boolean(),
+    /**
+     * `?view=phone` (#269): only Ana's phone, for a second page next to the real chain, so nobody mistakes the
+     * scripted scene's fixed numbers for the real home. Scripted agent with the inbox phone only; the full page otherwise.
+     */
+    view: z.enum(['full', 'phone']),
   })
   .refine((c) => c.agent === 'scripted' || c.simApiUrl !== undefined, { path: ['simApiUrl'], message: 'The remote agent needs a sim-api URL' })
   .refine((c) => c.turnBudgetMs >= c.agentTimeoutMs, { path: ['turnBudgetMs'], message: 'The turn budget must cover the agent timeout' });
@@ -62,15 +67,19 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>, s
   const override = isDev ? params.get('agent') : null;
   const fakeSpeech = isDev && params.get('voice') === 'fake';
   const agent = override ?? env['VITE_AGENT'] ?? 'scripted';
+  // Dev only (E2E of the phone-only page, #269): the inbox phone without restarting the dev server.
+  const phone = isDev && params.get('phone') === 'inbox' ? 'inbox' : (env['VITE_PHONE'] ?? 'scripted');
   const parsed = ConfigSchema.safeParse({
     agent,
     simApiUrl: env['VITE_SIM_API_URL'] ?? (override === 'remote' ? DEV_SIM_API_PATH : undefined),
     agentTimeoutMs: env['VITE_AGENT_TIMEOUT_MS'] ?? 8_000,
     turnBudgetMs: env['VITE_TURN_BUDGET_MS'] ?? 10_000,
     homeTimeZone: env['VITE_HOME_TIME_ZONE'] ?? DEFAULT_HOME_TIME_ZONE,
-    phone: env['VITE_PHONE'] ?? 'scripted',
+    phone,
     phonePollMs: env['VITE_PHONE_POLL_MS'] ?? 5_000,
     demo: params.get('demo') === '1',
+    // The scripted phone only fills during a turn, and the phone view has none: the real inbox only (review of #302).
+    view: agent === 'scripted' && phone === 'inbox' && params.get('view') === 'phone' ? 'phone' : 'full',
     voice: {
       speech: fakeSpeech ? 'fake' : 'browser',
       lang: env['VITE_VOICE_LANG'] ?? 'en-US',

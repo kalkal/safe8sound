@@ -14,6 +14,7 @@ describe('simulator config', () => {
         phone: 'scripted',
         phonePollMs: 5_000,
         demo: false,
+        view: 'full',
         voice: {
           speech: 'browser',
           lang: 'en-US',
@@ -33,6 +34,21 @@ describe('simulator config', () => {
     expect(parseConfig({}, '?demo=1', false)).toMatchObject({ ok: true, value: { demo: true } });
     expect(parseConfig({}, '?demo=yes', false)).toMatchObject({ ok: true, value: { demo: false } });
     expect(parseConfig({}, '?gallery', true)).toMatchObject({ ok: true, value: { demo: false } });
+  });
+
+  it('#269: ?view=phone shows only the phone, only with the scripted agent and the real inbox; the full page otherwise', () => {
+    expect(parseConfig({}, '', false)).toMatchObject({ ok: true, value: { view: 'full' } });
+    expect(parseConfig({ VITE_PHONE: 'inbox' }, '?view=phone', false)).toMatchObject({ ok: true, value: { view: 'phone', phone: 'inbox' } });
+    // The scripted phone only fills during a turn, and this view has none: it would stay empty (review of #302).
+    expect(parseConfig({}, '?view=phone', false)).toMatchObject({ ok: true, value: { view: 'full', phone: 'scripted' } });
+    // The real chain has its own phone beside the Echo (#296): never a page without the demo code gate.
+    expect(parseConfig({}, '?agent=remote&view=phone', true)).toMatchObject({ ok: true, value: { agent: 'remote', view: 'full' } });
+    expect(parseConfig({ VITE_PHONE: 'inbox' }, '?view=other', false)).toMatchObject({ ok: true, value: { view: 'full' } });
+  });
+
+  it('lets ?phone=inbox switch the phone to the inbox only in dev (the phone-only page E2E)', () => {
+    expect(parseConfig({}, '?phone=inbox&view=phone', true)).toMatchObject({ ok: true, value: { phone: 'inbox', view: 'phone' } });
+    expect(parseConfig({}, '?phone=inbox', false)).toMatchObject({ ok: true, value: { phone: 'scripted' } });
   });
 
   it('reads the phone from the real inbox when asked, and refuses an unknown phone source (#24)', () => {

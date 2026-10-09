@@ -249,6 +249,16 @@ createRoot(container).render(
             <Gallery />
           </Suspense>
         </Plain>
+      ) : config.ok && config.value.view === 'phone' ? (
+        // ?view=phone (#269): only Ana's phone, never the scripted answers (their numbers are fixed).
+        <Plain>
+          <p className="muted" data-testid="phone-only-note">
+            {t('phone.onlyInbox')}
+          </p>
+          <ErrorBoundary>
+            <PhonePanel feed={phone} timeZone={config.value.homeTimeZone} />
+          </ErrorBoundary>
+        </Plain>
       ) : config.ok && agent.ok ? (
         <Simulator agent={agent.value} config={config.value} session={session} studioVoice={studioVoice} />
       ) : (

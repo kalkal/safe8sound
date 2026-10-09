@@ -280,6 +280,8 @@ export const enUS = {
   'device.cover': 'the shutters',
   // The family phone in the simulator (surface C, issue #24).
   'phone.title': "Your daughter's phone (simulated)",
+  // ?view=phone (#269): the second page next to the real chain is only the phone (the real inbox), and says so.
+  'phone.onlyInbox': "Only Ana's phone: the messages {product} sends to the family. Ask {product} on the main page.",
   'phone.empty': 'No messages from {product} yet.',
   'phone.list': 'Notifications',
   'phone.storm_started': 'Power outage (storm) at home',

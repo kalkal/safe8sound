@@ -260,6 +260,7 @@ export const itIT = {
   'device.lawn_mower': 'il robot tagliaerba',
   'device.cover': 'le tapparelle',
   'phone.title': 'Il telefono di tua figlia (simulato)',
+  'phone.onlyInbox': 'Solo il telefono di Ana: i messaggi che {product} manda alla famiglia. Chiedi a {product} nella pagina principale.',
   'phone.empty': 'Ancora nessun messaggio da {product}.',
   'phone.list': 'Notifiche',
   'phone.storm_started': 'Blackout (temporale) a casa',
