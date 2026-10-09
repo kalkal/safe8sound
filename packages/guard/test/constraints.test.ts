@@ -261,6 +261,49 @@ describe('safe_room_comfort', () => {
     expect(check('safe_room_comfort', ctx({ points: [point(60, { tempC: 26, rh: 90 })] })).ok).toBe(true);
   });
 
+  describe('heat safety settings (#266)', () => {
+    const prefs = (safety: Record<string, unknown>) => PreferencesSchema.parse({ ...examplePreferences(), safety: { ...examplePreferences().safety, ...safety } });
+    const withPrefs = (safety: Record<string, unknown>, nightRecoveryMode: 'standard' | 'elderly' = 'standard') => input({ season: 'cooling', nightRecoveryMode, preferences: prefs(safety) });
+    // T0 is 20:00 in Rome: +60 min is 21:00 (day), +150 min is 22:30 (the night window starts at 22:00).
+
+    it('the stricter night limit refuses 26.5 °C at night for everyone, not by day; off, the 27 °C maximum holds all night', () => {
+      const on = withPrefs({ stricterNightLimit: true });
+      expect(check('safe_room_comfort', ctx({ input: on, points: [point(60, { tempC: 26.5, rh: 40 })] })).ok).toBe(true);
+      expect(check('safe_room_comfort', ctx({ input: on, points: [point(150, { tempC: 26.5, rh: 40 })] }))).toMatchObject({
+        ok: false,
+        reason: 'The safe room would reach 26.5 °C, above its 26 °C maximum.',
+        limit: 26,
+      });
+      expect(check('safe_room_comfort', ctx({ input: withPrefs({}), points: [point(150, { tempC: 26.5, rh: 40 })] })).ok).toBe(true);
+    });
+
+    it('with an older person the stricter night limit is 24 °C', () => {
+      const on = withPrefs({ stricterNightLimit: true }, 'elderly');
+      expect(check('safe_room_comfort', ctx({ input: on, points: [point(150, { tempC: 24.5, rh: 40 })] }))).toMatchObject({ ok: false, limit: 24 });
+    });
+
+    it('a stricter heat-index cap refuses under the maximum', () => {
+      const capped = withPrefs({ cooling: { maxC: 30 }, heatIndexCapC: 29 });
+      expect(check('safe_room_comfort', ctx({ input: capped, points: [point(60, { tempC: 29, rh: 50 })] }))).toMatchObject({ ok: false, limit: 29 });
+      expect(check('safe_room_comfort', ctx({ input: withPrefs({ cooling: { maxC: 30 } }), points: [point(60, { tempC: 29, rh: 50 })] })).ok).toBe(true);
+    });
+
+    it('a stored cap looser than the health constant plays the constant', () => {
+      // Written straight into the store, past set_preferences: 35 reads 32.2.
+      const loose = withPrefs({ cooling: { maxC: 40 }, heatIndexCapC: 35 });
+      expect(check('safe_room_comfort', ctx({ input: loose, points: [point(60, { tempC: 30, rh: 60 })] }))).toMatchObject({ ok: false, limit: 32.2 });
+    });
+  });
+
+  it('across rules, reports the hottest point, not the one furthest past its own limit (#266 review)', () => {
+    // 30 °C at 50 % feels like 31 °C (heat index, 1 °C past the 30 °C maximum); 30 °C at 60 % feels like 32.8 °C,
+    // in Extreme Caution (0.6 °C past 32.2 °C): the second is the danger to report.
+    const at30 = input({ season: 'cooling', preferences: PreferencesSchema.parse({ ...examplePreferences(), safety: { ...examplePreferences().safety, cooling: { ...examplePreferences().safety.cooling, maxC: 30 } } }) });
+    const result = check('safe_room_comfort', ctx({ input: at30, points: [point(60, { tempC: 30, rh: 50 }), point(65, { tempC: 30, rh: 60 })] }));
+    expect(result).toMatchObject({ ok: false, limit: 32.2 });
+    expect(result.reason).toMatch(/Extreme Caution/);
+  });
+
   it('reports the point that feels hottest', () => {
     const result = check('safe_room_comfort', ctx({ points: [point(60, { tempC: 26.5, rh: 80 }), point(65, { tempC: 26.8, rh: 85 }), point(70, { tempC: 25, rh: 50 })] }));
     expect(result).toMatchObject({ ok: false, limit: 27 });

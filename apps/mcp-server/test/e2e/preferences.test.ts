@@ -51,3 +51,32 @@ describe('preferences over MCP (SDK client, real HTTP)', () => {
     expect(read.structuredContent).toMatchObject({ isDefault: false, preferences: { comfortC: { cooling: 24 }, language: 'it-IT' } });
   });
 });
+
+describe('heat safety settings over MCP (#266)', () => {
+  it('get_preferences shows the bounds; set_preferences keeps a stricter choice and refuses a looser cap', async () => {
+    const backing = createMemoryBacking();
+    const read = await session(backing, (client) => client.callTool({ name: 'get_preferences', arguments: {} }));
+    expect(read.structuredContent).toMatchObject({
+      hardLimits: { stricterNightLimit: { default: false }, heatIndexCapC: { min: 26.7, max: 32.2, default: 32.2 }, elderlyCapC: { min: 26, max: 31, default: 31 } },
+    });
+
+    const stricter = await session(backing, (client) =>
+      client.callTool({ name: 'set_preferences', arguments: { safety: { stricterNightLimit: true, heatIndexCapC: 30 }, confirmed: true } }),
+    );
+    expect(stricter.isError).toBeFalsy();
+    expect(stricter).toMatchObject({ structuredContent: { preferences: { safety: { stricterNightLimit: true, heatIndexCapC: 30 } } } });
+    // The model only sees the text: it carries every value it must say.
+    const text = (stricter.content as { text: string }[])[0]?.text;
+    expect(text).toBe('Saved: safety.stricterNightLimit from false to true, safety.heatIndexCapC from 32.2 to 30.');
+
+    // The text names the maximum, the toggle and both caps as played (#266 review).
+    const after = await session(backing, (client) => client.callTool({ name: 'get_preferences', arguments: {} }));
+    expect((after.content as { text: string }[])[0]?.text).toContain(
+      'Safe room limits: at most 27 C, the stricter night limit on, a heat-index cap of 30 C, an older-person cap of 31 C.',
+    );
+
+    const looser = await session(backing, (client) => client.callTool({ name: 'set_preferences', arguments: { safety: { elderlyCapC: 33 }, confirmed: true } }));
+    expect(looser.isError).toBe(true);
+    expect(looser).toMatchObject({ structuredContent: { code: 'safety_threshold_out_of_range', details: { field: 'safety.elderlyCapC', nearestAllowed: 31 } } });
+  });
+});

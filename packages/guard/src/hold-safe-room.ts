@@ -1,4 +1,4 @@
-import { celsius, err, ok, toolError, type ErrorEnvelope, type HvacMode, type Pct, type Result } from '@cold-reserve/contracts';
+import { celsius, effectiveHeatSafety, err, ok, toolError, type ErrorEnvelope, type HvacMode, type Pct, type Result } from '@cold-reserve/contracts';
 import { humidityBandWithin, nextHumidityMode, type HumidityBandConfig, type HumidityMode, type ProjectionPoint, type RoomControl } from '@cold-reserve/core';
 import { projectFrom, type GuardInput } from './context.js';
 import { nightCoolingLimit, safeUntil, type SafeLimit } from './safe-until.js';
@@ -10,11 +10,40 @@ import { nightCoolingLimit, safeUntil, type SafeLimit } from './safe-until.js';
 // planner's rule; every other room is off. When heating it holds the minimum plus the margin.
 // A room without a humidity reading starts from the indoorEquilibriumRh estimate (projectFrom), like the guard.
 
-/** The safe room's temperature limit at an instant: the cooling maximum (lowered at night) or the heating minimum. */
-export function safeRoomLimitAt(input: Pick<GuardInput, 'preferences' | 'profile' | 'config' | 'season' | 'nightRecoveryMode'>): (ms: number) => number {
+/** What sets the safe room's limit at an instant, for the words that name it. */
+export type SafeRoomLimitKind = 'maximum' | 'night' | 'older_person_cap' | 'heat_index_cap' | 'minimum';
+
+type LimitInput = Pick<GuardInput, 'preferences' | 'profile' | 'config' | 'season' | 'nightRecoveryMode'>;
+
+/**
+ * The safe room's temperature limit at an instant and what sets it: when cooling, the lowest of the maximum, the
+ * night limit in the night window, and the caps the person set stricter (#266 review: the older-person cap with an
+ * older person, the heat-index cap as an air target for everyone), so the hold, its safe hours and the last resort
+ * never aim above a cap. With the default caps (31 °C, 32.2 °C) nothing changes. When heating, the minimum.
+ */
+export function safeRoomLimitKindAt(input: LimitInput): (ms: number) => { limitC: number; kind: SafeRoomLimitKind } {
   const { preferences, profile, config, season, nightRecoveryMode } = input;
-  if (season === 'heating') return () => preferences.safety.heating.minC;
-  return nightCoolingLimit({ maxC: preferences.safety.cooling.maxC, tz: profile.location.tz, night: config.nightRecovery, mode: nightRecoveryMode });
+  if (season === 'heating') return () => ({ limitC: preferences.safety.heating.minC, kind: 'minimum' });
+  const maxC = preferences.safety.cooling.maxC;
+  const night = nightCoolingLimit({ maxC, tz: profile.location.tz, night: config.nightRecovery, mode: nightRecoveryMode });
+  const heat = effectiveHeatSafety(preferences.safety);
+  // In this order on a tie, so the familiar words win: the maximum, then the night limit.
+  const caps: { limitC: number; kind: SafeRoomLimitKind }[] = [
+    ...(nightRecoveryMode === 'elderly' ? [{ limitC: heat.elderlyCapC, kind: 'older_person_cap' as const }] : []),
+    { limitC: heat.heatIndexCapC, kind: 'heat_index_cap' },
+  ];
+  return (ms) => {
+    const nightC = night(ms);
+    let best: { limitC: number; kind: SafeRoomLimitKind } = nightC < maxC ? { limitC: nightC, kind: 'night' } : { limitC: maxC, kind: 'maximum' };
+    for (const cap of caps) if (cap.limitC < best.limitC) best = cap;
+    return best;
+  };
+}
+
+/** The safe room's temperature limit at an instant (safeRoomLimitKindAt without the words). */
+export function safeRoomLimitAt(input: LimitInput): (ms: number) => number {
+  const at = safeRoomLimitKindAt(input);
+  return (ms) => at(ms).limitC;
 }
 
 export interface HoldSafeRoomOptions {

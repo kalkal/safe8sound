@@ -1,6 +1,6 @@
-import { pct } from '@cold-reserve/contracts';
+import { PreferencesSchema, pct } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { holdSafeRoom, safeRoomLimitAt, type HeldSafeRoom, type HoldSafeRoomInput } from '../src/hold-safe-room.js';
+import { holdSafeRoom, safeRoomLimitAt, safeRoomLimitKindAt, type HeldSafeRoom, type HoldSafeRoomInput } from '../src/hold-safe-room.js';
 import { H, T0, input, preferences, profile, snapshot } from './support.js';
 
 // One physics for "how long can the safe room hold" (#160, #24): the safe room's split held at the limit in
@@ -28,6 +28,9 @@ const strictestAhead = (i: HoldSafeRoomInput, ms: number): number => {
   return v;
 };
 
+// #266 review: a cap the person set stricter than the maximum is a limit of the hold too.
+const capped = (safety: Record<string, unknown>) => PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, cooling: { ...preferences.safety.cooling, maxC: 27 }, ...safety } });
+
 describe('safeRoomLimitAt', () => {
   it('cooling: the safety maximum by day, the night threshold of the mode at night when lower', () => {
     const day = Date.parse('2026-07-15T21:00:00+02:00');
@@ -39,6 +42,27 @@ describe('safeRoomLimitAt', () => {
 
   it('heating: the heating minimum, day and night', () => {
     expect(safeRoomLimitAt(input({ season: 'heating' }))(T0 + 5 * H)).toBe(preferences.safety.heating.minC);
+  });
+
+  const day = Date.parse('2026-07-15T21:00:00+02:00');
+  const night = Date.parse('2026-07-15T23:00:00+02:00');
+
+  it('the older-person cap below the maximum is the limit with an older person, by day; the night limit wins when lower (#266)', () => {
+    const elderly = input({ nightRecoveryMode: 'elderly', preferences: capped({ elderlyCapC: 26 }) });
+    expect(safeRoomLimitKindAt(elderly)(day)).toEqual({ limitC: 26, kind: 'older_person_cap' });
+    expect(safeRoomLimitKindAt(elderly)(night)).toEqual({ limitC: 24, kind: 'night' });
+    // Without an older person the cap does not apply.
+    expect(safeRoomLimitKindAt(input({ preferences: capped({ elderlyCapC: 26 }) }))(day)).toEqual({ limitC: 27, kind: 'maximum' });
+  });
+
+  it('a heat-index cap below the maximum is an air target too, for everyone (#266)', () => {
+    expect(safeRoomLimitKindAt(input({ preferences: capped({ heatIndexCapC: 26.7 }) }))(day)).toEqual({ limitC: 26.7, kind: 'heat_index_cap' });
+  });
+
+  it('with the default caps nothing changes: the maximum by day, the night limit at night', () => {
+    expect(safeRoomLimitKindAt(input({ preferences: capped({}) }))(day)).toEqual({ limitC: 27, kind: 'maximum' });
+    expect(safeRoomLimitKindAt(input({ preferences: capped({}) }))(night)).toEqual({ limitC: 26, kind: 'night' });
+    expect(safeRoomLimitKindAt(input({ season: 'heating' }))(day)).toEqual({ limitC: preferences.safety.heating.minC, kind: 'minimum' });
   });
 });
 
@@ -135,6 +159,12 @@ describe('holdSafeRoom', () => {
     // night limit starts, with charge left; pre-cooling would run the battery out first.
     expect(chosen.safeUntil).toEqual({ ms: Date.parse('2026-07-15T22:00:00+02:00'), limitedBy: 'temperature' });
     expect(setpointAt(chosen, T0)).toBe(safeRoomLimitAt(base)(T0) - opts.marginK);
+  });
+
+  it('with an older person and a 26 °C cap under a 27 °C maximum, the split holds under the cap (#266 review)', () => {
+    const base = input({ nightRecoveryMode: 'elderly', preferences: capped({ elderlyCapC: 26 }) });
+    const i = { ...base, config: { ...base.config, safeRoom: { ...base.config.safeRoom, preCoolLeadMinutes: 0 } } };
+    expect(setpointAt(held(i), T0)).toBe(26 - opts.marginK);
   });
 
   it('heating: the lead is for cooling only, the hold keeps the heating minimum plus the margin', () => {

@@ -6,13 +6,28 @@ import { CelsiusSchema, PctSchema, type MeasureUnit } from './units.js';
 
 export const PREFERENCES_SCHEMA_VERSION = 1;
 
+/** The heat-index cap for everyone: where the NWS "Extreme Caution" band starts (https://www.weather.gov/ama/heatindex). */
+export const HEAT_INDEX_CAP_MAX_C = 32.2;
+/** The air cap with an older person: above it, health effects escalate (Health Canada, upper indoor limits for older adults). */
+export const ELDERLY_CAP_MAX_C = 31;
+
 /** Safety thresholds of the safe room, measured on air temperature and relative humidity (plan §3.1). */
 export const SafetyThresholdsSchema = z.strictObject({
   cooling: z.strictObject({ maxC: CelsiusSchema }),
   heating: z.strictObject({ minC: CelsiusSchema }),
+  /**
+   * `maxPct` is the humid-air warning threshold and the planner's dry band, never a refusal (#248): humid air alone
+   * is not a heat danger. `minPct` refuses only where the plan dries the room (#107).
+   */
   humidity: z
     .strictObject({ minPct: PctSchema, maxPct: PctSchema })
     .refine((h) => h.minPct < h.maxPct, { message: 'Expected minPct < maxPct' }),
+  /** The night limit (26 °C, 24 °C with an older person) for every plan, not only the last resort (#266). Default off. */
+  stricterNightLimit: z.boolean().optional(),
+  /** The heat-index cap, only stricter than HEAT_INDEX_CAP_MAX_C (#266). */
+  heatIndexCapC: CelsiusSchema.optional(),
+  /** The air cap with an older person, only stricter than ELDERLY_CAP_MAX_C (#266). */
+  elderlyCapC: CelsiusSchema.optional(),
 });
 export type SafetyThresholds = z.infer<typeof SafetyThresholdsSchema>;
 
@@ -22,10 +37,15 @@ const CelsiusBoundSchema = z.strictObject({ min: CelsiusSchema, max: CelsiusSche
 const PctBoundSchema = z.strictObject({ min: PctSchema, max: PctSchema, default: PctSchema }).refine(ordered, orderedMessage);
 
 /** Hard limits and defaults per season. They come from config; people move thresholds only inside them. */
+const capBound = (constant: number) => CelsiusBoundSchema.refine((b) => b.max <= constant, { message: `Expected max <= ${String(constant)}: a cap may only be stricter` });
+
 export const SafetyHardLimitsSchema = z.strictObject({
   cooling: z.strictObject({ maxC: CelsiusBoundSchema }),
   heating: z.strictObject({ minC: CelsiusBoundSchema }),
   humidity: z.strictObject({ minPct: PctBoundSchema, maxPct: PctBoundSchema }),
+  stricterNightLimit: z.strictObject({ default: z.boolean() }).optional(),
+  heatIndexCapC: capBound(HEAT_INDEX_CAP_MAX_C).optional(),
+  elderlyCapC: capBound(ELDERLY_CAP_MAX_C).optional(),
 });
 export type SafetyHardLimits = z.infer<typeof SafetyHardLimitsSchema>;
 
@@ -71,6 +91,21 @@ export const PreferencesSchema = z
   });
 export type Preferences = z.infer<typeof PreferencesSchema>;
 
+/** A cap's range: the configured bounds, or up to the health constant when none are configured. */
+const capRange = (bound: { min: number; max: number } | undefined, constant: number) => ({ min: bound?.min ?? 0, max: Math.min(bound?.max ?? constant, constant) });
+
+/**
+ * The heat-safety settings the guard plays (#266): the defaults when unset, and a cap never looser than its health
+ * constant, whatever was stored (the clamp on read; the bounds refuse it on write).
+ */
+export function effectiveHeatSafety(safety: SafetyThresholds): { stricterNightLimit: boolean; heatIndexCapC: number; elderlyCapC: number } {
+  return {
+    stricterNightLimit: safety.stricterNightLimit ?? false,
+    heatIndexCapC: Math.min(safety.heatIndexCapC ?? HEAT_INDEX_CAP_MAX_C, HEAT_INDEX_CAP_MAX_C),
+    elderlyCapC: Math.min(safety.elderlyCapC ?? ELDERLY_CAP_MAX_C, ELDERLY_CAP_MAX_C),
+  };
+}
+
 /** Checks the chosen thresholds against the hard limits; reports the nearest allowed value. */
 export function checkSafetyWithinLimits(safety: SafetyThresholds, limits: SafetyHardLimits): Result<SafetyThresholds, ErrorEnvelope> {
   const checks: Array<{ field: string; value: number; min: number; max: number; unit: MeasureUnit }> = [
@@ -78,6 +113,8 @@ export function checkSafetyWithinLimits(safety: SafetyThresholds, limits: Safety
     { field: 'safety.heating.minC', value: safety.heating.minC, ...limits.heating.minC, unit: 'C' },
     { field: 'safety.humidity.minPct', value: safety.humidity.minPct, ...limits.humidity.minPct, unit: '%' },
     { field: 'safety.humidity.maxPct', value: safety.humidity.maxPct, ...limits.humidity.maxPct, unit: '%' },
+    ...(safety.heatIndexCapC === undefined ? [] : [{ field: 'safety.heatIndexCapC', value: safety.heatIndexCapC, ...capRange(limits.heatIndexCapC, HEAT_INDEX_CAP_MAX_C), unit: 'C' as const }]),
+    ...(safety.elderlyCapC === undefined ? [] : [{ field: 'safety.elderlyCapC', value: safety.elderlyCapC, ...capRange(limits.elderlyCapC, ELDERLY_CAP_MAX_C), unit: 'C' as const }]),
   ];
   for (const c of checks) {
     if (c.value < c.min || c.value > c.max) {

@@ -2,6 +2,7 @@ import {
   PreferencesSchema,
   SafetyThresholdsSchema,
   checkSafetyWithinLimits,
+  effectiveHeatSafety,
   err,
   ok,
   toolError,
@@ -27,6 +28,9 @@ export interface PreferencesUpdate {
         readonly cooling?: { readonly maxC?: number | undefined } | undefined;
         readonly heating?: { readonly minC?: number | undefined } | undefined;
         readonly humidity?: { readonly minPct?: number | undefined; readonly maxPct?: number | undefined } | undefined;
+        readonly stricterNightLimit?: boolean | undefined;
+        readonly heatIndexCapC?: number | undefined;
+        readonly elderlyCapC?: number | undefined;
       }
     | undefined;
   readonly autoStormOnGridLoss?: boolean | undefined;
@@ -85,6 +89,10 @@ export function updatePreferences(
       minPct: update.safety?.humidity?.minPct ?? current.safety.humidity.minPct,
       maxPct: update.safety?.humidity?.maxPct ?? current.safety.humidity.maxPct,
     },
+    // #266: absent stays absent (the defaults play), so stored preferences do not change by being read.
+    ...optional('stricterNightLimit', update.safety?.stricterNightLimit ?? current.safety.stricterNightLimit),
+    ...optional('heatIndexCapC', update.safety?.heatIndexCapC ?? current.safety.heatIndexCapC),
+    ...optional('elderlyCapC', update.safety?.elderlyCapC ?? current.safety.elderlyCapC),
   };
   const parsedSafety = SafetyThresholdsSchema.safeParse(safetyInput);
   if (!parsedSafety.success) {
@@ -120,6 +128,8 @@ const setpoint = (field: string, limit: number) =>
     details: { field, limit, nearestAllowed: limit, unit: 'C' },
   });
 
+const optional = <K extends string, V>(key: K, value: V | undefined): Partial<Record<K, V>> => (value === undefined ? {} : ({ [key]: value } as Record<K, V>));
+
 type Leaf = number | string | boolean;
 
 /** Logged fields, in a stable order. Contacts are logged as a count: names never enter the log. */
@@ -132,6 +142,10 @@ const LEAVES: ReadonlyArray<[string, (p: Preferences) => Leaf]> = [
   ['safety.heating.minC', (p) => p.safety.heating.minC],
   ['safety.humidity.minPct', (p) => p.safety.humidity.minPct],
   ['safety.humidity.maxPct', (p) => p.safety.humidity.maxPct],
+  // The values played (the defaults when unset), so a first choice logs from the default.
+  ['safety.stricterNightLimit', (p) => effectiveHeatSafety(p.safety).stricterNightLimit],
+  ['safety.heatIndexCapC', (p) => effectiveHeatSafety(p.safety).heatIndexCapC],
+  ['safety.elderlyCapC', (p) => effectiveHeatSafety(p.safety).elderlyCapC],
   ['autoStormOnGridLoss', (p) => p.autoStormOnGridLoss],
   ['familyContacts.count', (p) => p.familyContacts.length],
   ['language', (p) => p.language],

@@ -1,7 +1,8 @@
-import type { GuaranteeId, GuaranteeResult } from '@cold-reserve/contracts';
+import { effectiveHeatSafety, type GuaranteeId, type GuaranteeResult } from '@cold-reserve/contracts';
 import { batteryCapacityWh, localHour } from '@cold-reserve/core';
 import { UNSERVED_TOLERANCE_W, driedInto, type GuardContext } from './context.js';
 import { heatDanger, heatDangerReason, type HeatDanger } from './heat-danger.js';
+import { nightCoolingLimit } from './safe-until.js';
 
 // The five guarantees as Specification objects (plan §9.2): each reads the shared context and returns
 // its result; none can change the plan. Numbers in results are rounded for people, and the nearest
@@ -153,16 +154,31 @@ const safeRoomComfort: Constraint = {
     if (season !== 'cooling' && minT < safety.heating.minC - EPS) {
       return fail(`The safe room would drop to ${r1(minT).toString()} °C, below its ${safety.heating.minC.toString()} °C minimum.`, r1(minT), safety.heating.minC, 'C');
     }
-    // Heat danger (#248): the room feels hotter than its maximum (NWS heat index), or passes a fixed cap. The hottest
-    // feeling point is reported. Humid air alone is a warning (humidAirWarning), never a refusal.
+    // Heat danger (#248): the room feels hotter than its maximum (NWS heat index), or passes a cap. With the stricter
+    // night limit on (#266) the maximum drops to the night threshold in the night window; the caps may be set
+    // stricter, never looser (effectiveHeatSafety). The hottest failing point is reported (#266 review: not the one
+    // furthest past its own limit, which could put a milder heat-index point before Extreme Caution). Humid air alone
+    // is a warning (humidAirWarning), never a refusal.
     if (season !== 'heating') {
       const elderly = ctx.input.nightRecoveryMode === 'elderly';
-      const worst = readings
-        .flatMap((r) => {
-          const danger = heatDanger(r, { limitC: safety.cooling.maxC, elderly });
-          return danger === undefined ? [] : [{ r, danger }];
-        })
-        .reduce<{ r: (typeof readings)[number]; danger: HeatDanger } | undefined>((a, b) => (a === undefined || b.danger.valueC > a.danger.valueC ? b : a), undefined);
+      const heat = effectiveHeatSafety(safety);
+      const limitAt = heat.stricterNightLimit
+        ? nightCoolingLimit({ maxC: safety.cooling.maxC, tz: ctx.input.profile.location.tz, night: ctx.input.config.nightRecovery, mode: ctx.input.nightRecoveryMode })
+        : () => safety.cooling.maxC;
+      const caps = { heatIndexC: heat.heatIndexCapC, elderlyC: heat.elderlyCapC };
+      const worst = considered
+        .flatMap((p) =>
+          p.rooms
+            .filter((r) => r.id === preferences.safeRoomId)
+            .flatMap((r) => {
+              const danger = heatDanger(r, { limitC: limitAt(p.ms), elderly, caps });
+              return danger === undefined ? [] : [{ r, danger }];
+            }),
+        )
+        .reduce<{ r: (typeof readings)[number]; danger: HeatDanger } | undefined>(
+          (a, b) => (a === undefined || b.danger.valueC > a.danger.valueC ? b : a),
+          undefined,
+        );
       if (worst !== undefined) {
         // Air above the limit has a nearest allowed value; how hot the room feels does not (the air may already be at
         // the limit, #285 review), so the perceived-temperature rules leave it out.

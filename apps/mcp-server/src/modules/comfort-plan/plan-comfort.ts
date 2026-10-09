@@ -21,7 +21,7 @@ import {
   type Snapshot,
 } from '@cold-reserve/contracts';
 import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, orderSurplusRooms, seasonFor, surplusWindow, withTargets, type HumidityMode } from '@cold-reserve/core';
-import { buildContext, counterfactualOf, currentControls, holdSafeRoom, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
+import { buildContext, counterfactualOf, currentControls, holdSafeRoom, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeRoomLimitKindAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import { withModelHint, type ToolContext } from '../../tool.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
@@ -338,7 +338,8 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
   // In the home's time zone, as the family message and the guard's reasons say it.
   const safeUntilIso = localIso(best.untilMs, profile.location.tz);
   const room = profile.rooms.find((r) => r.id === preferences.safeRoomId)?.name ?? preferences.safeRoomId;
-  const then = lastResortThen({ limitedBy, season, limitThenC: limitAt(best.untilMs), ...preferences.safety });
+  const limitThen = safeRoomLimitKindAt(guardInput)(best.untilMs);
+  const then = lastResortThen({ limitedBy, season, limitThenC: limitThen.limitC, limitKind: limitThen.kind, ...preferences.safety });
   // The honest window (#160): from safeUntil, how far past the limit in force the room goes and by when; the
   // summary says it (the warning keeps its 300 characters for the reason).
   const window = lastResortWindow(best.points, { untilMs: best.untilMs, roomId: preferences.safeRoomId, season, limitAt });

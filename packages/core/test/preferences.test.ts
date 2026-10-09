@@ -149,3 +149,30 @@ describe('updatePreferences', () => {
     });
   });
 });
+
+describe('heat safety settings (#266): only stricter, logged like any change', () => {
+  const capped = SafetyHardLimitsSchema.parse({ ...exampleSafetyLimits(), stricterNightLimit: { default: false }, heatIndexCapC: { min: 26.7, max: 32.2, default: 32.2 }, elderlyCapC: { min: 26, max: 31, default: 31 } });
+  const cctx = { ...ctx, limits: capped };
+
+  it('turns the stricter night limit on and tightens both caps, one logged change each (defaults as "from")', () => {
+    const result = updatePreferences(current(), { safety: { stricterNightLimit: true, heatIndexCapC: 30, elderlyCapC: 28 } }, cctx);
+    expect(result).toMatchObject({ ok: true, value: { preferences: { safety: { stricterNightLimit: true, heatIndexCapC: 30, elderlyCapC: 28 } } } });
+    expect(result.ok && result.value.changes.map((c) => [c.field, c.from, c.to])).toEqual([
+      ['safety.stricterNightLimit', false, true],
+      ['safety.heatIndexCapC', 32.2, 30],
+      ['safety.elderlyCapC', 31, 28],
+    ]);
+  });
+
+  it('refuses a looser cap with the nearest allowed value', () => {
+    expect(updatePreferences(current(), { safety: { heatIndexCapC: 34 } }, cctx)).toMatchObject({ ok: false, error: { code: 'safety_threshold_out_of_range', details: { field: 'safety.heatIndexCapC', nearestAllowed: 32.2 } } });
+    expect(updatePreferences(current(), { safety: { elderlyCapC: 31.5 } }, cctx)).toMatchObject({ ok: false, error: { details: { field: 'safety.elderlyCapC', nearestAllowed: 31 } } });
+  });
+
+  it('keeps the other settings when one changes', () => {
+    const first = updatePreferences(current(), { safety: { heatIndexCapC: 30 } }, cctx);
+    if (!first.ok) throw new Error(first.error.message);
+    const second = updatePreferences(first.value.preferences, { safety: { stricterNightLimit: true } }, cctx);
+    expect(second.ok && second.value.preferences.safety).toMatchObject({ heatIndexCapC: 30, stricterNightLimit: true });
+  });
+});

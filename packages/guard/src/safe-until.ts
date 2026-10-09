@@ -1,4 +1,4 @@
-import type { NightRecoveryMode, Season } from '@cold-reserve/contracts';
+import { ELDERLY_CAP_MAX_C, HEAT_INDEX_CAP_MAX_C, type NightRecoveryMode, type Season } from '@cold-reserve/contracts';
 import { inNightWindow, type NightWindowHours, type ProjectionPoint } from '@cold-reserve/core';
 import { UNSERVED_TOLERANCE_W } from './context.js';
 import { heatDanger } from './heat-danger.js';
@@ -19,7 +19,8 @@ export function safeUntil(
     graceMinutes: number;
     roomId: string;
     season: Season;
-    safety: { cooling: { maxC: number }; heating: { minC: number }; humidity: { minPct: number } };
+    /** With the caps the person may set stricter (#266); unset, the health constants. */
+    safety: { cooling: { maxC: number }; heating: { minC: number }; humidity: { minPct: number }; heatIndexCapC?: number | undefined; elderlyCapC?: number | undefined };
     /** An older person in the safe room: the 31 °C cap applies (#248). */
     elderly?: boolean;
     /** Whether the plan dries the safe room at an instant: only then is air under the minimum its doing (#107). */
@@ -30,13 +31,18 @@ export function safeUntil(
 ): { ms: number; limitedBy: SafeLimit } | undefined {
   const fromMs = opts.nowMs + opts.graceMinutes * MINUTE_MS;
   const { cooling, heating, humidity } = opts.safety;
+  // Never looser than the health constants (the clamp on read, #266).
+  const caps = {
+    heatIndexC: Math.min(opts.safety.heatIndexCapC ?? HEAT_INDEX_CAP_MAX_C, HEAT_INDEX_CAP_MAX_C),
+    elderlyC: Math.min(opts.safety.elderlyCapC ?? ELDERLY_CAP_MAX_C, ELDERLY_CAP_MAX_C),
+  };
   for (const p of points) {
     if (p.flows.unservedLoadW > UNSERVED_TOLERANCE_W) return { ms: p.ms, limitedBy: 'battery' };
     if (p.ms < fromMs) continue;
     const room = p.rooms.find((r) => r.id === opts.roomId);
     if (room === undefined) continue;
     // Heat danger (#248): the air or the heat index above the limit in force, or a fixed cap. Humid air alone is not.
-    const tooHot = opts.season !== 'heating' && heatDanger(room, { limitC: opts.coolingMaxAt?.(p.ms) ?? cooling.maxC, elderly: opts.elderly ?? false, eps: EPS }) !== undefined;
+    const tooHot = opts.season !== 'heating' && heatDanger(room, { limitC: opts.coolingMaxAt?.(p.ms) ?? cooling.maxC, elderly: opts.elderly ?? false, eps: EPS, caps }) !== undefined;
     const tooCold = opts.season !== 'cooling' && room.tempC < heating.minC - EPS;
     if (tooHot || tooCold) return { ms: p.ms, limitedBy: 'temperature' };
     if (room.humidityPct < humidity.minPct - EPS && (opts.driesAt?.(p.ms) ?? false)) return { ms: p.ms, limitedBy: 'humidity' };

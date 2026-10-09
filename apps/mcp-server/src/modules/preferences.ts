@@ -2,6 +2,7 @@ import {
   GetPreferencesOutputSchema,
   SetPreferencesInputSchema,
   SetPreferencesOutputSchema,
+  effectiveHeatSafety,
   ok,
   toPublicPreferences,
   type HomeId,
@@ -56,7 +57,12 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
       // The name for people, the id in parentheses for the model (#274).
       const id = o.preferences.safeRoomId;
       const name = deps.roomNameFor?.(ctx.homeId, id);
-      return `${o.isDefault ? 'Default' : 'Saved'} preferences: cool to ${String(o.preferences.comfortC.cooling)} C, safe room ${name === undefined ? id : `${name} (${id})`}.`;
+      // The safe room's limits as the guard plays them (#266 review): the maximum, the toggle and both caps.
+      const heat = effectiveHeatSafety(o.preferences.safety);
+      const limits =
+        `Safe room limits: at most ${String(o.preferences.safety.cooling.maxC)} C, the stricter night limit ${heat.stricterNightLimit ? 'on' : 'off'}, ` +
+        `a heat-index cap of ${String(heat.heatIndexCapC)} C, an older-person cap of ${String(heat.elderlyCapC)} C.`;
+      return `${o.isDefault ? 'Default' : 'Saved'} preferences: cool to ${String(o.preferences.comfortC.cooling)} C, safe room ${name === undefined ? id : `${name} (${id})`}. ${limits}`;
     },
     handler: async (_args, ctx) => {
       const read = await current(ctx.homeId);
@@ -73,7 +79,8 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
     annotations: annotations(false),
     input: SetPreferencesInputSchema,
     output: SetPreferencesOutputSchema,
-    summarize: (o) => (o.changes.length === 0 ? 'Nothing changed.' : `Saved: ${o.changes.map((c) => c.field).join(', ')}.`),
+    // Every value in the text: the model only sees the text (repo rule on tool summaries).
+    summarize: (o) => (o.changes.length === 0 ? 'Nothing changed.' : `Saved: ${o.changes.map((c) => `${c.field} from ${String(c.from)} to ${String(c.to)}`).join(', ')}.`),
     handler: async (args, ctx) => {
       const read = await current(ctx.homeId);
       if (!read.ok) return read;

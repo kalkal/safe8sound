@@ -3,8 +3,11 @@ import { examplePreferences, exampleSafetyLimits } from '../src/fixtures.js';
 import {
   ConfigChangeSchema,
   PreferencesSchema,
+  ELDERLY_CAP_MAX_C,
+  HEAT_INDEX_CAP_MAX_C,
   SafetyHardLimitsSchema,
   checkSafetyWithinLimits,
+  effectiveHeatSafety,
 } from '../src/index.js';
 
 describe('PreferencesSchema', () => {
@@ -84,6 +87,57 @@ describe('checkSafetyWithinLimits (hard limits from config)', () => {
     const input = exampleSafetyLimits();
     input.cooling.maxC.default = 40;
     expect(SafetyHardLimitsSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('heat safety settings (#266, approved in #248): only stricter, never looser', () => {
+  const limits = SafetyHardLimitsSchema.parse({
+    ...exampleSafetyLimits(),
+    stricterNightLimit: { default: false },
+    heatIndexCapC: { min: 26.7, max: 32.2, default: 32.2 },
+    elderlyCapC: { min: 26, max: 31, default: 31 },
+  });
+  const withSafety = (extra: Record<string, unknown>) => {
+    const input = examplePreferences() as { safety: Record<string, unknown> };
+    input.safety = { ...input.safety, ...extra };
+    return PreferencesSchema.parse(input);
+  };
+
+  it('the health constants are the NWS Extreme Caution start and Health Canada critical limit for older adults', () => {
+    expect(HEAT_INDEX_CAP_MAX_C).toBe(32.2);
+    expect(ELDERLY_CAP_MAX_C).toBe(31);
+  });
+
+  it('stored preferences without the new fields still parse, and play the defaults', () => {
+    const prefs = PreferencesSchema.parse(examplePreferences());
+    expect(prefs.safety.stricterNightLimit).toBeUndefined();
+    expect(effectiveHeatSafety(prefs.safety)).toEqual({ stricterNightLimit: false, heatIndexCapC: 32.2, elderlyCapC: 31 });
+  });
+
+  it('keeps a stricter choice', () => {
+    const prefs = withSafety({ stricterNightLimit: true, heatIndexCapC: 30, elderlyCapC: 28 });
+    expect(effectiveHeatSafety(prefs.safety)).toEqual({ stricterNightLimit: true, heatIndexCapC: 30, elderlyCapC: 28 });
+    expect(checkSafetyWithinLimits(prefs.safety, limits).ok).toBe(true);
+  });
+
+  it('on write, refuses a looser cap with the nearest allowed value, and a cap below its bound', () => {
+    expect(checkSafetyWithinLimits(withSafety({ heatIndexCapC: 33 }).safety, limits)).toMatchObject({
+      ok: false,
+      error: { code: 'safety_threshold_out_of_range', details: { field: 'safety.heatIndexCapC', nearestAllowed: 32.2, unit: 'C' } },
+    });
+    expect(checkSafetyWithinLimits(withSafety({ elderlyCapC: 32 }).safety, limits)).toMatchObject({ ok: false, error: { details: { field: 'safety.elderlyCapC', nearestAllowed: 31 } } });
+    expect(checkSafetyWithinLimits(withSafety({ elderlyCapC: 25 }).safety, limits)).toMatchObject({ ok: false, error: { details: { field: 'safety.elderlyCapC', nearestAllowed: 26 } } });
+  });
+
+  it('on read, a looser stored cap is clamped to the health constant', () => {
+    expect(effectiveHeatSafety(withSafety({ heatIndexCapC: 35, elderlyCapC: 33 }).safety)).toMatchObject({ heatIndexCapC: 32.2, elderlyCapC: 31 });
+  });
+
+  it('refuses hard limits that would allow a looser cap than the health constants', () => {
+    const looser = { ...exampleSafetyLimits(), heatIndexCapC: { min: 26.7, max: 33, default: 32.2 } };
+    expect(SafetyHardLimitsSchema.safeParse(looser).success).toBe(false);
+    const elderly = { ...exampleSafetyLimits(), elderlyCapC: { min: 26, max: 32, default: 31 } };
+    expect(SafetyHardLimitsSchema.safeParse(elderly).success).toBe(false);
   });
 });
 

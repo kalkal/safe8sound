@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ELDERLY_CRITICAL_C, EXTREME_CAUTION_HEAT_INDEX_C, heatDanger, roundedHeatIndexC } from '../src/heat-danger.js';
+import { ELDERLY_CRITICAL_C, EXTREME_CAUTION_HEAT_INDEX_C, heatDanger, heatDangerReason, roundedHeatIndexC } from '../src/heat-danger.js';
 
 // #248: heat danger in the safe room is the air temperature or the NWS heat index above the limit in force; humid air
 // alone is not. Two fixed caps hold whatever the limit: the NWS Extreme Caution band (heat index from 32.2 °C) for
@@ -52,5 +52,27 @@ describe('heatDanger', () => {
   it('the caps are the NWS and Health Canada numbers', () => {
     expect(EXTREME_CAUTION_HEAT_INDEX_C).toBe(32.2);
     expect(ELDERLY_CRITICAL_C).toBe(31);
+  });
+});
+
+describe('stricter caps from the settings (#266)', () => {
+  it('a heat-index cap set lower refuses earlier, and says it is the set cap', () => {
+    // 29 °C at 50 % feels like about 29.9 °C: under a 30 °C maximum, over a 29 °C cap.
+    const caps = { heatIndexC: 29, elderlyC: 31 };
+    const d = heatDanger(at(29, 50), { limitC: 30, elderly: false, caps });
+    expect(d).toMatchObject({ rule: 'extreme_caution', limitC: 29 });
+    expect(heatDangerReason(at(29, 50), d ?? { rule: 'temperature', valueC: 0, limitC: 0 })).toMatch(/above the 29 °C heat-index cap set for this home\.$/);
+    expect(heatDanger(at(29, 50), { limitC: 30, elderly: false })).toBeUndefined();
+  });
+
+  it('an older-person cap set lower refuses earlier, and says so', () => {
+    const d = heatDanger(at(28.5, 20), { limitC: 30, elderly: true, caps: { heatIndexC: 32.2, elderlyC: 28 } });
+    expect(d).toEqual({ rule: 'elderly_critical', valueC: 28.5, limitC: 28 });
+    expect(heatDangerReason(at(28.5, 20), d ?? { rule: 'temperature', valueC: 0, limitC: 0 })).toBe('The safe room would reach 28.5 °C, above the 28 °C set for an older person.');
+  });
+
+  it('the default caps keep the health wording', () => {
+    const d = heatDanger(at(30, 60), { limitC: 40, elderly: false });
+    expect(heatDangerReason(at(30, 60), d ?? { rule: 'temperature', valueC: 0, limitC: 0 })).toMatch(/Extreme Caution band from 32\.2 °C\.$/);
   });
 });

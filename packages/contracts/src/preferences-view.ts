@@ -54,6 +54,9 @@ export const SetPreferencesInputSchema = z.strictObject({
       cooling: z.strictObject({ maxC: z.number().optional() }).optional(),
       heating: z.strictObject({ minC: z.number().optional() }).optional(),
       humidity: z.strictObject({ minPct: PctSchema.optional(), maxPct: PctSchema.optional() }).optional(),
+      stricterNightLimit: z.boolean().optional(),
+      heatIndexCapC: z.number().optional(),
+      elderlyCapC: z.number().optional(),
     })
     .optional(),
   autoStormOnGridLoss: z.boolean().optional(),

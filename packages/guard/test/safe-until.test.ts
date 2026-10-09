@@ -59,6 +59,14 @@ describe('safeUntil', () => {
       expect(safeUntil(shaped(() => ({ tempC: 26, rh: 90 })), opts)).toBeUndefined();
     });
 
+    it('stricter caps from the settings end the safe hours earlier (#266); a looser stored cap plays the constant', () => {
+      const lax = { ...opts, safety: { ...opts.safety, cooling: { maxC: 40 } } };
+      const warm = shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? 29 : 26, rh: 50 }));
+      expect(safeUntil(warm, lax)).toBeUndefined();
+      expect(safeUntil(warm, { ...lax, safety: { ...lax.safety, heatIndexCapC: 29 } })).toEqual({ ms: T0 + 2 * H, limitedBy: 'temperature' });
+      expect(safeUntil(shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? 30 : 26, rh: 60 })), { ...lax, safety: { ...lax.safety, heatIndexCapC: 35 } })).toEqual({ ms: T0 + 2 * H, limitedBy: 'temperature' });
+    });
+
     it('the fixed caps end the safe hours whatever the limit', () => {
       const lax = { ...opts, safety: { ...opts.safety, cooling: { maxC: 40 } } };
       expect(safeUntil(shaped((ms) => ({ tempC: ms >= T0 + 2 * H ? 30 : 26, rh: 60 })), lax)).toEqual({ ms: T0 + 2 * H, limitedBy: 'temperature' });

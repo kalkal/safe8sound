@@ -115,6 +115,14 @@ describe('what ends the safe hours, in words (#248)', () => {
     expect(lastResortThen({ limitedBy: 'temperature', season: 'cooling', limitThenC: 24, ...limits })).toBe('the room goes above, or feels hotter than, 24 °C, the night limit');
   });
 
+  it('a cap the person set ends the hours in its own words, never as the maximum (#266 review)', () => {
+    expect(lastResortThen({ limitedBy: 'temperature', season: 'cooling', limitThenC: 26, limitKind: 'older_person_cap', ...limits })).toBe('the room goes above 26 °C, the cap set for an older person');
+    expect(lastResortThen({ limitedBy: 'temperature', season: 'cooling', limitThenC: 26.7, limitKind: 'heat_index_cap', ...limits })).toBe(
+      'the room goes above, or feels hotter than, 26.7 °C, the heat-index cap set for this home',
+    );
+    expect(lastResortThen({ limitedBy: 'temperature', season: 'cooling', limitThenC: 24, limitKind: 'night', ...limits })).toBe('the room goes above, or feels hotter than, 24 °C, the night limit');
+  });
+
   it('humidity ends the hours only where the plan dries the room under its minimum', () => {
     expect(lastResortThen({ limitedBy: 'humidity', season: 'cooling', limitThenC: 27, ...limits })).toBe('the humidity drops under its 40 % minimum');
   });
