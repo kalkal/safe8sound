@@ -1,7 +1,7 @@
-import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result, type TempUnit } from '@cold-reserve/contracts';
-import { darkWindow, epsBaseLoadW, isTimeZone, localMidnightMs, scenarioClock, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
-import { FallbackSource, type SourceEvent } from '@cold-reserve/source-fallback';
-import { SCENARIO_IDS, SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, profileAtPlace, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
+import { HomeIdSchema, HomeProfileSchema, SandboxHomeIdSchema, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type Result, type TempUnit } from '@cold-reserve/contracts';
+import { darkWindow, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
+import { FallbackSource } from '@cold-reserve/source-fallback';
+import { SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, profileAtPlace } from '@cold-reserve/source-simulator';
 import { withCardResources, type CardDocuments } from './cards.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
@@ -20,6 +20,12 @@ import { outagesOf } from './milestones.js';
 import { createSandboxes } from './sandboxes.js';
 import { refreshFrom, shippedPlace, withHousehold, type SandboxPlay } from './sandbox-play.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
+import { envNumber, scenarioStartFor, scenarioTimelineFor, type ScenarioTimeline } from './scenario-clock.js';
+import { logClientScopes, logMetadataMode, logSourceEvent, warnMissingEpsLoad } from './startup-log.js';
+
+// Where they lived before #319: the entries and tests still import them from here.
+export { scenarioAnchor, scenarioClockFor, scenarioPlayFor, scenarioTimelineFor, type ScenarioTimeline } from './scenario-clock.js';
+export { logSourceEvent, warnMissingEpsLoad } from './startup-log.js';
 
 export interface AppOptions {
   /** Wall clock; the simulator runs on scenario time derived from it (plan §9.4). */
@@ -53,77 +59,6 @@ export interface AppOptions {
   readonly settingsStoreFor?: StateStoreFactory;
 }
 
-/**
- * The one scenario clock (#160): scenario time from the wall clock, the scenario, its start hour, speed and
- * anchor. createApp and the local entry use this same definition, so the simulator, the plans, the storm
- * sessions and the local store agree on "now".
- */
-export function scenarioClockFor(env: Readonly<Record<string, string | undefined>>, wall: Clock): Result<Clock, ErrorEnvelope> {
-  const play = scenarioPlayFor(env, wall);
-  return play.ok ? ok(play.value.clock) : play;
-}
-
-/**
- * The timeline and the env scenario's clock on it, built once (C2b): an entry passes both to createApp, so the
- * sandboxes' clocks come from the same timeline as the demo's (the same start, with the default `start` anchor).
- */
-export function scenarioPlayFor(env: Readonly<Record<string, string | undefined>>, wall: Clock): Result<{ timeline: ScenarioTimeline; clock: Clock }, ErrorEnvelope> {
-  const start = scenarioStartFor(env);
-  if (!start.ok) return start;
-  const timeline = scenarioTimelineFor(env, wall);
-  if (!timeline.ok) return timeline;
-  // The env scenario plays in the reference place (L1, #217); a sandbox plays the place of its settings (C2b).
-  const clock = timeline.value.clockFor({ startAt: start.value.scenario.startAt, tz: builtInPlace('reference').tz });
-  return clock.ok ? ok({ timeline: timeline.value, clock: clock.value }) : clock;
-}
-
-/** What every home's scenario clock shares: the anchor rule, the speed and the start hour (C2a, Refs #222). */
-export interface ScenarioTimeline {
-  /**
-   * The scenario clock of a home playing a scenario that starts at `startAt` in a place of zone `tz`. With
-   * `startedAtMs`, the home's day was started again at that wall instant (a sandbox's restart, C2b): it plays from
-   * the start hour then, whatever the shared anchor. With `advancedMs`, the visitor jumped that much scenario time
-   * ahead (#311): it is added to the start, the anchor (the playthrough) stays.
-   */
-  clockFor(play: { readonly startAt: string; readonly tz: string; readonly startedAtMs?: number; readonly advancedMs?: number }): Result<Clock, ErrorEnvelope>;
-}
-
-/**
- * One timeline per process: the same anchor (MCP_SCENARIO_ANCHOR, read once at start), speed and start hour
- * for every home, so every container and every home agree on how wall time maps to scenario time; each home
- * gets the clock of its own scenario start and its own place's midnight (a Houston sandbox reads Houston time).
- */
-export function scenarioTimelineFor(env: Readonly<Record<string, string | undefined>>, wall: Clock): Result<ScenarioTimeline, ErrorEnvelope> {
-  const speed = number(env, 'MCP_SCENARIO_SPEED', 1);
-  if (!speed.ok) return speed;
-  const startH = number(env, 'MCP_SCENARIO_START_H', 0);
-  if (!startH.ok) return startH;
-  const raw = env['MCP_SCENARIO_ANCHOR'];
-  const startedAtMs = wall.now();
-  // Validate the anchor rule once, on the reference place, so a bad setting fails at start.
-  const check = scenarioAnchor(raw, startedAtMs, builtInPlace('reference').tz);
-  if (!check.ok) return check;
-  return ok({
-    clockFor: ({ startAt, tz, startedAtMs: restartedAtMs, advancedMs }) => {
-      const anchor = restartedAtMs === undefined ? scenarioAnchor(raw, startedAtMs, tz) : ok(restartedAtMs);
-      if (!anchor.ok) return anchor;
-      return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: Date.parse(startAt) + startH.value * HOUR_MS + (advancedMs ?? 0), speed: speed.value }));
-    },
-  });
-}
-
-/** The scenario and the instant the server starts in it (its start plus MCP_SCENARIO_START_H): one definition. */
-function scenarioStartFor(env: Readonly<Record<string, string | undefined>>): Result<{ scenario: Scenario; scenarioId: ScenarioId; startMs: number }, ErrorEnvelope> {
-  const scenarioId = env['MCP_SCENARIO'] ?? 'clear-day';
-  if (!(SCENARIO_IDS as readonly string[]).includes(scenarioId)) {
-    return err(toolError('invalid_config', `MCP_SCENARIO must be one of ${SCENARIO_IDS.join(', ')}.`));
-  }
-  const startH = number(env, 'MCP_SCENARIO_START_H', 0);
-  if (!startH.ok) return startH;
-  const scenario = builtInScenario(scenarioId as ScenarioId);
-  return ok({ scenario, scenarioId: scenarioId as ScenarioId, startMs: Date.parse(scenario.startAt) + startH.value * HOUR_MS });
-}
-
 export interface App {
   readonly config: ServerConfig;
   readonly registry: ModuleRegistry;
@@ -150,129 +85,20 @@ const noLiveHome: HomeDataSource = {
   snapshot: () => Promise.resolve(err(toolError('home_data_stale', 'No live reading from the home yet.'))),
 };
 
-function number(env: Readonly<Record<string, string | undefined>>, key: string, fallback: number): Result<number, ErrorEnvelope> {
-  const raw = env[key];
-  // Number('') is 0: an empty value is a mistake, not a request for zero.
-  const value = raw === undefined ? fallback : raw.trim() === '' ? Number.NaN : Number(raw);
-  return Number.isFinite(value) && value >= 0 ? ok(value) : err(toolError('invalid_config', `${key} must be a non-negative number.`));
-}
-
 /**
  * Composition root shared by the local Node entry and the Lambda entry (plan §9.2: dependencies
  * built by a factory, no DI framework). Homes: `demo` is the seeded simulator; `home` is the real
  * home behind FallbackSource, read-only, with the simulator as its declared fallback.
  */
-/**
- * Which wall-clock instant is the start of the scenario (R1, 2026-10-01 architecture check):
- * `start` (default) = when this server starts, fine for one local process; `daily` = midnight in the
- * IANA zone of the place (T1: right in winter and on the days the clocks change, not the fixed offset of the
- * scenario's `startAt`), so the scenario clock reads the same hour as the home and every Lambda container agrees; or a fixed ISO instant. With a fixed instant (or a speed
- * above 1) the simulator stops at the end of the scenario. With `daily` the scenario jumps back 24 h at
- * midnight: a long-running local server replays the day again from its start.
- */
-export function scenarioAnchor(raw: string | undefined, startedAtMs: number, placeTimeZone: string): Result<number | ((wallMs: number) => number), ErrorEnvelope> {
-  if (raw === undefined || raw === 'start') return ok(startedAtMs);
-  if (raw === 'daily') {
-    if (!isTimeZone(placeTimeZone)) return err(toolError('invalid_config', 'The place of the scenario has no valid IANA time zone.'));
-    return ok((wallMs) => localMidnightMs(wallMs, placeTimeZone));
-  }
-  const instant = IsoDateTimeSchema.safeParse(raw);
-  return instant.success ? ok(Date.parse(instant.data)) : err(toolError('invalid_config', 'MCP_SCENARIO_ANCHOR must be start, daily or an ISO instant.'));
-}
-
-/**
- * Off grid the simulator, the guard and the storm safe hours read the EPS load from the home profile. A profile
- * without it gets no assumed figure: its storm calculations refuse (`missing_eps_load`), and start-up says so.
- */
-export function warnMissingEpsLoad(profiles: readonly HomeProfile[], logger: Logger): void {
-  for (const profile of profiles) {
-    const eps = epsBaseLoadW(profile);
-    if (eps.ok) continue;
-    logger.log({
-      ts: new Date().toISOString(),
-      level: 'warn',
-      component: 'mcp-server',
-      code: 'missing_eps_load',
-      category: 'internal',
-      message: 'The home profile gives no epsBaseLoadW: a simulated home gives no readings, and storm calculations refuse, until it does.',
-      correlationId: 'startup',
-      homeId: profile.homeId,
-    });
-  }
-}
-
-/**
- * The real home's data source switching to the simulator and back, in the shared log (#113). Not tied to one
- * request (the source is read by many), so the correlation id names the link.
- */
-export function logSourceEvent(logger: Logger, homeId: HomeId): (event: SourceEvent) => void {
-  return (event) => {
-    const base = { ts: event.at, component: 'mcp-server', correlationId: 'home-link', homeId, details: { event: event.type } } as const;
-    if (event.type === 'HOME_REACHABLE') {
-      logger.log({ ...base, level: 'info', message: 'The home answers again: live data is back.' });
-    } else if (event.type === 'HOME_UNREACHABLE') {
-      logger.log({
-        ...base,
-        level: 'warn',
-        code: event.reason,
-        category: categoryOf(event.reason),
-        message: `The home's data is ${event.homeLink}: the simulator stands in, and every reply says so.`,
-        ...(event.errorName === undefined ? {} : { errorName: event.errorName }),
-        details: { event: event.type, homeLink: event.homeLink, ...(event.lastLiveAt === undefined ? {} : { lastLiveAt: event.lastLiveAt }) },
-      });
-    } else {
-      logger.log({
-        ...base,
-        level: 'error',
-        code: event.code,
-        category: categoryOf(event.code),
-        message: 'The simulator standing in for the home failed: no home data until it is fixed.',
-        ...(event.errorName === undefined ? {} : { errorName: event.errorName }),
-      });
-    }
-  };
-}
-
-/**
- * The client scopes at start-up (#233): how many grants are agent, cards, phone or unscoped, counts only. After a
- * deploy it shows whether the agent:/cards: prefixes in the SSM client list took.
- */
-function logClientScopes(config: ServerConfig, logger: Logger): void {
-  const counts = { agent: 0, cards: 0, phone: 0, unscoped: 0 };
-  for (const grant of config.clients.values()) counts[grant.scope ?? 'unscoped'] += 1;
-  logger.log({
-    ts: new Date().toISOString(),
-    level: 'info',
-    component: 'mcp-server',
-    message: `Client scopes: ${String(counts.agent)} agent, ${String(counts.cards)} cards, ${String(counts.phone)} phone, ${String(counts.unscoped)} unscoped.`,
-    correlationId: 'startup',
-    details: { event: 'client_scopes', ...counts },
-  });
-}
-
-/** The Protected Resource Metadata mode at start-up (#149): auto, fixed or off, never the URL itself. */
-function logMetadataMode(config: ServerConfig, logger: Logger): void {
-  const pr = config.protectedResource;
-  const mode = pr === undefined ? 'off' : pr.resource === 'auto' ? 'auto' : 'fixed';
-  logger.log({
-    ts: new Date().toISOString(),
-    level: 'info',
-    component: 'mcp-server',
-    message: `Protected resource metadata: ${mode}.`,
-    correlationId: 'startup',
-    details: { event: 'protected_resource_metadata', mode, authorizationServers: pr?.authorizationServers.length ?? 0 },
-  });
-}
-
 export function createApp(env: Readonly<Record<string, string | undefined>>, opts: AppOptions): Result<App, ErrorEnvelope> {
   const config = loadConfig(env);
   if (!config.ok) return config;
 
   const start = scenarioStartFor(env);
   if (!start.ok) return start;
-  const sandboxTtlH = number(env, 'MCP_SANDBOX_TTL_H', 24);
-  const sandboxMaxNew = number(env, 'MCP_SANDBOX_MAX_NEW_PER_DAY', 100);
-  const sandboxMaxAdvances = number(env, 'MCP_SANDBOX_MAX_ADVANCES_PER_DAY', 30);
+  const sandboxTtlH = envNumber(env, 'MCP_SANDBOX_TTL_H', 24);
+  const sandboxMaxNew = envNumber(env, 'MCP_SANDBOX_MAX_NEW_PER_DAY', 100);
+  const sandboxMaxAdvances = envNumber(env, 'MCP_SANDBOX_MAX_ADVANCES_PER_DAY', 30);
   if (!sandboxTtlH.ok) return sandboxTtlH;
   if (!sandboxMaxNew.ok) return sandboxMaxNew;
   if (!sandboxMaxAdvances.ok) return sandboxMaxAdvances;
