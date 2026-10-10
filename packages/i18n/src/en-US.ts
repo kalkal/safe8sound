@@ -121,7 +121,8 @@ export const enUS = {
   'lastResort.notMedical': 'These are general tips, not medical advice.',
   // The whole frame, through the host (plan §11.2 p.2, #200): the words say what happens.
   'card.fullScreen': 'Full screen',
-  'card.back': 'Back',
+  // Full screen shows only the card: the way out says where it goes (owner, 10 Oct: a bare "Back" was missed).
+  'card.back': 'Back to the conversation',
   'card.loading': 'Loading…',
   'card.failed': 'This card could not be shown.',
   'card.noActions': 'Card actions are not available here: say it instead.',

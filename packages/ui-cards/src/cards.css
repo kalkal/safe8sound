@@ -4,6 +4,8 @@
 @layer base {
   /* What a card frame says outside a card (the applied notice, a second-step button) reads in the card font. */
   body {
+    /* No browser margin around the card (owner, 10 Oct): its first row lines up with the host's buttons outside the frame. */
+    margin: 0;
     font-family: var(--font-body);
   }
 }
@@ -33,6 +35,11 @@
       font-size: var(--font-size-lead);
       font-weight: var(--font-weight-medium);
     }
+  }
+
+  /* The "Full screen" row keeps the same gap above the card as the other button rows (owner, 10 Oct). */
+  .display-toggle {
+    margin-block-end: var(--space-3);
   }
 
   .card-expand,

@@ -115,7 +115,7 @@ export const itIT = {
   'lastResort.call': 'Se sei preoccupato, chiama il 112.',
   'lastResort.notMedical': 'Sono consigli generali, non un parere medico.',
   'card.fullScreen': 'Schermo intero',
-  'card.back': 'Indietro',
+  'card.back': 'Torna alla conversazione',
   'card.loading': 'Carico…',
   'card.failed': 'Questa scheda non si può mostrare.',
   'card.noActions': 'Card actions are not available here: say it instead.',

@@ -219,10 +219,10 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       expect(toggle).toHaveBeenCalledTimes(1);
     });
 
-    it('in full screen says "Back", and Escape goes back too', () => {
+    it('in full screen says where it goes back to, and Escape goes back too (owner, 10 Oct: a bare "Back" was missed)', () => {
       const toggle = vi.fn();
       view({ canFullscreen: true, fullscreen: true, toggle });
-      expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Back to the conversation' })).toBeTruthy();
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(toggle).toHaveBeenCalledTimes(1);
     });
