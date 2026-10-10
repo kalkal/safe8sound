@@ -106,6 +106,17 @@ describe('the storm detector (tick)', () => {
     expect(session.ok && session.value?.notifications.map((n) => n.transition)).toEqual(['storm_started', 'power_back']);
   });
 
+  it('#311: the essential reading tells the family once, during an active storm only', async () => {
+    const w = world(4);
+    await runStormDetector(w.deps, w.ctx, 'essential'); // the storm starts on this reading: no essential yet
+    await runStormDetector(w.deps, w.ctx, 'essential');
+    await runStormDetector(w.deps, w.ctx, 'essential');
+    expect((await w.inbox()).map((m) => m.transition).sort()).toEqual(['essential_level', 'storm_started']);
+    const calm = world(1);
+    await runStormDetector(calm.deps, calm.ctx, 'essential');
+    expect(await calm.inbox()).toEqual([]);
+  });
+
   it('a grid that drops again inside the window keeps the storm going', async () => {
     let flicker = false;
     const w = world(4, { snapshot: (s) => (flicker ? { ...s, gridAvailable: false } : s) });

@@ -33,6 +33,9 @@ export interface SandboxPlay {
   readonly version?: number;
   /** The temperature unit the visitor chose (#306): the tool texts follow it. */
   readonly units: TempUnit;
+  /** The scenario played and the instant it starts (its start hour included): the judges' clock reads its day (#311). */
+  readonly scenario: Scenario;
+  readonly startMs: number;
   /** The missing settings were reported for this build (one warning per build, C2b Q3). */
   missingReported?: boolean;
 }

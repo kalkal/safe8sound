@@ -83,6 +83,15 @@ describe('card tool calls: POST /v1/tools/call', () => {
     expect(ToolCallRequestSchema.safeParse({ name: 'get_demo_settings', arguments: { homeId: 'home' } }).success).toBe(false);
   });
 
+  it('#311 (additive): the judges clock lists the next moments and jumps to one', () => {
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_milestones', arguments: {} }).success).toBe(true);
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_milestones', arguments: { planId: 'plan-0001' } }).success).toBe(true);
+    expect(ToolCallRequestSchema.safeParse({ name: 'advance_clock', arguments: { kind: 'storm_start', at: '2026-07-17T10:00:00+02:00' } }).success).toBe(true);
+    expect(ToolCallRequestSchema.safeParse({ name: 'advance_clock', arguments: { hours: 2 } }).success).toBe(true);
+    expect(ToolCallRequestSchema.safeParse({ name: 'advance_clock', arguments: { hours: 48 } }).success).toBe(false);
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_milestones', arguments: { homeId: 'home' } }).success).toBe(false);
+  });
+
   it('answers the MCP CallToolResult a card expects, tool errors included', () => {
     expect(ToolCallReplySchema.safeParse({ content: [{ type: 'text', text: 'Applied.' }], structuredContent: { ok: true } }).success).toBe(true);
     const failed = toolError('plan_expired', 'The plan expired: ask for a new one.');

@@ -35,5 +35,10 @@ export const SandboxSettingsSchema = z.strictObject({
    * new scenario or place, so every container plays the same hour. Absent: the shared timeline's start.
    */
   scenarioStartedAt: IsoDateTimeSchema.optional(),
+  /**
+   * The judges' clock (#311, additive, approved in #311): scenario ms the visitor jumped ahead, added to the scenario
+   * start. The playthrough anchor never changes with it; a restart sets it back to 0. Absent: 0.
+   */
+  advancedMs: z.number().int().nonnegative().optional(),
 });
 export type SandboxSettings = z.infer<typeof SandboxSettingsSchema>;

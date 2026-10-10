@@ -19,6 +19,7 @@ import { z } from 'zod';
 import type { CapabilityModule } from '../registry.js';
 import { homeDetail, isSandbox } from '../sandbox-log.js';
 import { defineTool } from '../tool.js';
+import { demoClockTools, type DemoClockDeps } from './demo-clock.js';
 
 // `demo-settings` capability module (C2b, #222; contracts approved in #222): a visitor chooses what their own sandbox
 // plays (the scenario, the place, the units, who is at home) or starts the day again. Only visitor sandboxes list
@@ -39,6 +40,8 @@ export interface DemoSettingsDeps {
   readonly logger: Logger;
   /** Plays the new settings in this container at once; the others see them at their next request. */
   readonly onChange?: (homeId: HomeId, settings: SandboxSettings, correlationId: string) => Promise<void>;
+  /** The judges' clock (#311): with it, the sandbox lists its next moments and jumps to one. */
+  readonly clock?: DemoClockDeps;
 }
 
 const CHOICES = ['scenarioId', 'locationId', 'units', 'household'] as const;
@@ -111,6 +114,8 @@ export function demoSettingsModule(deps: DemoSettingsDeps): CapabilityModule {
         updatedAt: now,
         ...(restarted ? { scenarioStartedAt: now } : {}),
       };
+      // A restart is the only way back (#311): the day plays again from its start, with no jump.
+      if (restarted) delete next.advancedMs;
       const saved = await deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId }).putSandboxSettings(next, current.value.version);
       if (!saved.ok) return saved;
       for (const field of [...changed, ...(args.restart === true ? (['restart'] as const) : [])]) {
@@ -135,5 +140,22 @@ export function demoSettingsModule(deps: DemoSettingsDeps): CapabilityModule {
     },
   });
 
-  return { id: 'demo-settings', tools: [getDemoSettings, setScenario], enabledFor: isSandbox };
+  const clockTools =
+    deps.clock === undefined
+      ? []
+      : demoClockTools(
+          deps.clock,
+          {
+            read,
+            save: async (homeId, next, expected, correlationId) => {
+              const saved = await deps.storeFor(homeId, { correlationId }).putSandboxSettings(next, expected);
+              if (!saved.ok) return saved;
+              await deps.onChange?.(homeId, next, correlationId);
+              return ok(undefined);
+            },
+          },
+          { wallClock: deps.wallClock, logger: deps.logger },
+        );
+
+  return { id: 'demo-settings', tools: [getDemoSettings, setScenario, ...clockTools], enabledFor: isSandbox };
 }

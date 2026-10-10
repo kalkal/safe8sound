@@ -118,6 +118,20 @@ describe('the scenario timeline (C2a, Refs #222): one anchor and speed, a clock 
     expect(new Date(restarted.value.now()).toISOString()).toBe('2026-07-16T08:00:00.000Z');
   });
 
+  it('#311: a jump ahead adds scenario time to the start, and keeps the playthrough anchor', () => {
+    const moving = settableClock(at('2026-10-01T10:00:00Z'));
+    const timeline = scenarioTimelineFor({ MCP_SCENARIO_ANCHOR: 'daily', MCP_SCENARIO_START_H: '8' }, moving);
+    if (!timeline.ok) throw new Error('config');
+    const play = { startAt: '2026-07-16T00:00:00+02:00', tz: 'Europe/Rome', startedAtMs: at('2026-10-01T09:30:00Z') };
+    const plain = timeline.value.clockFor(play);
+    const ahead = timeline.value.clockFor({ ...play, advancedMs: 3 * H });
+    if (!plain.ok || !ahead.ok) throw new Error('clock');
+    expect(ahead.value.now() - plain.value.now()).toBe(3 * H);
+    expect(new Date(ahead.value.now()).toISOString()).toBe('2026-07-16T09:30:00.000Z');
+    // The playthrough (the key of storm sessions and the inbox, #240) is the same: nothing of the day is lost.
+    expect(ahead.value.playthrough?.()).toBe(plain.value.playthrough?.());
+  });
+
   it('plays two scenarios side by side: the same wall instant is each scenario own time', () => {
     const timeline = scenarioTimelineFor({ MCP_SCENARIO_ANCHOR: 'daily' }, wall(at('2026-10-01T10:00:00Z')));
     if (!timeline.ok) throw new Error('config');

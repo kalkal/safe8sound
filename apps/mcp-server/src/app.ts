@@ -1,5 +1,5 @@
 import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result, type TempUnit } from '@cold-reserve/contracts';
-import { epsBaseLoadW, isTimeZone, localMidnightMs, scenarioClock, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
+import { darkWindow, epsBaseLoadW, isTimeZone, localMidnightMs, scenarioClock, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
 import { FallbackSource, type SourceEvent } from '@cold-reserve/source-fallback';
 import { SCENARIO_IDS, SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, profileAtPlace, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
 import { withCardResources, type CardDocuments } from './cards.js';
@@ -8,12 +8,15 @@ import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
 import type { ComfortPlanWiring } from './comfort-plan-config.js';
 import { atHome } from './modules/comfort-plan/deps.js';
 import { comfortPlanModule } from './modules/comfort-plan/index.js';
+import type { DemoClockDeps } from './modules/demo-clock.js';
 import { demoSettingsModule, type SandboxChoices } from './modules/demo-settings.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
 import { stormModeModule, type StormModeDeps } from './modules/storm-mode/index.js';
+import { runStormDetector } from './modules/storm-mode/observe.js';
 import { familyReply } from './modules/storm-mode/tools.js';
 import type { PhoneReplyHandler } from './phone-inbox.js';
 import type { StormModeWiring } from './storm-mode-config.js';
+import { outagesOf } from './milestones.js';
 import { createSandboxes } from './sandboxes.js';
 import { refreshFrom, shippedPlace, withHousehold, type SandboxPlay } from './sandbox-play.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
@@ -79,9 +82,10 @@ export interface ScenarioTimeline {
   /**
    * The scenario clock of a home playing a scenario that starts at `startAt` in a place of zone `tz`. With
    * `startedAtMs`, the home's day was started again at that wall instant (a sandbox's restart, C2b): it plays from
-   * the start hour then, whatever the shared anchor.
+   * the start hour then, whatever the shared anchor. With `advancedMs`, the visitor jumped that much scenario time
+   * ahead (#311): it is added to the start, the anchor (the playthrough) stays.
    */
-  clockFor(play: { readonly startAt: string; readonly tz: string; readonly startedAtMs?: number }): Result<Clock, ErrorEnvelope>;
+  clockFor(play: { readonly startAt: string; readonly tz: string; readonly startedAtMs?: number; readonly advancedMs?: number }): Result<Clock, ErrorEnvelope>;
 }
 
 /**
@@ -100,10 +104,10 @@ export function scenarioTimelineFor(env: Readonly<Record<string, string | undefi
   const check = scenarioAnchor(raw, startedAtMs, builtInPlace('reference').tz);
   if (!check.ok) return check;
   return ok({
-    clockFor: ({ startAt, tz, startedAtMs: restartedAtMs }) => {
+    clockFor: ({ startAt, tz, startedAtMs: restartedAtMs, advancedMs }) => {
       const anchor = restartedAtMs === undefined ? scenarioAnchor(raw, startedAtMs, tz) : ok(restartedAtMs);
       if (!anchor.ok) return anchor;
-      return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: Date.parse(startAt) + startH.value * HOUR_MS, speed: speed.value }));
+      return ok(scenarioClock({ wall, anchorMs: anchor.value, scenarioStartMs: Date.parse(startAt) + startH.value * HOUR_MS + (advancedMs ?? 0), speed: speed.value }));
     },
   });
 }
@@ -268,8 +272,10 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   if (!start.ok) return start;
   const sandboxTtlH = number(env, 'MCP_SANDBOX_TTL_H', 24);
   const sandboxMaxNew = number(env, 'MCP_SANDBOX_MAX_NEW_PER_DAY', 100);
+  const sandboxMaxAdvances = number(env, 'MCP_SANDBOX_MAX_ADVANCES_PER_DAY', 30);
   if (!sandboxTtlH.ok) return sandboxTtlH;
   if (!sandboxMaxNew.ok) return sandboxMaxNew;
+  if (!sandboxMaxAdvances.ok) return sandboxMaxAdvances;
 
   const builtIn = start.value.scenario;
   const startSoc = opts.scenarioStartSocPct;
@@ -310,7 +316,10 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   // start of their day, each on its own scenario clock. Before any settings are saved, today's sandbox (Q3).
   // The reference home starts in its own unit (°C), the same rule as a later change of place.
   const sandboxDefaults: SandboxChoices = { scenarioId: start.value.scenarioId, locationId: 'reference', units: defaultUnitOf('reference'), household: 'older-man' };
-  const playSandbox = (homeId: HomeId, choices: SandboxChoices & { readonly version?: number | undefined; readonly scenarioStartedAt?: string | undefined }): Result<SandboxPlay, ErrorEnvelope> => {
+  const playSandbox = (
+    homeId: HomeId,
+    choices: SandboxChoices & { readonly version?: number | undefined; readonly scenarioStartedAt?: string | undefined; readonly advancedMs?: number | undefined },
+  ): Result<SandboxPlay, ErrorEnvelope> => {
     // Every place ships (L2, #247); a place the simulator did not know would be refused by set_scenario first.
     const place = shippedPlace(choices.locationId);
     if (place === undefined) return err(toolError('invalid_config', 'The stored place is not available.', { details: { field: 'locationId' } }));
@@ -320,6 +329,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
       startAt: sandboxScenario.startAt,
       tz: place.tz,
       ...(choices.scenarioStartedAt === undefined ? {} : { startedAtMs: Date.parse(choices.scenarioStartedAt) }),
+      ...(choices.advancedMs === undefined ? {} : { advancedMs: choices.advancedMs }),
     });
     if (!homeClock.ok) return homeClock;
     const profile = profileAtPlace(demo, place);
@@ -329,6 +339,8 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
       entry: { source: sim, profile, readOnly: false, levelSince: since, clock: homeClock.value },
       forecast: () => sim.forecast(),
       units: choices.units,
+      scenario: sandboxScenario,
+      startMs: Date.parse(sandboxScenario.startAt) + startHMs,
       ...(choices.version === undefined ? {} : { version: choices.version }),
     });
   };
@@ -367,6 +379,41 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   };
 
   const stormDeps: StormModeDeps | undefined = opts.stormMode === undefined ? undefined : { ...opts.stormMode, model: params, homes: planningHome, logger: opts.logger };
+
+  // The judges' clock (#311): a sandbox's day as played here, its plans, and the storm detector on its own clock.
+  const comfortPlan = opts.comfortPlan;
+  const demoClock: DemoClockDeps = {
+    day: (homeId) => {
+      const play = sandboxFor(homeId);
+      if (play === undefined) return undefined;
+      const { clock: homeClock, profile } = play.entry;
+      if (homeClock === undefined) return undefined;
+      const nowMs = homeClock.now();
+      const recharge =
+        comfortPlan === undefined
+          ? undefined
+          : darkWindow({ forecast: play.forecast(), fromMs: nowMs, pvPeakW: profile.pvPeakW, lossRatio: params.pv.lossRatio, essentialLoadW: comfortPlan.guard.reserve.essentialLoadW });
+      return {
+        nowMs,
+        version: play.version,
+        anchorMs: homeClock.playthrough?.() ?? opts.wallClock.now(),
+        startMs: play.startMs,
+        endMs: Date.parse(play.scenario.startAt) + play.scenario.durationH * HOUR_MS,
+        timeZone: profile.location.tz,
+        outages: outagesOf(play.scenario),
+        ...(recharge === undefined ? {} : { rechargeAtMs: recharge.toMs }),
+      };
+    },
+    getPlan: (homeId, planId, correlationId) =>
+      comfortPlan === undefined ? Promise.resolve(err(toolError('plan_not_found', 'No such plan in this sandbox.'))) : comfortPlan.storeFor(homeId, { correlationId }).getPlan(planId),
+    detect: async (ctx, kind) => {
+      if (stormDeps === undefined) return ok(undefined);
+      const ran = await runStormDetector(atHome(stormDeps, ctx.homeId), ctx, kind);
+      return ran.ok ? ok(undefined) : ran;
+    },
+    stableGridMs: (opts.stormMode?.config.stableGridMinutes ?? 0) * 60_000,
+    maxAdvancesPerDay: sandboxMaxAdvances.value,
+  };
   const modules = [
     energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver }),
     ...(opts.comfortPlan === undefined ? [] : [comfortPlanModule({ ...opts.comfortPlan, model: params, homes: planningHome, logger: opts.logger })]),
@@ -385,6 +432,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
             logger: opts.logger,
             // This container plays the change at once; the others at their next request.
             onChange: (homeId, _settings, correlationId) => sandboxes.refresh(homeId, correlationId),
+            clock: demoClock,
           }),
         ]),
     ...(opts.modules ?? []),

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ApplyPlanInputSchema, ApplyPlanOutputSchema } from './comfort-plan.js';
 import { IsoDateTimeSchema } from './common.js';
-import { SetScenarioInputSchema } from './demo-settings.js';
+import { AdvanceClockInputSchema, GetMilestonesInputSchema, SetScenarioInputSchema } from './demo-settings.js';
 import { ErrorCategorySchema, ErrorCodeSchema, ErrorEnvelopeSchema, categoryOf } from './errors.js';
 import { DataOriginSchema } from './origin.js';
 import { PlanSchema } from './plan.js';
@@ -117,6 +117,9 @@ export const ToolCallRequestSchema = z.discriminatedUnion('name', [
   // B2 (additive): the judge's settings drawer reads and saves its own sandbox only.
   z.strictObject({ name: z.literal('get_demo_settings'), arguments: z.strictObject({}) }),
   z.strictObject({ name: z.literal('set_scenario'), arguments: SetScenarioInputSchema }),
+  // #311 (additive, approved in #311): the judges' clock, on its own sandbox only.
+  z.strictObject({ name: z.literal('get_milestones'), arguments: GetMilestonesInputSchema }),
+  z.strictObject({ name: z.literal('advance_clock'), arguments: AdvanceClockInputSchema }),
 ]);
 export type ToolCallRequest = z.infer<typeof ToolCallRequestSchema>;
 

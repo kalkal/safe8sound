@@ -181,7 +181,8 @@ export async function detect(deps: StormModeDeps, o: Observed, event: StormEvent
     ...(o.snapshot.origin.scenario === undefined ? {} : { scenario: o.snapshot.origin.scenario }),
   };
   const step = stormReduce(o.session, event, context);
-  if (step.session === undefined || step.session === o.session) return ok(o);
+  // The essential level keeps the same session object but has a message to send (#311): only a step with neither is a no-op.
+  if (step.session === undefined || (step.session === o.session && step.transitions.length === 0)) return ok(o);
 
   let session = step.session;
   for (const transition of step.transitions) {
@@ -219,8 +220,23 @@ function logDeviceFailure(deps: StormModeDeps, o: Observed, failure: DeviceFailu
   });
 }
 
-/** One detector pass on the current reading: what the tick and the ingest run (plan §9.2). */
-export async function runStormDetector(deps: StormModeDeps, ctx: ToolContext): Promise<Result<Observed, ErrorEnvelope>> {
+/**
+ * The reading at which the battery reaches the plan's essential level (#311, the judges' clock): during an active
+ * storm whose family has not heard it yet, the level changes to essential; otherwise a plain reading.
+ */
+export function essentialEvent(o: Observed): StormEvent {
+  const told = o.session?.notifications.some((n) => n.transition === 'essential_level') === true;
+  if (o.session?.phase !== 'active' || told) return readingEvent(o);
+  return { type: 'reading', at: new Date(o.nowMs).toISOString(), gridAvailable: o.snapshot.gridAvailable, level: 'essential', previousLevel: 'comfort' };
+}
+
+/**
+ * One detector pass on the current reading: what the tick and the ingest run (plan §9.2), and the judges' clock at
+ * each moment it crosses (#311), with `essential` at the plan's first essential step.
+ */
+export async function runStormDetector(deps: StormModeDeps, ctx: ToolContext, kind: 'reading' | 'essential' = 'reading'): Promise<Result<Observed, ErrorEnvelope>> {
   const o = await readHome(deps, ctx);
-  return o.ok ? detect(deps, o.value, readingEvent(o.value)) : o;
+  if (!o.ok) return o;
+  // A storm that starts on this very reading is told first; the essential level follows at the next one.
+  return detect(deps, o.value, kind === 'essential' ? essentialEvent(o.value) : readingEvent(o.value));
 }

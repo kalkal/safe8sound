@@ -247,6 +247,18 @@ describe('POST /v1/tools/call: card actions, the MCP token stays here', () => {
     ]);
   });
 
+  it('#311: forwards the judges clock (get_milestones, advance_clock) for the home in the token; a jump over 24 h never leaves', async () => {
+    const { send, session, called } = setup();
+    const token = await session();
+    expect((await send('/v1/tools/call', { token, body: { name: 'get_milestones', arguments: {} } })).status).toBe(200);
+    expect((await send('/v1/tools/call', { token, body: { name: 'advance_clock', arguments: { hours: 2 } } })).status).toBe(200);
+    await problem(await send('/v1/tools/call', { token, body: { name: 'advance_clock', arguments: { hours: 48 } } }), 400, 'invalid_input');
+    expect(called).toEqual([
+      { home: 'demo#01aaaaaaaaaaaaaa', name: 'get_milestones' },
+      { home: 'demo#01aaaaaaaaaaaaaa', name: 'advance_clock' },
+    ]);
+  });
+
   it('refuses any tool that is not a card action', async () => {
     const { send, session, called } = setup();
     await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'notify_family', arguments: {} } }), 400, 'invalid_input');
