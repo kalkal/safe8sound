@@ -104,4 +104,15 @@ describe('preferences in a °F sandbox (#306): said in °F, with the °C value t
     const refused = await session(createMemoryBacking(), (client) => client.callTool({ name: 'set_preferences', arguments: { comfortC: { cooling: 29 }, confirmed: true } }), () => 'F');
     expect(text(refused)).toContain('comfortC.cooling must stay within the safety threshold (80.6 °F (27 C)).');
   });
+
+  it('#312: a heating comfort of 68 (°F, not converted) is refused with the 20 °C to send, and nothing is saved', async () => {
+    const backing = createMemoryBacking();
+    const refused = await session(backing, (client) => client.callTool({ name: 'set_preferences', arguments: { comfortC: { heating: 68 }, confirmed: true } }), () => 'F');
+    expect((refused as { isError?: boolean }).isError).toBe(true);
+    expect(text(refused)).toContain('68 °F is 20 °C: send comfortC.heating 20.');
+    const read = text(await session(backing, (client) => client.callTool({ name: 'get_preferences', arguments: {} }), () => 'F'));
+    expect(read).not.toContain('154.4');
+    const saved = text(await session(backing, (client) => client.callTool({ name: 'set_preferences', arguments: { comfortC: { heating: 19 }, confirmed: true } }), () => 'F'));
+    expect(saved).toBe('Saved: comfortC.heating from 68 °F (20 C) to 66.2 °F (19 C).');
+  });
 });

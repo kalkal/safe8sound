@@ -129,6 +129,31 @@ describe('updatePreferences', () => {
     });
   });
 
+  it('#312: refuses a heating comfort above the cooling safety maximum: no room is heated past the limit it is cooled to', () => {
+    expect(updatePreferences(current(), { comfortC: { heating: 68 } }, ctx)).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_setpoint', details: { field: 'comfortC.heating', limit: 27, nearestAllowed: 27, unit: 'C' } },
+    });
+    expect(updatePreferences(current(), { comfortC: { heating: 27.5 } }, ctx)).toMatchObject({ ok: false, error: { code: 'invalid_setpoint' } });
+    expect(updatePreferences(current(), { comfortC: { heating: 27 } }, ctx)).toMatchObject({ ok: true });
+  });
+
+  it('#312: in a °F sandbox a comfort above 40 is a °F number sent as °C: refused with the °C to send, nothing saved as 68 °C', () => {
+    const f = { ...ctx, unit: 'F' as const };
+    expect(updatePreferences(current(), { comfortC: { heating: 68 } }, f)).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_input', message: 'Temperatures are sent in Celsius: 68 looks like °F. 68 °F is 20 °C: send comfortC.heating 20.', details: { field: 'comfortC.heating' } },
+    });
+    expect(updatePreferences(current(), { comfortC: { cooling: 75 } }, f)).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_input', message: 'Temperatures are sent in Celsius: 75 looks like °F. 75 °F is 23.9 °C: send comfortC.cooling 23.9.', details: { field: 'comfortC.cooling' } },
+    });
+    // In °C the same number is just out of range, said as such.
+    expect(updatePreferences(current(), { comfortC: { cooling: 75 } }, ctx)).toMatchObject({ ok: false, error: { code: 'invalid_setpoint' } });
+    // A sensible °C value in a °F sandbox is saved.
+    expect(updatePreferences(current(), { comfortC: { heating: 20 } }, f)).toMatchObject({ ok: true });
+  });
+
   it('allows at most three family contacts and logs only how many, never names', () => {
     const three = updatePreferences(current(), { familyContacts: [contact('son'), contact('daughter'), contact('neighbour')] }, ctx);
     expect(three.ok && three.value.changes).toEqual([

@@ -107,8 +107,15 @@ export function updatePreferences(
   if (!withinLimits.ok) return withinLimits;
 
   const comfortC = { cooling: update.comfortC?.cooling ?? current.comfortC.cooling, heating: update.comfortC?.heating ?? current.comfortC.heating };
+  for (const field of ['cooling', 'heating'] as const) {
+    const sent = update.comfortC?.[field];
+    const unconverted = sent === undefined ? undefined : unconvertedFahrenheit(`comfortC.${field}`, sent, ctx.unit);
+    if (unconverted !== undefined) return err(unconverted);
+  }
   if (comfortC.cooling > safety.cooling.maxC) return err(setpoint('comfortC.cooling', safety.cooling.maxC, ctx.unit));
   if (comfortC.heating < safety.heating.minC) return err(setpoint('comfortC.heating', safety.heating.minC, ctx.unit));
+  // #312: no room is heated past the limit it is cooled to (an unconverted 68 was saved as 68 °C).
+  if (comfortC.heating > safety.cooling.maxC) return err(setpoint('comfortC.heating', safety.cooling.maxC, ctx.unit));
 
   const parsed = PreferencesSchema.safeParse({
     ...current,
@@ -125,6 +132,20 @@ export function updatePreferences(
     return err(toolError('invalid_input', 'These preferences are not valid.', { details: { issues } }));
   }
   return ok({ preferences: parsed.data, changes: diff(current, parsed.data, ctx) });
+}
+
+/** Above this a temperature in °C is no room temperature: in a °F sandbox it is a °F number sent as °C (#306 review). */
+export const FAHRENHEIT_LOOKING_ABOVE_C = 40;
+
+/**
+ * Inputs are always °C (#306 review, #312): in a °F sandbox a value no room is ever cooled or heated to is a °F number
+ * the model did not convert. The refusal says the °C to send; undefined when the value may be a °C one.
+ */
+export function unconvertedFahrenheit(field: string, valueC: number, unit: TempUnit | undefined): ErrorEnvelope | undefined {
+  if (unit !== 'F' || valueC <= FAHRENHEIT_LOOKING_ABOVE_C) return undefined;
+  const said = String(valueC);
+  const inC = String(Math.round(((valueC - 32) / 1.8) * 10) / 10);
+  return toolError('invalid_input', `Temperatures are sent in Celsius: ${said} looks like °F. ${said} °F is ${inC} °C: send ${field} ${inC}.`, { details: { field } });
 }
 
 const setpoint = (field: string, limit: number, unit: TempUnit = 'C') =>

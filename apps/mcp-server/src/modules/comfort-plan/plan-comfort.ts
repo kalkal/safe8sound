@@ -22,7 +22,7 @@ import {
   type Result,
   type Snapshot,
 } from '@cold-reserve/contracts';
-import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, orderSurplusRooms, seasonFor, surplusWindow, withTargets, type HumidityMode } from '@cold-reserve/core';
+import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, orderSurplusRooms, seasonFor, surplusWindow, unconvertedFahrenheit, withTargets, type HumidityMode } from '@cold-reserve/core';
 import { buildContext, counterfactualOf, currentControls, holdSafeRoom, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeRoomLimitKindAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import { withModelHint, type ToolContext } from '../../tool.js';
@@ -99,9 +99,6 @@ export function roomsText(rooms: readonly { id: string; name: string }[], budget
   return `${String(labels.length)} rooms`;
 }
 
-/** Above this a setpoint in °C is no room temperature: in a °F sandbox it is a °F number sent as °C (#306 review). */
-const FAHRENHEIT_LOOKING_ABOVE_C = 40;
-
 /** The unit of the texts for this call (#306): the sandbox's choice, °C otherwise. */
 const unitOf = (deps: ComfortPlanDeps, ctx: ToolContext): TempUnit => deps.homes(ctx.homeId)?.units ?? 'C';
 
@@ -116,11 +113,8 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   }
   // Inputs are always °C (#306 review): in a °F sandbox a setpoint no room is ever cooled or heated to is a °F number
   // the model did not convert. Refused with the °C to send, never planned at 161.6 °F.
-  if (input.setpointC !== undefined && input.setpointC > FAHRENHEIT_LOOKING_ABOVE_C && unitOf(deps, ctx) === 'F') {
-    const said = String(input.setpointC);
-    const inC = String(Math.round(((input.setpointC - 32) / 1.8) * 10) / 10);
-    return err(toolError('invalid_input', `Temperatures are sent in Celsius: ${said} looks like °F. ${said} °F is ${inC} °C: send setpointC ${inC}.`, { details: { field: 'setpointC' } }));
-  }
+  const unconverted = input.setpointC === undefined ? undefined : unconvertedFahrenheit('setpointC', input.setpointC, unitOf(deps, ctx));
+  if (unconverted !== undefined) return err(unconverted);
   const unknown = input.roomIds?.find((id) => !profile.rooms.some((r) => r.id === id));
   if (unknown !== undefined) {
     // The rooms there are, as "Name (id)", so the model retries with a real id instead of guessing (#274).
