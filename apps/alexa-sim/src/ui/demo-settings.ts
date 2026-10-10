@@ -1,6 +1,7 @@
 import {
   GetDemoSettingsOutputSchema,
   SetScenarioOutputSchema,
+  defaultUnitOf,
   err,
   ok,
   toolError,
@@ -40,13 +41,18 @@ export function badgeText(view: DemoSettingsView): string {
   return t('settings.badge', { place: t(`settings.place.${view.locationId}`), scenario: t(`settings.scenario.${view.scenarioId}`) });
 }
 
-/** The settings after a choice: only what was chosen changes; a restart plays the same day again. */
+/**
+ * The settings after a choice: only what was chosen changes; a restart plays the same day again. A new place starts
+ * in its own unit (°F everywhere, owner decision, 9 Oct: Houston in °F), unless a unit is chosen with it.
+ */
 export function applyChange(view: DemoSettingsView, change: SetScenarioInput): DemoSettingsView {
+  const placeUnit = change.locationId === undefined || change.locationId === view.locationId ? undefined : defaultUnitOf(change.locationId);
+  const units = change.units ?? placeUnit;
   return {
     ...view,
     ...(change.scenarioId === undefined ? {} : { scenarioId: change.scenarioId }),
     ...(change.locationId === undefined ? {} : { locationId: change.locationId }),
-    ...(change.units === undefined ? {} : { units: change.units }),
+    ...(units === undefined ? {} : { units }),
     ...(change.household === undefined ? {} : { household: change.household }),
   };
 }

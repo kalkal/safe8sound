@@ -131,6 +131,16 @@ describe('set_scenario', () => {
     expect(await deps.storeFor(A).getSandboxSettings()).toMatchObject({ ok: false, error: { code: 'settings_not_found' } });
   });
 
+  it('°F everywhere (owner decision, 9 Oct): a new place starts in its own unit; a unit sent with it, or later, wins', async () => {
+    const everywhere = (id: string) => ({ id, label: id, tz: id === 'houston' ? 'America/Chicago' : 'Europe/Rome' });
+    const { set } = setup({ place: (id) => everywhere(id) as ReturnType<DemoSettingsDeps['place']> });
+    expect(await set.handler({ locationId: 'houston' }, ctx(A))).toMatchObject({ ok: true, value: { settings: { locationId: 'houston', units: 'F' } } });
+    expect(await set.handler({ units: 'C' }, ctx(A))).toMatchObject({ ok: true, value: { settings: { locationId: 'houston', units: 'C' } } });
+    expect(await set.handler({ scenarioId: 'storm-blackout' }, ctx(A))).toMatchObject({ ok: true, value: { settings: { units: 'C' } } });
+    expect(await set.handler({ locationId: 'turin' }, ctx(A))).toMatchObject({ ok: true, value: { settings: { locationId: 'turin', units: 'C' } } });
+    expect(await set.handler({ locationId: 'houston', units: 'C' }, ctx(A))).toMatchObject({ ok: true, value: { settings: { locationId: 'houston', units: 'C' } } });
+  });
+
   it('returns a conflicting write as settings_version_conflict and a store failure as a value', async () => {
     const backing = createMemoryBacking();
     const base = memoryStateStoreFactory({ backing, clock: { now: () => WALL } });

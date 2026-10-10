@@ -1,4 +1,4 @@
-import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
+import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
 import { epsBaseLoadW, isTimeZone, localMidnightMs, scenarioClock, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
 import { FallbackSource, type SourceEvent } from '@cold-reserve/source-fallback';
 import { SCENARIO_IDS, SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, profileAtPlace, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
@@ -306,7 +306,8 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
 
   // Visitor sandboxes (#101) play their own settings (C2b, #222): the scenario, the place, who is at home and the
   // start of their day, each on its own scenario clock. Before any settings are saved, today's sandbox (Q3).
-  const sandboxDefaults: SandboxChoices = { scenarioId: start.value.scenarioId, locationId: 'reference', units: 'C', household: 'older-man' };
+  // The reference home starts in its own unit (°C), the same rule as a later change of place.
+  const sandboxDefaults: SandboxChoices = { scenarioId: start.value.scenarioId, locationId: 'reference', units: defaultUnitOf('reference'), household: 'older-man' };
   const playSandbox = (homeId: HomeId, choices: SandboxChoices & { readonly version?: number | undefined; readonly scenarioStartedAt?: string | undefined }): Result<SandboxPlay, ErrorEnvelope> => {
     // Every place ships (L2, #247); a place the simulator did not know would be refused by set_scenario first.
     const place = shippedPlace(choices.locationId);

@@ -6,6 +6,7 @@ import {
   ScenarioIdSchema,
   categoryOf,
   clampAdminCaps,
+  defaultUnitOf,
   type AdminCaps,
 } from '../src/index.js';
 
@@ -93,5 +94,15 @@ describe('the settings error codes', () => {
   it('a stale version is a conflict (a value, never a throw); missing settings are not_found', () => {
     expect(categoryOf('settings_version_conflict')).toBe('conflict');
     expect(categoryOf('settings_not_found')).toBe('not_found');
+  });
+});
+
+// °F everywhere (owner decision, 9 Oct): the default unit follows the place; the judge can still switch.
+describe('the temperature unit a place starts in', () => {
+  it('Houston starts in °F; Turin and the reference home in °C', () => {
+    expect(defaultUnitOf('houston')).toBe('F');
+    expect(defaultUnitOf('turin')).toBe('C');
+    expect(defaultUnitOf('reference')).toBe('C');
+    for (const id of LocationIdSchema.options) expect(['C', 'F']).toContain(defaultUnitOf(id));
   });
 });

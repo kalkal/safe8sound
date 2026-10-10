@@ -256,7 +256,8 @@ createRoot(container).render(
             {t('phone.onlyInbox')}
           </p>
           <ErrorBoundary>
-            <PhonePanel feed={phone} timeZone={config.value.homeTimeZone} />
+            {/* No demo settings here: the dev proxy reads the local demo home, which has no unit setting, so °C (review of #308). */}
+            <PhonePanel feed={phone} timeZone={config.value.homeTimeZone} units="C" />
           </ErrorBoundary>
         </Plain>
       ) : config.ok && agent.ok ? (

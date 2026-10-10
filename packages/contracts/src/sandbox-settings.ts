@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { IsoDateTimeSchema } from './common.js';
-import { TempUnitSchema } from './units.js';
+import { TempUnitSchema, type TempUnit } from './units.js';
 
 // C1 (#214, approved in #214): what a visitor may choose for their own sandbox home. Health thresholds are not
 // settings: the guard's limits stay in its own config. Structural bounds only.
@@ -12,6 +12,9 @@ export type ScenarioId = z.infer<typeof ScenarioIdSchema>;
 /** The places a scenario can happen in (plan §L1): `reference` keeps today's numbers. */
 export const LocationIdSchema = z.enum(['reference', 'turin', 'houston']);
 export type LocationId = z.infer<typeof LocationIdSchema>;
+
+/** The unit a place starts in (°F everywhere, owner decision, 9 Oct): Houston in °F, the others in °C. */
+export const defaultUnitOf = (id: LocationId): TempUnit => (id === 'houston' ? 'F' : 'C');
 
 /** Who is at home in the safe room: decides whose comfort the plan protects first. */
 export const HouseholdSchema = z.enum(['older-man', 'older-woman', 'no-one-at-risk']);

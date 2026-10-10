@@ -2,6 +2,7 @@ import {
   GetDemoSettingsOutputSchema,
   SetScenarioInputSchema,
   SetScenarioOutputSchema,
+  defaultUnitOf,
   err,
   ok,
   toolError,
@@ -95,14 +96,17 @@ export function demoSettingsModule(deps: DemoSettingsDeps): CapabilityModule {
       const current = await read(ctx.homeId, ctx.correlationId);
       if (!current.ok) return current;
       const before = current.value.settings;
-      const changed = CHOICES.filter((field) => args[field] !== undefined && args[field] !== before[field]);
+      // °F everywhere (owner decision, 9 Oct): a new place starts in its own unit (Houston in °F), unless one is sent with it.
+      const newPlace = args.locationId !== undefined && args.locationId !== before.locationId;
+      const wanted: SetScenarioInput = newPlace && args.units === undefined && args.locationId !== undefined ? { ...args, units: defaultUnitOf(args.locationId) } : args;
+      const changed = CHOICES.filter((field) => wanted[field] !== undefined && wanted[field] !== before[field]);
       const restarted = args.restart === true || changed.includes('scenarioId') || changed.includes('locationId');
       if (changed.length === 0 && !restarted) return ok({ settings: before, restarted: false });
 
       const now = new Date(deps.wallClock.now()).toISOString();
       const next: SandboxSettings = {
         ...before,
-        ...Object.fromEntries(changed.map((field) => [field, args[field]])),
+        ...Object.fromEntries(changed.map((field) => [field, wanted[field]])),
         version: (current.value.version ?? 0) + 1,
         updatedAt: now,
         ...(restarted ? { scenarioStartedAt: now } : {}),

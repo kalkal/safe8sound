@@ -30,6 +30,17 @@ describe('demo settings', () => {
     expect(applyChange(before, { restart: true })).toEqual(before);
   });
 
+  it('°F everywhere (owner decision, 9 Oct): a new place starts in its own unit; a unit chosen with it, or later, wins', () => {
+    const before = scriptedDemoSettings();
+    expect(applyChange(before, { locationId: 'houston' })).toMatchObject({ locationId: 'houston', units: 'F' });
+    expect(applyChange(before, { locationId: 'houston', units: 'C' })).toMatchObject({ locationId: 'houston', units: 'C' });
+    const houston = applyChange(before, { locationId: 'houston' });
+    expect(applyChange(houston, { units: 'C' })).toMatchObject({ locationId: 'houston', units: 'C' });
+    expect(applyChange(houston, { locationId: 'turin' })).toMatchObject({ locationId: 'turin', units: 'C' });
+    // Another choice keeps the unit: only a new place resets it.
+    expect(applyChange({ ...houston, units: 'C' }, { scenarioId: 'storm-blackout' })).toMatchObject({ units: 'C' });
+  });
+
   it('each scenario has its sky', () => {
     expect(skyOfScenario('clear-day')).toBe('mild');
     expect(skyOfScenario('heatwave')).toBe('hot');

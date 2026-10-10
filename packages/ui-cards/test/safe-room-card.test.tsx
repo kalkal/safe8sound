@@ -5,7 +5,10 @@ import { SafeRoomCard, clockOf, roomLabel } from '../src/SafeRoomCard.js';
 import { safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
 import { setTempUnit } from '../src/temp-unit.js';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setTempUnit('C');
+});
 
 describe('clockOf and roomLabel', () => {
   it('reads the clock time from a time already in the home zone, never converting it', () => {
@@ -53,7 +56,6 @@ describe('SafeRoomCard', () => {
     setTempUnit('F');
     render(<SafeRoomCard status={safeRoomInStorm()} />);
     expect(screen.getByRole('list', { name: 'In the safe room' }).textContent).toContain('Now: 80.2 °F · 55% RH');
-    setTempUnit('C');
   });
 
   it('draws the hours as ice cubes, described in words', () => {

@@ -17,6 +17,24 @@ const pickUnits = async (page: Page, unit: '°C' | '°F') => {
   await page.keyboard.press('Escape');
 };
 
+test('Houston starts in °F: choosing the place switches the unit, and the judge can switch back', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /SCENARIO/ }).click();
+  const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+  const units = drawer.getByRole('radiogroup', { name: 'Temperature units' });
+  await expect(units.getByRole('radio', { name: '°C' })).toBeChecked();
+  await drawer.getByText('Houston, Texas').click();
+  await expect(units.getByRole('radio', { name: '°F' })).toBeChecked();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Show my home' }).click();
+  const rooms = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]').getByRole('list', { name: 'Rooms' });
+  await expect(rooms).toContainText('°F');
+
+  await pickUnits(page, '°C');
+  await expect(rooms).toContainText('°C');
+  await expect(rooms).not.toContainText('°F');
+});
+
 test('°F in the drawer: the floor plan and the safe room follow, and a card on screen goes back to °C', async ({ page }) => {
   await page.goto('/');
   await pickUnits(page, '°F');
