@@ -258,7 +258,7 @@ describe('createInboxPhone', () => {
     await vi.advanceTimersByTimeAsync(5_000);
     reply = () => Promise.reject(new TypeError('network'));
     await vi.advanceTimersByTimeAsync(5_000);
-    reply = () => Promise.resolve(json(200, { messages: [{ text: 'Sara, unchecked' }] }));
+    reply = () => Promise.resolve(json(200, { messages: [{ text: 'Ana, unchecked' }] }));
     await vi.advanceTimersByTimeAsync(5_000);
     expect(phone.messages().map((m) => m.transition)).toEqual(['storm_started']);
     expect(lines.map((l) => [l.level, l.code, l.correlationId])).toEqual([
@@ -266,7 +266,7 @@ describe('createInboxPhone', () => {
       ['warn', 'phone_inbox_unreachable', 'poll-1'],
       ['warn', 'output_schema_violation', 'poll-1'],
     ]);
-    expect(JSON.stringify(lines)).not.toMatch(/Sara|alert for/);
+    expect(JSON.stringify(lines)).not.toMatch(/Ana|alert for/);
   });
 
   describe('reply (queue item 3, #24): the family answers from the phone', () => {

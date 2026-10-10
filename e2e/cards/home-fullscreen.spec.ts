@@ -53,3 +53,20 @@ for (const [width, height] of [
     await expect(page.getByLabel('Ask a question')).toBeEditable();
   });
 }
+
+test('the keyboard focus ring on "Full screen" is drawn inside the button, never clipped by the frame', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Show my home' }).click();
+  const card = page.locator('iframe[title="Home card"]').contentFrame();
+  const expand = card.getByRole('button', { name: 'Full screen' });
+  await expect(expand).toBeVisible();
+  // A key press first, so the browser treats the next focus as keyboard focus.
+  await page.keyboard.press('Shift');
+  await expand.focus();
+  await expect(expand).toHaveCSS('outline-style', 'solid');
+  const width = parseFloat(await expand.evaluate((el) => (globalThis as unknown as { getComputedStyle: (e: unknown) => { outlineWidth: string } }).getComputedStyle(el).outlineWidth));
+  const offset = parseFloat(await expand.evaluate((el) => (globalThis as unknown as { getComputedStyle: (e: unknown) => { outlineOffset: string } }).getComputedStyle(el).outlineOffset));
+  expect(width).toBeGreaterThan(0);
+  // Inside the border box: a negative offset at least as large as the ring.
+  expect(offset + width).toBeLessThanOrEqual(0);
+});

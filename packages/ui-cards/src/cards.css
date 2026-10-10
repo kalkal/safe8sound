@@ -42,6 +42,12 @@
     margin-block-end: var(--space-3);
   }
 
+  /* The toggle sits at the frame's edge: an outside ring would be clipped, so it is drawn inside the button. */
+  .display-toggle .card-expand:focus-visible {
+    outline: calc(var(--border-thin) * 3) solid var(--focus-ring);
+    outline-offset: calc(var(--border-thin) * -4);
+  }
+
   .card-expand,
   .button-secondary {
     min-block-size: var(--target-min);

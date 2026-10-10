@@ -265,6 +265,7 @@ export const itIT = {
   'phone.title': 'Il telefono di tua figlia (simulato)',
   'phone.onlyInbox': 'Solo il telefono di Ana: i messaggi che {product} manda alla famiglia. Chiedi a {product} nella pagina principale.',
   'phone.empty': 'Ancora nessun messaggio da {product}.',
+  'phone.whenTold': 'Ana riceve un messaggio quando inizia il temporale, quando la batteria arriva al livello essenziale, quando viene applicato il piano di emergenza e quando torna la corrente.',
   'phone.list': 'Notifiche',
   'phone.storm_started': 'Blackout (temporale) a casa',
   'phone.essential_level': 'Passato a Essenziale',

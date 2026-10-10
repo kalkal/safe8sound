@@ -15,6 +15,17 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
     expect(screen.getByText('No messages from Safe-8-Sound yet.')).toBeTruthy();
   });
 
+  it('the empty phone says, in one fixed line, when Ana will hear from it; the line goes with the first message', () => {
+    const line = 'Ana gets a message when the storm starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.';
+    const feed = createScriptedPhone();
+    render(<PhonePanel feed={feed} timeZone="Europe/Rome" />);
+    expect(screen.getByText(line)).toBeTruthy();
+    act(() => {
+      feed.deliver([phoneMessage('storm-started')]);
+    });
+    expect(screen.queryByText(line)).toBeNull();
+  });
+
   it('owner feedback (6 Oct): Ana\'s phone is a connected device with its own icon, a drawing beside the title', () => {
     const { container } = render(<PhonePanel feed={createScriptedPhone()} timeZone="Europe/Rome" />);
     const icon = container.querySelector('h2 svg[data-device="phone"]');

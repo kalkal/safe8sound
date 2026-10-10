@@ -3,16 +3,18 @@ import { stormMessage } from '@cold-reserve/i18n';
 
 // The family messages of the storm scene (Saturday night, storm-blackout), rendered by the real
 // i18n templates exactly as the server's notifier would, then parsed by the inbox contract.
-// "Sara" is the scene's fictional daughter.
+// "Ana" is the scene's fictional daughter (the owner's names, 3 Oct: Leo the grandpa, Ana the daughter).
 
 const ZONE = 'Europe/Rome';
-const NAME = 'Sara';
+const NAME = 'Ana';
 const ms = (iso: string) => Date.parse(iso);
 
 export const PHONE_FIXTURES = {
   'storm-started': { transition: 'storm_started', at: '2026-07-18T19:42:00+02:00', tempC: 26.8, safeUntil: '2026-07-19T06:40:00+02:00' },
   essential: { transition: 'essential_level', at: '2026-07-18T21:10:00+02:00', tempC: 26.8, safeUntil: '2026-07-19T06:40:00+02:00' },
   'power-back': { transition: 'power_back', at: '2026-07-19T05:52:00+02:00', tempC: 26.2, powerBackAt: '2026-07-19T05:48:00+02:00' },
+  // The last resort of the hot-day scene (#160, #170): sent when the second yes applies it, before its 21:20 deadline.
+  'last-resort': { transition: 'last_resort_applied', at: '2026-07-15T21:12:00+02:00', tempC: 23.6, safeUntil: '2026-07-15T22:00:00+02:00' },
 } as const satisfies Record<string, { transition: SendableTransition; at: string; tempC: number; safeUntil?: string; powerBackAt?: string }>;
 
 export type PhoneFixture = keyof typeof PHONE_FIXTURES;

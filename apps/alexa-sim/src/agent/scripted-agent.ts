@@ -79,7 +79,19 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
 
   return ok({
     canCallTools: options.degraded !== true,
-    callTool: (name, args) => Promise.resolve(options.degraded === true ? refuseAction() : scriptedToolCall(name, args, script.status?.ts)),
+    callTool: (name, args, context) => {
+      if (options.degraded === true) return Promise.resolve(refuseAction());
+      const result = scriptedToolCall(name, args, script.status?.ts);
+      // The card says the family was told (familyAlert.sent): the scripted phone gets that message, as the server sends it.
+      const alert = result.structuredContent?.['familyAlert'];
+      const sent = typeof alert === 'object' && alert !== null && 'sent' in alert && typeof alert.sent === 'number' ? alert.sent : 0;
+      if (result.isError !== true && sent > 0 && options.phone !== undefined) {
+        const message = phoneMessage('last-resort');
+        options.phone.deliver([message]);
+        (options.log ?? defaultLog)({ level: 'info', code: 'phone_delivered', correlationId: context.correlationId, details: { transition: message.transition } });
+      }
+      return Promise.resolve(result);
+    },
     ask: (question, context) => {
       const q = normalise(question);
       const entry = entries.find((e) => e.patterns.some((p) => q.includes(p)));

@@ -89,7 +89,12 @@ export function PhonePanel({ feed, timeZone, units = 'C' }: { feed: PhoneFeed; t
         <PhoneIcon alert={messages.length > 0} />
         {t('phone.title')}
       </h2>
-      {messages.length === 0 && <p className="muted">{t('phone.empty')}</p>}
+      {messages.length === 0 && (
+        <>
+          <p className="muted">{t('phone.empty')}</p>
+          <p className="muted">{t('phone.whenTold')}</p>
+        </>
+      )}
       {/* Something to answer to: the replies come with the first message. */}
       {messages.length > 0 && feed.reply !== undefined && <Replies reply={feed.reply} timeZone={timeZone} units={units} />}
       <ol className="phone-list" aria-label={t('phone.list')} aria-live="polite">

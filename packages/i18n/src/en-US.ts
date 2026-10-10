@@ -289,6 +289,8 @@ export const enUS = {
   // ?view=phone (#269): the second page next to the real chain is only the phone (the real inbox), and says so.
   'phone.onlyInbox': "Only Ana's phone: the messages {product} sends to the family. Ask {product} on the main page.",
   'phone.empty': 'No messages from {product} yet.',
+  // The empty phone says when the family will hear from it (owner decision, 10 Oct).
+  'phone.whenTold': 'Ana gets a message when the storm starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.',
   'phone.list': 'Notifications',
   'phone.storm_started': 'Power outage (storm) at home',
   'phone.essential_level': 'Switched to Essential',

@@ -16,6 +16,8 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await page.goto('/');
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
   await expect(phone.getByText('No messages from Safe-8-Sound yet.')).toBeVisible();
+  const whenTold = phone.getByText('Ana gets a message when the storm starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.');
+  await expect(whenTold).toBeVisible();
 
   await ask(page, "The power's out");
   const safeRoom = page.frameLocator('iframe[title="Safe room card"]');
@@ -31,6 +33,7 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await expect(home.getByRole('listitem', { name: 'Bedroom 1' })).toContainText('Served');
   await expect(home.getByRole('listitem', { name: 'Living' })).toContainText('Waiting: the level cools fewer rooms right now');
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toContainText('keeps it safe until');
+  await expect(whenTold).toHaveCount(0);
   await expectVoiceMatchesCards(page, ['Safe room card']);
 
   await ask(page, 'How is grandpa?');

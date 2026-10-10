@@ -3,10 +3,13 @@ import { expectVoiceMatchesCards } from '../voice-screen.js';
 
 // The last resort by touch (#160, #24): the plan card says honestly until when the safe room stays within
 // its limits, the receipt says it is a last resort, and the plan is applied in two taps, the second one
-// sending the confirmation the first one received. The token is never shown. ScriptedAgent only.
+// sending the confirmation the first one received; the family's phone then gets the alert. The token is never
+// shown. ScriptedAgent only.
 
 test('last resort: honest headline, two taps to apply, the family is told', async ({ page }) => {
   await page.goto('/');
+  const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
+  await expect(phone.getByText('No messages from Safe-8-Sound yet.')).toBeVisible();
   await page.getByLabel('Ask a question').fill('Last resort for a hot night');
   await page.getByRole('button', { name: 'Ask' }).click();
 
@@ -32,6 +35,10 @@ test('last resort: honest headline, two taps to apply, the family is told', asyn
   await expect(card.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
   await expect(card.getByText('1 registered family contact was alerted.')).toBeVisible();
   await expect(card.getByRole('button', { name: 'Yes, apply it now' })).toHaveCount(0);
+  // What the card says happens: the message reaches Ana's phone (review of #316).
+  const note = phone.getByRole('article', { name: 'Home battery low: please check in' });
+  await expect(note).toContainText('the home battery is low');
+  await expect(phone.getByText('No messages from Safe-8-Sound yet.')).toHaveCount(0);
 });
 
 test('a spoken first yes brings the confirmation card: one tap applies it, never "say yes again" (#215 review)', async ({ page }) => {

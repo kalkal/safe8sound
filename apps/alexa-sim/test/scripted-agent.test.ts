@@ -1,5 +1,7 @@
 import { PlanSchema } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
+import { lastResortPlan } from '@cold-reserve/ui-cards';
+import { SCRIPTED_LAST_RESORT_TOKEN } from '../src/agent/script-fixtures.js';
 import { createScriptedAgent } from '../src/agent/scripted-agent.js';
 import { createScriptedPhone } from '../src/phone/phone-feed.js';
 import script from '../src/agent/script.v1.json' with { type: 'json' };
@@ -179,7 +181,23 @@ describe('ScriptedAgent: the storm scene and the family phone (#24)', () => {
     if (!created.ok) throw new Error(created.error.message);
     await created.value.ask("The power's out", { correlationId: 'turn-1' });
     expect(lines).toEqual([{ level: 'info', code: 'phone_delivered', correlationId: 'turn-1', details: { transition: 'storm_started' } }]);
-    expect(JSON.stringify(lines)).not.toMatch(/Sara|alert for/);
+    expect(JSON.stringify(lines)).not.toMatch(/Ana|alert for/);
+  });
+
+  it('confirming the last resort tells the family on the phone, as the card says (familyAlert sent: 1); the first yes does not', async () => {
+    const phone = createScriptedPhone();
+    const lines: unknown[] = [];
+    const created = createScriptedAgent(script, { phone, log: (e) => lines.push(e) });
+    if (!created.ok) throw new Error(created.error.message);
+    const planId = lastResortPlan().id;
+    const first = await created.value.callTool('apply_plan', { planId }, { correlationId: 'turn-lr' });
+    expect(first.isError).not.toBe(true);
+    expect(phone.messages()).toEqual([]);
+    const second = await created.value.callTool('apply_plan', { planId, lastResortToken: SCRIPTED_LAST_RESORT_TOKEN }, { correlationId: 'turn-lr' });
+    expect(second.structuredContent).toMatchObject({ familyAlert: { sent: 1 } });
+    expect(phone.messages().map((m) => m.transition)).toEqual(['last_resort_applied']);
+    expect(phone.messages()[0]?.text).toContain('the home battery is low');
+    expect(lines).toEqual([{ level: 'info', code: 'phone_delivered', correlationId: 'turn-lr', details: { transition: 'last_resort_applied' } }]);
   });
 
   it('in the degraded mode never pretends a message was sent', async () => {

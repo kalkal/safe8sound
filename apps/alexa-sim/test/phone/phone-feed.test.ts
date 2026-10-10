@@ -44,7 +44,7 @@ describe('phone fixtures: real templates, valid contract messages', () => {
     for (const name of Object.keys(PHONE_FIXTURES) as (keyof typeof PHONE_FIXTURES)[]) {
       const m = InboxMessageSchema.parse(phoneMessage(name));
       expect(m.role).toBe('daughter');
-      expect(m.text).toContain('for Sara:');
+      expect(m.text).toContain('for Ana:');
     }
     expect(phoneMessage('power-back').text).toContain('power came back at home at 5:48');
     expect(phoneMessage('storm-started').text).toContain('keeps it safe until 6:40');

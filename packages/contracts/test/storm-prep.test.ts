@@ -66,7 +66,7 @@ describe('family replies from the phone', () => {
 
   it('records a reply by role and time, in the session and as the last check-in of the safe room', () => {
     const reply = { role: 'daughter', reply: 'on_my_way', at: '2026-07-18T21:30:00Z' };
-    expect(FamilyReplySchema.safeParse({ ...reply, name: 'Sara' }).success).toBe(false);
+    expect(FamilyReplySchema.safeParse({ ...reply, name: 'Ana' }).success).toBe(false);
     expect(StormSessionSchema.parse({ ...session, familyReplies: [reply] }).familyReplies).toEqual([reply]);
     const status = SafeRoomStatusSchema.parse({
       safeRoomId: 'bedroom-1',
@@ -88,7 +88,7 @@ describe('the answer of POST /phone/reply', () => {
   it('carries the recorded reply, and the safe room only for check_status (roles, never names)', () => {
     const recorded = { role: 'daughter', reply: 'on_my_way', at: '2026-07-18T21:30:00Z' };
     expect(PhoneReplyOutputSchema.parse({ recorded })).toEqual({ recorded });
-    expect(PhoneReplyOutputSchema.safeParse({ recorded, name: 'Sara' }).success).toBe(false);
+    expect(PhoneReplyOutputSchema.safeParse({ recorded, name: 'Ana' }).success).toBe(false);
   });
 
   it('has its own rate-limit code, retryable', () => {
