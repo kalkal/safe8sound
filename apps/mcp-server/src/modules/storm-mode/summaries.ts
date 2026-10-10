@@ -1,4 +1,4 @@
-import { DATA_GROUPS, isFullyLive, type DataOrigin, type NotifyFamilyOutputSchema, type SafeRoomStatus, type StartStormModeOutputSchema } from '@cold-reserve/contracts';
+import { DATA_GROUPS, formatTempFixed, isFullyLive, type DataOrigin, type TempUnit, type NotifyFamilyOutputSchema, type SafeRoomStatus, type StartStormModeOutputSchema } from '@cold-reserve/contracts';
 import { format } from '@cold-reserve/i18n';
 import type { z } from 'zod';
 import { localTimeText } from '@cold-reserve/core';
@@ -47,7 +47,8 @@ export function startSummary(o: StartOutput): string {
   return `${state} The safe room (${o.session.safeRoomId}) is covered for about ${one(o.safeHours)} hours, until ${localTimeText(o.safeUntil)}. ${family}${devicesText(o)}`;
 }
 
-export function safeRoomSummary(s: SafeRoomStatus): string {
+/** The safe room now, in the unit the sandbox chose (#306); the structured status stays in °C. */
+export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C'): string {
   const humidity = s.humidityPct === undefined ? '' : `, ${String(s.humidityPct)} % humidity`;
   const occupants = s.occupantRoles.length > 0 ? s.occupantRoles.join(', ') : 'nobody';
   const storm = s.stormPhase === undefined ? 'No storm mode.' : `Storm mode: ${s.stormPhase}.`;
@@ -61,7 +62,7 @@ export function safeRoomSummary(s: SafeRoomStatus): string {
       ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone it would hold about ${one(s.safeHours)} hours.`
       : `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`;
   return (
-    `Safe room ${s.safeRoomId}: ${one(s.tempC)} °C${humidity}, occupants: ${occupants}. Level ${s.level} (reason: ${s.levelReason}). ` +
+    `Safe room ${s.safeRoomId}: ${formatTempFixed(s.tempC, unit)}${humidity}, occupants: ${occupants}. Level ${s.level} (reason: ${s.levelReason}). ` +
     `${hours} ${storm}${checkIn} Home link ${s.homeLink}, ${dataText(s.origin)}.`
   );
 }

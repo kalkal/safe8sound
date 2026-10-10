@@ -1,6 +1,7 @@
 import {
   epochMs,
   err,
+  formatTemp,
   isFullyLive,
   ok,
   toolError,
@@ -10,6 +11,7 @@ import {
   type HomeProfile,
   type Plan,
   type Result,
+  type TempUnit,
 } from '@cold-reserve/contracts';
 import { epsBaseLoadW, invalidLastResortToken, type StateStore } from '@cold-reserve/core';
 import { rejectionOf, runGuard, type GuardVerdict } from '@cold-reserve/guard';
@@ -39,7 +41,7 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
   const store = deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId });
   const stored = await store.getPlan(input.planId);
   if (!stored.ok) return stored;
-  if (stored.value.status === 'applied') return ok(outcome(stored.value, true, home.profile));
+  if (stored.value.status === 'applied') return ok(outcome(stored.value, true, home.profile, home.units));
   // The person confirms before the agent applies (#230): in the turn that proposed the plan, nobody has answered
   // yet. A card tap carries no turn, so it is always the person's own yes.
   if (ctx.turnId !== undefined && stored.value.proposedInTurn === ctx.turnId) {
@@ -87,10 +89,12 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
     ...guardFrame(deps, stored.value.goal, loaded.value),
     model: deps.model,
     config: deps.guard,
+    // The guard's words in the unit the sandbox chose (#306).
+    displayUnit: home.units ?? 'C',
   });
   if (!verdict.ok && !(lastResort && holdsHardLimits(verdict))) {
     await recordRejection(store, verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId }, input.planId);
-    return err(rejectionOf(verdict) ?? toolError('unexpected_error', 'The safety check refused the plan without a reason.'));
+    return err(rejectionOf(verdict, home.units ?? 'C') ?? toolError('unexpected_error', 'The safety check refused the plan without a reason.'));
   }
 
   if (lastResort && !home.readOnly) {
@@ -99,7 +103,7 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
     if (!used.ok) {
       // A used token on a plan applied meanwhile (a retry, a concurrent second yes): the idempotent outcome.
       const now = await store.getPlan(stored.value.id);
-      return now.ok && now.value.status === 'applied' ? ok(outcome(now.value, true, profile)) : used;
+      return now.ok && now.value.status === 'applied' ? ok(outcome(now.value, true, profile, home.units)) : used;
     }
     if (used.value.planHash !== planHash(stored.value)) return err(invalidLastResortToken());
     logLastResort(deps, ctx, stored.value, 'last_resort_confirmed', 'Last-resort plan confirmed by a second yes.');
@@ -110,7 +114,7 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
   if (!applied.ok) return applied;
   if (lastResort && !applied.value.alreadyApplied) {
     logLastResort(deps, ctx, applied.value.plan, 'last_resort_applied', 'Last-resort plan applied.');
-    const alert = await alertFamily(deps.notifier, { plan: applied.value.plan, profile, preferences, snapshot, nowMs: deps.clock.now() });
+    const alert = await alertFamily(deps.notifier, { plan: applied.value.plan, profile, preferences, snapshot, nowMs: deps.clock.now(), unit: home.units ?? 'C' });
     const counts = { sent: alert.sent, failed: alert.failed };
     // Counts only: never a name, a handle or the text of the message.
     deps.logger.log({
@@ -136,9 +140,9 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
         details: { event: 'last_resort_alert_failed', planId: applied.value.plan.id, ...homeDetail(ctx.homeId) },
       });
     }
-    return ok({ ...outcome(applied.value.plan, false, profile), familyAlert: counts });
+    return ok({ ...outcome(applied.value.plan, false, profile, home.units), familyAlert: counts });
   }
-  return ok(outcome(applied.value.plan, applied.value.alreadyApplied, profile));
+  return ok(outcome(applied.value.plan, applied.value.alreadyApplied, profile, home.units));
 }
 
 /** A last resort fails a comfort guarantee by definition; it is applied only while the hard limits hold. */
@@ -175,17 +179,17 @@ function logLastResort(deps: ComfortPlanDeps, ctx: ToolContext, plan: Plan, even
   });
 }
 
-function outcome(plan: Plan, alreadyApplied: boolean, profile: HomeProfile): ApplyPlanOutput {
-  return { plan, alreadyApplied, advisoryOnly: plan.advisoryOnly, manualInstructions: plan.advisoryOnly ? manualInstructions(plan, profile) : [] };
+function outcome(plan: Plan, alreadyApplied: boolean, profile: HomeProfile, unit: TempUnit = 'C'): ApplyPlanOutput {
+  return { plan, alreadyApplied, advisoryOnly: plan.advisoryOnly, manualInstructions: plan.advisoryOnly ? manualInstructions(plan, profile, unit) : [] };
 }
 
-/** One line per room from the plan's first setting of it (plan §11.6, manual control card). */
-function manualInstructions(plan: Plan, profile: HomeProfile): { roomId: string; text: string }[] {
+/** One line per room from the plan's first setting of it (plan §11.6, manual control card), in the home's unit (#306). */
+function manualInstructions(plan: Plan, profile: HomeProfile, unit: TempUnit): { roomId: string; text: string }[] {
   const first = new Map<string, Plan['steps'][number]>();
   for (const s of [...plan.steps].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))) if (!first.has(s.roomId)) first.set(s.roomId, s);
   return [...first.values()].slice(0, 12).map((s) => {
     const name = profile.rooms.find((r) => r.id === s.roomId)?.name ?? s.roomId;
-    const what = s.hvacMode === 'off' ? 'off' : `${s.hvacMode} at ${s.setpointC.toString()} °C`;
+    const what = s.hvacMode === 'off' ? 'off' : `${s.hvacMode} at ${formatTemp(s.setpointC, unit)}`;
     return { roomId: s.roomId, text: `${name}: ${what}${s.fanOn ? ', fan on' : ''}`.slice(0, 120) };
   });
 }

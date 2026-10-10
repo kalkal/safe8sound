@@ -43,6 +43,7 @@ export function comfortPlanModule(deps: ComfortPlanDeps): CapabilityModule {
             ...summaryOptions,
             timeZone: profile?.location.tz ?? 'UTC',
             roomNames: Object.fromEntries((profile?.rooms ?? []).map((r) => [r.id, r.name])),
+            unit: deps.homes(plan.homeId)?.units ?? 'C',
           });
         },
         handler: (args, ctx) => planComfort(atHome(deps, ctx.homeId), args, ctx),

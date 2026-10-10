@@ -45,8 +45,9 @@ export function createLocalApp(
   // The app knows each home's clock once built: its stores are scoped to its playthrough (#234) and preferences are
   // stamped at its own time (C2b).
   let homeClock: App['homeClock'] = () => undefined;
+  let homeUnits: App['homeUnits'] = () => 'C';
   const storeFor = withPlaythrough(memory, (homeId) => homeClock(homeId));
-  const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId) });
+  const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId), unitsFor: (homeId) => homeUnits(homeId) });
   if (!modules.ok) return modules;
   const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock });
   if (!stormMode.ok) return stormMode;
@@ -67,5 +68,6 @@ export function createLocalApp(
   });
   if (!app.ok) return app;
   homeClock = app.value.homeClock;
+  homeUnits = app.value.homeUnits;
   return ok({ app: app.value, stormMode: stormMode.value });
 }

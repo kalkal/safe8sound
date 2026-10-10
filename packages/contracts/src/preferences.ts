@@ -2,7 +2,10 @@ import { z } from 'zod';
 import { EntityIdSchema, IsoDateTimeSchema, RoleSchema } from './common.js';
 import { toolError, type ErrorEnvelope } from './errors.js';
 import { err, ok, type Result } from './result.js';
-import { CelsiusSchema, PctSchema, type MeasureUnit } from './units.js';
+import { CelsiusSchema, PctSchema, formatTempForInput, type MeasureUnit, type TempUnit } from './units.js';
+
+/** A bound of a range in a refusal: in a °F sandbox a °C bound is said in °F with the °C to send (#306 review). */
+const bound = (value: number, measure: MeasureUnit, unit: TempUnit): string => (measure === 'C' && unit === 'F' ? formatTempForInput(value, 'F') : String(value));
 
 export const PREFERENCES_SCHEMA_VERSION = 1;
 
@@ -107,7 +110,7 @@ export function effectiveHeatSafety(safety: SafetyThresholds): { stricterNightLi
 }
 
 /** Checks the chosen thresholds against the hard limits; reports the nearest allowed value. */
-export function checkSafetyWithinLimits(safety: SafetyThresholds, limits: SafetyHardLimits): Result<SafetyThresholds, ErrorEnvelope> {
+export function checkSafetyWithinLimits(safety: SafetyThresholds, limits: SafetyHardLimits, unit: TempUnit = 'C'): Result<SafetyThresholds, ErrorEnvelope> {
   const checks: Array<{ field: string; value: number; min: number; max: number; unit: MeasureUnit }> = [
     { field: 'safety.cooling.maxC', value: safety.cooling.maxC, ...limits.cooling.maxC, unit: 'C' },
     { field: 'safety.heating.minC', value: safety.heating.minC, ...limits.heating.minC, unit: 'C' },
@@ -120,7 +123,7 @@ export function checkSafetyWithinLimits(safety: SafetyThresholds, limits: Safety
     if (c.value < c.min || c.value > c.max) {
       const limit = c.value < c.min ? c.min : c.max;
       return err(
-        toolError('safety_threshold_out_of_range', `${c.field} must stay between ${String(c.min)} and ${String(c.max)} ${c.unit}.`, {
+        toolError('safety_threshold_out_of_range', `${c.field} must stay between ${bound(c.min, c.unit, unit)} and ${bound(c.max, c.unit, unit)}${c.unit === 'C' && unit === 'F' ? '' : ` ${c.unit}`}.`, {
           details: { field: c.field, measured: c.value, limit, nearestAllowed: limit, unit: c.unit },
         }),
       );

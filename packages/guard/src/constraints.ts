@@ -1,4 +1,5 @@
 import { effectiveHeatSafety, type GuaranteeId, type GuaranteeResult } from '@cold-reserve/contracts';
+import { temp, tempNumber } from './display.js';
 import { batteryCapacityWh, localHour } from '@cold-reserve/core';
 import { UNSERVED_TOLERANCE_W, driedInto, type GuardContext } from './context.js';
 import { heatDanger, heatDangerReason, type HeatDanger } from './heat-danger.js';
@@ -143,16 +144,17 @@ const safeRoomComfort: Constraint = {
     if (readings.length === 0) {
       return { id: 'safe_room_comfort', ok: false, reason: 'The safe room has no reading, so its safety cannot be checked.' };
     }
+    const unit = ctx.input.displayUnit ?? 'C';
     const temps = readings.map((r) => r.tempC);
     const rhs = readings.map((r) => r.humidityPct);
     const maxT = Math.max(...temps);
     const minT = Math.min(...temps);
     // Measured air temperature and humidity only (plan §3.1): the fan and the feels-like never count here.
     if (season !== 'heating' && maxT > safety.cooling.maxC + EPS) {
-      return fail(`The safe room would reach ${r1(maxT).toString()} °C, above its ${safety.cooling.maxC.toString()} °C maximum.`, r1(maxT), safety.cooling.maxC, 'C');
+      return fail(`The safe room would reach ${temp(r1(maxT), unit)}, above its ${temp(safety.cooling.maxC, unit)} maximum.`, r1(maxT), safety.cooling.maxC, 'C');
     }
     if (season !== 'cooling' && minT < safety.heating.minC - EPS) {
-      return fail(`The safe room would drop to ${r1(minT).toString()} °C, below its ${safety.heating.minC.toString()} °C minimum.`, r1(minT), safety.heating.minC, 'C');
+      return fail(`The safe room would drop to ${temp(r1(minT), unit)}, below its ${temp(safety.heating.minC, unit)} minimum.`, r1(minT), safety.heating.minC, 'C');
     }
     // Heat danger (#248): the room feels hotter than its maximum (NWS heat index), or passes a cap. With the stricter
     // night limit on (#266) the maximum drops to the night threshold in the night window; the caps may be set
@@ -183,7 +185,7 @@ const safeRoomComfort: Constraint = {
         // Air above the limit has a nearest allowed value; how hot the room feels does not (the air may already be at
         // the limit, #285 review), so the perceived-temperature rules leave it out.
         const nearest = worst.danger.rule === 'temperature' ? { nearestAllowed: worst.danger.limitC } : {};
-        return { id: 'safe_room_comfort', ok: false, reason: heatDangerReason(worst.r, worst.danger), measured: r1(worst.danger.valueC), limit: worst.danger.limitC, ...nearest, unit: 'C' };
+        return { id: 'safe_room_comfort', ok: false, reason: heatDangerReason(worst.r, worst.danger, unit), measured: r1(worst.danger.valueC), limit: worst.danger.limitC, ...nearest, unit: 'C' };
       }
     }
     const maxRh = Math.max(...rhs);
@@ -196,7 +198,7 @@ const safeRoomComfort: Constraint = {
     return {
       id: 'safe_room_comfort',
       ok: true,
-      reason: `The safe room stays between ${r1(minT).toString()} and ${r1(maxT).toString()} °C, humidity ${Math.round(minRh).toString()}-${Math.round(maxRh).toString()} %.`,
+      reason: `The safe room stays between ${tempNumber(r1(minT), unit)} and ${temp(r1(maxT), unit)}, humidity ${Math.round(minRh).toString()}-${Math.round(maxRh).toString()} %.`,
       measured: r1(measured),
       limit,
       unit: 'C',

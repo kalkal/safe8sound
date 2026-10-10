@@ -62,6 +62,12 @@ export const toDisplayTemp = (c: number, unit: TempUnit): number => round1(unit 
 /** "24 °C", "87.6 °F": no trailing zero. */
 export const formatTemp = (c: number, unit: TempUnit): string => `${String(toDisplayTemp(c, unit))} °${unit}`;
 
+/**
+ * A value the tools take in °C, as said to a person who chose °F, with the °C to send in brackets (#306 review):
+ * "80.6 °F (27 C)", so the voice says °F and the model still knows the input. In °C, "27 C".
+ */
+export const formatTempForInput = (c: number, unit: TempUnit): string => (unit === 'F' ? `${formatTemp(c, 'F')} (${String(c)} C)` : `${String(c)} C`);
+
 /** "24.0 °C": always one decimal, next to other one-decimal figures. */
 export const formatTempFixed = (c: number, unit: TempUnit): string => `${toDisplayTemp(c, unit).toFixed(1)} °${unit}`;
 

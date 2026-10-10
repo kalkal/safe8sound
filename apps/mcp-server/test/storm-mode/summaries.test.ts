@@ -49,6 +49,23 @@ describe('what the model reads', () => {
     expect(text).toContain('simulated data (');
   });
 
+  it('in °F (#306): the safe room in °F, and the family told in °F too', async () => {
+    const w = world(4, { units: 'F' });
+    const started = await startStormMode(w.deps, { mode: 'active' }, w.ctx);
+    if (!started.ok) throw new Error(started.error.message);
+    const out = await safeRoomStatus(w.deps, w.ctx);
+    if (!out.ok) throw new Error(out.error.message);
+    // The structured status stays in °C; the text the model reads is in °F.
+    const f = Math.round((out.value.tempC * 1.8 + 32) * 10) / 10;
+    expect(safeRoomSummary(out.value, 'F')).toContain(`Safe room ${out.value.safeRoomId}: ${f.toFixed(1)} °F`);
+    expect(safeRoomSummary(out.value, 'F')).not.toContain('°C');
+    const told = await w.inbox();
+    expect(told.map((m) => m.text).join(' ')).toMatch(/is at \d+\.\d °F/);
+    expect(told.map((m) => m.text).join(' ')).not.toContain('°C');
+    const note = await notifyFamily(w.deps, { transition: 'essential_level' }, w.ctx);
+    expect(note.ok && note.value.preview).toMatch(/is at \d+\.\d °F/);
+  });
+
   it('notify_family: sent and skipped roles, and the preview addressed to the role', async () => {
     const w = world(4);
     await startStormMode(w.deps, { mode: 'active' }, w.ctx);

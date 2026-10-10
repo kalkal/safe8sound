@@ -25,6 +25,15 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
     );
   });
 
+  it('in the unit the sandbox chose: 26.44 °C is 79.6 °F, in English and Italian (#306)', () => {
+    const f = { ...fields, unit: 'F' as const };
+    const r = stormMessage('en-US', 'power_back', 'Ana', f);
+    expect(r.ok && r.value).toBe(`${PRODUCT_NAME} update for Ana: power came back at home at 6:30 AM. Bedroom is at 79.6 °F. Storm mode has ended. No action is needed.`);
+    const it = stormMessage('it-IT', 'power_back', 'Ana', f);
+    expect(it.ok && it.value).toContain('Bedroom è a 79.6 °F.');
+    for (const t of SENDABLE_TRANSITIONS) expect(JSON.stringify(stormMessage('en-US', t, 'Ana', f))).not.toContain('°C');
+  });
+
   it('essential level says until when', () => {
     const r = stormMessage('en-US', 'essential_level', 'Ana', fields);
     expect(r.ok && r.value).toContain('essential mode');

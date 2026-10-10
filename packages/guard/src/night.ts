@@ -1,4 +1,5 @@
 import { celsius, type HomeProfile, type NightRecovery, type PlanWarning } from '@cold-reserve/contracts';
+import { degreeHours, heatAmount, temp } from './display.js';
 import { nightMetrics, type NightMetrics, type ProjectionPoint, type RoomControl } from '@cold-reserve/core';
 import { UNSERVED_TOLERANCE_W, projectFrom, type GuardContext } from './context.js';
 
@@ -64,6 +65,7 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
   const best = round2(Math.max(plan.achievedHours, reference?.achievedHours ?? 0));
   const room = input.profile.rooms.find((r) => r.id === roomId)?.name ?? roomId;
   const limit = ctx.gridAvailable ? 'the air conditioner' : 'the battery';
+  const unit = input.displayUnit ?? 'C';
   return {
     nightRecovery: { ...base, status: 'infeasible', bestAchievableHours: best },
     warnings: [
@@ -72,8 +74,8 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
         // With the grid up the limit is the air conditioner (or the room's humidity), not the battery. When the
         // hours are reached, what cannot be kept is the heat budget: say that, not "x hours, not the 0".
         message: (plan.achievedHours >= requiredHours - EPS
-          ? `Tonight ${limit} cannot keep the heat in the ${room} within the night budget: about ${base.heatIndexDegreeHoursAbove26_7.toString()} heat-index degree-hours above 26.7 °C, over the ${cfg.budgetDegreeHours.toString()} allowed.`
-          : `Tonight ${limit} can keep the ${room} at or below ${thresholdC.toString()} °C for about ${best.toString()} hours, not the ${base.requiredHours.toString()} hours of the night-recovery target.`
+          ? `Tonight ${limit} cannot keep the heat in the ${room} within the night budget: about ${heatAmount(base.heatIndexDegreeHoursAbove26_7, unit)}, over the ${degreeHours(cfg.budgetDegreeHours, unit)} allowed.`
+          : `Tonight ${limit} can keep the ${room} at or below ${temp(thresholdC, unit)} for about ${best.toString()} hours, not the ${base.requiredHours.toString()} hours of the night-recovery target.`
         ).slice(0, 300),
       },
     ],

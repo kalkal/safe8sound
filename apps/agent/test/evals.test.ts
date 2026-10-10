@@ -25,9 +25,9 @@ const byId = (id: string) => {
 };
 
 describe('eval suite v1 (plan §10.2: 20 utterances, threshold 90%)', () => {
-  it('has 22 cases with unique ids and a 0.9 threshold (20 from plan §10.2, plus #273 "Is the power back?" and #274 scene 2b)', () => {
-    expect(EVAL_SUITE.cases).toHaveLength(22);
-    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(22);
+  it('has 23 cases with unique ids and a 0.9 threshold (20 from plan §10.2, plus #273 "Is the power back?", #274 scene 2b and a °F setpoint, #306)', () => {
+    expect(EVAL_SUITE.cases).toHaveLength(23);
+    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(23);
     expect(EVAL_SUITE.threshold).toBe(0.9);
   });
 
@@ -63,6 +63,12 @@ describe('scoreCase (metrics: tool choice, trajectory, no invented numbers)', ()
   it('accepts numbers the user said', () => {
     const score = scoreCase(byId('hot-grandpa'), turn(['plan_comfort'], ['Plan p-1: under 27 °C until 7 am.'], 'For 36 degrees I can keep it under 27 until 7 am.'));
     expect(score.noInventedNumbers).toBe(true);
+  });
+
+  it('a °F sandbox: a °F answer from °F tool text passes; a number converted by the model does not (#306)', () => {
+    const tools = ['Plan p-1: under 80.6 °F until 7 am.'];
+    expect(scoreCase(byId('hot-grandpa'), turn(['plan_comfort'], tools, 'I can keep it under 80.6 °F until 7 am.')).noInventedNumbers).toBe(true);
+    expect(scoreCase(byId('hot-grandpa'), turn(['plan_comfort'], tools, 'I can keep it under 27 °C until 7 am.')).noInventedNumbers).toBe(false);
   });
 
   it('fails the wrong first tool', () => {
@@ -117,7 +123,7 @@ describe('scoreCase (metrics: tool choice, trajectory, no invented numbers)', ()
 describe('runEvals on the Strands loop with the fake model (no Bedrock: cost rule)', () => {
   it('scores the reference policy at or above the threshold', async () => {
     const report = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: new FakeModel(referencePolicy), tools: stubTools() }));
-    expect(report.results).toHaveLength(22);
+    expect(report.results).toHaveLength(23);
     expect(report.passRate).toBeGreaterThanOrEqual(0.9);
     expect(report.passed).toBe(true);
   });

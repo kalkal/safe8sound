@@ -1,4 +1,5 @@
-import { ELDERLY_CAP_MAX_C, HEAT_INDEX_CAP_MAX_C } from '@cold-reserve/contracts';
+import { ELDERLY_CAP_MAX_C, HEAT_INDEX_CAP_MAX_C, type TempUnit } from '@cold-reserve/contracts';
+import { temp } from './display.js';
 import { nwsHeatIndexC } from '@cold-reserve/core';
 
 // Heat danger in the safe room (#248, approved in #248). Refused: the air above the limit in force, or the NWS heat
@@ -58,21 +59,22 @@ export function heatDanger(r: Reading, opts: { limitC: number; elderly: boolean;
 const r1 = (x: number) => Math.round(x * 10) / 10 + 0;
 
 /** The guard's reason for a dangerous reading, with its numbers. */
-export function heatDangerReason(r: Reading, d: HeatDanger): string {
-  const air = `${r1(r.tempC).toString()} °C at ${Math.round(r.humidityPct).toString()} % humidity`;
-  const value = r1(d.valueC).toString();
+export function heatDangerReason(r: Reading, d: HeatDanger, unit: TempUnit = 'C'): string {
+  const air = `${temp(r1(r.tempC), unit)} at ${Math.round(r.humidityPct).toString()} % humidity`;
+  const value = temp(r1(d.valueC), unit);
+  const limit = temp(d.limitC, unit);
   switch (d.rule) {
     case 'temperature':
-      return `The safe room would reach ${value} °C, above its ${d.limitC.toString()} °C maximum.`;
+      return `The safe room would reach ${value}, above its ${limit} maximum.`;
     case 'elderly_critical':
       return d.limitC < ELDERLY_CRITICAL_C
-        ? `The safe room would reach ${value} °C, above the ${d.limitC.toString()} °C set for an older person.`
-        : `The safe room would reach ${value} °C, above the ${d.limitC.toString()} °C that is critical for an older person.`;
+        ? `The safe room would reach ${value}, above the ${limit} set for an older person.`
+        : `The safe room would reach ${value}, above the ${limit} that is critical for an older person.`;
     case 'extreme_caution':
       return d.limitC < EXTREME_CAUTION_HEAT_INDEX_C
-        ? `The safe room would feel like ${value} °C (${air}), above the ${d.limitC.toString()} °C heat-index cap set for this home.`
-        : `The safe room would feel like ${value} °C (${air}), in the heat index's Extreme Caution band from ${d.limitC.toString()} °C.`;
+        ? `The safe room would feel like ${value} (${air}), above the ${limit} heat-index cap set for this home.`
+        : `The safe room would feel like ${value} (${air}), in the heat index's Extreme Caution band from ${limit}.`;
     case 'heat_index':
-      return `The safe room would feel like ${value} °C (${air}), above its ${d.limitC.toString()} °C maximum.`;
+      return `The safe room would feel like ${value} (${air}), above its ${limit} maximum.`;
   }
 }

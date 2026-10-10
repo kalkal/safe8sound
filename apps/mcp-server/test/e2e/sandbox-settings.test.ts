@@ -78,6 +78,24 @@ describe('sandbox settings on the local entry', () => {
     expect(JSON.stringify(logger.lines)).not.toContain(A);
   });
 
+  it('a visitor who chooses °F reads the plan in °F at the next call; the other sandbox keeps °C (#306)', async () => {
+    const local = createLocalApp(ENV, { wallClock: settableClock(WALL), logger: memoryLogger() });
+    if (!local.ok) throw new Error(local.error.message);
+    const open = await serve(local.value.app);
+    const a = await open(A);
+    const b = await open(B);
+    const text = async (call: typeof a.call) => ((await call('plan_comfort', { goal: 'cool' }))['content'] as { text: string }[])[0]?.text ?? '';
+    expect(await text(a.call)).toMatch(/What it does: [^.]*at \d+(\.\d)? °C/);
+    expect((await a.call('set_scenario', { units: 'F' })).isError).not.toBe(true);
+    expect(await text(a.call)).toMatch(/What it does: [^.]*at \d+(\.\d)? °F/);
+    expect(await text(b.call)).toMatch(/What it does: [^.]*at \d+(\.\d)? °C/);
+    // Every tool text of the °F sandbox: no °C left, the guard's reasons included.
+    const said = async (name: string, args: Record<string, unknown> = {}) => ((await a.call(name, args))['content'] as { text: string }[])[0]?.text ?? '';
+    for (const t of [await text(a.call), await said('get_safe_room_status'), await said('start_storm_mode', { mode: 'prepare' })]) expect(t).not.toContain('°C');
+    // Preferences are written in °C: said in °F with the °C to send in brackets.
+    expect(await said('get_preferences')).toContain('at most 80.6 °F (27 C)');
+  });
+
   it('a restart plays the day again from its start hour', async () => {
     const wall = settableClock(WALL);
     const local = createLocalApp(ENV, { wallClock: wall, logger: memoryLogger() });

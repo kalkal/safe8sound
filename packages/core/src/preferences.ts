@@ -4,6 +4,7 @@ import {
   checkSafetyWithinLimits,
   effectiveHeatSafety,
   err,
+  formatTempForInput,
   ok,
   toolError,
   type ConfigChange,
@@ -12,6 +13,7 @@ import {
   type Preferences,
   type Result,
   type SafetyHardLimits,
+  type TempUnit,
 } from '@cold-reserve/contracts';
 
 // Pure preferences logic (plan §3.1, §11.2 p.14-15): merge an update, keep every threshold inside
@@ -47,6 +49,8 @@ export interface PreferencesUpdateContext {
   readonly by: ConfigChange['by'];
   /** The path the confirmation came through, when the caller knows it. */
   readonly confirmedVia?: ConfigChange['confirmedVia'];
+  /** The unit the refusals are said in (#306 review): °F with the °C to send in brackets; °C when unset. */
+  readonly unit?: TempUnit;
 }
 
 export interface PreferencesUpdateResult {
@@ -99,12 +103,12 @@ export function updatePreferences(
     return err(toolError('invalid_input', 'These safety thresholds are not valid.', { details: { field: 'safety' } }));
   }
   const safety = parsedSafety.data;
-  const withinLimits = checkSafetyWithinLimits(safety, ctx.limits);
+  const withinLimits = checkSafetyWithinLimits(safety, ctx.limits, ctx.unit);
   if (!withinLimits.ok) return withinLimits;
 
   const comfortC = { cooling: update.comfortC?.cooling ?? current.comfortC.cooling, heating: update.comfortC?.heating ?? current.comfortC.heating };
-  if (comfortC.cooling > safety.cooling.maxC) return err(setpoint('comfortC.cooling', safety.cooling.maxC));
-  if (comfortC.heating < safety.heating.minC) return err(setpoint('comfortC.heating', safety.heating.minC));
+  if (comfortC.cooling > safety.cooling.maxC) return err(setpoint('comfortC.cooling', safety.cooling.maxC, ctx.unit));
+  if (comfortC.heating < safety.heating.minC) return err(setpoint('comfortC.heating', safety.heating.minC, ctx.unit));
 
   const parsed = PreferencesSchema.safeParse({
     ...current,
@@ -123,8 +127,8 @@ export function updatePreferences(
   return ok({ preferences: parsed.data, changes: diff(current, parsed.data, ctx) });
 }
 
-const setpoint = (field: string, limit: number) =>
-  toolError('invalid_setpoint', `${field} must stay within the safety threshold (${String(limit)} C).`, {
+const setpoint = (field: string, limit: number, unit: TempUnit = 'C') =>
+  toolError('invalid_setpoint', `${field} must stay within the safety threshold (${formatTempForInput(limit, unit)}).`, {
     details: { field, limit, nearestAllowed: limit, unit: 'C' },
   });
 

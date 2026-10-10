@@ -1,4 +1,4 @@
-import { categoryOf, type ErrorEnvelope, type Forecast, type HomeId, type Household, type LocationId, type Result, type SandboxSettings } from '@cold-reserve/contracts';
+import { categoryOf, type ErrorEnvelope, type Forecast, type HomeId, type Household, type LocationId, type Result, type SandboxSettings, type TempUnit } from '@cold-reserve/contracts';
 import type { Logger, StateStoreFactory } from '@cold-reserve/core';
 import { builtInPlace, type Place, type Scenario } from '@cold-reserve/source-simulator';
 import type { HomeEntry } from './modules/energy-status/index.js';
@@ -31,6 +31,8 @@ export interface SandboxPlay {
   readonly forecast: () => Forecast;
   /** The settings version played; absent: the built-in defaults. */
   readonly version?: number;
+  /** The temperature unit the visitor chose (#306): the tool texts follow it. */
+  readonly units: TempUnit;
   /** The missing settings were reported for this build (one warning per build, C2b Q3). */
   missingReported?: boolean;
 }

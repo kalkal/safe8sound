@@ -3,6 +3,7 @@ import {
   TempUnitSchema,
   formatTemp,
   formatTempFixed,
+  formatTempForInput,
   tempGap,
   toDisplayTemp,
   type TempUnit,
@@ -111,6 +112,12 @@ describe('temperatures for people, in °C or °F', () => {
       const g = tempGap(nowC, 24, 'F');
       expect(Math.round((g.now - g.ref) * 10) / 10).toBe(g.gap);
     }
+  });
+
+  it('a value the tools take in °C, said in °F with the °C to send in brackets (#306 review)', () => {
+    expect(formatTempForInput(27, 'F')).toBe('80.6 °F (27 C)');
+    expect(formatTempForInput(32.2, 'F')).toBe('90 °F (32.2 C)');
+    expect(formatTempForInput(27, 'C')).toBe('27 C');
   });
 
   it('the unit setting is °C or °F, nothing else', () => {

@@ -197,6 +197,36 @@ describe('dry air (#107): the plan cannot raise the humidity', () => {
   });
 });
 
+describe('the temperature unit of the texts (#306): the guard computes in °C, only its words change', () => {
+  const strings = (x: unknown): unknown => (typeof x === 'string' ? '' : Array.isArray(x) ? x.map(strings) : x !== null && typeof x === 'object' ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, strings(v)])) : x);
+  const cases = {
+    'a hot room with the AC off': input({ plan: plan([step({ mode: 'off' })]) }),
+    'a scorching humid night': input({
+      forecast: ForecastSchema.parse({ ...hotNight(), hourly: hotNight().hourly.map((h) => ({ ...h, tempOutC: h.tempOutC + 12, humidityOutPct: 95 })) }),
+      plan: plan([step({ mode: 'fan_only' })]),
+    }),
+    'a sensible plan': input(),
+  };
+
+  it.each(Object.entries(cases))('%s: the same verdict, numbers and pass/fail in °C and °F; only the strings differ', (_name, i) => {
+    const c = runGuard(i);
+    const f = runGuard({ ...i, displayUnit: 'F' });
+    expect(strings(f)).toEqual(strings(c));
+    expect(JSON.stringify(f)).not.toContain('°C');
+  });
+
+  it('says the safe room in °F: 27 °C is 80.6 °F, and the nearest allowed value in °F too', () => {
+    const i = input({ plan: plan([step({ mode: 'off' })]) });
+    const f = runGuard({ ...i, displayUnit: 'F' });
+    const room = f.guarantees.find((x) => x.id === 'safe_room_comfort');
+    expect(room?.reason).toMatch(/above its 80\.6 °F maximum\.$/);
+    // The structured numbers stay in °C for the cards.
+    expect(room).toMatchObject({ limit: 27, unit: 'C' });
+    expect(rejectionOf(f, 'F')?.message).toMatch(/ Nearest allowed: 80\.6 °F \(27 C\)\.$/);
+    expect(rejectionOf(runGuard(i))?.message).toMatch(/ Nearest allowed: 27 C\.$/);
+  });
+});
+
 describe('night recovery (feature queue item 1)', () => {
   it('is met when the bedroom stays at 25 °C all night', () => {
     const n = runGuard(input()).nightRecovery;

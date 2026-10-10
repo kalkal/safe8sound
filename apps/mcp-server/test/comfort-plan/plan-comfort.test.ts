@@ -584,6 +584,47 @@ describe('the guard frame (season and night mode), shared by propose and apply',
   });
 });
 
+describe('in a °F sandbox (#306): every text in °F, every number and decision the same as in °C', () => {
+  const both = async (over: Parameters<typeof world>[2], input: Parameters<typeof planComfort>[1]) => {
+    const c = world('storm-blackout', 10, over);
+    const f = world('storm-blackout', 10, { ...over, units: 'F' });
+    return [await planComfort(c.deps, input, c.ctx), await planComfort(f.deps, input, f.ctx)] as const;
+  };
+
+  it('the guided storm last resort: its warnings in °F, the structured plan in °C as before', async () => {
+    const [c, f] = await both({ snapshot: (x) => ({ ...x, batterySocPct: pct(17) }) }, { goal: 'cool' });
+    if (!c.ok || !f.ok) throw new Error('expected a plan');
+    expect(f.value.lastResort).toEqual(c.value.lastResort);
+    expect(f.value.guarantees.map((g) => [g.id, g.ok, g.measured, g.limit])).toEqual(c.value.guarantees.map((g) => [g.id, g.ok, g.measured, g.limit]));
+    const words = JSON.stringify({ warnings: f.value.warnings, guarantees: f.value.guarantees.map((g) => g.reason) });
+    expect(words).not.toContain('°C');
+    expect(f.value.warnings?.find((w) => w.code === 'night_recovery_infeasible')?.message).toBe('Tonight the Bedroom stays at or below 75.2 °F until about 2:15 AM, then it warms up.');
+  });
+
+  it('a setpoint that can only be °F is refused, with the °C to send: inputs are always °C (#306 review)', async () => {
+    const w = world('storm-blackout', 10, { units: 'F' });
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(72), roomIds: ['study'] }, w.ctx);
+    expect(r).toMatchObject({ ok: false, error: { code: 'invalid_input', details: { field: 'setpointC' } } });
+    expect(!r.ok && r.error.message).toBe('Temperatures are sent in Celsius: 72 looks like °F. 72 °F is 22.2 °C: send setpointC 22.2.');
+    // In a °C sandbox the schema and the guard decide as before.
+    const c = world('storm-blackout', 10);
+    const rc = await planComfort(c.deps, { goal: 'cool', setpointC: celsius(72), roomIds: ['study'] }, c.ctx);
+    expect(!rc.ok && rc.error.code).not.toBe('invalid_input');
+  });
+
+  it('a refused proposal says the refusal and its nearest allowed value in °F', async () => {
+    const [c, f] = await both({ snapshot: (x) => ({ ...x, batterySocPct: pct(30) }) }, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
+    if (c.ok || f.ok) throw new Error('expected refusals');
+    expect(f.error.code).toBe(c.error.code);
+    // The details' guarantees carry the guard's reasons, in °F: everything but the strings is the same.
+    const strings = (x: unknown): unknown => (typeof x === 'string' ? '' : Array.isArray(x) ? x.map(strings) : x !== null && typeof x === 'object' ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, strings(v)])) : x);
+    expect(strings(f.error.details)).toEqual(strings(c.error.details));
+    expect(JSON.stringify(f.error.details)).not.toContain('°C');
+    expect(f.error.message).toMatch(/°F/);
+    expect(f.error.message).not.toContain('°C');
+  });
+});
+
 describe('the night warning next to a last resort (#272)', () => {
   const night = { roomId: 'bedroom-1', mode: 'elderly' as const, thresholdC: celsius(24), window: { start: '2026-07-17T20:00:00.000Z', end: '2026-07-18T05:00:00.000Z' }, requiredHours: 6, achievedHours: 3.67, status: 'infeasible' as const, heatIndexDegreeHoursAbove26_7: 0.03, budgetDegreeHours: 4 };
   const hours = { code: 'night_recovery_infeasible', message: 'Tonight the battery can keep the Bedroom at or below 24 °C for about 3.67 hours, not the 6 hours of the night-recovery target.' } as const;

@@ -39,7 +39,7 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         input: z.strictObject({}),
         output: SafeRoomStatusSchema,
-        summarize: safeRoomSummary,
+        summarize: (o, ctx) => safeRoomSummary(o, deps.homes(ctx.homeId)?.units ?? 'C'),
         handler: (_args, ctx) => safeRoomStatus(atHome(deps, ctx.homeId), ctx),
       }),
       defineTool({

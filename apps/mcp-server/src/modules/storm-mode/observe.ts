@@ -85,6 +85,8 @@ export function messageFields(o: Observed, session: StormSession | undefined): S
   return {
     roomName: room?.name ?? o.safeRoom.id,
     tempC: o.safeRoom.tempC,
+    // The family reads the unit the sandbox chose (#306).
+    unit: o.home.units ?? 'C',
     atMs: o.nowMs,
     safeUntilMs: o.safeUntilMs,
     ...(session?.gridBackAt === undefined ? {} : { powerBackAtMs: Date.parse(session.gridBackAt) }),

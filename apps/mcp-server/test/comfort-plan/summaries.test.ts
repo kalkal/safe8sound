@@ -31,6 +31,60 @@ describe('what the model reads', () => {
     expect(text).toContain('Without the plan the safe room, Bedroom (bedroom-1), would peak at');
   });
 
+  describe('in the unit the sandbox chose (#306)', () => {
+    const F = { ...NIGHT, unit: 'F' as const };
+
+    it('the surplus rooms in °F: the gap comes from the rounded absolutes, so now − comfort adds up', () => {
+      const surplus = {
+        from: '2026-07-16T16:00:00+02:00',
+        to: '2026-07-16T20:05:00+02:00',
+        keptKWh: 3.4,
+        comfortC: 24,
+        rooms: [
+          { roomId: 'bedroom-1', setpointC: 24, reason: 'safe_room' as const, aboveTargetK: 1 },
+          { roomId: 'bedroom-2', setpointC: 23, reason: 'occupied_tonight' as const, aboveTargetK: 6.9 },
+          { roomId: 'study', setpointC: 23, reason: 'occupied' as const, aboveTargetK: -0.4 },
+        ],
+      };
+      const names = { 'bedroom-1': 'Bedroom', 'bedroom-2': 'Second bedroom', study: 'Study' };
+      const text = planSummary({ ...examplePlan(), surplus } as Plan, { ...F, roomNames: names });
+      // 30.9 °C is 87.62 °F, said 87.6; the comfort 75.2; the gap 87.6 − 75.2 = 12.4, never 6.9 × 1.8 = 12.42 rounded alone.
+      expect(text).toContain(
+        '1) Bedroom (safe room), now 77.0 °F, 1.8 °F above the 75.2 °F comfort, cooling to 75.2 °F; ' +
+          '2) Second bedroom (slept in tonight), now 87.6 °F, 12.4 °F above the 75.2 °F comfort, cooling to 73.4 °F; ' +
+          '3) Study (occupied), now 74.5 °F, 0.7 °F below the 75.2 °F comfort, cooling to 73.4 °F.',
+      );
+      // Without the comfort there is no absolute to round: the gap alone, × 1.8.
+      const older = { from: surplus.from, to: surplus.to, keptKWh: surplus.keptKWh, rooms: surplus.rooms };
+      expect(planSummary({ ...examplePlan(), surplus: older } as Plan, { ...F, roomNames: names })).toContain('1) Bedroom (safe room), 1.8 °F above comfort, cooling to 75.2 °F;');
+    });
+
+    it('the guided storm in °F: the window, the night warning line and the counterfactual, with no °C left in them', async () => {
+      const w = world('storm-blackout', 10, { snapshot: (x) => ({ ...x, batterySocPct: pct(17) }) });
+      const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+      if (!r.ok) throw new Error(r.error.message);
+      const text = planSummary(r.value, F);
+      // 24 °C is 75.2 °F; 24.7 °C is 76.46 °F, said 76.5.
+      expect(text).toContain('The battery lasts until 11:40 PM; the safe room stays at or below its 75.2 °F night limit until about 2:15 AM, then warms up to 76.5 °F by 6:20 AM.');
+      const counterfactual = text.split(/(?<=\.) /).find((x) => x.startsWith('Without the plan')) ?? '';
+      expect(counterfactual).toMatch(/would peak at \d+(\.\d)? °F at /);
+      expect(counterfactual).toContain('heat-index °F-hours');
+      expect(counterfactual).not.toContain('°C');
+      expect(text).toMatch(/What it does: .*cool at \d+(\.\d)? °F/);
+    });
+
+    it('the night line in °F: hours at or below the threshold in °F, the heat budget as °F-hours, the same amount as in °C', () => {
+      const night = { roomId: 'bedroom-1', mode: 'elderly', thresholdC: 24, window: { start: '2026-07-17T20:00:00.000Z', end: '2026-07-18T05:00:00.000Z' }, requiredHours: 6, achievedHours: 3.67, status: 'unmet', heatIndexDegreeHoursAbove26_7: 5, budgetDegreeHours: 4 };
+      const p = { ...examplePlan(), nightRecovery: night } as Plan;
+      expect(planSummary(p, NIGHT)).toContain('3.67 of 6 hours at or below 24 °C, and the heat would reach 5 heat-index degree-hours above 26.7 °C, over the 4 allowed.');
+      // 5 and 4 degree-hours (°C) are 9 and 7.2 °F-hours: the same amount; the threshold 26.7 °C is 80.1 °F.
+      expect(planSummary(p, F)).toContain('3.67 of 6 hours at or below 75.2 °F, and the heat would reach 9 heat-index °F-hours above 80.1 °F, over the 7.2 allowed.');
+      // Just over the budget: the amount rounded up, never "7.2 over the 7.2" (#306 review).
+      const close = { ...p, nightRecovery: { ...night, heatIndexDegreeHoursAbove26_7: 4.01 } } as Plan;
+      expect(planSummary(close, F)).toContain('the heat would reach 7.3 heat-index °F-hours above 80.1 °F, over the 7.2 allowed.');
+    });
+  });
+
   it('plan_comfort: where the solar surplus went, in order, by room name, with every number (#203)', () => {
     const surplus = {
       from: '2026-07-16T16:00:00+02:00',

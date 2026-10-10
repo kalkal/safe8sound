@@ -18,6 +18,10 @@ describe('system prompt (versioned, short: cost rule)', () => {
     expect(prompt).toContain('Never ask the person for an id, a token or a code, and never make one up; a last resort is confirmed by a tap on its card.');
   });
 
+  it('says temperatures in the unit the tools wrote, and sends tool inputs in °C (#306 and its review)', () => {
+    expect(prompt).toContain('Say temperatures in the unit the tools used (°C or °F). Tool inputs are always in °C: convert what the person says (72 °F is 22.2 °C).');
+  });
+
   it('names the product from i18n, never hard-coded', () => {
     expect(SYSTEM_PROMPT_TEMPLATE).toContain('{product}');
     expect(SYSTEM_PROMPT_TEMPLATE).not.toContain(PRODUCT_NAME);

@@ -71,6 +71,8 @@ The agent reads only the text content of a tool result, not `structuredContent`,
 - **apply_plan:** what happened, and on the real home every manual step.
 - **get_reserve_outlook:** the three hour counts and the data origin.
 
+**The unit of the texts (#306).** A visitor sandbox may choose °F (`set_scenario` `units`); the choice travels with the sandbox, read with its settings on every request, and the real home and `demo` say °C. Every temperature a person reads or hears follows it: the plan text, the guard's reasons and refusals (`GuardInput.displayUnit`, `rejectionOf(verdict, unit)`), the warnings, the last-resort words, the safe room status, the family messages, the fan tip and the manual steps, all through the shared helper of the cards (`packages/contracts/src/units.ts`). Everything is computed in °C: a verdict, its numbers and its pass or fail are the same in both units (a test runs the same input in each), and the structured fields (`measured`, `limit`, `comfortLimitC`…) stay in °C for the cards to convert. A gap next to its two temperatures comes from the rounded absolutes (`tempGap`), so the numbers add up; a heat-index degree-hour amount is x1.8 in °F, said as °F-hours above 80.1 °F. `get_preferences` and `set_preferences` take °C (the settings are written in °C); in a °F sandbox their texts say each temperature in °F with the °C to send in brackets, "at most 80.6 °F (27 C)", so the voice says °F and the model still knows what to send. The agent prompt says temperatures in the tools' unit, never converted.
+
 ## Tests
 - Unit tests of the planner, the counterfactual and each handler path, including errors, expiry, the real home, revalidation and overrides.
 - Properties:

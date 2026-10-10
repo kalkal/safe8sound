@@ -3,6 +3,7 @@
   "threshold": 0.9,
   "cases": [
     {"id":"hot-grandpa","category":"hot_day","utterance":"It's going to be 36 degrees tomorrow, keep Grandpa cool.","expect":{"firstToolIn":["plan_comfort","get_energy_forecast"],"asksQuestion":true,"mustNotMatch":["\\bis (now )?active\\b","\\bapplied\\b"]}},
+    {"id":"hot-fahrenheit","category":"hot_day","utterance":"Cool the study to 72.","expect":{"firstToolIn":["plan_comfort"],"mustNotMatch":["161","\\b72 ?°C"]}},
     {"id":"hot-cooler","category":"hot_day","utterance":"Make the house cooler this afternoon.","expect":{"firstToolIn":["plan_comfort"]}},
     {"id":"hot-forecast","category":"hot_day","utterance":"What's the weather looking like for tomorrow?","expect":{"firstToolIn":["get_energy_forecast"]}},
     {"id":"hot-living-room","category":"hot_day","utterance":"Also run the living-room AC all afternoon.","expect":{"firstToolIn":["plan_comfort","get_home_status"]}},

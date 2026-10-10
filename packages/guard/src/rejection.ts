@@ -1,4 +1,5 @@
-import { toolError, type ErrorCode, type ErrorDetails, type ErrorEnvelope, type GuaranteeId } from '@cold-reserve/contracts';
+import { toolError, type ErrorCode, type ErrorDetails, type ErrorEnvelope, type GuaranteeId, type TempUnit } from '@cold-reserve/contracts';
+import { degreeHours, heatAmount, inputTemp, temp } from './display.js';
 import type { GuardVerdict } from './guard.js';
 
 // A rejected plan becomes a guard_rejection error envelope (docs/error-handling.md §2): the model reads
@@ -13,7 +14,8 @@ const CODE: Record<GuaranteeId, ErrorCode> = {
   pacing_on_track: 'pacing_off_track',
 };
 
-export function rejectionOf(verdict: GuardVerdict): ErrorEnvelope | undefined {
+/** The refusal for a verdict, its words in the unit the person chose (#306); its details stay in °C. */
+export function rejectionOf(verdict: GuardVerdict, unit: TempUnit = 'C'): ErrorEnvelope | undefined {
   const failed = verdict.guarantees.find((g) => !g.ok);
   if (failed !== undefined) {
     const details: ErrorDetails = {
@@ -26,14 +28,20 @@ export function rejectionOf(verdict: GuardVerdict): ErrorEnvelope | undefined {
       guarantees: verdict.guarantees,
     };
     // The model reads only this text (not the details): it carries the value the guard would accept.
-    const allowed = failed.nearestAllowed === undefined ? '' : ` Nearest allowed: ${failed.nearestAllowed.toString()}${failed.unit === undefined ? '' : ` ${failed.unit}`}.`;
+    const value = failed.nearestAllowed;
+    const allowed =
+      value === undefined
+        ? ''
+        : failed.unit === 'C' && unit === 'F'
+          ? ` Nearest allowed: ${inputTemp(value, 'F')}.`
+          : ` Nearest allowed: ${value.toString()}${failed.unit === undefined ? '' : ` ${failed.unit}`}.`;
     return toolError(CODE[failed.id], `${failed.reason}${allowed}`.slice(0, 300), { details });
   }
   const night = verdict.nightRecovery;
   if (night?.status === 'unmet') {
     const minutes = (h: number) => Math.round(h * 60);
-    const heat = `${night.heatIndexDegreeHoursAbove26_7.toString()} heat-index degree-hours above 26.7 °C`;
-    const budget = `${night.budgetDegreeHours.toString()} allowed`;
+    const heat = heatAmount(night.heatIndexDegreeHoursAbove26_7, unit);
+    const budget = `${degreeHours(night.budgetDegreeHours, unit)} allowed`;
     // With no hour required (a plan that sees only the end of the night) only the heat budget can fail.
     if (night.requiredHours === 0) {
       return toolError('night_recovery_unmet', `The plan lets the heat in the safe room reach ${heat} tonight, over the ${budget}.`, { details: { roomId: night.roomId } });
@@ -41,7 +49,7 @@ export function rejectionOf(verdict: GuardVerdict): ErrorEnvelope | undefined {
     const overBudget = night.heatIndexDegreeHoursAbove26_7 > night.budgetDegreeHours;
     return toolError(
       'night_recovery_unmet',
-      `The plan keeps the safe room at or below ${night.thresholdC.toString()} °C for ${night.achievedHours.toString()} of the ${night.requiredHours.toString()} night hours it can reach${overBudget ? `, and lets the heat reach ${heat}, over the ${budget}` : ''}.`,
+      `The plan keeps the safe room at or below ${temp(night.thresholdC, unit)} for ${night.achievedHours.toString()} of the ${night.requiredHours.toString()} night hours it can reach${overBudget ? `, and lets the heat reach ${heat}, over the ${budget}` : ''}.`,
       {
         details: {
           roomId: night.roomId,

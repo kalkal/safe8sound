@@ -24,10 +24,11 @@ export function createLambdaApp(
   // The app knows each home's clock once built: its stores are scoped to its playthrough (#234) and preferences are
   // stamped at its own time (C2b).
   let homeClock: App['homeClock'] = () => undefined;
+  let homeUnits: App['homeUnits'] = () => 'C';
   const storeFor = withPlaythrough(opts.storeFor, (homeId) => homeClock(homeId));
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) return preferences;
-  const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId) });
+  const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId), unitsFor: (homeId) => homeUnits(homeId) });
   if (!modules.ok) return modules;
   // The family phone's inbox lives in the same table (#24); its read route is served here for the visitor sandboxes
   // (#267): sim-api reads it with its sandbox phone token for the visitor's phone panel.
@@ -50,6 +51,7 @@ export function createLambdaApp(
   });
   if (!app.ok) return app;
   homeClock = app.value.homeClock;
+  homeUnits = app.value.homeUnits;
   // GET /phone/inbox (#267, approved in #267): read-only here, no reply path; the MCP paths are unchanged.
   const phone = createPhoneInboxHandler(app.value.config, { inbox: stormMode.value.inbox, admit: app.value.admitSandbox, logger: wallStamped(opts.logger, opts.wallClock) });
   return ok({ ...app.value, handler: createLocalHandler(app.value.handler, phone) });

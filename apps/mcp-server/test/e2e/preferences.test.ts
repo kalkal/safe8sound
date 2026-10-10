@@ -15,10 +15,10 @@ import { TOKEN } from '../helpers.js';
 // config/preferences.json, composeModules and the demo home profile.
 const clock = { now: () => Date.parse('2026-07-15T12:00:00Z') };
 
-async function session<T>(backing: MemoryBacking, run: (client: Client) => Promise<T>): Promise<T> {
+async function session<T>(backing: MemoryBacking, run: (client: Client) => Promise<T>, unitsFor?: () => 'C' | 'F'): Promise<T> {
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) throw new Error(preferences.error.message);
-  const modules = composeModules({ preferences: preferences.value, storeFor: memoryStateStoreFactory({ backing, clock }), clock });
+  const modules = composeModules({ preferences: preferences.value, storeFor: memoryStateStoreFactory({ backing, clock }), clock, ...(unitsFor === undefined ? {} : { unitsFor }) });
   if (!modules.ok) throw new Error(modules.error.message);
   const app = createApp({ MCP_CLIENTS: `agent@demo=${TOKEN}` }, { wallClock: clock, logger: { log: () => undefined }, modules: modules.value });
   if (!app.ok) throw new Error(app.error.message);
@@ -78,5 +78,30 @@ describe('heat safety settings over MCP (#266)', () => {
     const looser = await session(backing, (client) => client.callTool({ name: 'set_preferences', arguments: { safety: { elderlyCapC: 33 }, confirmed: true } }));
     expect(looser.isError).toBe(true);
     expect(looser).toMatchObject({ structuredContent: { code: 'safety_threshold_out_of_range', details: { field: 'safety.elderlyCapC', nearestAllowed: 31 } } });
+  });
+});
+
+describe('preferences in a °F sandbox (#306): said in °F, with the °C value the tools take in brackets', () => {
+  const text = (r: unknown) => ((r as { content: { text: string }[] }).content[0]?.text ?? '');
+
+  it('get_preferences says every temperature in °F, then the °C to send', async () => {
+    const backing = createMemoryBacking();
+    const read = text(await session(backing, (client) => client.callTool({ name: 'get_preferences', arguments: {} }), () => 'F'));
+    expect(read).toMatch(/cool to \d+(\.\d)? °F \(\d+(\.\d)? C\)/);
+    // 27 °C is 80.6 °F; 32.2 °C is 89.96 °F, said 90; 31 °C is 87.8 °F.
+    expect(read).toContain('Safe room limits: at most 80.6 °F (27 C), the stricter night limit off, a heat-index cap of 90 °F (32.2 C), an older-person cap of 87.8 °F (31 C).');
+  });
+
+  it('set_preferences says each temperature it changed in °F with its °C, and other values as they are', async () => {
+    const backing = createMemoryBacking();
+    const saved = text(
+      await session(backing, (client) => client.callTool({ name: 'set_preferences', arguments: { safety: { stricterNightLimit: true, heatIndexCapC: 30 }, confirmed: true } }), () => 'F'),
+    );
+    expect(saved).toBe('Saved: safety.stricterNightLimit from false to true, safety.heatIndexCapC from 90 °F (32.2 C) to 86 °F (30 C).');
+  });
+
+  it('set_preferences refuses in °F with the °C to send in brackets (#306 review)', async () => {
+    const refused = await session(createMemoryBacking(), (client) => client.callTool({ name: 'set_preferences', arguments: { comfortC: { cooling: 29 }, confirmed: true } }), () => 'F');
+    expect(text(refused)).toContain('comfortC.cooling must stay within the safety threshold (80.6 °F (27 C)).');
   });
 });

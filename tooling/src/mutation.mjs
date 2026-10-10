@@ -30,6 +30,8 @@ export const GROUPS = [
   // The guard is split per source so that each slice stays well under 15 minutes of heavy lock.
   { name: 'guard-constraints', mutate: ['packages/guard/src/constraints.ts'], tests: ['packages/guard/test/constraints.test.ts'] },
   { name: 'guard-rejection', mutate: ['packages/guard/src/rejection.ts'], tests: ['packages/guard/test/rejection.test.ts'] },
+  // The guard's words in the chosen unit (#306): measured by the tests that read them in °C and °F.
+  { name: 'guard-display', mutate: ['packages/guard/src/display.ts'], tests: ['packages/guard/test/rejection.test.ts', 'packages/guard/test/guard.test.ts'] },
   { name: 'guard-config', mutate: ['packages/guard/src/config.ts'], tests: ['packages/guard/test/config.test.ts'] },
   {
     name: 'guard-context',

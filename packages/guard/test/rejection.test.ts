@@ -78,6 +78,19 @@ describe('rejectionOf', () => {
     );
   });
 
+  it('in °F (#306): the threshold in °F and the heat as °F-hours, the same amount (x1.8)', () => {
+    const n = { ...night('unmet'), heatIndexDegreeHoursAbove26_7: 7.2 };
+    expect(rejectionOf(verdict(all(), n), 'F')?.message).toBe(
+      'The plan keeps the safe room at or below 78.8 °F for 2.5 of the 6 night hours it can reach, and lets the heat reach 13 heat-index °F-hours above 80.1 °F, over the 7.2 allowed.',
+    );
+  });
+
+  it('in °F an amount just over the budget is never said as equal to it: the amount is rounded up (#306 review)', () => {
+    // 4.01 degree-hours are 7.218 °F-hours: said 7.3, over the 7.2 allowed, never "7.2 over the 7.2".
+    const n = { ...night('unmet'), heatIndexDegreeHoursAbove26_7: 4.01 };
+    expect(rejectionOf(verdict(all(), n), 'F')?.message).toContain('lets the heat reach 7.3 heat-index °F-hours above 80.1 °F, over the 7.2 allowed.');
+  });
+
   it('with no hour required, an unmet night is the heat budget alone, without hours', () => {
     const n = { ...night('unmet'), requiredHours: 0, achievedHours: 0.5, heatIndexDegreeHoursAbove26_7: 7.2 };
     expect(rejectionOf(verdict(all(), n))).toEqual({

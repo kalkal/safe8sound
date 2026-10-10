@@ -1,4 +1,4 @@
-import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
+import { HomeIdSchema, HomeProfileSchema, IsoDateTimeSchema, SandboxHomeIdSchema, categoryOf, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result, type TempUnit } from '@cold-reserve/contracts';
 import { epsBaseLoadW, isTimeZone, localMidnightMs, scenarioClock, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
 import { FallbackSource, type SourceEvent } from '@cold-reserve/source-fallback';
 import { SCENARIO_IDS, SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, profileAtPlace, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
@@ -128,6 +128,8 @@ export interface App {
   readonly familyReply?: PhoneReplyHandler;
   /** A home's own scenario clock, for what is composed before the app: its stores' playthrough (#234), preferences (C2b). */
   readonly homeClock: (homeId: HomeId) => Clock | undefined;
+  /** A home's temperature unit for the tool texts (#306): the sandbox's choice; °C for the real home and demo. */
+  readonly homeUnits: (homeId: HomeId) => TempUnit;
   /**
    * Admits a visitor sandbox and brings it up to date with its saved settings, as an MCP request does (#267): a
    * phone read in a fresh container then reads the inbox of the sandbox's own playthrough.
@@ -326,6 +328,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     return ok({
       entry: { source: sim, profile, readOnly: false, levelSince: since, clock: homeClock.value },
       forecast: () => sim.forecast(),
+      units: choices.units,
       ...(choices.version === undefined ? {} : { version: choices.version }),
     });
   };
@@ -358,7 +361,9 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     // The home's clock goes to the modules where their domain runs on scenario time: both entries pass scenarioClock
     // (local-app, lambda-app, #175). A test composing modules on another clock passes none and keeps it.
     const homeClock = opts.scenarioClock !== undefined && entry?.clock !== undefined ? { clock: entry.clock } : {};
-    return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly, ...homeClock } : undefined;
+    // The unit a visitor chose (#306), read with the settings on every request; the real home and demo say °C.
+    const units = sandboxFor(homeId)?.units ?? 'C';
+    return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly, units, ...homeClock } : undefined;
   };
 
   const stormDeps: StormModeDeps | undefined = opts.stormMode === undefined ? undefined : { ...opts.stormMode, model: params, homes: planningHome, logger: opts.logger };
@@ -393,6 +398,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes, ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }) }),
     ...(stormDeps === undefined ? {} : { familyReply: (input, ctx) => familyReply(atHome(stormDeps, ctx.homeId), input, ctx) }),
     homeClock: (homeId) => homeFor(homeId)?.clock,
+    homeUnits: (homeId) => sandboxFor(homeId)?.units ?? 'C',
     admitSandbox: async (homeId, correlationId) => {
       const admitted = sandboxes.admit(homeId);
       if (!admitted.ok) return admitted;

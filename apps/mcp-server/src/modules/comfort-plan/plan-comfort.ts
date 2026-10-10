@@ -3,6 +3,7 @@ import {
   REAL_HOME_ID,
   celsius,
   err,
+  formatTemp,
   ok,
   pct,
   toolError,
@@ -10,6 +11,7 @@ import {
   type Forecast,
   type HomeProfile,
   type LevelStep,
+  type TempUnit,
   type NightRecovery,
   type Plan,
   type PlanComfortInput,
@@ -97,6 +99,12 @@ export function roomsText(rooms: readonly { id: string; name: string }[], budget
   return `${String(labels.length)} rooms`;
 }
 
+/** Above this a setpoint in °C is no room temperature: in a °F sandbox it is a °F number sent as °C (#306 review). */
+const FAHRENHEIT_LOOKING_ABOVE_C = 40;
+
+/** The unit of the texts for this call (#306): the sandbox's choice, °C otherwise. */
+const unitOf = (deps: ComfortPlanDeps, ctx: ToolContext): TempUnit => deps.homes(ctx.homeId)?.units ?? 'C';
+
 export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput, ctx: ToolContext): Promise<Result<Plan, ErrorEnvelope>> {
   const loaded = await loadInputs(deps, ctx);
   if (!loaded.ok) return loaded;
@@ -105,6 +113,13 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   if (!snapshot.gridAvailable) {
     const eps = epsBaseLoadW(profile);
     if (!eps.ok) return eps;
+  }
+  // Inputs are always °C (#306 review): in a °F sandbox a setpoint no room is ever cooled or heated to is a °F number
+  // the model did not convert. Refused with the °C to send, never planned at 161.6 °F.
+  if (input.setpointC !== undefined && input.setpointC > FAHRENHEIT_LOOKING_ABOVE_C && unitOf(deps, ctx) === 'F') {
+    const said = String(input.setpointC);
+    const inC = String(Math.round(((input.setpointC - 32) / 1.8) * 10) / 10);
+    return err(toolError('invalid_input', `Temperatures are sent in Celsius: ${said} looks like °F. ${said} °F is ${inC} °C: send setpointC ${inC}.`, { details: { field: 'setpointC' } }));
   }
   const unknown = input.roomIds?.find((id) => !profile.rooms.some((r) => r.id === id));
   if (unknown !== undefined) {
@@ -126,6 +141,8 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     model: deps.model,
     config: deps.guard,
     nightRecoveryMode,
+    // The guard's words in the unit the sandbox chose (#306); it computes in °C either way.
+    displayUnit: unitOf(deps, ctx),
   };
   const overridden = input.setpointC !== undefined || input.roomIds !== undefined;
   // Every candidate tried, for the last resort.
@@ -188,7 +205,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   // answer, saved and applicable, with a short note of the refusal. Never only a refusal when a plan holds.
   let refusedProposal: { code: ErrorEnvelope['code']; message: string } | undefined;
   if (chosen === undefined && overridden && last !== undefined) {
-    const refusal = rejectionOf(last.verdict);
+    const refusal = rejectionOf(last.verdict, guardInput.displayUnit);
     const holds = refusal === undefined ? undefined : firstPassing(deps, guardInput, ladder);
     if (refusal !== undefined && holds !== undefined) {
       // The guard's no to the proposal stays in the audit trail.
@@ -198,7 +215,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     }
   }
   if (chosen === undefined) {
-    const refused = last === undefined ? undefined : rejectionOf(last.verdict);
+    const refused = last === undefined ? undefined : rejectionOf(last.verdict, guardInput.displayUnit);
     // The receipt's badge and its "simulated data" notice (#198 review): the data origin, and the real home as a
     // flag, never a home id (a sandbox id stays out of tool output).
     // A refused proposal when only the last resort is left: the model asks again with only the goal, so the
@@ -241,7 +258,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     sourceOrigin: snapshot.origin,
     advisoryOnly: loaded.value.home.readOnly,
     ...(chosen.verdict.nightRecovery === undefined ? {} : { nightRecovery: chosen.verdict.nightRecovery }),
-    ...(warningsOf(chosen, safest, roomName).length === 0 ? {} : { warnings: warningsOf(chosen, safest, roomName) }),
+    ...(warningsOf(chosen, safest, roomName, unitOf(deps, ctx)).length === 0 ? {} : { warnings: warningsOf(chosen, safest, roomName, unitOf(deps, ctx)) }),
     ...(safest === undefined ? {} : { lastResort: safest.lastResort }),
     ...(refusedProposal === undefined ? {} : { refusedProposal }),
     ...(ctx.turnId === undefined ? {} : { proposedInTurn: ctx.turnId }),
@@ -339,7 +356,7 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
   const safeUntilIso = localIso(best.untilMs, profile.location.tz);
   const room = profile.rooms.find((r) => r.id === preferences.safeRoomId)?.name ?? preferences.safeRoomId;
   const limitThen = safeRoomLimitKindAt(guardInput)(best.untilMs);
-  const then = lastResortThen({ limitedBy, season, limitThenC: limitThen.limitC, limitKind: limitThen.kind, ...preferences.safety });
+  const then = lastResortThen({ limitedBy, season, limitThenC: limitThen.limitC, limitKind: limitThen.kind, ...preferences.safety, unit: guardInput.displayUnit ?? 'C' });
   // The honest window (#160): from safeUntil, how far past the limit in force the room goes and by when; the
   // summary says it (the warning keeps its 300 characters for the reason).
   const window = lastResortWindow(best.points, { untilMs: best.untilMs, roomId: preferences.safeRoomId, season, limitAt });
@@ -375,21 +392,21 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
  * Only when the room crosses the night threshold itself (or never crosses it); the heat-budget variant (the hours
  * are reached) and a crossing of another limit keep the guard's words (#272 review).
  */
-export function alignedNightWarning(w: PlanWarning, lr: Plan['lastResort'], night: NightRecovery | undefined, roomName: string): PlanWarning {
+export function alignedNightWarning(w: PlanWarning, lr: Plan['lastResort'], night: NightRecovery | undefined, roomName: string, unit: TempUnit = 'C'): PlanWarning {
   if (w.code !== 'night_recovery_infeasible' || lr?.limitedBy !== 'battery' || night === undefined) return w;
   if (night.achievedHours >= night.requiredHours) return w;
   let until: string;
   if (lr.limitCrossedAt !== undefined && lr.limitCrossedC === night.thresholdC) until = `about ${localTimeText(lr.limitCrossedAt)}`;
   else if (lr.limitCrossedAt === undefined && lr.worstAt === undefined) until = 'the next recharge';
   else return w;
-  return { code: w.code, message: `Tonight the ${roomName} stays at or below ${String(night.thresholdC)} °C until ${until}, then it warms up.`.slice(0, 300) };
+  return { code: w.code, message: `Tonight the ${roomName} stays at or below ${formatTemp(night.thresholdC, unit)} until ${until}, then it warms up.`.slice(0, 300) };
 }
 
 /** The plan's warnings: the night warning aligned with a last resort, and "no heat danger" never next to it (#285 review). */
-function warningsOf(chosen: Attempt, safest: LastResort | undefined, roomName: string): PlanWarning[] {
+function warningsOf(chosen: Attempt, safest: LastResort | undefined, roomName: string, unit: TempUnit): PlanWarning[] {
   const night = chosen.verdict.nightRecovery;
   const own = safest === undefined ? chosen.verdict.warnings : chosen.verdict.warnings.filter((w) => w.code !== 'humid_air');
-  return [...own.map((w) => alignedNightWarning(w, safest?.lastResort, night, roomName)), ...(safest === undefined ? [] : [safest.warning])];
+  return [...own.map((w) => alignedNightWarning(w, safest?.lastResort, night, roomName, unit)), ...(safest === undefined ? [] : [safest.warning])];
 }
 
 function withOverrides(rung: LevelStep, input: PlanComfortInput): LevelStep {

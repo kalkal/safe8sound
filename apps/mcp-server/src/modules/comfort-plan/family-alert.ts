@@ -1,4 +1,4 @@
-import { epochMs, toolError, type ErrorEnvelope, type HomeProfile, type Plan, type Preferences, type Snapshot } from '@cold-reserve/contracts';
+import { epochMs, toolError, type ErrorEnvelope, type HomeProfile, type Plan, type Preferences, type Snapshot, type TempUnit } from '@cold-reserve/contracts';
 import type { Notifier } from '@cold-reserve/core';
 import { stormMessage, type Locale } from '@cold-reserve/i18n';
 
@@ -20,7 +20,7 @@ export const alertLocaleOf = (language: string): Locale => ALERT_LOCALES.find((l
 
 export async function alertFamily(
   notifier: Notifier,
-  input: { readonly plan: Plan; readonly profile: HomeProfile; readonly preferences: Preferences; readonly snapshot: Snapshot; readonly nowMs: number },
+  input: { readonly plan: Plan; readonly profile: HomeProfile; readonly preferences: Preferences; readonly snapshot: Snapshot; readonly nowMs: number; readonly unit?: TempUnit },
 ): Promise<AlertOutcome> {
   const { plan, profile, preferences, snapshot } = input;
   if (plan.lastResort === undefined) return { sent: 0, failed: 0 };
@@ -33,6 +33,8 @@ export async function alertFamily(
   const fields = {
     roomName: profile.rooms.find((r) => r.id === roomId)?.name ?? roomId,
     tempC,
+    // The family reads the unit the sandbox chose (#306).
+    unit: input.unit ?? 'C',
     atMs: input.nowMs,
     safeUntilMs: epochMs(plan.lastResort.safeUntil),
     timeZone: profile.location.tz,

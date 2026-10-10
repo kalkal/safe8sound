@@ -106,6 +106,18 @@ describe('updatePreferences', () => {
     ]);
   });
 
+  it('in a °F sandbox the refusals say °F with the °C to send in brackets; the details stay in °C (#306 review)', () => {
+    const f = { ...ctx, unit: 'F' as const };
+    const setpoint = updatePreferences(current(), { comfortC: { cooling: 29 } }, f);
+    expect(setpoint).toMatchObject({ ok: false, error: { code: 'invalid_setpoint', message: 'comfortC.cooling must stay within the safety threshold (80.6 °F (27 C)).', details: { limit: 27, unit: 'C' } } });
+    const range = updatePreferences(current(), { safety: { cooling: { maxC: 35 } } }, f);
+    expect(range).toMatchObject({ ok: false, error: { code: 'safety_threshold_out_of_range', details: { field: 'safety.cooling.maxC', unit: 'C' } } });
+    expect(!range.ok && range.error.message).toMatch(/^safety\.cooling\.maxC must stay between \d+(\.\d)? °F \(\d+ C\) and \d+(\.\d)? °F \(\d+ C\)\.$/);
+    // A percentage stays a percentage.
+    const rh = updatePreferences(current(), { safety: { humidity: { maxPct: 99 } } }, f);
+    expect(!rh.ok && rh.error.message).toMatch(/ %\.$/);
+  });
+
   it('refuses a comfort setpoint outside the safety thresholds of its season', () => {
     expect(updatePreferences(current(), { comfortC: { cooling: 29 } }, ctx)).toMatchObject({
       ok: false,

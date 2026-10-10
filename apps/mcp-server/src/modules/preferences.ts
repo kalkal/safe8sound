@@ -3,11 +3,13 @@ import {
   SetPreferencesInputSchema,
   SetPreferencesOutputSchema,
   effectiveHeatSafety,
+  formatTempForInput,
   ok,
   toPublicPreferences,
   type HomeId,
   type Preferences,
   type SafetyHardLimits,
+  type TempUnit,
 } from '@cold-reserve/contracts';
 import { updatePreferences, type Clock, type StateStoreFactory } from '@cold-reserve/core';
 import { z } from 'zod';
@@ -32,7 +34,14 @@ export interface PreferencesModuleDeps {
   readonly clock: Clock;
   /** A home's own scenario clock (C2b): a change is stamped at that home's time; without one, `clock`. */
   readonly clockFor?: (homeId: HomeId) => Clock | undefined;
+  /** The home's temperature unit for the texts (#306); °C when unset. The tools still take °C. */
+  readonly unitsFor?: (homeId: HomeId) => TempUnit;
 }
+
+/** A changed field holds a temperature when one of its path segments is a °C value (comfortC, maxC, heatIndexCapC…). */
+const isTemperatureField = (field: string): boolean => field.split('.').some((part) => /C$/.test(part));
+const changeValue = (field: string, value: unknown, unit: TempUnit): string =>
+  typeof value === 'number' && isTemperatureField(field) && unit === 'F' ? formatTempForInput(value, unit) : String(value);
 
 // set_preferences overwrites safety thresholds: marked destructive, so the host asks for confirmation.
 // That host prompt is the one gate a prompt injection cannot bypass.
@@ -59,10 +68,11 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
       const name = deps.roomNameFor?.(ctx.homeId, id);
       // The safe room's limits as the guard plays them (#266 review): the maximum, the toggle and both caps.
       const heat = effectiveHeatSafety(o.preferences.safety);
+      const unit = deps.unitsFor?.(ctx.homeId) ?? 'C';
       const limits =
-        `Safe room limits: at most ${String(o.preferences.safety.cooling.maxC)} C, the stricter night limit ${heat.stricterNightLimit ? 'on' : 'off'}, ` +
-        `a heat-index cap of ${String(heat.heatIndexCapC)} C, an older-person cap of ${String(heat.elderlyCapC)} C.`;
-      return `${o.isDefault ? 'Default' : 'Saved'} preferences: cool to ${String(o.preferences.comfortC.cooling)} C, safe room ${name === undefined ? id : `${name} (${id})`}. ${limits}`;
+        `Safe room limits: at most ${formatTempForInput(o.preferences.safety.cooling.maxC, unit)}, the stricter night limit ${heat.stricterNightLimit ? 'on' : 'off'}, ` +
+        `a heat-index cap of ${formatTempForInput(heat.heatIndexCapC, unit)}, an older-person cap of ${formatTempForInput(heat.elderlyCapC, unit)}.`;
+      return `${o.isDefault ? 'Default' : 'Saved'} preferences: cool to ${formatTempForInput(o.preferences.comfortC.cooling, unit)}, safe room ${name === undefined ? id : `${name} (${id})`}. ${limits}`;
     },
     handler: async (_args, ctx) => {
       const read = await current(ctx.homeId);
@@ -80,7 +90,11 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
     input: SetPreferencesInputSchema,
     output: SetPreferencesOutputSchema,
     // Every value in the text: the model only sees the text (repo rule on tool summaries).
-    summarize: (o) => (o.changes.length === 0 ? 'Nothing changed.' : `Saved: ${o.changes.map((c) => `${c.field} from ${String(c.from)} to ${String(c.to)}`).join(', ')}.`),
+    summarize: (o, ctx) => {
+      if (o.changes.length === 0) return 'Nothing changed.';
+      const unit = deps.unitsFor?.(ctx.homeId) ?? 'C';
+      return `Saved: ${o.changes.map((c) => `${c.field} from ${changeValue(c.field, c.from, unit)} to ${changeValue(c.field, c.to, unit)}`).join(', ')}.`;
+    },
     handler: async (args, ctx) => {
       const read = await current(ctx.homeId);
       if (!read.ok) return read;
@@ -93,6 +107,8 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
         by: 'user',
         // The model passed confirmed: true after the host prompt; the log says so, not more.
         confirmedVia: 'tool',
+        // Its refusals said in the sandbox's unit, with the °C to send (#306 review).
+        unit: deps.unitsFor?.(ctx.homeId) ?? 'C',
       });
       if (!next.ok) return next;
       const saved = await deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId }).putPreferences(next.value.preferences, next.value.changes);

@@ -1,10 +1,20 @@
-import { DATA_GROUPS, epochMs, isFullyLive, type ApplyPlanOutput, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
+import { DATA_GROUPS, epochMs, formatTemp, isFullyLive, tempGap, type ApplyPlanOutput, type TempUnit, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
 import { localIso, localTimeText } from '@cold-reserve/core';
 
 // The text content of each tool result. The agent (Strands) reads only this text, not structuredContent
 // (F7 finding): every number and fact the model may say is here. The JSON is for the cards and clients.
 
 const one = (x: number) => x.toFixed(1);
+
+// Temperatures in the unit the sandbox chose (#306): computed in °C, written with the shared helper of the cards.
+const deg = (c: number, unit: TempUnit) => formatTemp(c, unit);
+/** A heat-index degree-hour amount (a sum of differences, not an absolute): × 1.8 in °F, to one decimal. */
+const degreeHours = (dh: number, unit: TempUnit) => (unit === 'F' ? Math.round(dh * 18) / 10 : dh);
+/** An amount against that budget: in °F rounded up to the tenth, never said as equal to a budget it passes (#306 review). */
+const heatAmount = (dh: number, unit: TempUnit) => (unit === 'F' ? Math.ceil(Math.round(dh * 18 * 1e6) / 1e6) / 10 : dh);
+const degreeHoursLabel = (unit: TempUnit) => (unit === 'F' ? 'heat-index °F-hours' : 'heat-index degree-hours');
+/** The NWS heat-index threshold the night's heat budget counts above (26.7 °C, 80 °F). */
+const HEAT_BUDGET_FROM_C = 26.7;
 
 /** "live data", or which groups are simulated (simulated data is never presented as real, plan §9.4). */
 function dataText(o: DataOrigin): string {
@@ -15,12 +25,12 @@ function dataText(o: DataOrigin): string {
 
 /** Each room's first setting in the plan, in time order. */
 /** What the plan does in each room, by room label (CE-13): never an internal id. */
-function roomSettings(p: Plan, names: Readonly<Record<string, string>> | undefined): string {
+function roomSettings(p: Plan, names: Readonly<Record<string, string>> | undefined, unit: TempUnit): string {
   const first = new Map<string, Plan['steps'][number]>();
   for (const s of [...p.steps].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))) if (!first.has(s.roomId)) first.set(s.roomId, s);
   if (first.size === 0) return 'no room is run';
   return [...first.values()]
-    .map((s) => `${names?.[s.roomId] ?? 'a room'}: ${s.hvacMode === 'off' ? 'off' : `${s.hvacMode} at ${String(s.setpointC)} °C`}${s.fanOn ? ', fan on' : ''}`)
+    .map((s) => `${names?.[s.roomId] ?? 'a room'}: ${s.hvacMode === 'off' ? 'off' : `${s.hvacMode} at ${deg(s.setpointC, unit)}`}${s.fanOn ? ', fan on' : ''}`)
     .join('; ');
 }
 
@@ -31,9 +41,9 @@ function rungText(r: LevelStep): string {
 }
 
 /** One scenario of the counterfactual; without its night hours when the text already says one end time (#299). */
-function lineText(l: CounterfactualLine, timeZone: string, nightHours: boolean): string {
+function lineText(l: CounterfactualLine, timeZone: string, nightHours: boolean, unit: TempUnit): string {
   const night = nightHours ? `, ${one(l.hoursAtOrBelowThreshold)} night hours at or below the threshold` : '';
-  return `${String(l.peakTempC)} °C at ${localTimeText(localIso(Date.parse(l.peakAt), timeZone))} (${one(l.heatIndexDegreeHours)} heat-index degree-hours${night})`;
+  return `${deg(l.peakTempC, unit)} at ${localTimeText(localIso(Date.parse(l.peakAt), timeZone))} (${one(degreeHours(l.heatIndexDegreeHours, unit))} ${degreeHoursLabel(unit)}${night})`;
 }
 
 /** What the plan text needs besides the plan: the night window (guard config). */
@@ -46,6 +56,8 @@ export interface PlanSummaryOptions {
   readonly timeZone: string;
   /** Room labels by id, for the sentences a person hears (CE-13): never an internal id. */
   readonly roomNames?: Readonly<Record<string, string>>;
+  /** The temperature unit the sandbox chose (#306); °C when unset. */
+  readonly unit?: TempUnit;
 }
 
 const SURPLUS_REASON = { safe_room: 'safe room', occupied: 'occupied', occupied_tonight: 'slept in tonight' } as const;
@@ -53,12 +65,21 @@ const SURPLUS_REASON = { safe_room: 'safe room', occupied: 'occupied', occupied_
 /** Where the solar surplus went (#203), in order, by room name, with every number (F7): the scene reads alone. */
 function surplusText(s: NonNullable<Plan['surplus']>, opts: PlanSummaryOptions): string {
   // Owner feedback: the room now against the comfort, then the setpoint ("cooled to 23 °C · 6.9 °C above target" was not understood).
+  const unit = opts.unit ?? 'C';
   const rooms = s.rooms.map((r, i) => {
     const name = opts.roomNames?.[r.roomId] ?? 'a room';
     const side = r.aboveTargetK >= 0 ? 'above' : 'below';
-    const delta = `${Math.abs(r.aboveTargetK).toFixed(1)} °C ${side}`;
-    const versus = s.comfortC === undefined ? `${delta} comfort` : `now ${(s.comfortC + r.aboveTargetK).toFixed(1)} °C, ${delta} the ${s.comfortC.toFixed(1)} °C comfort`;
-    return `${String(i + 1)}) ${name} (${SURPLUS_REASON[r.reason]}), ${versus}, cooling to ${String(r.setpointC)} °C`;
+    // With the comfort known, the gap comes from the rounded absolutes, so now − comfort adds up (#306); without it,
+    // the gap alone (× 1.8 in °F).
+    let versus: string;
+    if (s.comfortC === undefined) {
+      const gap = unit === 'F' ? Math.round(Math.abs(r.aboveTargetK) * 18) / 10 : Math.abs(r.aboveTargetK);
+      versus = `${gap.toFixed(1)} °${unit} ${side} comfort`;
+    } else {
+      const g = tempGap(s.comfortC + r.aboveTargetK, s.comfortC, unit);
+      versus = `now ${g.now.toFixed(1)} °${unit}, ${g.gap.toFixed(1)} °${unit} ${side} the ${g.ref.toFixed(1)} °${unit} comfort`;
+    }
+    return `${String(i + 1)}) ${name} (${SURPLUS_REASON[r.reason]}), ${versus}, cooling to ${deg(r.setpointC, unit)}`;
   });
   return (
     `Solar surplus from ${localTimeText(s.from)} to ${localTimeText(s.to)}: ${s.keptKWh.toFixed(1)} kWh kept at home instead of exported to the grid. ` +
@@ -89,18 +110,19 @@ function windowText(lr: NonNullable<Plan['lastResort']>, opts: PlanSummaryOption
   const by = localTimeText(lr.worstAt);
   // The worst point is the end of the safe hours itself: "at" that time, never "up to … by" it.
   const atEnd = epochMs(lr.worstAt) === epochMs(lr.safeUntil);
-  const temp = `${String(lr.worstC)} °C`;
+  const unit = opts.unit ?? 'C';
+  const temp = deg(lr.worstC, unit);
   // The limit came down at safeUntil with the room above it (decided by plan_comfort from the data, #166).
   if (lr.loweredLimitC !== undefined) {
-    const head = `From ${until} the limit is ${String(lr.loweredLimitC)} °C and the safe room is above it`;
+    const head = `From ${until} the limit is ${deg(lr.loweredLimitC, unit)} and the safe room is above it`;
     return atEnd ? `${head}: at ${until} it is at ${temp}.` : `${head}, up to ${temp} by ${by}.`;
   }
-  const limit = `${String(lr.comfortLimitC)} °C${!heating && inNight(wallHour(lr.worstAt), opts) ? ' night' : ''} limit`;
+  const limit = `${deg(lr.comfortLimitC, unit)}${!heating && inNight(wallHour(lr.worstAt), opts) ? ' night' : ''} limit`;
   // Both times in one sentence and no duration (#272): the battery runs out, the room holds the limit in force where
   // it crosses it (#272 review), then warms.
   if (lr.limitedBy === 'battery' && lr.limitCrossedAt !== undefined && !heating) {
     const crossedC = lr.limitCrossedC ?? lr.comfortLimitC;
-    const crossedLimit = `${String(crossedC)} °C${inNight(wallHour(lr.limitCrossedAt), opts) ? ' night' : ''} limit`;
+    const crossedLimit = `${deg(crossedC, unit)}${inNight(wallHour(lr.limitCrossedAt), opts) ? ' night' : ''} limit`;
     return `The battery lasts until ${until}; the safe room stays at or below its ${crossedLimit} until about ${localTimeText(lr.limitCrossedAt)}, then warms up to ${temp} by ${by}.`;
   }
   const then = atEnd
@@ -126,7 +148,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   const parts = [
     ...refused,
     `${head} (${commanded}), built on ${dataText(p.sourceOrigin)}.`,
-    `What it does: ${roomSettings(p, opts.roomNames)}.`,
+    `What it does: ${roomSettings(p, opts.roomNames, opts.unit ?? 'C')}.`,
     ...(p.surplus === undefined ? [] : [surplusText(p.surplus, opts)]),
     `Confirming it also allows these steps down if the battery falls behind: ${p.ladder.map(rungText).join('; ')}.`,
     `Guarantees: ${p.guarantees.map((g) => `${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`).join(' ')}`,
@@ -144,9 +166,9 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
     // (grace minutes counted) stay in the structured counterfactual for the card.
     const nightHours = lr?.limitCrossedAt === undefined;
     parts.push(
-      `Without the plan the safe room${opts.roomNames?.[c.roomId] === undefined ? ` (${c.roomId})` : `, ${opts.roomNames[c.roomId]} (${c.roomId}),`} would peak at ${lineText(noPlan, opts.timeZone, nightHours)}; ` +
-        `with the naive plan (air conditioning until the battery dies) at ${lineText(naive, opts.timeZone, nightHours)}; ` +
-        `with this plan at ${lineText(plan, opts.timeZone, nightHours)}.`,
+      `Without the plan the safe room${opts.roomNames?.[c.roomId] === undefined ? ` (${c.roomId})` : `, ${opts.roomNames[c.roomId]} (${c.roomId}),`} would peak at ${lineText(noPlan, opts.timeZone, nightHours, opts.unit ?? 'C')}; ` +
+        `with the naive plan (air conditioning until the battery dies) at ${lineText(naive, opts.timeZone, nightHours, opts.unit ?? 'C')}; ` +
+        `with this plan at ${lineText(plan, opts.timeZone, nightHours, opts.unit ?? 'C')}.`,
     );
   }
   const window = p.lastResort === undefined ? undefined : windowText(p.lastResort, opts, p.horizonAt);
@@ -177,12 +199,15 @@ function nightText(n: NonNullable<Plan['nightRecovery']>, opts: PlanSummaryOptio
   if (n.requiredHours === 0 && n.status === 'met' && coveredHours < opts.nightWindowHours) {
     return `${head} not assessable yet: the plan covers only ${String(coveredHours)} of the ${String(opts.nightWindowHours)} night hours.`;
   }
-  const heat = `the heat would reach ${String(n.heatIndexDegreeHoursAbove26_7)} heat-index degree-hours above 26.7 °C, over the ${String(n.budgetDegreeHours)} allowed`;
+  const unit = opts.unit ?? 'C';
+  const heat =
+    `the heat would reach ${String(heatAmount(n.heatIndexDegreeHoursAbove26_7, unit))} ${degreeHoursLabel(unit)} above ${deg(HEAT_BUDGET_FROM_C, unit)}, ` +
+    `over the ${String(degreeHours(n.budgetDegreeHours, unit))} allowed`;
   const overBudget = n.heatIndexDegreeHoursAbove26_7 > n.budgetDegreeHours;
   // With no hour required, only the heat budget can fail: say that, not "0.5 of 0 hours".
   if (n.requiredHours === 0 && n.status !== 'met') return `${head} ${n.status}: ${heat}.`;
   const best = n.bestAchievableHours === undefined ? '' : `, best achievable ${String(n.bestAchievableHours)} hours`;
-  const hours = `${String(n.achievedHours)} of ${String(n.requiredHours)} hours at or below ${String(n.thresholdC)} °C${best}`;
+  const hours = `${String(n.achievedHours)} of ${String(n.requiredHours)} hours at or below ${deg(n.thresholdC, unit)}${best}`;
   return `${head} ${n.status}: ${hours}${overBudget ? `, and ${heat}` : ''}.`;
 }
 

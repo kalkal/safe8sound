@@ -41,7 +41,7 @@ describe('withHousehold', () => {
 describe('refreshFrom: one settings read per request (C2b)', () => {
   const A = HomeIdSchema.parse('demo#00000000000000aa');
   const settings = SandboxSettingsSchema.parse({ version: 2, updatedAt: '2026-10-04T10:00:00Z', scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' });
-  const play = (version?: number): SandboxPlay => ({ entry: {} as SandboxPlay['entry'], forecast: () => ({}) as ReturnType<SandboxPlay['forecast']>, ...(version === undefined ? {} : { version }) });
+  const play = (version?: number): SandboxPlay => ({ entry: {} as SandboxPlay['entry'], forecast: () => ({}) as ReturnType<SandboxPlay['forecast']>, units: 'C', ...(version === undefined ? {} : { version }) });
   const storeWith = (read: Awaited<ReturnType<StateStore['getSandboxSettings']>>): StateStoreFactory => () => ({ getSandboxSettings: () => Promise.resolve(read) }) as unknown as StateStore;
 
   it('keeps the sandbox when the version is the one played, and rebuilds it on a new one', async () => {

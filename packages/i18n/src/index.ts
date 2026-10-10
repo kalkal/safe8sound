@@ -1,4 +1,4 @@
-import { err, ok, type LastResortAction, type Result, type SendableTransition, type StormMessageText } from '@cold-reserve/contracts';
+import { err, formatTemp, formatTempFixed, ok, type LastResortAction, type TempUnit, type Result, type SendableTransition, type StormMessageText } from '@cold-reserve/contracts';
 import { enUS, type MessageKey } from './en-US.js';
 import { itIT } from './it-IT.js';
 
@@ -59,6 +59,8 @@ export interface StormMessageFields {
   /** Name of the configured safe room (from the home profile). */
   readonly roomName: string;
   readonly tempC: number;
+  /** The temperature unit the family reads (the sandbox's choice, #306); °C when unset. */
+  readonly unit?: TempUnit;
   /** When the message is sent (epoch ms). */
   readonly atMs: number;
   /** Until when the safe room is covered (epoch ms); needed by the messages that quote it. */
@@ -76,7 +78,7 @@ function renderStorm(locale: Locale, transition: SendableTransition, addressee: 
   return format(locale, STORM_KEYS[transition], {
     name: addressee,
     room: fields.roomName,
-    tempC: fields.tempC.toFixed(1),
+    temp: formatTempFixed(fields.tempC, fields.unit ?? 'C'),
     at: clockTime(locale, fields.atMs, fields.timeZone),
     ...(fields.safeUntilMs === undefined ? {} : { safeUntil: clockTime(locale, fields.safeUntilMs, fields.timeZone) }),
     ...(fields.powerBackAtMs === undefined ? {} : { powerBackAt: clockTime(locale, fields.powerBackAtMs, fields.timeZone) }),
@@ -122,8 +124,9 @@ export interface LastResortAdvice {
   readonly notMedical: string;
 }
 
-export function lastResortAdvice(locale: Locale, actions: readonly LastResortAction[]): LastResortAdvice {
-  const text = (key: MessageKey): string => CATALOGS[locale][key];
+export function lastResortAdvice(locale: Locale, actions: readonly LastResortAction[], unit: TempUnit = 'C'): LastResortAdvice {
+  // The fan rule is 35 °C, said in the unit the person chose (#306).
+  const text = (key: MessageKey): string => CATALOGS[locale][key].replace('{fanMax}', formatTemp(35, unit));
   return {
     title: text('lastResort.title'),
     actions: actions.map((a) => text(`lastResort.action.${a}`)),

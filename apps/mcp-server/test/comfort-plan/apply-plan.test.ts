@@ -136,6 +136,10 @@ describe('apply_plan (two-phase: confirm)', () => {
     const r = await applyPlan(w.deps, { planId: plan.id }, w.ctx);
     expect(r.ok && r.value.advisoryOnly).toBe(true);
     expect(r.ok && r.value.manualInstructions[0]?.text).toMatch(/^Bedroom: (cool|dry) at \d+(\.\d)? °C/);
+    // The steps by hand follow the unit of the home's texts too (#306), the card shows them as they are.
+    const f = world('heatwave', 14, { homeId: REAL, readOnly: true, units: 'F', snapshot: (s) => ({ ...s, origin: live }) });
+    const fr = await applyPlan(f.deps, { planId: (await proposed(f)).id }, f.ctx);
+    expect(fr.ok && fr.value.manualInstructions[0]?.text).toMatch(/^Bedroom: (cool|dry) at \d+(\.\d)? °F/);
   });
 
   it('refuses a plan the guard rejects on the current state, and records the rejection', async () => {
@@ -358,6 +362,16 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
       expect(applied.ok && applied.value.status).toBe('applied');
       await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
       expect(await w.inbox()).toHaveLength(1);
+    });
+
+    it('in the unit the sandbox chose: a °F sandbox alerts the family in °F (#306)', async () => {
+      const w = stormAt(30, { units: 'F' });
+      const plan = await lastResort(w);
+      const { token } = await firstYes(w, plan);
+      await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+      const text = (await w.inbox())[0]?.text ?? '';
+      expect(text).toMatch(/is at \d+\.\d °F/);
+      expect(text).not.toContain('°C');
     });
 
     it('on the real home too: the alert is a message, not a command to the home, and the person hears it went out', async () => {

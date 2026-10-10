@@ -100,18 +100,18 @@ export const enUS = {
   'config.invalid': 'The simulator is not configured correctly. Check its settings and reload the page.',
   // Family messages in storm mode, Mileti style: source, hazard, place, status, time, what to do.
   'storm.started':
-    '{product} alert for {name}: a storm cut the power at home. {room} is at {tempC} °C and the battery keeps it safe until {safeUntil}. No action is needed now. Next message: when the level changes or power returns.',
+    '{product} alert for {name}: a storm cut the power at home. {room} is at {temp} and the battery keeps it safe until {safeUntil}. No action is needed now. Next message: when the level changes or power returns.',
   'storm.essential':
-    '{product} update for {name}: to keep {room} safe until {safeUntil}, the battery switched to essential mode. {room} is at {tempC} °C. No action is needed now. Next message: when the level changes or power returns.',
-  'storm.powerBack': '{product} update for {name}: power came back at home at {powerBackAt}. {room} is at {tempC} °C. Storm mode has ended. No action is needed.',
+    '{product} update for {name}: to keep {room} safe until {safeUntil}, the battery switched to essential mode. {room} is at {temp}. No action is needed now. Next message: when the level changes or power returns.',
+  'storm.powerBack': '{product} update for {name}: power came back at home at {powerBackAt}. {room} is at {temp}. Storm mode has ended. No action is needed.',
   // Sent by the server when a last-resort plan is applied (#160): the fixed "battery low, check on them" alert.
   'storm.lastResort':
-    '{product} alert for {name}: the home battery is low. {room} is at {tempC} °C and stays within its limits until {safeUntil}, then gets warmer. Please check on them.',
+    '{product} alert for {name}: the home battery is low. {room} is at {temp} and stays within its limits until {safeUntil}, then gets warmer. Please check on them.',
   // The last-resort card (#160): zero-energy actions and heat-illness signs, from docs/heat-advice.md.
   'lastResort.title': 'Keep cool without power',
   'lastResort.action.close_curtains': 'Close the curtains on the sunny side.',
   'lastResort.action.drink_water': 'Drink water often, even without thirst.',
-  'lastResort.action.fan_below_35c': 'Use a fan only while the room is below 35 °C.',
+  'lastResort.action.fan_below_35c': 'Use a fan only while the room is below {fanMax}.',
   'lastResort.signsTitle': 'Signs of heat stroke',
   'lastResort.sign.confusion': 'Confusion or lack of coordination',
   'lastResort.sign.hotSkin': 'Hot skin that is not sweating',

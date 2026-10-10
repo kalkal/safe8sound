@@ -19,7 +19,9 @@ type LimitInput = Pick<GuardInput, 'preferences' | 'profile' | 'config' | 'seaso
  * The safe room's temperature limit at an instant and what sets it: when cooling, the lowest of the maximum, the
  * night limit in the night window, and the caps the person set stricter (#266 review: the older-person cap with an
  * older person, the heat-index cap as an air target for everyone), so the hold, its safe hours and the last resort
- * never aim above a cap. With the default caps (31 °C, 32.2 °C) nothing changes. When heating, the minimum.
+ * never aim the air above a cap. In humid air the heat index can pass its cap below that air target: the guard and
+ * safe-until still refuse or end the hours there, the hold just does not aim lower for it. With the default caps
+ * (31 °C, 32.2 °C) nothing changes. When heating, the minimum.
  */
 export function safeRoomLimitKindAt(input: LimitInput): (ms: number) => { limitC: number; kind: SafeRoomLimitKind } {
   const { preferences, profile, config, season, nightRecoveryMode } = input;

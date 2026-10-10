@@ -1,4 +1,4 @@
-import { LAST_RESORT_ACTIONS, type LastResortAction, type Season } from '@cold-reserve/contracts';
+import { LAST_RESORT_ACTIONS, formatTemp, type LastResortAction, type Season, type TempUnit } from '@cold-reserve/contracts';
 import type { SafeRoomLimitKind } from '@cold-reserve/guard';
 
 // The honest window of a last resort (#160): from safeUntil on, how far past its limit the safe room goes and
@@ -103,13 +103,16 @@ export function lastResortThen(o: {
   cooling: { maxC: number };
   heating: { minC: number };
   humidity: { minPct: number };
+  /** The unit of the words (#306); °C when unset. */
+  unit?: TempUnit;
 }): string {
+  const t = (c: number) => formatTemp(c, o.unit ?? 'C');
   if (o.limitedBy === 'battery') return 'the battery runs out';
   if (o.limitedBy === 'humidity') return `the humidity drops under its ${String(o.humidity.minPct)} % minimum`;
-  if (o.season === 'heating') return `the room drops below its ${String(o.heating.minC)} °C minimum`;
-  if (o.limitKind === 'older_person_cap') return `the room goes above ${String(o.limitThenC)} °C, the cap set for an older person`;
-  if (o.limitKind === 'heat_index_cap') return `the room goes above, or feels hotter than, ${String(o.limitThenC)} °C, the heat-index cap set for this home`;
+  if (o.season === 'heating') return `the room drops below its ${t(o.heating.minC)} minimum`;
+  if (o.limitKind === 'older_person_cap') return `the room goes above ${t(o.limitThenC)}, the cap set for an older person`;
+  if (o.limitKind === 'heat_index_cap') return `the room goes above, or feels hotter than, ${t(o.limitThenC)}, the heat-index cap set for this home`;
   return o.limitThenC < o.cooling.maxC
-    ? `the room goes above, or feels hotter than, ${String(o.limitThenC)} °C, the night limit`
-    : `the room goes above, or feels hotter than, its ${String(o.cooling.maxC)} °C maximum`;
+    ? `the room goes above, or feels hotter than, ${t(o.limitThenC)}, the night limit`
+    : `the room goes above, or feels hotter than, its ${t(o.cooling.maxC)} maximum`;
 }

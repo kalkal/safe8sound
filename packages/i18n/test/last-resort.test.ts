@@ -17,6 +17,11 @@ describe('last-resort advice', () => {
     expect(lastResortAdvice('en-US', ['fan_below_35c']).actions[0]).toContain('35 °C');
   });
 
+  it('the fan line in the unit the sandbox chose: 35 °C is 95 °F (#306)', () => {
+    expect(lastResortAdvice('en-US', ['fan_below_35c'], 'F').actions[0]).toBe('Use a fan only while the room is below 95 °F.');
+    expect(lastResortAdvice('it-IT', ['fan_below_35c'], 'F').actions[0]).toBe('Usa un ventilatore solo finché la stanza è sotto i 95 °F.');
+  });
+
   it('always gives the heat-stroke signs and says to call 112 when worried', () => {
     const advice = lastResortAdvice('en-US', []);
     expect(advice.signs.length).toBeGreaterThanOrEqual(4);

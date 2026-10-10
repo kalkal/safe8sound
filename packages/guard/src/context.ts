@@ -9,6 +9,7 @@ import {
   type Preferences,
   type Season,
   type Snapshot,
+  type TempUnit,
 } from '@cold-reserve/contracts';
 import {
   acLimitW,
@@ -44,6 +45,8 @@ export interface GuardInput {
   readonly model: SimParams;
   readonly config: GuardConfig;
   readonly nightRecoveryMode: NightRecoveryMode;
+  /** The unit of the guard's words (#306): it computes in °C either way. °C when unset. */
+  readonly displayUnit?: TempUnit;
 }
 
 /** Everything the constraints read, computed once. */

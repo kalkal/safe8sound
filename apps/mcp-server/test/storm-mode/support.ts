@@ -48,6 +48,8 @@ export interface WorldOptions {
   readonly snapshot?: (s: Snapshot) => Snapshot;
   /** Changes the demo home (the simulator and the module see the same profile). */
   readonly profile?: (p: HomeProfile) => HomeProfile;
+  /** The temperature unit the sandbox chose (#306). */
+  readonly units?: 'C' | 'F';
 }
 
 /** The storm-blackout scenario at hour `atH` (the grid is down from 3 to 18.5), with every dependency. */
@@ -70,7 +72,7 @@ export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'st
   const deps: StormModeDeps = {
     homes: (h) =>
       h === DEMO
-        ? { source: { snapshot: () => Promise.resolve(ok(snapshotOf(h))) }, forecast: () => sim().forecast(), profile: { ...profile, homeId: h }, readOnly: false }
+        ? { source: { snapshot: () => Promise.resolve(ok(snapshotOf(h))) }, forecast: () => sim().forecast(), profile: { ...profile, homeId: h }, readOnly: false, ...(over.units === undefined ? {} : { units: over.units }) }
         : undefined,
     storeFor,
     preferencesFor: () => Promise.resolve(ok(over.preferences ?? preferences)),

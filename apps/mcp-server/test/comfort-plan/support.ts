@@ -39,7 +39,7 @@ export function comfortConfig() {
 }
 
 /** A simulator scenario at hour `atH`, with every dependency of the module. */
-export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean; notifier?: Notifier; storeWallMs?: number } = {}) {
+export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean; notifier?: Notifier; storeWallMs?: number; units?: 'C' | 'F' } = {}) {
   const profile = demoProfile();
   const scenario = builtInScenario(id);
   const startMs = Date.parse(scenario.startAt);
@@ -81,6 +81,7 @@ export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; read
             forecast: () => (over.forecast ? over.forecast(sim.forecast()) : sim.forecast()),
             profile: { ...profile, homeId: h },
             readOnly: over.readOnly ?? false,
+            ...(over.units === undefined ? {} : { units: over.units }),
           }
         : undefined,
     storeFor,

@@ -97,16 +97,16 @@ export const itIT = {
   'surface.failed': 'Questa parte dello schermo ha smesso di funzionare. Ricarica la pagina per riprovare.',
   'config.invalid': 'Il simulatore non è configurato correttamente. Controlla le impostazioni e ricarica la pagina.',
   'storm.started':
-    'Avviso di {product} per {name}: un temporale ha tolto la corrente in casa. {room} è a {tempC} °C e la batteria la tiene al sicuro fino alle {safeUntil}. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
+    'Avviso di {product} per {name}: un temporale ha tolto la corrente in casa. {room} è a {temp} e la batteria la tiene al sicuro fino alle {safeUntil}. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
   'storm.essential':
-    'Aggiornamento di {product} per {name}: per tenere {room} al sicuro fino alle {safeUntil}, la batteria è passata al livello essenziale. {room} è a {tempC} °C. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
-  'storm.powerBack': 'Aggiornamento di {product} per {name}: la corrente è tornata in casa alle {powerBackAt}. {room} è a {tempC} °C. La modalità temporale è finita. Non serve fare nulla.',
+    'Aggiornamento di {product} per {name}: per tenere {room} al sicuro fino alle {safeUntil}, la batteria è passata al livello essenziale. {room} è a {temp}. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
+  'storm.powerBack': 'Aggiornamento di {product} per {name}: la corrente è tornata in casa alle {powerBackAt}. {room} è a {temp}. La modalità temporale è finita. Non serve fare nulla.',
   'storm.lastResort':
-    'Avviso di {product} per {name}: la batteria di casa è quasi scarica. {room} è a {tempC} °C e resta nei suoi limiti fino alle {safeUntil}, poi si scalda. Per favore, vai a controllare.',
+    'Avviso di {product} per {name}: la batteria di casa è quasi scarica. {room} è a {temp} e resta nei suoi limiti fino alle {safeUntil}, poi si scalda. Per favore, vai a controllare.',
   'lastResort.title': 'Stare freschi senza corrente',
   'lastResort.action.close_curtains': 'Chiudi le tende dal lato al sole.',
   'lastResort.action.drink_water': 'Bevi acqua spesso, anche senza sete.',
-  'lastResort.action.fan_below_35c': 'Usa un ventilatore solo finché la stanza è sotto i 35 °C.',
+  'lastResort.action.fan_below_35c': 'Usa un ventilatore solo finché la stanza è sotto i {fanMax}.',
   'lastResort.signsTitle': 'Segni di colpo di calore',
   'lastResort.sign.confusion': 'Confusione o mancanza di coordinazione',
   'lastResort.sign.hotSkin': 'Pelle calda che non suda',

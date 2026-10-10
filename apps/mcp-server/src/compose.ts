@@ -1,6 +1,6 @@
 import type { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { HomeIdSchema, SandboxHomeIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
+import { HomeIdSchema, SandboxHomeIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Result, type TempUnit } from '@cold-reserve/contracts';
 import { seededRng, type Clock, type StateStoreFactory } from '@cold-reserve/core';
 import { demoProfile } from '@cold-reserve/source-simulator';
 import {
@@ -35,6 +35,8 @@ export interface ComposeOptions {
   readonly clock: Clock;
   /** A home's own scenario clock (C2b), known once the app is built: the entries bind it late. */
   readonly clockFor?: (homeId: HomeId) => Clock | undefined;
+  /** A home's temperature unit for the texts (#306), known once the app is built: bound late like clockFor. */
+  readonly unitsFor?: (homeId: HomeId) => TempUnit;
 }
 
 export function composeModules(opts: ComposeOptions): Result<CapabilityModule[], ErrorEnvelope> {
@@ -53,6 +55,7 @@ export function composeModules(opts: ComposeOptions): Result<CapabilityModule[],
     defaultsFor: (homeId) => (SandboxHomeIdSchema.safeParse(homeId).success ? sandboxDefaults.value : demoDefaults.value),
     clock: opts.clock,
     ...(opts.clockFor === undefined ? {} : { clockFor: opts.clockFor }),
+    ...(opts.unitsFor === undefined ? {} : { unitsFor: opts.unitsFor }),
   });
   return ok([{ ...preferences, enabledFor: (homeId) => profileFor(homeId) !== undefined }]);
 }
