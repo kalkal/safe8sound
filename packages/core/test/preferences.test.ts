@@ -135,7 +135,37 @@ describe('updatePreferences', () => {
       error: { code: 'invalid_setpoint', details: { field: 'comfortC.heating', limit: 27, nearestAllowed: 27, unit: 'C' } },
     });
     expect(updatePreferences(current(), { comfortC: { heating: 27.5 } }, ctx)).toMatchObject({ ok: false, error: { code: 'invalid_setpoint' } });
-    expect(updatePreferences(current(), { comfortC: { heating: 27 } }, ctx)).toMatchObject({ ok: true });
+    expect(updatePreferences(current(), { comfortC: { cooling: 27, heating: 27 } }, ctx)).toMatchObject({ ok: true });
+  });
+
+  it('#321: the heating comfort never goes above the cooling comfort, whichever of the two is sent', () => {
+    // The example: cooling 25, heating 20.
+    expect(updatePreferences(current(), { comfortC: { heating: 26 } }, ctx)).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_setpoint', message: 'comfortC.heating must stay at or below the cooling comfort (25 C).', details: { field: 'comfortC.heating', limit: 25, nearestAllowed: 25, unit: 'C' } },
+    });
+    expect(updatePreferences(current(), { comfortC: { cooling: 19 } }, ctx)).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_setpoint', message: 'comfortC.cooling must stay at or above the heating comfort (20 C).', details: { field: 'comfortC.cooling', limit: 20, nearestAllowed: 20, unit: 'C' } },
+    });
+    expect(updatePreferences(current(), { comfortC: { cooling: 22, heating: 23 } }, ctx)).toMatchObject({ ok: false, error: { details: { field: 'comfortC.heating', limit: 22 } } });
+    expect(updatePreferences(current(), { comfortC: { cooling: 22, heating: 22 } }, ctx)).toMatchObject({ ok: true });
+    // In a °F sandbox, said in °F with the °C to send.
+    const f = updatePreferences(current(), { comfortC: { heating: 26 } }, { ...ctx, unit: 'F' });
+    expect(!f.ok && f.error.message).toBe('comfortC.heating must stay at or below the cooling comfort (77 °F (25 C)).');
+  });
+
+  it('#321: an old heating comfort above the limits does not block saving other fields; sending it again, or lowering the cooling maximum under it, is refused', () => {
+    const old = PreferencesSchema.parse({ ...examplePreferences(), comfortC: { cooling: 25, heating: 30 } });
+    expect(updatePreferences(old, { language: 'it-IT' }, ctx)).toMatchObject({ ok: true });
+    expect(updatePreferences(old, { comfortC: { heating: 29 } }, ctx)).toMatchObject({ ok: false, error: { code: 'invalid_setpoint', details: { field: 'comfortC.heating' } } });
+    expect(updatePreferences(old, { safety: { cooling: { maxC: 26 } } }, ctx)).toMatchObject({ ok: false, error: { code: 'invalid_setpoint', details: { field: 'comfortC.heating', limit: 26 } } });
+  });
+
+  it('#321: 40 in a °F sandbox is still a °C value (out of range); 40.1 is a °F number sent as °C', () => {
+    const f = { ...ctx, unit: 'F' as const };
+    expect(updatePreferences(current(), { comfortC: { heating: 40 } }, f)).toMatchObject({ ok: false, error: { code: 'invalid_setpoint' } });
+    expect(updatePreferences(current(), { comfortC: { heating: 40.1 } }, f)).toMatchObject({ ok: false, error: { code: 'invalid_input', details: { field: 'comfortC.heating' } } });
   });
 
   it('#312: in a °F sandbox a comfort above 40 is a °F number sent as °C: refused with the °C to send, nothing saved as 68 °C', () => {

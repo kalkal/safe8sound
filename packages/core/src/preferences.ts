@@ -114,8 +114,17 @@ export function updatePreferences(
   }
   if (comfortC.cooling > safety.cooling.maxC) return err(setpoint('comfortC.cooling', safety.cooling.maxC, ctx.unit));
   if (comfortC.heating < safety.heating.minC) return err(setpoint('comfortC.heating', safety.heating.minC, ctx.unit));
-  // #312: no room is heated past the limit it is cooled to (an unconverted 68 was saved as 68 °C).
-  if (comfortC.heating > safety.cooling.maxC) return err(setpoint('comfortC.heating', safety.cooling.maxC, ctx.unit));
+  // #312: no room is heated past the limit it is cooled to (an unconverted 68 was saved as 68 °C). Checked when the
+  // heating comfort or that limit is sent (#321): an old value saved before the rule never blocks other fields.
+  const heatingSent = update.comfortC?.heating !== undefined;
+  const coolingSent = update.comfortC?.cooling !== undefined;
+  if ((heatingSent || update.safety?.cooling?.maxC !== undefined) && comfortC.heating > safety.cooling.maxC) {
+    return err(setpoint('comfortC.heating', safety.cooling.maxC, ctx.unit));
+  }
+  // #321: heating never above cooling (the preferences card and the season assume it), said on the field sent.
+  if ((heatingSent || coolingSent) && comfortC.heating > comfortC.cooling) {
+    return err(heatingSent ? order('comfortC.heating', 'at or below the cooling', comfortC.cooling, ctx.unit) : order('comfortC.cooling', 'at or above the heating', comfortC.heating, ctx.unit));
+  }
 
   const parsed = PreferencesSchema.safeParse({
     ...current,
@@ -150,6 +159,11 @@ export function unconvertedFahrenheit(field: string, valueC: number, unit: TempU
 
 const setpoint = (field: string, limit: number, unit: TempUnit = 'C') =>
   toolError('invalid_setpoint', `${field} must stay within the safety threshold (${formatTempForInput(limit, unit)}).`, {
+    details: { field, limit, nearestAllowed: limit, unit: 'C' },
+  });
+
+const order = (field: string, where: string, limit: number, unit: TempUnit = 'C') =>
+  toolError('invalid_setpoint', `${field} must stay ${where} comfort (${formatTempForInput(limit, unit)}).`, {
     details: { field, limit, nearestAllowed: limit, unit: 'C' },
   });
 
