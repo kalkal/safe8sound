@@ -15,7 +15,7 @@ if (outDir === undefined) {
 }
 const read = (specifier: string) => readFileSync(fileURLToPath(import.meta.resolve(specifier)), 'utf8');
 const card = renderCardHtml(
-  { tokensCss: read('@cold-reserve/design-tokens/tokens.css'), cardsCss: read('@cold-reserve/ui-cards/cards.css'), bundleJs: read('@cold-reserve/ui-cards/card-app.js') },
+  { tokensCss: read('@cold-reserve/design-tokens/tokens.css'), cardsCss: read('@cold-reserve/ui-cards/cards.css'), cubesCss: read('@cold-reserve/ui-cards/cubes.css'), bundleJs: read('@cold-reserve/ui-cards/card-app.js') },
   'plan',
 );
 const file = join(outDir, 'security-headers.json');

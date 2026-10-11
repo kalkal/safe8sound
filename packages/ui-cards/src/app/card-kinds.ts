@@ -96,6 +96,8 @@ export interface CardAssets {
   /** The generated tokens CSS of @cold-reserve/design-tokens. */
   tokensCss: string;
   cardsCss: string;
+  /** CubeRow's stylesheet (the ice cubes), shared with the idle screen. */
+  cubesCss: string;
   /** The single-file card bundle (React + ext-apps App). */
   bundleJs: string;
 }
@@ -136,6 +138,7 @@ export function renderCardHtml(assets: CardAssets, kind: CardKind): string {
     LAYER_ORDER,
     escapeClosing(assets.tokensCss, 'style'),
     escapeClosing(assets.cardsCss, 'style'),
+    escapeClosing(assets.cubesCss, 'style'),
     '</style>',
     '</head>',
     '<body>',

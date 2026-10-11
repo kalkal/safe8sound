@@ -58,8 +58,9 @@ describe('cardDocumentsFromFiles', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cards-'));
     writeFileSync(join(dir, 'tokens.css'), ':root{--a:1}');
     writeFileSync(join(dir, 'cards.css'), '.card{}');
+    writeFileSync(join(dir, 'cubes.css'), '.cube{}');
     if (withBundle) writeFileSync(join(dir, 'card-app.js'), 'console.log(1)');
-    return { tokensCss: join(dir, 'tokens.css'), cardsCss: join(dir, 'cards.css'), bundleJs: join(dir, 'card-app.js') };
+    return { tokensCss: join(dir, 'tokens.css'), cardsCss: join(dir, 'cards.css'), cubesCss: join(dir, 'cubes.css'), bundleJs: join(dir, 'card-app.js') };
   }
 
   it('builds a self-contained document that declares its CSP and names its card', () => {

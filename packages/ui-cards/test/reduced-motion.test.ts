@@ -37,15 +37,15 @@ describe('reduced motion', () => {
     expect(source.indexOf('@media (prefers-reduced-motion: reduce)')).toBeGreaterThan(overrides);
   });
 
-  it('no card rule hard-codes a duration: motion uses the tokens', () => {
-    const source = css('cards.css');
+  it.each(['cards.css', 'cubes.css'])('no rule in %s hard-codes a duration: motion uses the tokens', (file) => {
+    const source = css(file);
     const motionRule = reducedMotionBlock(source) ?? '';
     const declarations = [...source.replace(motionRule, '').matchAll(/(transition|animation)[\w-]*\s*:\s*([^;]+);/g)];
     for (const [, , value] of declarations) expect(value).not.toMatch(/\d+m?s\b/);
   });
 
-  it('the melting cube moves only through the melt duration token, so reduced motion shows it already melted', () => {
-    const source = css('cards.css');
+  it('the melting cube (cubes.css, shared with the idle screen) moves only through the melt duration token, so reduced motion shows it already melted', () => {
+    const source = css('cubes.css');
     expect(source).toMatch(/\.cube\[data-melting="true"\]::after\s*\{[^}]*animation:[^;]*var\(--duration-melt\)[^;]*forwards;/);
   });
 });

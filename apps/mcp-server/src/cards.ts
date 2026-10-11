@@ -45,6 +45,7 @@ export function withCardResources(modules: readonly CapabilityModule[], document
 export interface CardFiles {
   readonly tokensCss: string;
   readonly cardsCss: string;
+  readonly cubesCss: string;
   /** Built by `pnpm --filter @cold-reserve/ui-cards build:card`, never committed. */
   readonly bundleJs: string;
 }
@@ -55,6 +56,7 @@ export function workspaceCardFiles(): CardFiles {
   return {
     tokensCss: fileURLToPath(import.meta.resolve('@cold-reserve/design-tokens/tokens.css')),
     cardsCss,
+    cubesCss: fileURLToPath(import.meta.resolve('@cold-reserve/ui-cards/cubes.css')),
     // The bundle may not exist yet, so it is not resolved through the exports (that would throw).
     bundleJs: join(dirname(cardsCss), '..', 'dist', 'card-app.js'),
   };
@@ -77,8 +79,9 @@ export function cardDocumentsFromFiles(files: CardFiles): CardDocuments {
       if (bundleJs === undefined) return err(toolError('invalid_config', 'The card bundle is not built: run pnpm --filter @cold-reserve/ui-cards build:card.'));
       const tokensCss = text(files.tokensCss);
       const cardsCss = text(files.cardsCss);
-      if (tokensCss === undefined || cardsCss === undefined) return err(toolError('invalid_config', 'The card styles are missing from the workspace.'));
-      return ok(renderCardHtml({ tokensCss, cardsCss, bundleJs }, kind));
+      const cubesCss = text(files.cubesCss);
+      if (tokensCss === undefined || cardsCss === undefined || cubesCss === undefined) return err(toolError('invalid_config', 'The card styles are missing from the workspace.'));
+      return ok(renderCardHtml({ tokensCss, cardsCss, cubesCss, bundleJs }, kind));
     },
   };
 }

@@ -1,29 +1,10 @@
 import type { ReserveOutlook } from '@cold-reserve/contracts';
-import { Fragment, type CSSProperties } from 'react';
+import { Fragment } from 'react';
 import { CardShell } from './CardShell.js';
+import { CubeRow } from './CubeRow.js';
 import { formatHours, t } from './text.js';
 
-const MIN_CUBES = 12;
-const MAX_CUBES = 24;
-
-/** One cube per hour at the current level: whole cubes, then the part of the last hour (signature element 2). */
-export function cubeFills(hours: number): number[] {
-  const count = Math.min(MAX_CUBES, Math.max(MIN_CUBES, Math.ceil(hours)));
-  return Array.from({ length: count }, (_, i) => Math.min(1, Math.max(0, hours - i)));
-}
-
-/** What the row of cubes shows, in words: derived from the same fills that are drawn. */
-export function cubesLabel(hours: number): string {
-  const fills = cubeFills(hours);
-  const full = fills.filter((f) => f === 1).length;
-  const part = fills.some((f) => f > 0 && f < 1);
-  const hoursText = t(hours <= 1 ? 'cubes.hourOne' : 'cubes.hourMany', { hours: formatHours(hours) });
-  let cubes: string;
-  if (hours > MAX_CUBES) cubes = t('cubes.day');
-  else if (full === 0) cubes = t('cubes.partOnly');
-  else cubes = (full === 1 ? t('cubes.fullOne') : t('cubes.fullMany', { count: String(full) })) + (part ? t('cubes.partMore') : '');
-  return t('cubes.label', { hours: hoursText, cubes });
-}
+export { cubeFills, cubesLabel } from './CubeRow.js';
 
 export function IceCubesCard({ outlook }: { outlook: ReserveOutlook }) {
   const hours = outlook.hoursAtCurrentLevel;
@@ -38,11 +19,7 @@ export function IceCubesCard({ outlook }: { outlook: ReserveOutlook }) {
               {t('cubes.hours', { hours: formatHours(hours) })}
             </p>
             {/* The cubes right under the big number, so they are in the first view on every screen (owner, 1 and 11 Oct). */}
-            <div className="cubes" role="img" aria-label={cubesLabel(hours)}>
-              {cubeFills(hours).map((fill, i) => (
-                <span key={i} className="cube" data-fill={fill} style={{ '--fill': String(fill) } as CSSProperties} />
-              ))}
-            </div>
+            <CubeRow hours={hours} />
           </div>
         </Fragment>,
         <Fragment key="more">

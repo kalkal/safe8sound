@@ -759,44 +759,16 @@
     line-height: 1;
   }
 
-  /* One row whatever the hours: 56 px cubes on an Echo, narrower only where they do not fit (a phone). */
+  /* The cubes themselves are CubeRow's (@cold-reserve/ui-cards/cubes.css): here only their place, under the hours. */
   .reserve-clock .cubes {
-    display: flex;
     grid-column: 1 / -1;
-    gap: var(--space-1);
   }
 
-  .reserve-clock .cube {
-    position: relative;
-    overflow: hidden;
-    flex: 0 1 var(--cube-size);
-    box-sizing: border-box;
-    min-inline-size: 0;
-    aspect-ratio: 1;
-    border: var(--border-thin) solid var(--cube-edge);
-    border-radius: var(--radius-cube);
-    background: var(--surface-card-raised);
-
-    &::after {
-      position: absolute;
-      inset: auto 0 0;
-      block-size: calc(var(--fill) * 100%);
-      background: var(--cube-fill);
-      content: "";
-    }
-
-    &[data-melting="true"]::after {
-      animation: reserve-cube-melt var(--duration-melt) ease-in-out forwards;
-    }
-  }
-
-  @keyframes reserve-cube-melt {
-    from {
-      block-size: 100%;
-    }
-
-    to {
-      block-size: calc(var(--fill) * 100%);
+  /* On a phone the idle band is short, under the intro: the clock keeps its rows as on an Echo (one, or two above
+     CUBES_PER_ROW), the cubes narrower, so all of them stay in the first view. */
+  @media (width < 48rem) {
+    .reserve-clock .cubes {
+      grid-template-columns: repeat(var(--cubes-per-row), minmax(0, var(--cube-size)));
     }
   }
 

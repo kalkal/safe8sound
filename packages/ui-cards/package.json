@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./card-kinds": "./src/app/card-kinds.ts",
     "./cards.css": "./src/cards.css",
+    "./cubes.css": "./src/cubes.css",
     "./card-app.js": "./dist/card-app.js"
   },
   "dependencies": {

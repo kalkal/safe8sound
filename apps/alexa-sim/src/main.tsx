@@ -1,4 +1,5 @@
 import '@cold-reserve/design-tokens/tokens.css';
+import '@cold-reserve/ui-cards/cubes.css';
 import './app.css';
 import type { HomeStatus, ReserveOutlook, SetScenarioInput } from '@cold-reserve/contracts';
 import { getLocale, setLocale, subscribeLocale, type Locale } from '@cold-reserve/i18n';

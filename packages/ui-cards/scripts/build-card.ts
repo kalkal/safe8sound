@@ -18,7 +18,7 @@ if (!size.ok) {
   process.exit(1);
 }
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
-const assets = { tokensCss: read('../../design-tokens/generated/tokens.css'), cardsCss: read('../src/cards.css'), bundleJs: readFileSync(bundlePath, 'utf8') };
+const assets = { tokensCss: read('../../design-tokens/generated/tokens.css'), cardsCss: read('../src/cards.css'), cubesCss: read('../src/cubes.css'), bundleJs: readFileSync(bundlePath, 'utf8') };
 const unsafe = (Object.keys(CARD_KINDS) as CardKind[]).filter((kind) => !isInlineSafe(renderCardHtml(assets, kind)));
 if (unsafe.length > 0) {
   console.error(`The card bundle is not safe to inline in: ${unsafe.join(', ')}.`);

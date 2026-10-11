@@ -69,7 +69,7 @@ describe('parseCardResult: the tool result as the card sees it, never trusted un
 });
 
 describe('renderCardHtml: one self-contained document per card', () => {
-  const assets = { tokensCss: ':root{--a:1}', cardsCss: '.card{}</style><script>', bundleJs: 'console.log("</script><img>")' };
+  const assets = { tokensCss: ':root{--a:1}', cardsCss: '.card{}</style><script>', cubesCss: '.cube{}', bundleJs: 'console.log("</script><img>")' };
 
   it('names the card and starts dark, as the Amazon card guide does by default', () => {
     const html = renderCardHtml(assets, 'plan');

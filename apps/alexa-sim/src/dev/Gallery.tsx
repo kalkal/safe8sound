@@ -1,4 +1,5 @@
 import '@cold-reserve/ui-cards/cards.css';
+import '@cold-reserve/ui-cards/cubes.css';
 import { HomeProfileSchema, PlanSchema, PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
 import { exampleHomeProfile, examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import {

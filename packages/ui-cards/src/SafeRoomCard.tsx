@@ -1,7 +1,7 @@
 import { formatTempFixed, type SafeRoomStatus } from '@cold-reserve/contracts';
-import { Fragment, type CSSProperties } from 'react';
+import { Fragment } from 'react';
 import { CardShell } from './CardShell.js';
-import { cubeFills, cubesLabel } from './IceCubesCard.js';
+import { CubeRow } from './CubeRow.js';
 import { getTempUnit } from './temp-unit.js';
 import { formatHours, t } from './text.js';
 
@@ -48,18 +48,7 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
               {clockOf(status.safeUntil)}
             </p>
             {/* The signature element right under the big time, so it is in the first view on every screen (owner, 1 and 11 Oct). */}
-            <div className="cubes" role="img" aria-label={cubesLabel(status.safeHours)}>
-              {cubeFills(status.safeHours).map((fill, i) => (
-                <span
-                  key={i}
-                  className="cube"
-                  data-fill={fill}
-                  // In the storm the hour being used melts once, from full to what is left (the time that remains).
-                  {...(inStorm && i === Math.floor(status.safeHours) ? { 'data-melting': true } : {})}
-                  style={{ '--fill': String(fill) } as CSSProperties}
-                />
-              ))}
-            </div>
+            <CubeRow hours={status.safeHours} storm={inStorm} />
           </div>
         </Fragment>,
         <Fragment key="more">

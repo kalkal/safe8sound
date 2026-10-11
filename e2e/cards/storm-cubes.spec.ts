@@ -1,4 +1,6 @@
+import { exampleReserveOutlook } from '../../packages/contracts/src/fixtures.js';
 import { expect, test } from '../no-network.js';
+import { openRemote } from '../remote-session.js';
 
 // The ice cubes at 56 px (owner decision, 2 Oct) and, in the storm, the cube of the hour being used that empties
 // once to what is left of it (video, scene 3). With reduced motion it is drawn at its level straight away.
@@ -49,6 +51,33 @@ test('at 375 px the bigger cubes wrap inside the card: nothing scrolls sideways'
   await page.setViewportSize({ width: 375, height: 812 });
   const card = await powerOut(page);
   await expect(card.locator('.cube').first()).toBeVisible();
+  // A narrow card: the cubes on two even rows (CubeRow's --cubes-half), not three uneven ones.
+  const tops = await card.locator('.cube').evaluateAll((els: { getBoundingClientRect(): { top: number } }[]) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+  expect(new Set(tops).size).toBe(2);
   expect(await card.locator('body').evaluate((b) => { const root = (b as unknown as Box).ownerDocument.documentElement; return root.scrollWidth <= root.clientWidth; })).toBe(true);
   expect(await page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(375);
+});
+
+test('a 15 h reserve card at 1280 × 800: the cubes stay 56 px, on two even rows (owner: 56 px on an Echo)', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // 15 cubes on one row would not fit the card's content (≈ 862 px) at 56 px: CUBES_PER_ROW is 14.
+  const reserve = { ...exampleReserveOutlook(), hoursAtCurrentLevel: 15, hoursAtEssential: 30 };
+  await page.route('**/sim-api/v1/turns', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: 'About 15 hours of cold reserve.', cards: [{ tool: 'get_reserve_outlook', result: reserve }] }) }),
+  );
+  await openRemote(page);
+  await page.getByLabel('Ask a question').fill('How long will the cold reserve last?');
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
+  const cubes = page.frameLocator('iframe[title="Cold reserve card"]').locator('.cube');
+  await expect(cubes).toHaveCount(15);
+  const boxes = await cubes.evaluateAll((els: { getBoundingClientRect(): { top: number; width: number; height: number } }[]) =>
+    els.map((el) => el.getBoundingClientRect()).map((r) => ({ top: Math.round(r.top), width: r.width, height: r.height })),
+  );
+  for (const box of boxes) {
+    expect(box.width).toBeCloseTo(56, 0);
+    expect(box.height).toBeCloseTo(56, 0);
+  }
+  const rows = [...new Set(boxes.map((b) => b.top))];
+  expect(rows).toHaveLength(2);
+  expect(boxes.filter((b) => b.top === rows[0])).toHaveLength(8);
 });
