@@ -227,7 +227,7 @@ describe('updatePreferences', () => {
     expect(!refused.ok && refused.error.message).toBe('comfortC.heating must stay within the safety threshold (27 C). Send at most 25 C.');
   });
 
-  it('#329 review: sending back any suggestion is accepted or refused on another field (property)', () => {
+  it('#329 review: sending back each suggestion is accepted within three tries, never refused twice on the same field (property)', () => {
     const value = (b: { min: number; max: number }) => fc.integer({ min: Math.ceil(b.min), max: Math.floor(b.max) });
     const temp = fc.integer({ min: 10, max: 32 });
     fc.assert(
@@ -246,13 +246,20 @@ describe('updatePreferences', () => {
           const saved = parsed.data;
           const comfortC = { ...(sent.cooling === undefined ? {} : { cooling: sent.cooling }), ...(sent.heating === undefined ? {} : { heating: sent.heating }) };
           const safety = { ...(sendMax ? { cooling: { maxC } } : {}), ...(sendMin ? { heating: { minC } } : {}) };
-          const update = { comfortC, safety };
-          const refused = updatePreferences(saved, update, ctx);
-          if (refused.ok || refused.error.code !== 'invalid_setpoint') return;
-          const field = String(refused.error.details?.field);
-          const key = field === 'comfortC.heating' ? 'heating' : 'cooling';
-          const again = updatePreferences(saved, { ...update, comfortC: { ...comfortC, [key]: Number(refused.error.details?.nearestAllowed) } }, ctx);
-          if (!again.ok) expect(again.error.details?.field).not.toBe(field);
+          let update = { comfortC, safety };
+          let result = updatePreferences(saved, update, ctx);
+          if (result.ok || result.error.code !== 'invalid_setpoint') return;
+          let previous: string | undefined;
+          for (let tries = 0; tries < 3 && !result.ok; tries += 1) {
+            expect(result.error.code).toBe('invalid_setpoint');
+            const field = String(result.error.details?.field);
+            expect(field).not.toBe(previous);
+            previous = field;
+            const key = field === 'comfortC.heating' ? 'heating' : 'cooling';
+            update = { ...update, comfortC: { ...update.comfortC, [key]: Number(result.error.details?.nearestAllowed) } };
+            result = updatePreferences(saved, update, ctx);
+          }
+          expect(result.ok).toBe(true);
         },
       ),
     );

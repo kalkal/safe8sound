@@ -177,9 +177,9 @@ const order = (field: string, where: string, limit: number, unit: TempUnit = 'C'
     details: { field, limit, nearestAllowed, unit: 'C' },
   });
 
-/** The model reads only the message (#329 review): a suggestion other than the rule's limit is said there too. */
+/** The model reads only the message (#329 review): a suggestion under the rule's limit is said there too (the only one that differs: the heating under the cooling maximum). */
 const sendInstead = (limit: number, nearestAllowed: number, unit: TempUnit) =>
-  nearestAllowed === limit ? '' : ` Send ${nearestAllowed < limit ? 'at most' : 'at least'} ${formatTempForInput(nearestAllowed, unit)}.`;
+  nearestAllowed < limit ? ` Send at most ${formatTempForInput(nearestAllowed, unit)}.` : '';
 
 const coolingFirst = (minC: number, unit: TempUnit = 'C') =>
   toolError(

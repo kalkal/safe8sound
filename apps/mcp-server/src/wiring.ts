@@ -12,8 +12,6 @@ import { stormModeWiring, type StormModeWiring } from './storm-mode-config.js';
 // Everything runs on the scenario clock; the store keeps the wall clock, for retention only (#175).
 
 export interface WiredModules {
-  /** The store scoped to each home's playthrough (#234). */
-  readonly storeFor: StateStoreFactory;
   readonly modules: CapabilityModule[];
   readonly stormMode: StormModeWiring;
   readonly comfortPlan: ComfortPlanWiring;
@@ -25,8 +23,12 @@ export interface WiredModules {
 }
 
 export function wireModules(o: { readonly store: StateStoreFactory; readonly clock: Clock }): Result<WiredModules, ErrorEnvelope> {
-  let homeClock: App['homeClock'] = () => undefined;
-  let homeUnits: App['homeUnits'] = () => 'C';
+  // Before `bind` nothing has a home's clock or unit: a call then is a wiring bug, said loudly, never the wall clock or °C.
+  const unbound = (): never => {
+    throw new Error('wireModules: a home was used before bind(app)');
+  };
+  let homeClock: App['homeClock'] = unbound;
+  let homeUnits: App['homeUnits'] = unbound;
   const storeFor = withPlaythrough(o.store, (homeId) => homeClock(homeId));
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) return preferences;
@@ -39,7 +41,6 @@ export function wireModules(o: { readonly store: StateStoreFactory; readonly clo
   const comfortPlan = comfortPlanWiring({ storeFor, preferences: preferences.value, clock, notifier: stormMode.value.notifier });
   if (!comfortPlan.ok) return comfortPlan;
   return ok({
-    storeFor,
     modules: modules.value,
     stormMode: stormMode.value,
     comfortPlan: comfortPlan.value,

@@ -412,6 +412,24 @@ describe('refusals (review of #110)', () => {
     expect(called.map((c) => c.name)).toEqual(['get_reserve_outlook', 'get_home_status', 'apply_plan']);
   });
 
+  it('#334: a read the overall cap refuses whose give-back fails is still a 429, and the failure is a warn line', async () => {
+    const memory = memoryQuotaStore();
+    const releaseFails: QuotaStore = {
+      consume: (...args) => memory.consume(...args),
+      release: (key, amount) =>
+        key.startsWith('READS#') ? Promise.reject(Object.assign(new Error('Rate exceeded'), { name: 'ThrottlingException' })) : memory.release(key, amount),
+    };
+    const { send, session, logs, called } = setup({ SIM_LIMIT_READ_CALLS_GLOBAL: '1' }, undefined, { quota: releaseFails });
+    const token = await session();
+    const read = { token, body: { name: 'get_home_status', arguments: {} }, headers: { 'x-correlation-id': '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60' } };
+    expect((await send('/v1/tools/call', read)).status).toBe(200);
+    await problem(await send('/v1/tools/call', read), 429, 'demo_quota_exceeded');
+    expect(called).toHaveLength(1);
+    expect(logs).toContainEqual(
+      expect.objectContaining({ level: 'warn', message: 'read_refund_failed', correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60', errorName: 'ThrottlingException', details: { codeId: 'judges' } }),
+    );
+  });
+
   it('passes a card tool failure on as Problem Details (agent_unavailable -> 503)', async () => {
     const { send, session, logs } = setup({}, undefined, { toolReply: err(toolError('agent_unavailable', 'The home could not be reached.')) });
     await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'apply_plan', arguments: { planId: 'plan-0001' } } }), 503, 'agent_unavailable');
