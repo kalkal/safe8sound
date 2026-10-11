@@ -68,7 +68,8 @@ export async function startStormMode(deps: StormModeDeps, input: StartStormModeI
 
 /** get_safe_room_status: the safe room now and its safe hours. Read-only: no session write, no message. */
 export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext): Promise<Result<SafeRoomStatus, ErrorEnvelope>> {
-  const o = await readHome(deps, ctx);
+  // A read: it degrades to the live reading when the store cannot be reached (#114); the writes stay fail-closed.
+  const o = await readHome(deps, ctx, true);
   if (!o.ok) return o;
   const { safeRoom, snapshot, session } = o.value;
   // The family's latest reply in this storm, by role only; its time on the home's clock (queue item 3).
@@ -87,6 +88,7 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext): Pro
     ...(reply === undefined ? {} : { lastCheckIn: { ...reply, at: localIso(Date.parse(reply.at), o.value.home.profile.location.tz) } }),
     origin: snapshot.origin,
     homeLink: snapshot.homeLink,
+    ...(o.value.storeUnavailable === true ? { storeUnavailable: true as const } : {}),
   });
 }
 

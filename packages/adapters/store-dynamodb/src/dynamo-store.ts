@@ -98,7 +98,11 @@ const ADMIN_PK = 'ADMIN#CONFIG';
 
 /** An expected outcome carried out of a #run body; converted back to a Result there. */
 class Failure extends Error {
-  constructor(readonly error: ErrorEnvelope) {
+  /** `logAs`: an unexpected outcome also reported to onError under this error name (#114: the cause goes to the log, never the message). */
+  constructor(
+    readonly error: ErrorEnvelope,
+    readonly logAs?: string,
+  ) {
     super(error.message);
   }
 }
@@ -354,7 +358,13 @@ class DynamoStateStore implements StateStore {
     try {
       return ok(await body());
     } catch (error) {
-      if (error instanceof Failure) return err(error.error);
+      if (error instanceof Failure) {
+        if (error.logAs !== undefined) {
+          const cause = Object.assign(new Error(error.error.message), { name: error.logAs });
+          this.#onError?.({ code: 'unexpected_error', operation, cause, ...(this.#correlationId === undefined ? {} : { correlationId: this.#correlationId }) });
+        }
+        return err(error.error);
+      }
       // Only the table and the network fail transiently; anything else is a bug and must not be retried.
       const code = isTransient(error) ? 'store_unavailable' : 'unexpected_error';
       this.#onError?.({ code, operation, cause: error, ...(this.#correlationId === undefined ? {} : { correlationId: this.#correlationId }) });
@@ -404,12 +414,13 @@ function isTransient(error: unknown): boolean {
 function parse<T>(schema: z.ZodType<T>, item: TableItem): T {
   if (!isReadableSchemaVersion(item['schemaVersion'], SCHEMA_VERSION)) {
     throw new Failure(
-      toolError('unexpected_error', `Stored item ${item.SK} has schemaVersion ${String(item['schemaVersion'])}; this version reads ${String(SCHEMA_VERSION)}.`),
+      toolError('unexpected_error', `A stored record has schemaVersion ${String(item['schemaVersion'])}; this version reads ${String(SCHEMA_VERSION)}.`),
+      'StoredItemNewerSchema',
     );
   }
   const parsed = readStored(schema, item['data']);
   if (!parsed.success) {
-    throw new Failure(toolError('unexpected_error', `Stored item ${item.SK} does not match its schema.`));
+    throw new Failure(toolError('unexpected_error', 'A stored record does not match its schema.'), 'StoredItemInvalid');
   }
   return parsed.data;
 }

@@ -46,6 +46,8 @@ export interface Observed {
   /** When the hold ends (or the cap): the projection's own time, from the home's reading. */
   readonly safeUntilMs: number;
   readonly session: StormSession | undefined;
+  /** #114: the store could not be read (preferences or the storm session): the live reading, the default safe room, no session. */
+  readonly storeUnavailable?: true;
   /** Who asked: the correlation id and the home of the log lines. */
   readonly ctx: ToolContext;
 }
@@ -62,7 +64,14 @@ export const levelOf = (session: StormSession | undefined): { level: Level; leve
  * off; on battery alone, down to the hardware floor, also while preparing with the grid still up (what the
  * storm will have). Capped at `capHours`; counted from the home's reading.
  */
-function holdHours(deps: StormModeDeps, profile: HomeProfile, snapshot: Snapshot, forecast: Forecast, preferences: Preferences): Result<{ hours: number; untilMs: number }, ErrorEnvelope> {
+function holdHours(
+  deps: StormModeDeps,
+  profile: HomeProfile,
+  snapshot: Snapshot,
+  forecast: Forecast,
+  preferences: Preferences,
+  strictest = false,
+): Result<{ hours: number; untilMs: number }, ErrorEnvelope> {
   // Never assume an EPS load (#107): the projection would quietly count none.
   const eps = epsBaseLoadW(profile);
   if (!eps.ok) return eps;
@@ -70,7 +79,9 @@ function holdHours(deps: StormModeDeps, profile: HomeProfile, snapshot: Snapshot
   if (forecast.hourly.length === 0) return err(toolError('forecast_unavailable', 'No weather hour to count the safe hours with.'));
   const nowMs = Date.parse(snapshot.ts);
   const toMs = nowMs + deps.config.capHours * HOUR_MS;
-  const frame = guardFrame({ config: deps.comfortConfig }, 'auto', { snapshot, forecast, preferences });
+  const read = guardFrame({ config: deps.comfortConfig }, 'auto', { snapshot, forecast, preferences });
+  // #114: without the saved preferences nobody knows whether an older person is home: the stricter night limit plays.
+  const frame = strictest ? { ...read, nightRecoveryMode: 'elderly' as const } : read;
   const held = holdSafeRoom(
     { snapshot: { ...snapshot, gridAvailable: false }, forecast, profile, preferences, ...frame, model: deps.model, config: deps.guard },
     { toMs, dischargeFloorPct: pct(profile.battery.minSocHwPct), humidityBand: deps.comfortConfig.planner.humidityBand, marginK: deps.comfortConfig.planner.essentialMarginK },
@@ -140,23 +151,62 @@ export async function deliver(deps: StormModeDeps, o: Observed, session: StormSe
   return ok({ session: { ...session, notifications }, plan, ...(failure === undefined ? {} : { failure }) });
 }
 
-/** Reads the home, the latest storm session and the safe hours. No side effects. */
-export async function readHome(deps: StormModeDeps, ctx: ToolContext): Promise<Result<Observed, ErrorEnvelope>> {
+/**
+ * Reads the home, the latest storm session and the safe hours. No side effects. With `degrade` (#114, the read-only
+ * status), a store that cannot be reached (`store_unavailable`) does not stop the reading: the default preferences
+ * and no session, flagged `storeUnavailable`, the hours at the stricter night limit, and one warn line.
+ */
+export async function readHome(deps: StormModeDeps, ctx: ToolContext, degrade = false): Promise<Result<Observed, ErrorEnvelope>> {
   const home = deps.homes(ctx.homeId);
   if (home === undefined) return err(toolError('home_not_found', 'This client is not linked to a configured home.'));
   const snapshot = await home.source.snapshot();
   if (!snapshot.ok) return snapshot;
-  const preferences = await deps.preferencesFor(ctx.homeId, home.profile);
+  const unreachable: string[] = [];
+  const canDegrade = (e: ErrorEnvelope, what: string): boolean => {
+    if (!degrade || e.code !== 'store_unavailable') return false;
+    unreachable.push(what);
+    return true;
+  };
+  let preferences = await deps.preferencesFor(ctx.homeId, home.profile);
+  if (!preferences.ok && canDegrade(preferences.error, 'preferences')) preferences = deps.defaultPreferencesFor(ctx.homeId, home.profile);
   if (!preferences.ok) return preferences;
   const safeRoomId = preferences.value.safeRoomId;
   const safeRoom = snapshot.value.rooms.find((r) => r.id === safeRoomId);
   if (!safeRoom) return err(toolError('home_data_stale', `No reading from the safe room ${safeRoomId}.`, { details: { roomId: safeRoomId } }));
-  const hours = holdHours(deps, home.profile, snapshot.value, home.forecast(), preferences.value);
-  if (!hours.ok) return hours;
   const store = deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId });
-  const latest = await store.getLatestStormSession();
+  let latest = await store.getLatestStormSession();
+  if (!latest.ok && canDegrade(latest.error, 'storm_session')) latest = ok(undefined);
   if (!latest.ok) return latest;
-  return ok({ home, store, preferences: preferences.value, snapshot: snapshot.value, safeRoom, nowMs: deps.clock.now(), safeHours: hours.value.hours, safeUntilMs: hours.value.untilMs, session: latest.value, ctx });
+  const degraded = unreachable.length > 0;
+  const hours = holdHours(deps, home.profile, snapshot.value, home.forecast(), preferences.value, degraded);
+  if (!hours.ok) return hours;
+  const nowMs = deps.clock.now();
+  if (degraded) {
+    deps.logger.log({
+      ts: new Date(nowMs).toISOString(),
+      level: 'warn',
+      component: 'mcp-server',
+      message: 'storm_read_degraded',
+      correlationId: ctx.correlationId,
+      code: 'store_unavailable',
+      category: 'dependency_unavailable',
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      details: { event: 'storm_read_degraded', unreachable: unreachable.join(','), ...homeDetail(ctx.homeId) },
+    });
+  }
+  return ok({
+    home,
+    store,
+    preferences: preferences.value,
+    snapshot: snapshot.value,
+    safeRoom,
+    nowMs,
+    safeHours: hours.value.hours,
+    safeUntilMs: hours.value.untilMs,
+    session: latest.value,
+    ...(degraded ? { storeUnavailable: true as const } : {}),
+    ctx,
+  });
 }
 
 /** The reading as a detector event: the grid state is measured; the level follows the session. */

@@ -15,6 +15,8 @@ export interface StormModeDeps {
   readonly storeFor: StateStoreFactory;
   /** The saved preferences (safe room, thresholds, contacts, language), or the config defaults. */
   readonly preferencesFor: (homeId: HomeId, profile: HomeProfile) => Promise<Result<Preferences, ErrorEnvelope>>;
+  /** The config defaults alone, for the read-only status when the store cannot be reached (#114). */
+  readonly defaultPreferencesFor: (homeId: HomeId, profile: HomeProfile) => Result<Preferences, ErrorEnvelope>;
   /** Wall clock of the sessions and the messages; the same clock as the store's TTL. */
   readonly clock: Clock;
   readonly config: StormModeConfig;

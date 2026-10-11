@@ -41,7 +41,7 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
               {t('safeRoom.storm')}
             </p>
           )}
-          <p className="eyebrow">{t('safeRoom.until')}</p>
+          <p className="eyebrow">{t(status.storeUnavailable === true ? 'safeRoom.untilStrict' : 'safeRoom.until')}</p>
           {/* The big time and the cubes: one row on a short screen (data-fit-tight), so both stay at full size. */}
           <div className="hero-row">
             <p className="hero-value" data-testid="safe-until">
@@ -70,6 +70,11 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
             <li>{t('safeRoom.level', { level: t(`level.${status.level}`), reason: t(`reason.${status.levelReason}`) })}</li>
           </ul>
           {inStorm && <p className="advice">{t('safeRoom.stay')}</p>}
+          {status.storeUnavailable === true && (
+            <p className="info-strip" data-testid="store-down">
+              {t('safeRoom.storeDown')}
+            </p>
+          )}
           {status.homeLink !== 'ok' && (
             <p className="info-strip" data-testid="home-link">
               {t(status.homeLink === 'stale' ? 'safeRoom.stale' : 'safeRoom.lost')}

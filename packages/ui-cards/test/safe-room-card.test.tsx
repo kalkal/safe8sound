@@ -36,6 +36,13 @@ describe('SafeRoomCard', () => {
     expect(screen.getAllByRole('alert')).toHaveLength(1);
   });
 
+  it('#114: with the store down, the time is at the stricter older-person limit and the card says it is the live reading only', () => {
+    render(<SafeRoomCard status={{ ...safeRoomCalm(), storeUnavailable: true }} />);
+    expect(screen.getByText('At the stricter older-person limit, at least until')).toBeTruthy();
+    expect(screen.queryByText('Comfortable at least until')).toBeNull();
+    expect(screen.getByTestId('store-down').textContent).toBe('The saved settings and the storm state cannot be read right now: this is the live reading only.');
+  });
+
   it('gives the hours as an estimate, "at least until", with the clock of the home', () => {
     render(<SafeRoomCard status={safeRoomInStorm()} />);
     expect(screen.getByRole('region', { name: 'Safe room · Bedroom 1' })).toBeTruthy();

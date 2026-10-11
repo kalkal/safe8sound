@@ -138,6 +138,11 @@ export const SafeRoomStatusSchema = z.strictObject({
   lastCheckIn: FamilyReplySchema.optional(),
   origin: DataOriginSchema,
   homeLink: HomeLinkSchema,
+  /**
+   * #114 (additive, approved in #114): the store could not be read, so this is the live reading with the default
+   * safe room, no storm session, and the hours at the stricter night limit. Absent when the store answered.
+   */
+  storeUnavailable: z.literal(true).optional(),
 });
 export type SafeRoomStatus = z.infer<typeof SafeRoomStatusSchema>;
 

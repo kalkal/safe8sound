@@ -276,6 +276,8 @@ export const enUS = {
   'safeRoom.stay': 'Stay in the safe room and keep the door closed.',
   'safeRoom.stale': 'The home has not sent a fresh reading: these are the last known values.',
   'safeRoom.lost': 'The home cannot be reached: these are the last known values.',
+  'safeRoom.untilStrict': 'At the stricter older-person limit, at least until',
+  'safeRoom.storeDown': 'The saved settings and the storm state cannot be read right now: this is the live reading only.',
   'reason.weather': 'weather',
   'reason.occupancy': 'who is home',
   'reason.user_choice': 'your choice',

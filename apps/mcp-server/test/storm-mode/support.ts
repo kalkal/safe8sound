@@ -76,6 +76,7 @@ export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'st
         : undefined,
     storeFor,
     preferencesFor: () => Promise.resolve(ok(over.preferences ?? preferences)),
+    defaultPreferencesFor: () => ok(preferences),
     clock,
     config: stormConfig(),
     notifier: over.notifier ?? phone.value.notifier,

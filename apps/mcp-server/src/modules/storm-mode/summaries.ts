@@ -55,7 +55,9 @@ export function startSummary(o: StartOutput, room: RoomLabel = idOnly): string {
 export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: RoomLabel = idOnly): string {
   const humidity = s.humidityPct === undefined ? '' : `, ${String(s.humidityPct)} % humidity`;
   const occupants = s.occupantRoles.length > 0 ? s.occupantRoles.join(', ') : 'nobody';
-  const storm = s.stormPhase === undefined ? 'No storm mode.' : `Storm mode: ${s.stormPhase}.`;
+  // #114: the store could not be read: no storm session is known, and the hours are only at the stricter night limit.
+  const degraded = s.storeUnavailable === true;
+  const storm = degraded ? 'Storm mode could not be checked.' : s.stormPhase === undefined ? 'No storm mode.' : `Storm mode: ${s.stormPhase}.`;
   const checkIn =
     s.lastCheckIn === undefined
       ? ''
@@ -63,9 +65,13 @@ export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: R
   // With the grid up the safe room is not on the battery: its hours are only a what-if (#273).
   const hours =
     s.gridAvailable === true
-      ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone it would hold about ${one(s.safeHours)} hours.`
-      : `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`;
+      ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone${degraded ? ', at the stricter night limit for an older person,' : ''} it would hold about ${one(s.safeHours)} hours.`
+      : degraded
+        ? `At the stricter night limit for an older person, it holds for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`
+        : `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`;
+  const head = degraded ? 'The saved settings and the storm state are not reachable right now: this is the live reading only. ' : '';
   return (
+    head +
     `Safe room ${room(s.safeRoomId)}: ${formatTempFixed(s.tempC, unit)}${humidity}, occupants: ${occupants}. Level ${s.level} (reason: ${s.levelReason}). ` +
     `${hours} ${storm}${checkIn} Home link ${s.homeLink}, ${dataText(s.origin)}.`
   );

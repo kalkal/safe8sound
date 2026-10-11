@@ -253,6 +253,8 @@ export const itIT = {
   'safeRoom.stay': 'Resta nella stanza rifugio e tieni la porta chiusa.',
   'safeRoom.stale': 'La casa non ha mandato una lettura recente: questi sono gli ultimi valori noti.',
   'safeRoom.lost': 'La casa non è raggiungibile: questi sono gli ultimi valori noti.',
+  'safeRoom.untilStrict': 'Con il limite più severo per una persona anziana, almeno fino alle',
+  'safeRoom.storeDown': 'Le impostazioni salvate e lo stato della tempesta non si leggono ora: questa è solo la lettura dal vivo.',
   'reason.weather': 'meteo',
   'reason.occupancy': 'chi è in casa',
   'reason.user_choice': 'tua scelta',

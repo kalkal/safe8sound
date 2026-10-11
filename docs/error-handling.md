@@ -66,7 +66,7 @@ Every error carries a stable machine code (`snake_case`), a category and a short
 | Weather/air-quality forecast | Last cached forecast with its age; confidence drops to `low` |
 | Bedrock / AgentCore | Scripted answers for status questions + clear notice; no actions |
 | Polly | Browser speech synthesis |
-| DynamoDB | Read-only answers from the current snapshot; preferences changes rejected with a clear message |
+| DynamoDB | Read-only answers from the current snapshot; preferences changes rejected with a clear message. `get_safe_room_status` (#114): a `store_unavailable` read of the preferences or the storm session still answers the live reading with the default safe room and no storm session, flagged `storeUnavailable`, its hours at the stricter older-person night limit (nobody knows who is home), the text and the card saying so, never "safe" alone; one warn line `storm_read_degraded` with the correlation id. Every write (start_storm_mode, notify_family, a family reply) stays fail-closed. A stored record that cannot be read never names its key in the message: the cause goes to the log through `onError` (`StoredItemNewerSchema`, `StoredItemInvalid`). |
 
 ## 6. Observability
 - One correlation id per user turn, propagated simulator → sim-api → agent → MCP server → logs (Powertools Logger, JSON).

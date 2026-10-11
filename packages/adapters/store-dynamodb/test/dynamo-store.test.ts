@@ -177,8 +177,12 @@ describe('store-dynamodb failures (docs/error-handling.md)', () => {
   it('reports an item that no longer matches its schema as unexpected_error', async () => {
     const table = createFakeTable();
     await table.put({ PK: `HOME#${HOME}`, SK: 'PREFS', schemaVersion: 1, data: { language: 'klingon' } });
-    const { store } = setup(table);
-    expect(await store.getPreferences()).toMatchObject({ ok: false, error: { code: 'unexpected_error', category: 'internal' } });
+    const { store, errors } = setup(table);
+    const result = await store.getPreferences();
+    expect(result).toMatchObject({ ok: false, error: { code: 'unexpected_error', category: 'internal' } });
+    // #114: the message never names a store key; the cause goes to the log.
+    expect(!result.ok && result.error.message).not.toContain('PREFS');
+    expect(errors).toMatchObject([{ code: 'unexpected_error', operation: 'getPreferences', cause: { name: 'StoredItemInvalid' } }]);
   });
 
   it('reads an item a newer version wrote with an additive field: the unknown field is dropped (R7, #111)', async () => {
@@ -198,5 +202,6 @@ describe('store-dynamodb failures (docs/error-handling.md)', () => {
     const result = await store.getPreferences();
     expect(result).toMatchObject({ ok: false, error: { code: 'unexpected_error' } });
     expect(!result.ok && result.error.message).toMatch(/schemaVersion 2/);
+    expect(!result.ok && result.error.message).not.toContain('PREFS');
   });
 });

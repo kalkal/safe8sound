@@ -17,6 +17,7 @@ import { defaultPreferencesFor, type PreferencesConfig } from './preferences-con
 export interface StormModeWiring {
   readonly storeFor: StateStoreFactory;
   readonly preferencesFor: (homeId: HomeId, profile: HomeProfile) => Promise<Result<Preferences, ErrorEnvelope>>;
+  readonly defaultPreferencesFor: (homeId: HomeId, profile: HomeProfile) => Result<Preferences, ErrorEnvelope>;
   readonly clock: Clock;
   readonly config: StormModeConfig;
   readonly notifier: InAppNotifier['notifier'];
@@ -50,6 +51,7 @@ export function stormModeWiring(opts: { storeFor: StateStoreFactory; preferences
       if (!saved.ok) return saved;
       return saved.value === undefined ? defaultPreferencesFor(opts.preferences, profile, homeId) : ok(saved.value);
     },
+    defaultPreferencesFor: (homeId, profile) => defaultPreferencesFor(opts.preferences, profile, homeId),
     clock: opts.clock,
     config: config.value,
     notifier: phone.value.notifier,
