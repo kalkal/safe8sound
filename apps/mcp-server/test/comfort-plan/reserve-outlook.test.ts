@@ -1,4 +1,4 @@
-import { ReserveOutlookSchema, pct } from '@cold-reserve/contracts';
+import { CARD_TOOL_ACCESS, ReserveOutlookSchema, pct } from '@cold-reserve/contracts';
 import { reserveOutlookHours } from '@cold-reserve/core';
 import { reserveOf } from '@cold-reserve/guard';
 import { describe, expect, it } from 'vitest';
@@ -57,8 +57,8 @@ describe('the comfort-plan module', () => {
     expect(m.id).toBe('comfort-plan');
     expect(m.tools.map((t) => [t.name, t.annotations.readOnlyHint, t.annotations.destructiveHint])).toEqual([
       ['plan_comfort', true, false],
-      ['apply_plan', false, true],
-      ['get_reserve_outlook', true, false],
+      ['apply_plan', CARD_TOOL_ACCESS.apply_plan === 'read', true],
+      ['get_reserve_outlook', CARD_TOOL_ACCESS.get_reserve_outlook === 'read', false],
     ]);
   });
 

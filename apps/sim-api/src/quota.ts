@@ -32,7 +32,11 @@ export function memoryQuotaStore(): QuotaStore {
 export interface QuotaLimits {
   readonly turnsPerCodePerDay: number;
   readonly turnsGlobalPerDay: number;
+  /** Card calls that change something (`CARD_TOOL_ACCESS` write: apply_plan, set_preferences…) per demo code per UTC day. */
   readonly toolCallsPerCodePerDay: number;
+  /** Card reads (`CARD_TOOL_ACCESS` read) per demo code and overall per UTC day (#334): reads never use up the writes. */
+  readonly readCallsPerCodePerDay: number;
+  readonly readCallsGlobalPerDay: number;
   /** Wrong demo codes per client IP per hour (a right code gives its attempt back, review of #139). */
   readonly codeAttemptsPerIpPerHour: number;
   /** Characters spoken by Polly per demo code and overall per UTC day; cache hits are free (approved in #25). */
@@ -139,11 +143,26 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
       await store.release(`SPEECH#${codeId}#${day.id}`, chars);
       await store.release(`SPEECH#GLOBAL#${day.id}`, chars);
     },
-    async toolCall(codeId: string): Promise<Result<void, ErrorEnvelope>> {
+    /**
+     * One card call, on the counter of its kind (#334): a write on `TOOLS#`, a read on `READS#` per code, then on the
+     * overall read count. A read the overall cap refuses gives its per-code count back, like the spoken characters.
+     */
+    async toolCall(codeId: string, access: 'read' | 'write', onGiveBackFailed?: (errorName: string) => void): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);
-      const allowed = await counted(() => store.consume(`TOOLS#${codeId}#${day.id}`, limits.toolCallsPerCodePerDay, day.endMs));
-      if (!allowed.ok) return allowed;
-      return allowed.value ? ok(undefined) : over(day.retryAfterMs, DAILY);
+      if (access === 'write') {
+        const allowed = await counted(() => store.consume(`TOOLS#${codeId}#${day.id}`, limits.toolCallsPerCodePerDay, day.endMs));
+        if (!allowed.ok) return allowed;
+        return allowed.value ? ok(undefined) : over(day.retryAfterMs, DAILY);
+      }
+      const perCode = await counted(() => store.consume(`READS#${codeId}#${day.id}`, limits.readCallsPerCodePerDay, day.endMs));
+      if (!perCode.ok) return perCode;
+      if (!perCode.value) return over(day.retryAfterMs, DAILY);
+      const overall = await counted(() => store.consume(`READS#GLOBAL#${day.id}`, limits.readCallsGlobalPerDay, day.endMs));
+      if (!overall.ok) return overall;
+      if (overall.value) return ok(undefined);
+      const back = await counted(() => store.release(`READS#${codeId}#${day.id}`));
+      if (!back.ok) onGiveBackFailed?.(causes.get(back.error) ?? 'unknown');
+      return over(day.retryAfterMs, DAILY);
     },
     /**
      * Counts one demo code attempt from this IP, atomically, BEFORE the code is looked at (review of #110):

@@ -1,4 +1,4 @@
-import { HomeStatusSchema, ErrorEnvelopeSchema, LogEntrySchema, err, toolError, type HomeStatus } from '@cold-reserve/contracts';
+import { CARD_TOOL_ACCESS, HomeStatusSchema, ErrorEnvelopeSchema, LogEntrySchema, err, toolError, type HomeStatus } from '@cold-reserve/contracts';
 import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import type { SourceEvent } from '@cold-reserve/source-fallback';
@@ -171,7 +171,7 @@ describe('tools/list of the production registry', () => {
   it('marks get_home_status read-only and non-destructive', async () => {
     const body = (await (await post(app().handler, toolsList)).json()) as { result: { tools: { name: string; annotations: unknown }[] } };
     expect(body.result.tools.find((t) => t.name === 'get_home_status')?.annotations).toMatchObject({
-      readOnlyHint: true,
+      readOnlyHint: CARD_TOOL_ACCESS.get_home_status === 'read',
       destructiveHint: false,
     });
   });

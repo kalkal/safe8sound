@@ -1,6 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { isIP } from 'node:net';
 import {
+  CARD_TOOL_ACCESS,
   PROBLEM_JSON_CONTENT_TYPE,
   SessionRequestSchema,
   SpeechRequestSchema,
@@ -313,7 +314,9 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
 
       const request = ToolCallRequestSchema.safeParse(body);
       if (!request.success) return fail(toolError('invalid_input', 'Only card actions can be called here.'));
-      const allowed = await quota.toolCall(codeId);
+      const allowed = await quota.toolCall(codeId, CARD_TOOL_ACCESS[request.data.name], (errorName) => {
+        deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'warn', component: 'sim-api', message: 'read_refund_failed', correlationId, errorName, details: { codeId } });
+      });
       if (!allowed.ok) return fail(allowed.error, undefined, {}, codeId);
       const reply = await deps.tools.call({ home, request: request.data, correlationId });
       if (!reply.ok) return fail(reply.error, undefined, {}, codeId);

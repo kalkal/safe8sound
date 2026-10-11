@@ -125,6 +125,22 @@ export const ToolCallRequestSchema = z.discriminatedUnion('name', [
 ]);
 export type ToolCallRequest = z.infer<typeof ToolCallRequestSchema>;
 
+/**
+ * #334: what each card call does, said once, for every name above (the type makes a new entry choose): a `read`
+ * changes nothing (the tool's `readOnlyHint`, a test holds them equal). sim-api meters reads on their own counter,
+ * so a judge switching scenarios never uses up the budget of apply_plan.
+ */
+export const CARD_TOOL_ACCESS: Readonly<Record<ToolCallRequest['name'], 'read' | 'write'>> = {
+  apply_plan: 'write',
+  set_preferences: 'write',
+  get_home_status: 'read',
+  get_demo_settings: 'read',
+  set_scenario: 'write',
+  get_milestones: 'read',
+  advance_clock: 'write',
+  get_reserve_outlook: 'read',
+};
+
 /** The MCP CallToolResult a card receives: tool errors are values (isError + the error envelope). */
 export const ToolCallReplySchema = z.strictObject({
   isError: z.boolean().optional(),

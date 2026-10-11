@@ -1,4 +1,4 @@
-import { AdvanceClockOutputSchema, GetMilestonesOutputSchema, HomeIdSchema, celsius, ok, pct, toolError, type HomeId, type Plan, type SandboxSettings } from '@cold-reserve/contracts';
+import { AdvanceClockOutputSchema, CARD_TOOL_ACCESS, GetMilestonesOutputSchema, HomeIdSchema, celsius, ok, pct, toolError, type HomeId, type Plan, type SandboxSettings } from '@cold-reserve/contracts';
 import { examplePlan } from '@cold-reserve/contracts/fixtures';
 import { localIso, memoryLogger } from '@cold-reserve/core';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
@@ -101,8 +101,8 @@ describe('judges clock: who sees it (#311)', () => {
 
   it('marks the list read-only and the jump as a write that is not idempotent', () => {
     const { list, advance } = setup();
-    expect(list.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
-    expect(advance.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: false });
+    expect(list.annotations).toMatchObject({ readOnlyHint: CARD_TOOL_ACCESS.get_milestones === 'read', destructiveHint: false, idempotentHint: true });
+    expect(advance.annotations).toMatchObject({ readOnlyHint: CARD_TOOL_ACCESS.advance_clock === 'read', destructiveHint: false, idempotentHint: false });
   });
 });
 

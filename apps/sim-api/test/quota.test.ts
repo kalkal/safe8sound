@@ -2,7 +2,7 @@ import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import { createQuota, memoryQuotaStore, type QuotaLimits, type QuotaStore } from '../src/quota.js';
 
-const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 2, phoneReadsPerCodePerMinute: 3 };
+const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, readCallsPerCodePerDay: 2, readCallsGlobalPerDay: 3, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 2, phoneReadsPerCodePerMinute: 3 };
 // 2026-10-01 23:59:00 UTC: one minute to the daily reset.
 const NOW = Date.UTC(2026, 9, 1, 23, 59, 0);
 
@@ -32,9 +32,29 @@ describe('daily caps, checked before calling the agent (plan §13.2.4), reset at
 
   it('counts card tool calls separately from turns', async () => {
     const q = quota();
-    expect((await q.toolCall('judges')).ok).toBe(true);
-    expect((await q.toolCall('judges')).ok).toBe(false);
+    expect((await q.toolCall('judges', 'write')).ok).toBe(true);
+    expect((await q.toolCall('judges', 'write')).ok).toBe(false);
     expect((await q.turn('judges')).ok).toBe(true);
+  });
+
+  it('#334: card reads have their own count: they never use up the writes, and their cap answers the same 429', async () => {
+    const q = quota();
+    expect((await q.toolCall('judges', 'read')).ok).toBe(true);
+    expect((await q.toolCall('judges', 'read')).ok).toBe(true);
+    expect(await q.toolCall('judges', 'read')).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', retryable: true, retryAfterMs: 60_000 } });
+    expect((await q.toolCall('judges', 'write')).ok).toBe(true);
+  });
+
+  it('#334: the overall read cap holds across codes, and a refused read gives its per-code count back', async () => {
+    const store = memoryQuotaStore();
+    const q = quota(NOW, store);
+    await q.toolCall('a', 'read');
+    await q.toolCall('b', 'read');
+    await q.toolCall('c', 'read');
+    expect(await q.toolCall('c', 'read')).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded' } });
+    // c used one read and the refused one went back: with room again overall, c still has its second read.
+    await store.release(`READS#GLOBAL#2026-10-01`);
+    expect((await q.toolCall('c', 'read')).ok).toBe(true);
   });
 
   it('starts again the next UTC day', async () => {
@@ -102,7 +122,7 @@ describe('a slow or failing quota store (Copilot on #156)', () => {
     ['a network failure', Object.assign(new Error('connect'), { code: 'ECONNRESET' })],
   ])('answers store_unavailable (503, retryable, still fail closed) for %s, keeping the error name', async (_case, error) => {
     const q = createQuota({ store: failing(error), limits: LIMITS, clock: fixedClock(NOW), ipSalt: SALT });
-    for (const result of [await q.turn('judges'), await q.toolCall('judges'), await q.codeAttempt('203.0.113.7')]) {
+    for (const result of [await q.turn('judges'), await q.toolCall('judges', 'write'), await q.codeAttempt('203.0.113.7')]) {
       expect(result).toMatchObject({ ok: false, error: { code: 'store_unavailable', category: 'dependency_unavailable', retryable: true } });
       if (!result.ok) expect(q.causeOf(result.error)).toBe(error.name);
     }

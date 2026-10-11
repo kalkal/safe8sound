@@ -1,4 +1,4 @@
-import { HomeIdSchema, SandboxSettingsSchema, SetScenarioOutputSchema, toolError, type HomeId, type SandboxSettings } from '@cold-reserve/contracts';
+import { CARD_TOOL_ACCESS, HomeIdSchema, SandboxSettingsSchema, SetScenarioOutputSchema, toolError, type HomeId, type SandboxSettings } from '@cold-reserve/contracts';
 import { memoryLogger, type StateStore } from '@cold-reserve/core';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { describe, expect, it } from 'vitest';
@@ -53,8 +53,8 @@ describe('demo settings module: who sees it', () => {
 
   it('marks get as read-only, set as idempotent and not destructive', () => {
     const { get, set } = setup();
-    expect(get.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
-    expect(set.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
+    expect(get.annotations).toMatchObject({ readOnlyHint: CARD_TOOL_ACCESS.get_demo_settings === 'read', destructiveHint: false, idempotentHint: true });
+    expect(set.annotations).toMatchObject({ readOnlyHint: CARD_TOOL_ACCESS.set_scenario === 'read', destructiveHint: false, idempotentHint: true });
   });
 });
 

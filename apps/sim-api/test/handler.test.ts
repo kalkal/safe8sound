@@ -401,6 +401,17 @@ describe('refusals (review of #110)', () => {
     expect(called).toHaveLength(1);
   });
 
+  it('#334: card reads go on their own count: switching scenarios never leaves apply_plan with a 429', async () => {
+    const { send, session, called } = setup({ SIM_LIMIT_TOOL_CALLS_PER_CODE: '1', SIM_LIMIT_READ_CALLS_PER_CODE: '2' });
+    const token = await session();
+    const read = { token, body: { name: 'get_reserve_outlook', arguments: {} } };
+    expect((await send('/v1/tools/call', read)).status).toBe(200);
+    expect((await send('/v1/tools/call', { token, body: { name: 'get_home_status', arguments: {} } })).status).toBe(200);
+    await problem(await send('/v1/tools/call', read), 429, 'demo_quota_exceeded');
+    expect((await send('/v1/tools/call', { token, body: { name: 'apply_plan', arguments: { planId: 'plan-0001' } } })).status).toBe(200);
+    expect(called.map((c) => c.name)).toEqual(['get_reserve_outlook', 'get_home_status', 'apply_plan']);
+  });
+
   it('passes a card tool failure on as Problem Details (agent_unavailable -> 503)', async () => {
     const { send, session, logs } = setup({}, undefined, { toolReply: err(toolError('agent_unavailable', 'The home could not be reached.')) });
     await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'apply_plan', arguments: { planId: 'plan-0001' } } }), 503, 'agent_unavailable');

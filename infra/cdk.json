@@ -66,6 +66,8 @@
         "turnsPerCodePerDay": 20,
         "turnsGlobalPerDay": 30,
         "toolCallsPerCodePerDay": 20,
+        "readCallsPerCodePerDay": 200,
+        "readCallsGlobalPerDay": 2000,
         "codeAttemptsPerIpPerHour": 10,
         "speechCharsPerCodePerDay": 6000,
         "speechCharsGlobalPerDay": 30000,

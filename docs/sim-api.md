@@ -33,7 +33,9 @@ The caps live in the shared DynamoDB table, one item per key (sort key `COUNT`),
 | --- | --- | --- |
 | `DEMO#TURNS#<codeId>#<day>` | turns per demo code | UTC day |
 | `DEMO#TURNS#GLOBAL#<day>` | turns for everyone | UTC day |
-| `DEMO#TOOLS#<codeId>#<day>` | card actions per demo code | UTC day |
+| `DEMO#TOOLS#<codeId>#<day>` | card calls that change something per demo code (`CARD_TOOL_ACCESS` write: apply_plan, set_preferences, set_scenario, advance_clock) | UTC day |
+| `DEMO#READS#<codeId>#<day>` | card reads per demo code (`CARD_TOOL_ACCESS` read: get_home_status, get_reserve_outlook, get_demo_settings, get_milestones), #334: reads never use up the writes | UTC day |
+| `DEMO#READS#GLOBAL#<day>` | card reads for everyone (a read it refuses gives its per-code count back) | UTC day |
 | `DEMO#ATTEMPT#<salted hash of the IP>#<hour>` | wrong demo codes per client IP | UTC hour |
 | `DEMO#PHONE#SESSION#<jti>#<minute>` | phone panel reads per session | UTC minute |
 | `DEMO#PHONE#CODE#<codeId>#<minute>` | phone panel reads per demo code, all its sessions | UTC minute |

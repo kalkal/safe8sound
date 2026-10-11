@@ -1,4 +1,4 @@
-import { PreferencesSchema, SafetyHardLimitsSchema, type HomeId } from '@cold-reserve/contracts';
+import { CARD_TOOL_ACCESS, PreferencesSchema, SafetyHardLimitsSchema, type HomeId } from '@cold-reserve/contracts';
 import { examplePreferences, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import type { StateStore } from '@cold-reserve/core';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
@@ -33,7 +33,7 @@ describe('preferences module (MCP tools)', () => {
     const body = (await res.json()) as { result: { tools: Array<{ name: string; annotations: Record<string, boolean> }> } };
     const byName = Object.fromEntries(body.result.tools.map((t) => [t.name, t.annotations]));
     expect(byName['get_preferences']).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
-    expect(byName['set_preferences']).toMatchObject({ readOnlyHint: false, destructiveHint: true, idempotentHint: true });
+    expect(byName['set_preferences']).toMatchObject({ readOnlyHint: CARD_TOOL_ACCESS.set_preferences === 'read', destructiveHint: true, idempotentHint: true });
   });
 
   it('names the safe room in the text, its id only in parentheses for the model (#274)', async () => {
