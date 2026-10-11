@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ApplyPlanInputSchema, ApplyPlanOutputSchema } from './comfort-plan.js';
+import { ApplyPlanInputSchema, ApplyPlanOutputSchema, ReserveOutlookInputSchema } from './comfort-plan.js';
 import { IsoDateTimeSchema } from './common.js';
 import { AdvanceClockInputSchema, GetMilestonesInputSchema, SetScenarioInputSchema } from './demo-settings.js';
 import { ErrorCategorySchema, ErrorCodeSchema, ErrorEnvelopeSchema, categoryOf } from './errors.js';
@@ -120,6 +120,8 @@ export const ToolCallRequestSchema = z.discriminatedUnion('name', [
   // #311 (additive, approved in #311): the judges' clock, on its own sandbox only.
   z.strictObject({ name: z.literal('get_milestones'), arguments: GetMilestonesInputSchema }),
   z.strictObject({ name: z.literal('advance_clock'), arguments: AdvanceClockInputSchema }),
+  // #327 (additive, approved in #327): the idle screen's ice cubes read the reserve hours, read-only, home from the token.
+  z.strictObject({ name: z.literal('get_reserve_outlook'), arguments: ReserveOutlookInputSchema }),
 ]);
 export type ToolCallRequest = z.infer<typeof ToolCallRequestSchema>;
 

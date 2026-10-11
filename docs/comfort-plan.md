@@ -85,6 +85,7 @@ The agent reads only the text content of a tool result, not `structuredContent`,
 
 ## get_reserve_outlook (read-only)
 The reserve counted in hours for the ice-cube card, with the semantics agreed in #21:
+- **From the page (#327).** The idle Echo screen reads it through sim-api `POST /v1/tools/call` with no arguments, read-only, for the home in the session token (a `homeId` in the body is refused), metered by the tool quota; the page calls it on load and when the home or the scenario changes, never on a timer.
 - **Same energy basis.** `hoursAtCurrentLevel` and `hoursAtEssential` count the same energy. On grid that is only what comfort may spend, above the guard's reserve floor; off grid it is everything down to the hardware floor.
 - **The reserve alone.** `reserveHoursAtEssential` is the storm reserve after the losses, over the essential load. On grid it can exceed the spendable hours, so there is no invariant between them.
 - **Level loads.** They come from `config/comfort-plan.json` (`outlook.levelLoadW`, an assumption to calibrate). Essential is the guard's `reserve.essentialLoadW`.

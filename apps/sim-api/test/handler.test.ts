@@ -236,6 +236,15 @@ describe('POST /v1/tools/call: card actions, the MCP token stays here', () => {
     await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'get_home_status', arguments: { homeId: 'home' } } }), 400, 'invalid_input');
   });
 
+  it('#327: forwards the idle screen read of get_reserve_outlook for the home in the token, never one from the body', async () => {
+    const { send, session, called } = setup();
+    const res = await send('/v1/tools/call', { token: await session(), body: { name: 'get_reserve_outlook', arguments: {} } });
+    expect(res.status).toBe(200);
+    expect(called).toEqual([{ home: 'demo#01aaaaaaaaaaaaaa', name: 'get_reserve_outlook' }]);
+    await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'get_reserve_outlook', arguments: { homeId: 'home' } } }), 400, 'invalid_input');
+    expect(called).toHaveLength(1);
+  });
+
   it('B2: forwards the settings drawer (get_demo_settings, set_scenario) for the home in the token', async () => {
     const { send, session, called } = setup();
     const token = await session();
