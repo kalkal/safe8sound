@@ -1,10 +1,10 @@
-import { NotifyFamilyInputSchema, NotifyFamilyOutputSchema, SafeRoomStatusSchema, StartStormModeInputSchema, StartStormModeOutputSchema } from '@cold-reserve/contracts';
+import { NotifyFamilyInputSchema, NotifyFamilyOutputSchema, SafeRoomStatusSchema, StartStormModeInputSchema, StartStormModeOutputSchema, type HomeId } from '@cold-reserve/contracts';
 import { z } from 'zod';
 import type { CapabilityModule } from '../../registry.js';
 import { defineTool } from '../../tool.js';
 import { atHome } from '../comfort-plan/deps.js';
 import type { StormModeDeps } from './deps.js';
-import { notifySummary, safeRoomSummary, startSummary } from './summaries.js';
+import { notifySummary, safeRoomSummary, startSummary, type RoomLabel } from './summaries.js';
 import { notifyFamily, safeRoomStatus, startStormMode } from './tools.js';
 
 export { parseStormModeConfig, type StormModeConfig } from './config.js';
@@ -28,7 +28,7 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         input: StartStormModeInputSchema,
         output: StartStormModeOutputSchema,
-        summarize: startSummary,
+        summarize: (o, ctx) => startSummary(o, roomLabel(deps, ctx.homeId)),
         handler: (args, ctx) => startStormMode(atHome(deps, ctx.homeId), args, ctx),
       }),
       defineTool({
@@ -39,7 +39,7 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         input: z.strictObject({}),
         output: SafeRoomStatusSchema,
-        summarize: (o, ctx) => safeRoomSummary(o, deps.homes(ctx.homeId)?.units ?? 'C'),
+        summarize: (o, ctx) => safeRoomSummary(o, deps.homes(ctx.homeId)?.units ?? 'C', roomLabel(deps, ctx.homeId)),
         handler: (_args, ctx) => safeRoomStatus(atHome(deps, ctx.homeId), ctx),
       }),
       defineTool({
@@ -56,5 +56,14 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         handler: (args, ctx) => notifyFamily(atHome(deps, ctx.homeId), args, ctx),
       }),
     ],
+  };
+}
+
+/** The safe room said by its name from the home profile, with its id: "Bedroom 1 (bedroom-1)"; the id alone if unknown. */
+function roomLabel(deps: StormModeDeps, homeId: HomeId): RoomLabel {
+  const rooms = deps.homes(homeId)?.profile.rooms ?? [];
+  return (roomId) => {
+    const name = rooms.find((r) => r.id === roomId)?.name;
+    return name === undefined ? roomId : `${name} (${roomId})`;
   };
 }

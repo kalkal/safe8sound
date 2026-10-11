@@ -397,7 +397,7 @@ export function alignedNightWarning(w: PlanWarning, lr: Plan['lastResort'], nigh
 }
 
 /** The plan's warnings: the night warning aligned with a last resort, and "no heat danger" never next to it (#285 review). */
-function warningsOf(chosen: Attempt, safest: LastResort | undefined, roomName: string, unit: TempUnit): PlanWarning[] {
+export function warningsOf(chosen: Attempt, safest: LastResort | undefined, roomName: string, unit: TempUnit): PlanWarning[] {
   const night = chosen.verdict.nightRecovery;
   const own = safest === undefined ? chosen.verdict.warnings : chosen.verdict.warnings.filter((w) => w.code !== 'humid_air');
   return [...own.map((w) => alignedNightWarning(w, safest?.lastResort, night, roomName, unit)), ...(safest === undefined ? [] : [safest.warning])];

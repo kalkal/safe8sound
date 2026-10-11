@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { notifySummary, safeRoomSummary, startSummary } from '../../src/modules/storm-mode/summaries.js';
+import { stormModeModule } from '../../src/modules/storm-mode/index.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
 import { notifyFamily, safeRoomStatus, startStormMode } from '../../src/modules/storm-mode/tools.js';
 import { world } from './support.js';
@@ -47,6 +48,20 @@ describe('what the model reads', () => {
     expect(text).not.toMatch(/Giulia|phone-/);
     expect(text).toContain('Storm mode: active.');
     expect(text).toContain('simulated data (');
+  });
+
+  it('the storm tools say the safe room by its name, with its id: "Bedroom 1 (bedroom-1)"', async () => {
+    const w = world(4);
+    const tools = stormModeModule(w.deps).tools;
+    const said = (name: string, output: unknown) => tools.find((t) => t.name === name)?.summarize?.(output, w.ctx) ?? '';
+    const started = await startStormMode(w.deps, { mode: 'active' }, w.ctx);
+    if (!started.ok) throw new Error(started.error.message);
+    const status = await safeRoomStatus(w.deps, w.ctx);
+    if (!status.ok) throw new Error(status.error.message);
+    const room = w.deps.homes(w.ctx.homeId)?.profile.rooms.find((r) => r.id === status.value.safeRoomId);
+    if (room === undefined) throw new Error('no safe room in the profile');
+    expect(said('start_storm_mode', started.value)).toContain(`The safe room, ${room.name} (${room.id}), is covered`);
+    expect(said('get_safe_room_status', status.value)).toContain(`Safe room ${room.name} (${room.id}): `);
   });
 
   it('in °F (#306): the safe room in °F, and the family told in °F too', async () => {

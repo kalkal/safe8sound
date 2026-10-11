@@ -482,6 +482,18 @@ describe('what the model reads', () => {
     expect(outlookSummary(down.value)).toContain('The grid is down.');
   });
 
+  it('get_reserve_outlook on grid counts the comfort hours above the storm reserve; off grid the whole battery (#287 review)', async () => {
+    const low = world('heatwave', 14, { snapshot: (s) => ({ ...s, batterySocPct: pct(15) }) });
+    const up = await reserveOutlook(low.deps, {}, low.ctx);
+    if (!up.ok) throw new Error(up.error.message);
+    expect(up.value.gridAvailable).toBe(true);
+    expect(outlookSummary(up.value)).toMatch(/^For comfort, above the storm reserve: about /);
+    const storm = world('storm-blackout', 3);
+    const down = await reserveOutlook(storm.deps, {}, storm.ctx);
+    if (!down.ok) throw new Error(down.error.message);
+    expect(outlookSummary(down.value)).toMatch(/^On the battery alone: about /);
+  });
+
   it('a refused proposal: the first words say the guard refused it and why, then that this plan holds and is ready to apply (#202)', async () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(22), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);

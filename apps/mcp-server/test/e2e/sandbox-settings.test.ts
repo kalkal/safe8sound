@@ -183,6 +183,24 @@ describe('sandbox settings on the Lambda entry: two containers, one table', () =
     expect(GetDemoSettingsOutputSchema.parse((await two.call('get_demo_settings')).structuredContent).settings.scenarioId).toBe('storm-blackout');
   });
 
+  it('°F chosen through one container is said by the other: the plan, the preferences and an unconverted number (#306, #324)', async () => {
+    const table = createFakeTable();
+    const container = (seed: number) => {
+      const wall = settableClock(WALL);
+      const app = createLambdaApp({ ...ENV, MCP_SCENARIO_ANCHOR: 'daily' }, { wallClock: wall, logger: memoryLogger(), storeFor: dynamoStateStoreFactory({ table, clock: wall, rng: seededRng(seed) }) });
+      if (!app.ok) throw new Error(app.error.message);
+      return app.value;
+    };
+    const one = await (await serve(container(1)))(A);
+    const two = await (await serve(container(2)))(A);
+    const said = async (name: string, args: Record<string, unknown> = {}) => ((await two.call(name, args))['content'] as { text: string }[])[0]?.text ?? '';
+    expect((await one.call('set_scenario', { units: 'F' })).isError).not.toBe(true);
+    expect(await said('plan_comfort', { goal: 'cool' })).toMatch(/What it does: [^.]*at \d+(\.\d)? °F/);
+    expect(await said('get_preferences')).toContain('at most 80.6 °F (27 C)');
+    // The Lambda entry's preferences know the sandbox's unit too: 68 is a °F number sent as °C.
+    expect(await said('set_preferences', { comfortC: { heating: 68 }, confirmed: true })).toContain('68 °F is 20 °C: send comfortC.heating 20.');
+  });
+
   it('a store that cannot read the settings leaves the sandbox playing what it played, and says so in the log', async () => {
     const table = createFakeTable();
     const wall = settableClock(WALL);

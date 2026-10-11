@@ -244,8 +244,11 @@ export function outlookSummary(o: ReserveOutlook): string {
   if (o.hoursAtCurrentLevel === 0 && o.hoursAtEssential === 0 && o.reserveHoursAtEssential === 0) {
     return `The battery is empty: 0 hours on the battery, at any level, and none left in the storm reserve. ${grid} ${asOf}`;
   }
+  // On grid the spendable hours are only what comfort may use above the storm reserve (#21): said so, or "0 hours"
+  // next to "the reserve gives 1 hour" reads as a contradiction (#287 review). Off grid it is the whole battery.
+  const spendable = o.gridAvailable ? 'For comfort, above the storm reserve' : 'On the battery alone';
   return (
-    `On the battery alone: about ${one(o.hoursAtCurrentLevel)} hours at ${o.level} level, or ${one(o.hoursAtEssential)} hours at essential with the same energy; ` +
+    `${spendable}: about ${one(o.hoursAtCurrentLevel)} hours at ${o.level} level, or ${one(o.hoursAtEssential)} hours at essential with the same energy; ` +
     `the storm reserve alone gives ${one(o.reserveHoursAtEssential)} hours at essential. ${grid} ${asOf}`
   );
 }

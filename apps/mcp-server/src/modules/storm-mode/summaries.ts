@@ -37,18 +37,22 @@ function dataText(o: DataOrigin): string {
   return `simulated data (${simulated}${o.scenario === undefined ? '' : `, scenario ${o.scenario}`})`;
 }
 
-export function startSummary(o: StartOutput): string {
+/** A room as it is said: its name with its id, "Bedroom 1 (bedroom-1)", so the model says the name and still knows the id. */
+export type RoomLabel = (roomId: string) => string;
+const idOnly: RoomLabel = (roomId) => roomId;
+
+export function startSummary(o: StartOutput, room: RoomLabel = idOnly): string {
   const state =
     o.effectiveMode === 'active'
       ? 'Storm mode is active: the grid is down, so the storm reserve is now the budget.'
       : `Storm mode is prepared: ${o.reason === 'grid_still_up' ? 'the grid is still up, so the storm reserve stays locked.' : 'the storm reserve stays locked until the grid goes down.'}`;
   const told = o.session.notifications.filter((n) => n.transition === 'storm_started' && n.delivered);
   const family = told.length > 0 ? `Family told that the storm started: ${told.map((n) => `${n.contactRole} (${n.channel})`).join(', ')}.` : 'No family message was sent.';
-  return `${state} The safe room (${o.session.safeRoomId}) is covered for about ${one(o.safeHours)} hours, until ${localTimeText(o.safeUntil)}. ${family}${devicesText(o)}`;
+  return `${state} The safe room, ${room(o.session.safeRoomId)}, is covered for about ${one(o.safeHours)} hours, until ${localTimeText(o.safeUntil)}. ${family}${devicesText(o)}`;
 }
 
 /** The safe room now, in the unit the sandbox chose (#306); the structured status stays in °C. */
-export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C'): string {
+export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: RoomLabel = idOnly): string {
   const humidity = s.humidityPct === undefined ? '' : `, ${String(s.humidityPct)} % humidity`;
   const occupants = s.occupantRoles.length > 0 ? s.occupantRoles.join(', ') : 'nobody';
   const storm = s.stormPhase === undefined ? 'No storm mode.' : `Storm mode: ${s.stormPhase}.`;
@@ -62,7 +66,7 @@ export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C'): string
       ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone it would hold about ${one(s.safeHours)} hours.`
       : `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`;
   return (
-    `Safe room ${s.safeRoomId}: ${formatTempFixed(s.tempC, unit)}${humidity}, occupants: ${occupants}. Level ${s.level} (reason: ${s.levelReason}). ` +
+    `Safe room ${room(s.safeRoomId)}: ${formatTempFixed(s.tempC, unit)}${humidity}, occupants: ${occupants}. Level ${s.level} (reason: ${s.levelReason}). ` +
     `${hours} ${storm}${checkIn} Home link ${s.homeLink}, ${dataText(s.origin)}.`
   );
 }

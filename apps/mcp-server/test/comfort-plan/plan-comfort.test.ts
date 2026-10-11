@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { holdSafeRoom } from '@cold-reserve/guard';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
-import { alignedNightWarning, guardFrame, loadInputs, planComfort, roomsText } from '../../src/modules/comfort-plan/plan-comfort.js';
+import { alignedNightWarning, guardFrame, loadInputs, planComfort, roomsText, warningsOf } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { REAL, preferences, world } from './support.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
@@ -317,6 +317,18 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(r.value.lastResort).toBeDefined();
     expect(r.value.warnings?.some((x) => x.code === 'humid_air')).toBe(false);
     expect(JSON.stringify(r.value.warnings)).not.toContain('no heat danger');
+  });
+
+  it('the humid-air warning of the chosen verdict is dropped next to a last resort, and only there (#285 review, not vacuous)', () => {
+    type Chosen = Parameters<typeof warningsOf>[0];
+    type Safest = NonNullable<Parameters<typeof warningsOf>[1]>;
+    const humidAir = { code: 'humid_air', message: 'The air is humid, but there is no heat danger.' } as const;
+    const dry = { code: 'dry_air', message: 'The air is dry.' } as const;
+    const chosen = { verdict: { warnings: [humidAir, dry] } } as unknown as Chosen;
+    const lastResortWarning = { code: 'last_resort_plan', message: 'Only the safe room stays cool.' } as const;
+    const safest = { lastResort: { limitedBy: 'hardware' }, warning: lastResortWarning } as unknown as Safest;
+    expect(warningsOf(chosen, undefined, 'Bedroom', 'C').map((w) => w.code)).toEqual(['humid_air', 'dry_air']);
+    expect(warningsOf(chosen, safest, 'Bedroom', 'C').map((w) => w.code)).toEqual(['dry_air', 'last_resort_plan']);
   });
 
   it('the last resort IS the hold of the safe room (#24, decision A): the safe room alone at essential, every other room off', async () => {
