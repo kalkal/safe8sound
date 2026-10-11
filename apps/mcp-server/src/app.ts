@@ -146,9 +146,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     homeId: HomeId,
     choices: SandboxChoices & { readonly version?: number | undefined; readonly scenarioStartedAt?: string | undefined; readonly advancedMs?: number | undefined },
   ): Result<SandboxPlay, ErrorEnvelope> => {
-    // Every place ships (L2, #247); a place the simulator did not know would be refused by set_scenario first.
     const place = shippedPlace(choices.locationId);
-    if (place === undefined) return err(toolError('invalid_config', 'The stored place is not available.', { details: { field: 'locationId' } }));
     const played = withHousehold(builtInScenario(choices.scenarioId, choices.locationId), choices.household);
     const sandboxScenario = startSoc === undefined ? played : { ...played, initial: { ...played.initial, batterySocPct: pct(startSoc) } };
     const homeClock = timeline.value.clockFor({
@@ -252,8 +250,8 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
             wallClock: opts.wallClock,
             defaults: sandboxDefaults,
             place: (id) => {
-              const place = shippedPlace(id);
-              return place === undefined ? undefined : { id: place.id, label: place.label, tz: place.tz };
+              const { label, tz } = shippedPlace(id);
+              return { id, label, tz };
             },
             logger: opts.logger,
             // This container plays the change at once; the others at their next request.

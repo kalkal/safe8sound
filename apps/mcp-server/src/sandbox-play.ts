@@ -22,8 +22,8 @@ export function withHousehold(scenario: Scenario, household: Household): Scenari
   return { ...scenario, occupancy: scenario.occupancy.map((o) => ({ ...o, roles: o.roles.map((r) => (r === SCRIPT_ROLE ? role : r)) })) };
 }
 
-/** A place shipped with the simulator: the reference home, Turin and Houston (L2, #247). */
-export const shippedPlace = (id: LocationId): Place | undefined => builtInPlace(id);
+/** A place shipped with the simulator: the reference home, Turin and Houston (L2, #247). Every LocationId ships. */
+export const shippedPlace = (id: LocationId): Place => builtInPlace(id);
 
 /** One sandbox as this container plays it. */
 export interface SandboxPlay {
