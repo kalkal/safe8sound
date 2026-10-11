@@ -113,17 +113,26 @@ export function updatePreferences(
     if (unconverted !== undefined) return err(unconverted);
   }
   if (comfortC.cooling > safety.cooling.maxC) return err(setpoint('comfortC.cooling', safety.cooling.maxC, ctx.unit));
-  if (comfortC.heating < safety.heating.minC) return err(setpoint('comfortC.heating', safety.heating.minC, ctx.unit));
+  // #329 review: under a cooling comfort below the heating minimum no heating comfort passes (at least the minimum, at
+  // most the cooling): every heating refusal becomes "raise the cooling first", so a suggestion is never refused again.
+  const refuseHeating = (refusal: ErrorEnvelope) =>
+    err(comfortC.cooling < safety.heating.minC ? coolingFirst(safety.heating.minC, ctx.unit) : refusal);
+  if (comfortC.heating < safety.heating.minC) return refuseHeating(setpoint('comfortC.heating', safety.heating.minC, ctx.unit));
   // #312: no room is heated past the limit it is cooled to (an unconverted 68 was saved as 68 °C). Checked when the
   // heating comfort or that limit is sent (#321): an old value saved before the rule never blocks other fields.
   const heatingSent = update.comfortC?.heating !== undefined;
   const coolingSent = update.comfortC?.cooling !== undefined;
+  // #325: a heating comfort every rule accepts: at or below the cooling comfort and its maximum, never under the minimum.
+  const heatingNearest = Math.max(safety.heating.minC, Math.min(comfortC.cooling, safety.cooling.maxC));
   if ((heatingSent || update.safety?.cooling?.maxC !== undefined) && comfortC.heating > safety.cooling.maxC) {
-    return err(setpoint('comfortC.heating', safety.cooling.maxC, ctx.unit));
+    return refuseHeating(setpoint('comfortC.heating', safety.cooling.maxC, ctx.unit, heatingNearest));
   }
   // #321: heating never above cooling (the preferences card and the season assume it), said on the field sent.
   if ((heatingSent || coolingSent) && comfortC.heating > comfortC.cooling) {
-    return err(heatingSent ? order('comfortC.heating', 'at or below the cooling', comfortC.cooling, ctx.unit) : order('comfortC.cooling', 'at or above the heating', comfortC.heating, ctx.unit));
+    if (heatingSent) return refuseHeating(order('comfortC.heating', 'at or below the cooling', comfortC.cooling, ctx.unit, heatingNearest));
+    // #325: under an old heating above the cooling maximum no cooling comfort can pass: that heating comes down first.
+    if (comfortC.heating > safety.cooling.maxC) return refuseHeating(heatingFirst(safety.cooling.maxC, heatingNearest, ctx.unit));
+    return err(order('comfortC.cooling', 'at or above the heating', comfortC.heating, ctx.unit));
   }
 
   const parsed = PreferencesSchema.safeParse({
@@ -157,15 +166,34 @@ export function unconvertedFahrenheit(field: string, valueC: number, unit: TempU
   return toolError('invalid_input', `Temperatures are sent in Celsius: ${said} looks like °F. ${said} °F is ${inC} °C: send ${field} ${inC}.`, { details: { field } });
 }
 
-const setpoint = (field: string, limit: number, unit: TempUnit = 'C') =>
-  toolError('invalid_setpoint', `${field} must stay within the safety threshold (${formatTempForInput(limit, unit)}).`, {
-    details: { field, limit, nearestAllowed: limit, unit: 'C' },
+/** A refused setpoint: the rule's limit, and the nearest value every rule accepts (the limit unless said otherwise, #325). */
+const setpoint = (field: string, limit: number, unit: TempUnit = 'C', nearestAllowed = limit) =>
+  toolError('invalid_setpoint', `${field} must stay within the safety threshold (${formatTempForInput(limit, unit)}).${sendInstead(limit, nearestAllowed, unit)}`, {
+    details: { field, limit, nearestAllowed, unit: 'C' },
   });
 
-const order = (field: string, where: string, limit: number, unit: TempUnit = 'C') =>
-  toolError('invalid_setpoint', `${field} must stay ${where} comfort (${formatTempForInput(limit, unit)}).`, {
-    details: { field, limit, nearestAllowed: limit, unit: 'C' },
+const order = (field: string, where: string, limit: number, unit: TempUnit = 'C', nearestAllowed = limit) =>
+  toolError('invalid_setpoint', `${field} must stay ${where} comfort (${formatTempForInput(limit, unit)}).${sendInstead(limit, nearestAllowed, unit)}`, {
+    details: { field, limit, nearestAllowed, unit: 'C' },
   });
+
+/** The model reads only the message (#329 review): a suggestion other than the rule's limit is said there too. */
+const sendInstead = (limit: number, nearestAllowed: number, unit: TempUnit) =>
+  nearestAllowed === limit ? '' : ` Send ${nearestAllowed < limit ? 'at most' : 'at least'} ${formatTempForInput(nearestAllowed, unit)}.`;
+
+const coolingFirst = (minC: number, unit: TempUnit = 'C') =>
+  toolError(
+    'invalid_setpoint',
+    `comfortC.cooling is below the heating safety minimum (${formatTempForInput(minC, unit)}), so no heating comfort can pass: raise the cooling first, to ${formatTempForInput(minC, unit)} at least.`,
+    { details: { field: 'comfortC.cooling', limit: minC, nearestAllowed: minC, unit: 'C' } },
+  );
+
+const heatingFirst = (limit: number, nearestAllowed: number, unit: TempUnit = 'C') =>
+  toolError(
+    'invalid_setpoint',
+    `comfortC.heating, saved earlier, is above the cooling safety maximum (${formatTempForInput(limit, unit)}): lower it first, to ${formatTempForInput(nearestAllowed, unit)} at most.`,
+    { details: { field: 'comfortC.heating', limit, nearestAllowed, unit: 'C' } },
+  );
 
 const optional = <K extends string, V>(key: K, value: V | undefined): Partial<Record<K, V>> => (value === undefined ? {} : ({ [key]: value } as Record<K, V>));
 

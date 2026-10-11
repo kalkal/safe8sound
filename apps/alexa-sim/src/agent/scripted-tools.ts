@@ -30,7 +30,7 @@ function applyLastResort(token: unknown): ToolCallResult {
   return success(SCRIPT_FIXTURES['last-resort-applied']().result, 'The last-resort plan is applied.');
 }
 
-// TODO(#321): this scripted save skips the server's preference rules (core updatePreferences: the safety limits, heating
+// TODO(#330): this scripted save skips the server's preference rules (core updatePreferences: the safety limits, heating
 // at or below cooling, an unconverted °F number); alexa-sim does not depend on core.
 function setPreferences(args: Record<string, unknown>, at: string | undefined): ToolCallResult {
   const input = SetPreferencesInputSchema.safeParse(args);

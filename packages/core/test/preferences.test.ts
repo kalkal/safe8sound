@@ -132,7 +132,7 @@ describe('updatePreferences', () => {
   it('#312: refuses a heating comfort above the cooling safety maximum: no room is heated past the limit it is cooled to', () => {
     expect(updatePreferences(current(), { comfortC: { heating: 68 } }, ctx)).toMatchObject({
       ok: false,
-      error: { code: 'invalid_setpoint', details: { field: 'comfortC.heating', limit: 27, nearestAllowed: 27, unit: 'C' } },
+      error: { code: 'invalid_setpoint', details: { field: 'comfortC.heating', limit: 27, nearestAllowed: 25, unit: 'C' } },
     });
     expect(updatePreferences(current(), { comfortC: { heating: 27.5 } }, ctx)).toMatchObject({ ok: false, error: { code: 'invalid_setpoint' } });
     expect(updatePreferences(current(), { comfortC: { cooling: 27, heating: 27 } }, ctx)).toMatchObject({ ok: true });
@@ -160,6 +160,102 @@ describe('updatePreferences', () => {
     expect(updatePreferences(old, { language: 'it-IT' }, ctx)).toMatchObject({ ok: true });
     expect(updatePreferences(old, { comfortC: { heating: 29 } }, ctx)).toMatchObject({ ok: false, error: { code: 'invalid_setpoint', details: { field: 'comfortC.heating' } } });
     expect(updatePreferences(old, { safety: { cooling: { maxC: 26 } } }, ctx)).toMatchObject({ ok: false, error: { code: 'invalid_setpoint', details: { field: 'comfortC.heating', limit: 26 } } });
+  });
+
+  it('#325: the suggested value passes every comfort rule, so sending it back is accepted', () => {
+    // The example: cooling 25, heating 20, heating minimum 18, cooling maximum 27.
+    const sendBack = (prefs: ReturnType<typeof current>, update: Parameters<typeof updatePreferences>[1]) => {
+      const refused = updatePreferences(prefs, update, ctx);
+      if (refused.ok) throw new Error('expected a refusal');
+      const field = String(refused.error.details?.field);
+      const nearest = Number(refused.error.details?.nearestAllowed);
+      const key = field === 'comfortC.heating' ? 'heating' : 'cooling';
+      return { refused: refused.error, again: updatePreferences(prefs, { comfortC: { ...update.comfortC, [key]: nearest } }, ctx) };
+    };
+    // Heating above the cooling maximum: the rule's limit is 27, the suggestion 25, the cooling comfort.
+    const above = sendBack(current(), { comfortC: { heating: 28 } });
+    expect(above.refused).toMatchObject({ details: { field: 'comfortC.heating', limit: 27, nearestAllowed: 25 } });
+    expect(above.again.ok).toBe(true);
+    // Heating above the cooling comfort: 25.
+    const over = sendBack(current(), { comfortC: { heating: 26 } });
+    expect(over.refused).toMatchObject({ details: { field: 'comfortC.heating', limit: 25, nearestAllowed: 25 } });
+    expect(over.again.ok).toBe(true);
+    // Cooling under the saved heating: the heating, 20.
+    const under = sendBack(current(), { comfortC: { cooling: 19 } });
+    expect(under.refused).toMatchObject({ details: { field: 'comfortC.cooling', limit: 20, nearestAllowed: 20 } });
+    expect(under.again.ok).toBe(true);
+  });
+
+  it('#325: a cooling comfort under an old heating above the limit asks to lower the heating first, with a value that passes', () => {
+    const old = PreferencesSchema.parse({ ...examplePreferences(), comfortC: { cooling: 25, heating: 30 } });
+    const refused = updatePreferences(old, { comfortC: { cooling: 26 } }, ctx);
+    expect(refused).toMatchObject({
+      ok: false,
+      error: {
+        code: 'invalid_setpoint',
+        message: 'comfortC.heating, saved earlier, is above the cooling safety maximum (27 C): lower it first, to 26 C at most.',
+        details: { field: 'comfortC.heating', limit: 27, nearestAllowed: 26, unit: 'C' },
+      },
+    });
+    expect(updatePreferences(old, { comfortC: { cooling: 26, heating: 26 } }, ctx)).toMatchObject({ ok: true });
+  });
+
+  it('#325: under a cooling comfort below the heating minimum the cooling goes up first, and each suggestion sent back is accepted or moves on', () => {
+    const lowCooling = PreferencesSchema.parse({ ...examplePreferences(), comfortC: { cooling: 16, heating: 18 } });
+    const first = updatePreferences(lowCooling, { comfortC: { heating: 19 } }, ctx);
+    expect(first).toMatchObject({
+      ok: false,
+      error: {
+        message: 'comfortC.cooling is below the heating safety minimum (18 C), so no heating comfort can pass: raise the cooling first, to 18 C at least.',
+        details: { field: 'comfortC.cooling', limit: 18, nearestAllowed: 18 },
+      },
+    });
+    const second = updatePreferences(lowCooling, { comfortC: { heating: 19, cooling: 18 } }, ctx);
+    expect(second).toMatchObject({ ok: false, error: { details: { field: 'comfortC.heating', limit: 18, nearestAllowed: 18 } } });
+    expect(updatePreferences(lowCooling, { comfortC: { heating: 18, cooling: 18 } }, ctx)).toMatchObject({ ok: true });
+  });
+
+  it('#329 review: a raised heating minimum above the cooling comfort asks to raise the cooling, not the heating again', () => {
+    const saved = PreferencesSchema.parse({ ...examplePreferences(), comfortC: { cooling: 21, heating: 20 } });
+    expect(updatePreferences(saved, { safety: { heating: { minC: 22 } } }, ctx)).toMatchObject({ ok: false, error: { details: { field: 'comfortC.cooling', nearestAllowed: 22 } } });
+    const old = PreferencesSchema.parse({ ...examplePreferences(), comfortC: { cooling: 25, heating: 30 } });
+    expect(updatePreferences(old, { comfortC: { cooling: 17 } }, ctx)).toMatchObject({ ok: false, error: { details: { field: 'comfortC.cooling', nearestAllowed: 18 } } });
+  });
+
+  it('#329 review: a suggestion other than the rule limit is said in the message', () => {
+    const refused = updatePreferences(current(), { comfortC: { heating: 28 } }, ctx);
+    expect(!refused.ok && refused.error.message).toBe('comfortC.heating must stay within the safety threshold (27 C). Send at most 25 C.');
+  });
+
+  it('#329 review: sending back any suggestion is accepted or refused on another field (property)', () => {
+    const value = (b: { min: number; max: number }) => fc.integer({ min: Math.ceil(b.min), max: Math.floor(b.max) });
+    const temp = fc.integer({ min: 10, max: 32 });
+    fc.assert(
+      fc.property(
+        temp,
+        temp,
+        value(limits.cooling.maxC),
+        value(limits.heating.minC),
+        fc.record({ cooling: fc.option(temp, { nil: undefined }), heating: fc.option(temp, { nil: undefined }) }),
+        fc.boolean(),
+        fc.boolean(),
+        (savedCooling, savedHeating, maxC, minC, sent, sendMax, sendMin) => {
+          // Saved preferences pass the schema (cooling at most its maximum, heating at least its minimum), not the order rules.
+          const parsed = PreferencesSchema.safeParse({ ...examplePreferences(), comfortC: { cooling: savedCooling, heating: savedHeating } });
+          fc.pre(parsed.success);
+          const saved = parsed.data;
+          const comfortC = { ...(sent.cooling === undefined ? {} : { cooling: sent.cooling }), ...(sent.heating === undefined ? {} : { heating: sent.heating }) };
+          const safety = { ...(sendMax ? { cooling: { maxC } } : {}), ...(sendMin ? { heating: { minC } } : {}) };
+          const update = { comfortC, safety };
+          const refused = updatePreferences(saved, update, ctx);
+          if (refused.ok || refused.error.code !== 'invalid_setpoint') return;
+          const field = String(refused.error.details?.field);
+          const key = field === 'comfortC.heating' ? 'heating' : 'cooling';
+          const again = updatePreferences(saved, { ...update, comfortC: { ...comfortC, [key]: Number(refused.error.details?.nearestAllowed) } }, ctx);
+          if (!again.ok) expect(again.error.details?.field).not.toBe(field);
+        },
+      ),
+    );
   });
 
   it('#321: 40 in a °F sandbox is still a °C value (out of range); 40.1 is a °F number sent as °C', () => {
