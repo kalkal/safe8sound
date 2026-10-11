@@ -5,6 +5,7 @@ import { ApplyPlanOutputSchema } from '@cold-reserve/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDemoSession } from '../../src/agent/demo-session.js';
 import { createRemoteAgent } from '../../src/agent/remote-agent.js';
+import { fetchReserve } from '../../src/ui/reserve.js';
 
 // Remote mode end to end (#101): the simulator's RemoteAgent and demo session against the REAL local
 // sim-api, agent (fake model) and MCP server, each in its own process on 127.0.0.1. No AWS.
@@ -127,6 +128,17 @@ describe('remote mode: simulator -> sim-api -> agent -> MCP server', () => {
     const result = ApplyPlanOutputSchema.parse(applied.structuredContent);
     expect(result).toMatchObject({ alreadyApplied: false, advisoryOnly: false, plan: { id: card.result.id } });
     expect(result.plan.homeId).toMatch(/^demo#[0-9a-f]{16}$/);
+  }, 60_000);
+
+  it("the idle screen's ice cubes read the reserve through sim-api (get_reserve_outlook on tools/call, #333)", async () => {
+    const { session, agent } = remote();
+    await session.start(CODE);
+    const logged: unknown[] = [];
+    const reserve = await fetchReserve(agent, { correlationId: crypto.randomUUID() }, (line) => logged.push(line));
+    expect(reserve.ok).toBe(true);
+    if (!reserve.ok) return;
+    expect(reserve.value.hoursAtCurrentLevel).toBeGreaterThan(0);
+    expect(logged).toEqual([]);
   }, 60_000);
 });
 

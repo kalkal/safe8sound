@@ -1,4 +1,4 @@
-import { PlanSchema } from '@cold-reserve/contracts';
+import { PlanSchema, ReserveOutlookSchema } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { lastResortPlan } from '@cold-reserve/ui-cards';
 import { SCRIPTED_LAST_RESORT_TOKEN } from '../src/agent/script-fixtures.js';
@@ -198,6 +198,12 @@ describe('ScriptedAgent: the storm scene and the family phone (#24)', () => {
     expect(phone.messages().map((m) => m.transition)).toEqual(['last_resort_applied']);
     expect(phone.messages()[0]?.text).toContain('the home battery is low');
     expect(lines).toEqual([{ level: 'info', code: 'phone_delivered', correlationId: 'turn-lr', details: { transition: 'last_resort_applied' } }]);
+  });
+
+  it('the idle screen reads the cold reserve (owner, 11 Oct): get_reserve_outlook answers with the reserve fixture', async () => {
+    const reply = await agent().callTool('get_reserve_outlook', {}, ctx);
+    expect(reply.isError).not.toBe(true);
+    expect(ReserveOutlookSchema.safeParse(reply.structuredContent).success).toBe(true);
   });
 
   it('in the degraded mode never pretends a message was sent', async () => {

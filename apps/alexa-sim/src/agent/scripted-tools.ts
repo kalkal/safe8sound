@@ -59,6 +59,11 @@ function setPreferences(args: Record<string, unknown>, at: string | undefined): 
 
 export function scriptedToolCall(name: string, args: Record<string, unknown>, at: string | undefined): ToolCallResult {
   if (name === 'apply_plan') return applyPlan(args);
+  // The idle screen's cold reserve clock (owner, 11 Oct): read-only, the reserve of the scripted home.
+  if (name === 'get_reserve_outlook') {
+    const reserve = SCRIPT_FIXTURES['reserve-outlook']();
+    return success(reserve.result, 'Cold reserve.');
+  }
   if (name === 'set_preferences') return setPreferences(args, at);
   return toolErrorResult(toolError('invalid_input', `The simulator does not run ${name}.`));
 }

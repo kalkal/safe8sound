@@ -1,5 +1,5 @@
 import type { ReserveOutlook } from '@cold-reserve/contracts';
-import type { CSSProperties } from 'react';
+import { Fragment, type CSSProperties } from 'react';
 import { CardShell } from './CardShell.js';
 import { formatHours, t } from './text.js';
 
@@ -28,19 +28,30 @@ export function cubesLabel(hours: number): string {
 export function IceCubesCard({ outlook }: { outlook: ReserveOutlook }) {
   const hours = outlook.hoursAtCurrentLevel;
   return (
-    <CardShell title={t('cubes.title')} origin={outlook.origin.energy}>
-      <p className="hero-value" data-testid="cube-hours">
-        {t('cubes.hours', { hours: formatHours(hours) })}
-      </p>
-      <p className="muted">{t('cubes.basis', { level: t(`level.${outlook.level}`) })}</p>
-      <div className="cubes" role="img" aria-label={cubesLabel(hours)}>
-        {cubeFills(hours).map((fill, i) => (
-          <span key={i} className="cube" data-fill={fill} style={{ '--fill': String(fill) } as CSSProperties} />
-        ))}
-      </div>
-      {outlook.level !== 'essential' && (
-        <p className="warning">{t('cubes.essential', { hours: formatHours(outlook.hoursAtEssential) })}</p>
-      )}
-    </CardShell>
+    <CardShell
+      title={t('cubes.title')}
+      origin={outlook.origin.energy}
+      pages={[
+        <Fragment key="first">
+          <div className="hero-row">
+            <p className="hero-value" data-testid="cube-hours">
+              {t('cubes.hours', { hours: formatHours(hours) })}
+            </p>
+            {/* The cubes right under the big number, so they are in the first view on every screen (owner, 1 and 11 Oct). */}
+            <div className="cubes" role="img" aria-label={cubesLabel(hours)}>
+              {cubeFills(hours).map((fill, i) => (
+                <span key={i} className="cube" data-fill={fill} style={{ '--fill': String(fill) } as CSSProperties} />
+              ))}
+            </div>
+          </div>
+        </Fragment>,
+        <Fragment key="more">
+          <p className="muted">{t('cubes.basis', { level: t(`level.${outlook.level}`) })}</p>
+          {outlook.level !== 'essential' && (
+            <p className="warning">{t('cubes.essential', { hours: formatHours(outlook.hoursAtEssential) })}</p>
+          )}
+        </Fragment>,
+      ]}
+    />
   );
 }

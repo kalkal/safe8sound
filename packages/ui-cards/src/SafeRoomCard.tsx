@@ -1,5 +1,5 @@
 import { formatTempFixed, type SafeRoomStatus } from '@cold-reserve/contracts';
-import type { CSSProperties } from 'react';
+import { Fragment, type CSSProperties } from 'react';
 import { CardShell } from './CardShell.js';
 import { cubeFills, cubesLabel } from './IceCubesCard.js';
 import { getTempUnit } from './temp-unit.js';
@@ -27,43 +27,56 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
       : t('safeRoom.nowRh', { temp: formatTempFixed(status.tempC, getTempUnit()), rh: String(Math.round(status.humidityPct)) });
   const who = status.occupantRoles.length > 0 ? status.occupantRoles.join(', ') : t('safeRoom.nobody');
   return (
-    <CardShell title={t('safeRoom.title', { room: roomLabel(status.safeRoomId) })} origin={status.origin.rooms}>
-      {inStorm && (
-        <p className="storm-banner" role="alert">
-          <span className="storm-icon" aria-hidden="true">
-            ⚡
-          </span>
-          {t('safeRoom.storm')}
-        </p>
-      )}
-      <p className="eyebrow">{t('safeRoom.until')}</p>
-      <p className="hero-value" data-testid="safe-until">
-        {clockOf(status.safeUntil)}
-      </p>
-      <p className="muted">{t('safeRoom.hours', { hours: formatHours(status.safeHours) })}</p>
-      <ul className="facts" aria-label={t('safeRoom.facts')}>
-        <li>{t('safeRoom.who', { who })}</li>
-        <li>{now}</li>
-        <li>{t('safeRoom.level', { level: t(`level.${status.level}`), reason: t(`reason.${status.levelReason}`) })}</li>
-      </ul>
-      <div className="cubes" role="img" aria-label={cubesLabel(status.safeHours)}>
-        {cubeFills(status.safeHours).map((fill, i) => (
-          <span
-            key={i}
-            className="cube"
-            data-fill={fill}
-            // In the storm the hour being used melts once, from full to what is left (the time that remains).
-            {...(inStorm && i === Math.floor(status.safeHours) ? { 'data-melting': true } : {})}
-            style={{ '--fill': String(fill) } as CSSProperties}
-          />
-        ))}
-      </div>
-      {inStorm && <p className="advice">{t('safeRoom.stay')}</p>}
-      {status.homeLink !== 'ok' && (
-        <p className="info-strip" data-testid="home-link">
-          {t(status.homeLink === 'stale' ? 'safeRoom.stale' : 'safeRoom.lost')}
-        </p>
-      )}
-    </CardShell>
+    <CardShell
+      title={t('safeRoom.title', { room: roomLabel(status.safeRoomId) })}
+      origin={status.origin.rooms}
+      pages={[
+        // Page 1: the storm, the giant time and the ice cubes (owner, 10 and 11 Oct).
+        <Fragment key="first">
+          {inStorm && (
+            <p className="storm-banner" role="alert">
+              <span className="storm-icon" aria-hidden="true">
+                ⚡
+              </span>
+              {t('safeRoom.storm')}
+            </p>
+          )}
+          <p className="eyebrow">{t('safeRoom.until')}</p>
+          {/* The big time and the cubes: one row on a short screen (data-fit-tight), so both stay at full size. */}
+          <div className="hero-row">
+            <p className="hero-value" data-testid="safe-until">
+              {clockOf(status.safeUntil)}
+            </p>
+            {/* The signature element right under the big time, so it is in the first view on every screen (owner, 1 and 11 Oct). */}
+            <div className="cubes" role="img" aria-label={cubesLabel(status.safeHours)}>
+              {cubeFills(status.safeHours).map((fill, i) => (
+                <span
+                  key={i}
+                  className="cube"
+                  data-fill={fill}
+                  // In the storm the hour being used melts once, from full to what is left (the time that remains).
+                  {...(inStorm && i === Math.floor(status.safeHours) ? { 'data-melting': true } : {})}
+                  style={{ '--fill': String(fill) } as CSSProperties}
+                />
+              ))}
+            </div>
+          </div>
+        </Fragment>,
+        <Fragment key="more">
+          <p className="muted">{t('safeRoom.hours', { hours: formatHours(status.safeHours) })}</p>
+          <ul className="facts" aria-label={t('safeRoom.facts')}>
+            <li>{t('safeRoom.who', { who })}</li>
+            <li>{now}</li>
+            <li>{t('safeRoom.level', { level: t(`level.${status.level}`), reason: t(`reason.${status.levelReason}`) })}</li>
+          </ul>
+          {inStorm && <p className="advice">{t('safeRoom.stay')}</p>}
+          {status.homeLink !== 'ok' && (
+            <p className="info-strip" data-testid="home-link">
+              {t(status.homeLink === 'stale' ? 'safeRoom.stale' : 'safeRoom.lost')}
+            </p>
+          )}
+        </Fragment>,
+      ]}
+    />
   );
 }

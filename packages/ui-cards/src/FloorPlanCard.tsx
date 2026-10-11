@@ -1,4 +1,5 @@
 import { formatTempFixed, type HomeStatus } from '@cold-reserve/contracts';
+import { Fragment } from 'react';
 import { CardShell } from './CardShell.js';
 import { DeviceIcon } from './DeviceIcon.js';
 import { roomLabel } from './SafeRoomCard.js';
@@ -11,38 +12,46 @@ import { t } from './text.js';
  */
 export function FloorPlanCard({ status }: { status: HomeStatus }) {
   return (
-    <CardShell title={t('floor.title')} origin={status.origin.rooms}>
-      {!status.gridAvailable && <p className="advice">{t('floor.gridDown')}</p>}
-      <ul className="facts energy-facts" aria-label={t('floor.energy')}>
-        <li>
-          <DeviceIcon device="battery" level={status.batterySocPct} />
-          {t('floor.battery', { pct: String(Math.round(status.batterySocPct)) })}
-        </li>
-        <li>
-          <DeviceIcon device="solar" on={status.pvW > 0} />
-          {t('floor.solar', { kw: (status.pvW / 1000).toFixed(1) })}
-        </li>
-        <li>
-          <DeviceIcon device="grid" on={status.gridAvailable} />
-          {gridText(status)}
-        </li>
-        <li>{t('floor.level', { level: t(`level.${status.level}`), reason: t(`reason.${status.levelReason}`) })}</li>
-      </ul>
-      <ul className="floor-plan" aria-label={t('floor.rooms')}>
-        {status.rooms.map((room) => {
-          const name = roomLabel(room.roomId);
-          return (
-            <li key={room.roomId} className="room-tile" data-state={room.state} aria-label={name}>
-              <DeviceIcon device="split" on={room.state === 'served'} />
-              <span className="room-name">{name}</span>
-              <span className="room-temp">{formatTempFixed(room.tempC, getTempUnit())}</span>
-              {room.occupants.length > 0 && <span className="muted">{room.occupants.join(', ')}</span>}
-              <span className="room-state">{room.waitingReason === undefined ? t('floor.served') : t(`floor.waiting.${room.waitingReason}`)}</span>
+    <CardShell
+      title={t('floor.title')}
+      origin={status.origin.rooms}
+      pages={[
+        <Fragment key="first">
+          {!status.gridAvailable && <p className="advice">{t('floor.gridDown')}</p>}
+          <ul className="facts energy-facts" aria-label={t('floor.energy')}>
+            <li>
+              <DeviceIcon device="battery" level={status.batterySocPct} />
+              {t('floor.battery', { pct: String(Math.round(status.batterySocPct)) })}
             </li>
-          );
-        })}
-      </ul>
-    </CardShell>
+            <li>
+              <DeviceIcon device="solar" on={status.pvW > 0} />
+              {t('floor.solar', { kw: (status.pvW / 1000).toFixed(1) })}
+            </li>
+            <li>
+              <DeviceIcon device="grid" on={status.gridAvailable} />
+              {gridText(status)}
+            </li>
+            <li>{t('floor.level', { level: t(`level.${status.level}`), reason: t(`reason.${status.levelReason}`) })}</li>
+          </ul>
+        </Fragment>,
+        <Fragment key="more">
+          <ul className="floor-plan" aria-label={t('floor.rooms')}>
+            {status.rooms.map((room) => {
+              const name = roomLabel(room.roomId);
+              return (
+                <li key={room.roomId} className="room-tile" data-state={room.state} aria-label={name}>
+                  <DeviceIcon device="split" on={room.state === 'served'} />
+                  <span className="room-name">{name}</span>
+                  <span className="room-temp">{formatTempFixed(room.tempC, getTempUnit())}</span>
+                  {room.occupants.length > 0 && <span className="muted">{room.occupants.join(', ')}</span>}
+                  <span className="room-state">{room.waitingReason === undefined ? t('floor.served') : t(`floor.waiting.${room.waitingReason}`)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </Fragment>,
+      ]}
+    />
   );
 }
 

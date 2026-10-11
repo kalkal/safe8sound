@@ -39,6 +39,14 @@ function setup(onSave = vi.fn(), preferences: Preferences = PreferencesSchema.pa
 }
 
 const button = (name: string) => screen.getByRole('button', { name });
+/** Pages instead of scrolling (owner, 10 Oct): comfort on page 1, the safe room on page 2, the order and contacts on 3. */
+function toPage(n: number) {
+  for (let i = 0; i < 3; i++) {
+    const where = screen.getByRole('navigation', { name: 'Pages of this card' }).textContent;
+    if (where.includes(`${String(n)} of`)) return;
+    fireEvent.click(button(Number(/(\d) of/.exec(where)?.[1]) < n ? 'Next page' : 'Previous page'));
+  }
+}
 const unavailable = (name: string) => button(name).getAttribute('aria-disabled') === 'true';
 
 describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
@@ -65,6 +73,7 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
 
   it('keeps the safe room first in the priority list and moves the others with up and down', () => {
     setup();
+    toPage(3);
     const list = screen.getByRole('list', { name: 'Room priority' });
     const names = () => within(list).getAllByRole('listitem').map((li) => within(li).getByTestId('room-name').textContent);
     expect(names()).toEqual(['Bedroom', 'Living room', 'Study']);
@@ -76,6 +85,7 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
 
   it('keeps keyboard focus on the moved room, even when the button becomes unavailable', () => {
     setup();
+    toPage(3);
     button('Move Study up').focus();
     fireEvent.click(button('Move Study up'));
     expect(document.activeElement).toBe(button('Move Study up'));
@@ -85,7 +95,9 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
 
   it('choosing another safe room puts it first', () => {
     setup();
+    toPage(2);
     fireEvent.click(screen.getByRole('radio', { name: 'Study' }));
+    toPage(3);
     const list = screen.getByRole('list', { name: 'Room priority' });
     expect(within(list).getAllByTestId('room-name')[0]?.textContent).toBe('Study');
   });
@@ -108,6 +120,7 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
 
   it('shows contacts by role and channel only, in words, never names or handles', () => {
     setup();
+    toPage(3);
     const contacts = screen.getByRole('list', { name: 'Family contacts, 1 of 3' });
     expect(contacts.textContent).toBe('Daughter · in-app');
     expect(document.body.textContent).not.toContain('Example Contact');
@@ -117,6 +130,7 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
   it('saves only what changed, as a confirmed set_preferences input', () => {
     const onSave = setup();
     fireEvent.click(button('Cooler'));
+    toPage(3);
     fireEvent.click(button('Move Study up'));
     fireEvent.click(button('Save'));
     expect(onSave).toHaveBeenCalledOnce();
@@ -153,6 +167,7 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
   it('shows readable room names from the ids when the host gives no names', () => {
     const valid = PreferencesSchema.parse(examplePreferences());
     render(<PreferencesCard view={{ preferences: toPublicPreferences(valid), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) }} />);
+    toPage(3);
     const list = screen.getByRole('list', { name: 'Room priority' });
     expect(within(list).getAllByTestId('room-name').map((n) => n.textContent)).toEqual(['Bedroom 1', 'Living', 'Study']);
   });

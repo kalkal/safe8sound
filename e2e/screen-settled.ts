@@ -10,7 +10,8 @@ import { expect } from './no-network.js';
 type Sized = { clientHeight: number };
 
 export async function expectScreenSettled(page: Page): Promise<void> {
-  const frames = page.locator('iframe.card-frame');
+  // The cards on screen: an answer's other cards wait hidden behind their tabs (pages instead of scrolling, 10 Oct).
+  const frames = page.locator('iframe.card-frame:visible');
   const count = await frames.count();
   for (let i = 0; i < count; i++) {
     await frames.nth(i).scrollIntoViewIfNeeded();

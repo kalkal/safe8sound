@@ -2,8 +2,7 @@ import { expect, test } from '../no-network.js';
 
 // Owner, 10 Oct: on a large screen (1920 × 1080, 1366 × 768) the home's own "Full screen" showed only the home, and
 // the way back was a bare "Back" nobody saw as one. Now it says where it goes, Escape works too, and the
-// conversation comes back. Inline, "Full screen" sits on the same left edge as "Hide my home", with a gap above
-// the card, like the other button rows.
+// conversation comes back. Inline, "Full screen" sits in the card's own title row (pages instead of scrolling, 10 Oct).
 
 for (const [width, height] of [
   [1920, 1080],
@@ -19,14 +18,13 @@ for (const [width, height] of [
     const expand = card.getByRole('button', { name: 'Full screen' });
     await expect(expand).toBeVisible();
 
-    // Same left edge as "Hide my home", and a gap between the button row and the card.
-    const hide = await page.getByRole('button', { name: 'Hide my home' }).boundingBox();
+    // In the card's own title row (pages instead of scrolling, owner 10 Oct: one row less), at least 48 px tall.
+    const title = await card.getByRole('heading', { name: 'The home right now' }).boundingBox();
     const expandBox = await expand.boundingBox();
-    const cardBox = await card.getByRole('region', { name: 'The home right now' }).boundingBox();
-    if (hide === null || expandBox === null || cardBox === null) throw new Error('missing boxes');
+    if (title === null || expandBox === null) throw new Error('missing boxes');
     // boundingBox() inside a frame is already in page coordinates.
-    expect(Math.abs(expandBox.x - hide.x)).toBeLessThanOrEqual(1);
-    expect(cardBox.y - (expandBox.y + expandBox.height)).toBeGreaterThanOrEqual(8);
+    expect(Math.abs(expandBox.y + expandBox.height / 2 - (title.y + title.height / 2))).toBeLessThan(24);
+    expect(expandBox.height).toBeGreaterThanOrEqual(48);
 
     await expand.click();
     const back = card.getByRole('button', { name: 'Back to the conversation' });

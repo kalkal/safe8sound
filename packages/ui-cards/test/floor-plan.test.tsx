@@ -14,25 +14,25 @@ afterEach(() => {
 describe('FloorPlanCard (signature element 3: the thermal floor plan, generated from the home)', () => {
   it('draws one tile per room, generated from the status, never by hand', () => {
     render(<FloorPlanCard status={homeInStorm()} />);
-    const plan = screen.getByRole('list', { name: 'Rooms' });
-    expect(within(plan).getAllByRole('listitem')).toHaveLength(homeInStorm().rooms.length);
+    const plan = screen.getByRole('list', { name: 'Rooms', hidden: true });
+    expect(within(plan).getAllByRole('listitem', { hidden: true })).toHaveLength(homeInStorm().rooms.length);
   });
 
   it('says for each room whether it is served, or waiting and why, in words', () => {
     render(<FloorPlanCard status={homeInStorm()} />);
-    const bedroom = screen.getByRole('listitem', { name: 'Bedroom 1' });
+    const bedroom = screen.getByRole('listitem', { name: 'Bedroom 1', hidden: true });
     expect(bedroom.textContent).toContain('Served');
     expect(bedroom.textContent).toContain('26.8 °C');
     expect(bedroom.textContent).toContain('grandpa');
-    const living = screen.getByRole('listitem', { name: 'Living' });
+    const living = screen.getByRole('listitem', { name: 'Living', hidden: true });
     expect(living.textContent).toContain('Waiting: the level cools fewer rooms right now');
   });
 
   it('°F everywhere (owner decision, 9 Oct): each room in the chosen unit', () => {
     setTempUnit('F');
     render(<FloorPlanCard status={homeInStorm()} />);
-    expect(screen.getByRole('listitem', { name: 'Bedroom 1' }).textContent).toContain('80.2 °F');
-    expect(screen.getByRole('list', { name: 'Rooms' }).textContent).not.toContain('°C');
+    expect(screen.getByRole('listitem', { name: 'Bedroom 1', hidden: true }).textContent).toContain('80.2 °F');
+    expect(screen.getByRole('list', { name: 'Rooms', hidden: true }).textContent).not.toContain('°C');
   });
 
   it('says the battery feeds only the safe room while the grid is down', () => {

@@ -8,6 +8,8 @@ import { openRemote } from '../remote-session.js';
 const examples = (page: import('@playwright/test').Page) => page.getByRole('group', { name: 'Example questions' });
 
 test('scripted: choosing the storm scenario swaps the hot-day examples for the storm ones, which the demo answers', async ({ page }) => {
+  // A tall screen shows all three examples (a short Echo shows two, on one row).
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/');
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toBeVisible();
 

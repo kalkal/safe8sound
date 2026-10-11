@@ -19,7 +19,7 @@ const show = (state: CardState, notice?: { ok: boolean; text: string }, canAct =
 describe('CardApp: what the person sees inside the ui:// frame', () => {
   it('an applied plan keeps its safety check in sight, like every plan (owner feedback, 6 Oct)', () => {
     show({ kind: 'applied', data: { plan: { ...hotDayPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] } });
-    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check', hidden: true })).toBeTruthy();
     expect(screen.getByTestId('receipt-stamp').textContent).toBe('APPROVED');
   });
 
@@ -33,14 +33,14 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
 
   it('shows the plan and the guard receipt; Apply calls apply_plan through the host', () => {
     const onCallTool = show({ kind: 'plan', data: hotDayPlan() });
-    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check', hidden: true })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Apply plan' }));
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_7Hq2mX9vK3' });
   });
 
   it('a last-resort plan is applied by touch in two steps: the first tap asks, with no token (#160)', () => {
     const onCallTool = show({ kind: 'plan', data: lastResortPlan() });
-    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check', hidden: true })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Apply the last-resort plan' }));
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_LastResort01' });
   });
@@ -57,7 +57,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     // CE-22: the notice and its button sit in a card, and the receipt stays: the person still sees what fails.
     expect(notice.closest('.card')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Yes, apply it now' }).closest('.card')).toBe(notice.closest('.card'));
-    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check', hidden: true })).toBeTruthy();
     // The person hears and sees where they are: focus moves to the notice.
     expect(document.activeElement).toBe(notice);
     expect(document.body.textContent).not.toContain('Plan applied.');
@@ -128,7 +128,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
   it('shows the home as a floor plan for get_home_status', () => {
     show({ kind: 'home', data: homeInStorm() });
     expect(screen.getByRole('region', { name: 'The home right now' })).toBeTruthy();
-    expect(screen.getByRole('listitem', { name: 'Bedroom 1' }).textContent).toContain('Served');
+    expect(screen.getByRole('listitem', { name: 'Bedroom 1', hidden: true }).textContent).toContain('Served');
   });
 
   it('shows the safe room for the storm card', () => {
@@ -142,7 +142,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(screen.getByRole('alert').textContent).toBe(
       'The safety check refused this plan: Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W.',
     );
-    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check', hidden: true })).toBeTruthy();
     expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');
     expect(screen.queryByRole('button', { name: /Apply/ })).toBeNull();
   });

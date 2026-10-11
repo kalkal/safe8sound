@@ -46,7 +46,7 @@ describe('SafeRoomCard', () => {
 
   it('lists who is in the room, the measured air, and the level with its reason', () => {
     render(<SafeRoomCard status={safeRoomInStorm()} />);
-    const facts = screen.getByRole('list', { name: 'In the safe room' });
+    const facts = screen.getByRole('list', { name: 'In the safe room', hidden: true });
     expect(facts.textContent).toContain('Who: grandpa');
     expect(facts.textContent).toContain('Now: 26.8 °C · 55% RH');
     expect(facts.textContent).toContain('Level: Essential (storm)');
@@ -55,7 +55,14 @@ describe('SafeRoomCard', () => {
   it('°F everywhere (owner decision, 9 Oct): the measured air in the chosen unit', () => {
     setTempUnit('F');
     render(<SafeRoomCard status={safeRoomInStorm()} />);
-    expect(screen.getByRole('list', { name: 'In the safe room' }).textContent).toContain('Now: 80.2 °F · 55% RH');
+    expect(screen.getByRole('list', { name: 'In the safe room', hidden: true }).textContent).toContain('Now: 80.2 °F · 55% RH');
+  });
+
+  it('the ice cubes come right under the big time, before the facts (owner, 1 Oct: the signature element stays in the first view)', () => {
+    const { container } = render(<SafeRoomCard status={safeRoomInStorm()} />);
+    const hero = screen.getByTestId('safe-until');
+    expect(hero.nextElementSibling?.classList.contains('cubes')).toBe(true);
+    expect(container.querySelector('.cubes')?.compareDocumentPosition(screen.getByRole('list', { name: /./, hidden: true })) ?? 0).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('draws the hours as ice cubes, described in words', () => {
@@ -85,7 +92,7 @@ describe('SafeRoomCard', () => {
     render(<SafeRoomCard status={safeRoomCalm()} />);
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByText(/keep the door closed/)).toBeNull();
-    expect(screen.getByRole('list', { name: 'In the safe room' }).textContent).toContain('Level: Comfort (your choice)');
+    expect(screen.getByRole('list', { name: 'In the safe room', hidden: true }).textContent).toContain('Level: Comfort (your choice)');
   });
 
   it('shows the data origin, and an information strip when the home link is not ok', () => {
@@ -99,6 +106,6 @@ describe('SafeRoomCard', () => {
 
   it('says when nobody is in the room', () => {
     render(<SafeRoomCard status={{ ...safeRoomCalm(), occupantRoles: [] }} />);
-    expect(screen.getByRole('list', { name: 'In the safe room' }).textContent).toContain('Who: nobody right now');
+    expect(screen.getByRole('list', { name: 'In the safe room', hidden: true }).textContent).toContain('Who: nobody right now');
   });
 });

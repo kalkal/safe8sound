@@ -1,3 +1,4 @@
+import { toCardPage, toLastCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 import { expectVoiceMatchesCards } from '../voice-screen.js';
 
@@ -18,10 +19,12 @@ test('a refused proposal: the storm reserve said by voice and card, the plan tha
   // One plan card, and no refusal card next to it.
   await expect(page.locator('iframe[title="Plan card"]')).toHaveCount(1);
   await expect(card.getByRole('alert')).toHaveCount(0);
+  await toLastCardPage(card);
   await expect(card.getByRole('region', { name: 'Safety check' }).getByTestId('receipt-stamp')).toHaveText('APPROVED');
   await expectVoiceMatchesCards(page, ['Plan card']);
 
   const plan = card.getByRole('region', { name: 'Plan' });
+  await toCardPage(card, 1);
   await plan.getByRole('button', { name: 'Apply plan' }).click();
   await expect(card.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
 });

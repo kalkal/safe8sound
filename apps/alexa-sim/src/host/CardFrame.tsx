@@ -19,12 +19,16 @@ import { answerCardCall, confirmationFor } from './tool-calls.js';
 const HOST_INFO = { name: 'cold-reserve-alexa-sim', version: '0.1.0' };
 /** The card keeps this height while it waits for its result (ui-cards), so the frame never shrinks and grows back. */
 const INITIAL_HEIGHT_PX = CARD_WAITING_MIN_PX;
+/** A landscape Echo screen, as in app.css: there the cards fit the content band. */
+const ECHO_LANDSCAPE = '(width >= 56rem)';
 /** The modes this host can show a card in (#200): full screen only when the person asks for it. */
 const DISPLAY_MODES: ('inline' | 'fullscreen')[] = ['inline', 'fullscreen'];
 
 /** The hostContext of a frame: the MCP Apps fields, plus the simulator's own demo key only in demo mode. */
-export function hostContextFor({ theme, timeZone, fullscreen, demo, locale, units = 'C' }: { theme: 'dark' | 'light'; timeZone: string; fullscreen: boolean; demo: boolean; locale: Locale; units?: TempUnit }) {
+export function hostContextFor({ theme, timeZone, fullscreen, demo, locale, units = 'C', maxHeight }: { theme: 'dark' | 'light'; timeZone: string; fullscreen: boolean; demo: boolean; locale: Locale; units?: TempUnit; maxHeight?: number }) {
   return {
+    // No scrolling on the Echo screen (owner, 10 Oct): inline, the height the card has; the card fits itself in it.
+    ...(maxHeight === undefined ? {} : { containerDimensions: { maxHeight } }),
     theme,
     timeZone,
     // #263: the page's language, through the standard MCP Apps field.
@@ -59,7 +63,7 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
   const frameRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
   const locale = useSyncExternalStore(subscribeLocale, getLocale);
-  const contextRef = useRef({ theme, timeZone, demo, locale, units });
+  const contextRef = useRef<{ theme: 'dark' | 'light'; timeZone: string; demo: boolean; locale: Locale; units: TempUnit; maxHeight?: number }>({ theme, timeZone, demo, locale, units });
   contextRef.current = { theme, timeZone, demo, locale, units };
   const [height, setHeight] = useState(INITIAL_HEIGHT_PX);
   const [failed, setFailed] = useState(false);
@@ -119,9 +123,6 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
     };
   }, [agent, card, document, turnId]);
 
-  useEffect(() => {
-    bridgeRef.current?.setHostContext(hostContextFor({ theme, timeZone, fullscreen, demo, locale, units }));
-  }, [theme, timeZone, fullscreen, demo, locale, units]);
 
   // Full screen: Escape on the page goes back too (inside the frame the card handles it), and focus follows
   // the frame in and back, so a keyboard user is never left behind the overlay.
@@ -145,6 +146,54 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
     };
   }, [fullscreen]);
 
+  // No scrolling on the Echo screen (owner, 10 Oct): inline, the room left in the content band below this frame. On a
+  // phone (narrower than a landscape Echo) the band scrolls like a page instead, so the 48 px targets stay 48 px.
+  const [room, setRoom] = useState(Number.POSITIVE_INFINITY);
+  useEffect(() => {
+    const host = hostRef.current;
+    const band = host?.closest('.band-content');
+    if (!host || !band) return undefined;
+    const echo = window.matchMedia(ECHO_LANDSCAPE);
+    const measure = () => {
+      // On a phone, or behind its tab (not laid out): no limit; it is measured when it shows.
+      if (!echo.matches || host.offsetParent === null) {
+        setRoom(Number.POSITIVE_INFINITY);
+        return;
+      }
+      const bandBox = band.getBoundingClientRect();
+      const hostBox = host.getBoundingClientRect();
+      // What the band holds below this frame (the answer box's padding and border): the frame leaves room for it.
+      // Measured from the band's content, never from its scroll height (equal to its own height when all fits).
+      const contentBottom = Math.max(...Array.from(band.children, (child) => child.getBoundingClientRect().bottom));
+      const below = Math.max(0, contentBottom - hostBox.bottom);
+      setRoom(Math.floor(bandBox.bottom - hostBox.top - below));
+    };
+    echo.addEventListener('change', measure);
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        echo.removeEventListener('change', measure);
+      };
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(band);
+    // A card shown again by its tab gets its size back, and what sits above it (the answer's words, the tabs) can
+    // change height after a font loads: measured then too.
+    observer.observe(host);
+    for (const above of band.querySelectorAll(':scope > *, .answer > *, .tool-cards > *')) observer.observe(above);
+    return () => {
+      echo.removeEventListener('change', measure);
+      observer.disconnect();
+    };
+  }, []);
+  // MCP Apps containerDimensions: the card fits itself in this height (inline only; full screen is the whole screen).
+  const maxHeight = fullscreen || !Number.isFinite(room) ? undefined : Math.max(0, room);
+  // Also in the first hostContext: a frame measured before its bridge connected (a card behind its tab) still fits.
+  if (maxHeight !== undefined) contextRef.current.maxHeight = maxHeight;
+  useEffect(() => {
+    bridgeRef.current?.setHostContext(hostContextFor({ theme, timeZone, fullscreen, demo, locale, units, ...(maxHeight === undefined ? {} : { maxHeight }) }));
+  }, [theme, timeZone, fullscreen, demo, locale, units, maxHeight]);
+
   if (!document.ok || failed) return <p role="alert">{t('surface.failed')}</p>;
   // The wrapper is always there, so the frame is never remounted (that would reload the card).
   return (
@@ -159,7 +208,11 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
         className="card-frame"
         title={t(`cardFrame.${kind}`)}
         sandbox="allow-scripts"
-        style={{ blockSize: fullscreen ? '100%' : `${String(height)}px`, colorScheme: theme }}
+        style={{
+          // Never taller than the room in the band, even while the card waits or before it fits itself.
+          blockSize: fullscreen ? '100%' : `${String(Math.min(height, maxHeight ?? height))}px`,
+          colorScheme: theme,
+        }}
       />
     </div>
   );

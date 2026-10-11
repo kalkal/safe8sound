@@ -18,8 +18,11 @@ export async function expectVoiceMatchesCards(page: Page, cards: readonly string
   for (const title of cards) {
     const frame = answer.frameLocator(`iframe[title="${title}"]`);
     // Read the card once it is drawn, never its empty frame.
-    await expect(frame.locator('section.card').first()).toBeVisible();
-    for (const n of numberTokens(await frame.locator('body').innerText())) shown.add(n);
+    await expect(frame.locator('section.card').first()).toBeAttached();
+    // Every page of the card counts (pages instead of scrolling, owner 10 Oct): a number on page 2 is on the card.
+    // Each element's own text, apart: the card's words never run into each other ("16:00" "2.4", not "16:002.4").
+    // The card's own elements only: the document also inlines the card bundle's script, whose numbers would "match".
+    for (const n of numberTokens((await frame.locator('#root *').allTextContents()).join(' '))) shown.add(n);
   }
   const missing = [...spoken].filter((n) => !shown.has(n));
   expect(missing, `said but not shown on ${cards.join(', ')}`).toEqual([]);

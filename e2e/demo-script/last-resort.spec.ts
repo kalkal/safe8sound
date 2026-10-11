@@ -1,3 +1,4 @@
+import { toCardPage, toLastCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 import { expectVoiceMatchesCards } from '../voice-screen.js';
 
@@ -19,6 +20,7 @@ test('last resort: honest headline, two taps to apply, the family is told', asyn
   await expect(plan.getByTestId('plan-horizon')).toHaveText('22:00');
   await expect(plan.getByTestId('last-resort-window')).toHaveText('Then up to 26.1 °C by 03:00, past the 24 °C limit.');
   await expect(plan.getByText('Comfortable at least until')).toHaveCount(0);
+  await toLastCardPage(card);
   await expect(card.getByRole('region', { name: 'Safety check' }).getByTestId('receipt-stamp')).toHaveText('LAST RESORT: Safe room comfort NOT MET');
   // Never "can't be applied" next to an Apply button: a last resort says how it is applied (review of #288).
   await expect(card.getByRole('region', { name: 'Safety check' }).getByTestId('receipt-explain')).toContainText('applied only after you confirm twice');
@@ -27,6 +29,7 @@ test('last resort: honest headline, two taps to apply, the family is told', asyn
   for (const n of ['22:00', '26.1', '03:00']) expect(spoken).toContain(n);
   await expectVoiceMatchesCards(page, ['Plan card']);
 
+  await toCardPage(card, 1);
   await plan.getByRole('button', { name: 'Apply the last-resort plan' }).click();
   await expect(card.getByRole('status').filter({ hasText: 'Not applied yet: this is a last resort.' })).toBeVisible();
   await expect(card.locator('body')).not.toContainText('lr_');

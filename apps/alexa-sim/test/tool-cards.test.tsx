@@ -2,7 +2,7 @@
 import { ReserveOutlookSchema, ok, type Result } from '@cold-reserve/contracts';
 import { exampleReserveOutlook } from '@cold-reserve/contracts/fixtures';
 import { hotDayPlan, type CardKind } from '@cold-reserve/ui-cards';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Agent } from '../src/agent/agent.js';
 import type { CardSlot } from '../src/agent/wire.js';
@@ -30,6 +30,30 @@ describe('ToolCards: each tool result in its own sandboxed ui:// frame', () => {
     const frames = screen.getAllByTitle(/card$/);
     expect(frames.map((f) => f.getAttribute('title'))).toEqual(['Plan card', 'Cold reserve card']);
     expect(frames.every((f) => f.getAttribute('sandbox') === 'allow-scripts')).toBe(true);
+  });
+
+  it('pages instead of scrolling (owner, 10 Oct): one card at a time, a tab per card named by what it shows; the others stay loaded', () => {
+    show([
+      { tool: 'plan_comfort', result: hotDayPlan() },
+      { tool: 'get_reserve_outlook', result: ReserveOutlookSchema.parse(exampleReserveOutlook()) },
+    ]);
+    const tabs = screen.getByRole('tablist', { name: 'Cards of this answer' });
+    expect(screen.getAllByRole('tab').map((t) => [t.textContent, t.getAttribute('aria-selected')])).toEqual([
+      ['Plan', 'true'],
+      ['Cold reserve', 'false'],
+    ]);
+    expect(tabs).toBeTruthy();
+    const panelOf = (title: string) => screen.getByTitle(title).closest('[role="tabpanel"]') as HTMLElement;
+    expect(panelOf('Plan card').hidden).toBe(false);
+    expect(panelOf('Cold reserve card').hidden).toBe(true);
+    fireEvent.click(screen.getByRole('tab', { name: 'Cold reserve' }));
+    expect(panelOf('Plan card').hidden).toBe(true);
+    expect(panelOf('Cold reserve card').hidden).toBe(false);
+  });
+
+  it('a single card has no tabs', () => {
+    show([{ tool: 'plan_comfort', result: hotDayPlan() }]);
+    expect(screen.queryByRole('tablist')).toBeNull();
   });
 
   it('shows a calm message in place of a card that failed its contract, and keeps the others', () => {

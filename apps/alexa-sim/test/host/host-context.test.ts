@@ -19,6 +19,12 @@ describe('the hostContext a card frame receives', () => {
     expect(hostContextFor({ ...base, locale: 'it-IT', demo: false })).toMatchObject({ locale: 'it-IT' });
   });
 
+  it('no scrolling on the Echo screen (owner, 10 Oct): inline, the height the card has, as MCP Apps containerDimensions', () => {
+    const base = { theme: 'dark' as const, timeZone: 'Europe/Rome', fullscreen: false, locale: 'en-US' as const, demo: false };
+    expect(hostContextFor({ ...base, maxHeight: 221 })).toMatchObject({ containerDimensions: { maxHeight: 221 } });
+    expect(hostContextFor(base)).not.toHaveProperty('containerDimensions');
+  });
+
   it('°F everywhere (owner decision, 9 Oct): always tells the card the chosen unit, so a switch back to °C reaches it too', () => {
     const base = { theme: 'dark' as const, timeZone: 'Europe/Rome', fullscreen: false, locale: 'en-US' as const, demo: false };
     expect(hostContextFor({ ...base, units: 'F' })).toMatchObject({ [UNITS_CONTEXT_KEY]: 'F' });

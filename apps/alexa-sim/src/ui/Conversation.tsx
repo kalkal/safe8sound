@@ -2,7 +2,7 @@ import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { getLocale } from '@cold-reserve/i18n';
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMachine } from '@xstate/react';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SyntheticEvent } from 'react';
 import { fromPromise } from 'xstate';
 import type { Agent, AgentAnswer, DemoSession } from '../agent/index.js';
 import type { VoiceConfig } from '../config.js';
@@ -12,6 +12,8 @@ import { useVoice, type StudioVoice } from '../voice/use-voice.js';
 import { useSlowTurn } from './slow-turn.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { AnswerCard } from './AnswerCard.js';
+import { addAnswer, currentAnswer, emptyHistory, historyPosition, stepAnswer } from './answer-history.js';
+import { AnswerPager } from './AnswerPager.js';
 import { DemoCodeGate } from './DemoCodeGate.js';
 import { DemoOverlay } from './DemoOverlay.js';
 import { ExampleQuestions, type ExampleQuestion } from './ExampleQuestions.js';
@@ -35,9 +37,15 @@ export interface ConversationProps {
   onAnswer?: (answer: AgentAnswer) => void;
   /** The example buttons for the home's state (#268): storm examples with the grid down. */
   examples?: readonly ExampleQuestion[];
+  /** Three bands (owner, 10 Oct): what the header band shows (title, theme, the home button). */
+  head?: ReactNode;
+  /** The home, when open: shown in the content band in place of the answer. */
+  homeView?: ReactNode;
+  /** The idle screen's own content (the cold reserve clock, owner 11 Oct), under the first screen's hint. */
+  idle?: ReactNode;
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false, onAnswer, examples }: ConversationProps) {
+export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false, onAnswer, examples, head, homeView, idle }: ConversationProps) {
   const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
@@ -91,6 +99,17 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
   useEffect(() => {
     if (answer !== undefined) onAnswer?.(answer);
   }, [answer, onAnswer]);
+  // One answer at a time (owner's choice, 10 Oct): every answered turn is kept, with its question, for Previous / Next.
+  const [history, setHistory] = useState(emptyHistory);
+  const questions = useRef(new Map<string, string>());
+  useEffect(() => {
+    if (answer === undefined || turnId === null) return;
+    if (question !== null) questions.current.set(turnId, question);
+    setHistory((previous) => addAnswer(previous, turnId));
+  }, [answer, turnId, question]);
+  const shownTurn = currentAnswer(history);
+  const shown = useQuery<TurnResult>({ queryKey: turnKey(shownTurn ?? null), queryFn: skipToken });
+  const position = historyPosition(history);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const micRef = useRef<HTMLButtonElement>(null);
@@ -119,13 +138,34 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
     setDraft('');
   };
   const thinking = snapshot.matches('thinking');
+  // A turn on its way (or failed): the content band shows it, not an older answer.
+  const busy = thinking || listening || snapshot.matches('failed');
+  const homeShown = homeView !== undefined && homeView !== null && !busy;
+  // Nothing asked yet: the content band explains what to ask.
+  const firstScreen = !busy && !homeShown && history.turns.length === 0 && !snapshot.matches('speaking');
   // A cold start can take most of the browser's wait (#270): after a while the screen says so, honestly.
   const slowTurn = useSlowTurn(thinking);
 
   return (
-    <>
-      <section className="conversation">
-        {question !== null && !snapshot.matches('idle') && !listening && <p className="bubble">{question}</p>}
+    <div className="bands">
+      {(head !== undefined || position !== undefined) && (
+        <div className="band-head">
+          {head}
+          {/* Where we are among the answers: in the header band, so the content band is the answer's alone. */}
+          {!busy && !homeShown && position !== undefined && (
+            <AnswerPager
+              position={position}
+              onStep={(delta) => {
+                setHistory((previous) => stepAnswer(previous, delta));
+              }}
+            />
+          )}
+        </div>
+      )}
+      <section className="conversation band-content">
+        {/* While a turn runs, its question; otherwise the question of the answer on screen. */}
+        {busy && question !== null && !listening && <p className="bubble">{question}</p>}
+        {!busy && !homeShown && shownTurn !== undefined && questions.current.has(shownTurn) && <p className="bubble">{questions.current.get(shownTurn)}</p>}
         {listening && (
           <p className="thinking" role="status">
             {t('voice.listening')}
@@ -157,27 +197,18 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
         )}
         {/* Status and alert announce themselves; the answer needs a live region that exists before it appears. */}
         <div aria-live="polite">
-          {(snapshot.matches('showingAnswer') || speaking) && turn.data?.ok === true && turnId !== null && (
-            <AnswerCard answer={turn.data.value} timeZone={timeZone} turnId={turnId} />
+          {!busy && !homeShown && shown.data?.ok === true && shownTurn !== undefined && (
+            // One answer, one state: Previous / Next never carry a tab or a frame from another answer.
+            <AnswerCard key={shownTurn} answer={shown.data.value} timeZone={timeZone} turnId={shownTurn} />
           )}
         </div>
-        {/* The row keeps its place even when empty: the form never moves under a finger when the voice starts or stops. */}
-        {speakReplies && (
-          <div className="voice-row">
-            {speaking && (
-              <button
-                ref={stopSpeakingRef}
-                type="button"
-                className="link-button"
-                onClick={() => {
-                  sendAndRefocus({ type: 'CANCEL' });
-                }}
-              >
-                {t('voice.stopSpeaking')}
-              </button>
-            )}
-          </div>
+        {homeShown && homeView}
+        {firstScreen && (
+          <p id="question-hint" className="welcome">
+            {t('chat.hint')}
+          </p>
         )}
+        {firstScreen && idle}
         {/* A refused demo session is explained by the gate alone, not as a failed answer (review of #140). */}
         {snapshot.matches('failed') && error !== null && error.category !== 'unauthorized' && (
           <div className="failure" role="alert">
@@ -199,19 +230,30 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
       {session !== undefined && token === undefined ? (
         <DemoCodeGate session={session} />
       ) : (
-      <form className="ask" onSubmit={onSubmit}>
-        <label htmlFor="question">{t('chat.label')}</label>
-        <p id="question-hint" className="muted">
-          {t('chat.hint')}
-        </p>
-        <ExampleQuestions
+      <form className="ask band-actions" onSubmit={onSubmit}>
+        {/* Three bands: the label is said, not shown (the placeholder and Ask show it); the hint is the first
+            screen's content, and once answers come it stays only as the field's description. */}
+        <label htmlFor="question" className="visually-hidden">
+          {t('chat.label')}
+        </label>
+        {!firstScreen && (
+          <p id="question-hint" className="visually-hidden">
+            {t('chat.hint')}
+          </p>
+        )}
+        <div className="try-row">
+          <span className="try-saying" aria-hidden="true">
+            {t('examples.trySaying')}
+          </span>
+          <ExampleQuestions
           {...(examples === undefined ? {} : { examples })}
           onPick={(question) => {
             // Only fills the field: the person reads it and presses Ask (never sent by itself).
             setDraft(question);
             inputRef.current?.focus();
           }}
-        />
+          />
+        </div>
         <div className="ask-row">
           <input
             id="question"
@@ -228,11 +270,26 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
           <button type="submit" className="button" disabled={thinking}>
             {t('chat.send')}
           </button>
-          {micAvailable && (
+          {/* Three bands: stopping the voice is an action in this row, in the place of Speak (disabled while the answer
+              is read anyway), so it never pushes the card out of the band nor squeezes the field. */}
+          {speakReplies && speaking && (
+            <button
+              ref={stopSpeakingRef}
+              type="button"
+              className="button voice-button"
+              aria-label={t('voice.stopSpeaking')}
+              onClick={() => {
+                sendAndRefocus({ type: 'CANCEL' });
+              }}
+            >
+              {t('voice.stopSpeakingShort')}
+            </button>
+          )}
+          {micAvailable && !speaking && (
             <button
               ref={micRef}
               type="button"
-              className="button"
+              className="button voice-button"
               aria-pressed={listening}
               disabled={thinking || speaking}
               onClick={() => {
@@ -248,10 +305,10 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
             {t('voice.browserVoice')}
           </p>
         )}
-        {privacy !== null && <p className="notice">{t(privacy)}</p>}
+        {privacy !== null && <p className="notice privacy-notice">{t(privacy)}</p>}
       </form>
       )}
       {demo && <DemoOverlay said={question !== null && !snapshot.matches('idle') && !listening ? question : null} speaking={speaking} />}
-    </>
+    </div>
   );
 }

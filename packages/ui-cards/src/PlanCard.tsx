@@ -1,5 +1,5 @@
 import { epochMs, formatTemp, tempGap, type Plan } from '@cold-reserve/contracts';
-import { useId, useState } from 'react';
+import { Fragment, useId, useState, type ReactElement } from 'react';
 import { CardShell } from './CardShell.js';
 import { homeClock, isSimulated, levelSpans, pacingGeometry } from './plan-model.js';
 import { roomLabel } from './SafeRoomCard.js';
@@ -14,10 +14,12 @@ export interface PlanCardProps {
   batteryUsableWh?: number;
   onApply?: (planId: string) => void;
   onDismiss?: () => void;
+  /** Pages the host of the card adds after the plan's own (the safety check), each with its key. */
+  extraPages?: readonly ReactElement[];
 }
 
 /** The hot-day plan (screen S1/plan, Signature mockup): estimate first, then the ribbon and the charge line. */
-export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }: PlanCardProps) {
+export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss, extraPages = [] }: PlanCardProps) {
   // The guard never modifies a plan: a rejected one can be read, never applied.
   // Apply only when the host can run it (onApply given), the plan is proposed and every guarantee passes.
   const applicable = onApply !== undefined && plan.status === 'proposed' && plan.guarantees.every((g) => g.ok);
@@ -26,8 +28,10 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
   const lastResortApplicable = onApply !== undefined && plan.status === 'proposed' && lastResort !== undefined;
   // One tap, one call: the buttons wait for the answer, which replaces this card.
   const [sending, setSending] = useState(false);
-  return (
-    <CardShell title={t('plan.title')} origin={isSimulated(plan) ? 'simulated' : 'live'}>
+  // One giant number per view, pages instead of scrolling (owner, 10 Oct): page 1 is the headline and the one accent
+  // button; then the levels and the notes, the battery line, and whatever the host adds (the safety check).
+  const first = (
+    <Fragment key="first">
       {/* The guard refused the model's proposal and this plan holds instead (#202): said first, inside the card. */}
       {plan.refusedProposal !== undefined && (
         <p className="notice" data-testid="refused-proposal">
@@ -48,15 +52,6 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
       ) : (
         <LastResortHero lastResort={lastResort} timeZone={timeZone} />
       )}
-      {/* The ribbon reads as "Comfort … until the horizon": a last resort shows only its honest window. */}
-      {lastResort === undefined && <LevelRibbon plan={plan} timeZone={timeZone} />}
-      <PacingLine plan={plan} timeZone={timeZone} batteryUsableWh={batteryUsableWh} />
-      {(plan.warnings ?? []).map((w) => (
-        <p key={w.code} className="warning" role="note">
-          {w.message}
-        </p>
-      ))}
-      {plan.advisoryOnly && <p className="muted">{t('plan.advisory')}</p>}
       {applicable && (
         <div className="plan-actions">
           <p className="muted">{t('plan.validUntil', { time: homeClock(plan.expiresAt, timeZone) })}</p>
@@ -95,8 +90,31 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss }
           </button>
         </div>
       )}
-    </CardShell>
+    </Fragment>
   );
+  const notes = (plan.warnings ?? []).length > 0 || plan.advisoryOnly || lastResort === undefined;
+  const pages = [
+    first,
+    ...(notes
+      ? [
+          <Fragment key="levels">
+            {/* The ribbon reads as "Comfort … until the horizon": a last resort shows only its honest window. */}
+            {lastResort === undefined && <LevelRibbon plan={plan} timeZone={timeZone} />}
+            {(plan.warnings ?? []).map((w) => (
+              <p key={w.code} className="warning" role="note">
+                {w.message}
+              </p>
+            ))}
+            {plan.advisoryOnly && <p className="muted">{t('plan.advisory')}</p>}
+          </Fragment>,
+        ]
+      : []),
+    <Fragment key="line">
+      <PacingLine plan={plan} timeZone={timeZone} batteryUsableWh={batteryUsableWh} />
+    </Fragment>,
+    ...extraPages,
+  ];
+  return <CardShell title={t('plan.title')} origin={isSimulated(plan) ? 'simulated' : 'live'} pages={pages} />;
 }
 
 type Surplus = NonNullable<Plan['surplus']>;

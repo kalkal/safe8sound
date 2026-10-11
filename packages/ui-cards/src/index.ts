@@ -17,7 +17,8 @@ export {
 } from './app/card-kinds.js';
 export { CardShell, OriginBadge } from './CardShell.js';
 export { GuardReceipt, RefusalReceipt } from './GuardReceipt.js';
-export { IceCubesCard, cubeFills } from './IceCubesCard.js';
+export { IceCubesCard, cubeFills, cubesLabel } from './IceCubesCard.js';
+export { formatHours } from './text.js';
 export { PlanCard, type PlanCardProps } from './PlanCard.js';
 export { PreferencesCard, type PreferencesCardProps } from './PreferencesCard.js';
 export { FloorPlanCard } from './FloorPlanCard.js';

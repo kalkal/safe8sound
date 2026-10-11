@@ -13,7 +13,7 @@ import { isCardKind, isStormState, parseCardResult, parseSaveResult, safeTimeZon
 // Entry of the ui:// card bundle. The document names its card (data-card); the host sends the tool
 // result and the context (theme, time zone) through the MCP Apps bridge. Covered by the host e2e tests.
 
-type Context = Pick<McpUiHostContext, 'theme' | 'timeZone' | 'displayMode' | 'availableDisplayModes' | 'locale'>;
+type Context = Pick<McpUiHostContext, 'theme' | 'timeZone' | 'displayMode' | 'availableDisplayModes' | 'locale' | 'containerDimensions'>;
 
 function Card({ kind }: { kind: CardKind }) {
   const [state, setState] = useState<CardState>({ kind: 'waiting' });
@@ -33,7 +33,7 @@ function Card({ kind }: { kind: CardKind }) {
         setState(parseCardResult(kind, result));
       });
       created.addEventListener('hostcontextchanged', (changed) => {
-        const { theme, timeZone, displayMode, availableDisplayModes, locale } = changed;
+        const { theme, timeZone, displayMode, availableDisplayModes, locale, containerDimensions } = changed;
         // #263: the card speaks the host's language (standard hostContext.locale); English otherwise.
         if (isLocale(locale)) setLocale(locale);
         if (isDemoContext(changed)) setDemo(true);
@@ -49,6 +49,7 @@ function Card({ kind }: { kind: CardKind }) {
           ...(displayMode !== undefined && { displayMode }),
           ...(availableDisplayModes !== undefined && { availableDisplayModes }),
           ...(locale !== undefined && { locale }),
+          ...(containerDimensions !== undefined && { containerDimensions }),
         }));
       });
     },
@@ -63,6 +64,7 @@ function Card({ kind }: { kind: CardKind }) {
         ...(initial.displayMode !== undefined && { displayMode: initial.displayMode }),
         ...(initial.availableDisplayModes !== undefined && { availableDisplayModes: initial.availableDisplayModes }),
         ...(initial.locale !== undefined && { locale: initial.locale }),
+        ...(initial.containerDimensions !== undefined && { containerDimensions: initial.containerDimensions }),
       });
       if (isLocale(initial.locale)) setLocale(initial.locale);
       setDemo(isDemoContext(initial));
@@ -110,6 +112,8 @@ function Card({ kind }: { kind: CardKind }) {
       state={state}
       timeZone={safeTimeZone(context.timeZone)}
       canAct={app?.getHostCapabilities()?.serverTools !== undefined}
+      // No scrolling on the Echo screen (owner, 10 Oct): inline, the height the host gives this frame.
+      {...(fullscreen ? {} : { maxHeight: maxHeightOf(context.containerDimensions) })}
       display={{ canFullscreen: context.availableDisplayModes?.includes('fullscreen') === true, fullscreen, toggle: toggleDisplay }}
       {...(notice !== undefined && { notice })}
       onCallTool={(name, args) => {
@@ -134,6 +138,14 @@ function Card({ kind }: { kind: CardKind }) {
       }}
     />
   );
+}
+
+/** MCP Apps containerDimensions: a fixed height or a maximum one; none when the host gives neither. */
+function maxHeightOf(dimensions: Context['containerDimensions']): number | undefined {
+  if (dimensions === undefined) return undefined;
+  if ('maxHeight' in dimensions && typeof dimensions.maxHeight === 'number') return dimensions.maxHeight;
+  if ('height' in dimensions && typeof dimensions.height === 'number') return dimensions.height;
+  return undefined;
 }
 
 logUnhandled(window);

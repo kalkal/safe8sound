@@ -88,15 +88,15 @@ describe('PlanCard', () => {
 
   it('shows the level ribbon: the current level marked "now", each span, and the levels not needed', () => {
     show(hotDayPlan());
-    const ribbon = screen.getByRole('list', { name: 'Level through the day' });
-    const rungs = within(ribbon).getAllByRole('listitem');
+    const ribbon = screen.getByRole('list', { name: 'Level through the day', hidden: true });
+    const rungs = within(ribbon).getAllByRole('listitem', { hidden: true });
     expect(rungs.map((r) => r.textContent)).toEqual(['Comfortnow15:00 to 19:00', 'Balanced19:00 to 23:00', 'Saver23:00 to 07:00', 'Essentialnot needed']);
     expect(rungs[0]?.getAttribute('aria-current')).toBe('true');
   });
 
   it('draws the expected charge with the storm reserve floor, and describes it in words', () => {
     show(hotDayPlan());
-    const chart = screen.getByRole('img', { name: /Expected charge/ });
+    const chart = screen.getByRole('img', { name: /Expected charge/, hidden: true });
     expect(chart.getAttribute('aria-label')).toBe('Expected charge from 80% at 15:00 to 46% at 06:40. Storm reserve 6 kWh (43%), never used for comfort.');
     expect(chart.querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(6);
     expect(chart.querySelector('[data-part="floor"]')).toBeTruthy();
@@ -131,7 +131,7 @@ describe('PlanCard', () => {
   it('says when the plan is advice only, and every warning the voice must say', () => {
     show(advisoryPlan());
     expect(screen.getByText('Advice only: nothing is switched automatically.')).toBeTruthy();
-    expect(screen.getByRole('note').textContent).toBe('The bedroom stays at or below 24 °C for 4 of the 6 hours needed tonight.');
+    expect(screen.getByRole('note', { hidden: true }).textContent).toBe('The bedroom stays at or below 24 °C for 4 of the 6 hours needed tonight.');
     expect(screen.getByTestId('origin-badge').textContent).toBe('LIVE');
   });
 
@@ -148,7 +148,7 @@ describe('PlanCard', () => {
 
   it('in a storm draws no floor and says the storm reserve is in use', () => {
     show(stormPlan(), { batteryUsableWh: 13_800 });
-    const chart = screen.getByRole('img', { name: /Expected charge/ });
+    const chart = screen.getByRole('img', { name: /Expected charge/, hidden: true });
     expect(chart.querySelector('[data-part="floor"]')).toBeNull();
     expect(chart.getAttribute('aria-label')).toBe('Expected charge from 80% at 15:00 to 46% at 06:40. Storm reserve 6 kWh in use.');
     expect(screen.getByText('Storm reserve 6 kWh in use.')).toBeTruthy();
@@ -156,7 +156,7 @@ describe('PlanCard', () => {
 
   it('on an older plan without grid state draws the floor only when it is known, and never says storm', () => {
     show({ ...hotDayPlan(), reserveFloorSocPct: undefined });
-    expect(screen.getByRole('img', { name: /Expected charge/ }).querySelector('[data-part="floor"]')).toBeNull();
+    expect(screen.getByRole('img', { name: /Expected charge/, hidden: true }).querySelector('[data-part="floor"]')).toBeNull();
     expect(screen.queryByText(/in use/)).toBeNull();
   });
 
@@ -178,7 +178,7 @@ describe('PlanCard', () => {
       show(lastResortPlan());
       expect(screen.getByTestId('last-resort-window').textContent).toBe('Then up to 79 °F by 03:00, past the 75.2 °F limit.');
       // The ribbon would read as "Comfort … to 07:00": a last resort does not show it.
-      expect(screen.queryByRole('list', { name: 'Level through the day' })).toBeNull();
+      expect(screen.queryByRole('list', { name: 'Level through the day', hidden: true })).toBeNull();
     });
 
     it('says the limit that came down at night, when that is what ends the safe hours', () => {

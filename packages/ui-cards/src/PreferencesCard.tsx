@@ -1,6 +1,6 @@
 import { SetPreferencesInputSchema, formatTemp, toDisplayTemp, type DataOriginValue, type GetPreferencesOutput, type ReserveOutlook, type SetPreferencesInput } from '@cold-reserve/contracts';
 import { CATALOGS, type MessageKey } from '@cold-reserve/i18n';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CardShell } from './CardShell.js';
 import { getTempUnit } from './temp-unit.js';
 import { formatHours, t } from './text.js';
@@ -113,102 +113,111 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave }: Prefer
   };
 
   return (
-    <CardShell title={t('prefs.title')} {...(badge !== undefined && { origin: badge })}>
-      <fieldset className="prefs-group">
-        <legend className="eyebrow">{t('prefs.comfort')}</legend>
-        <div className="stepper">
-          <StepButton
-            label={t('prefs.cooler')}
-            unavailable={cooling <= coolingMin}
-            onPress={() => {
-              setCooling(Math.max(coolingMin, cooling - SETPOINT_STEP_C));
-            }}
-          >
-            −
-          </StepButton>
-          <span className="stepper-value" data-testid="comfort-value" aria-live="polite">
-            {t('prefs.degrees', { value: formatTemp(cooling, getTempUnit()) })}
-          </span>
-          <StepButton
-            label={t('prefs.warmer')}
-            unavailable={cooling >= coolingMax}
-            onPress={() => {
-              setCooling(Math.min(coolingMax, cooling + SETPOINT_STEP_C));
-            }}
-          >
-            +
-          </StepButton>
-        </div>
-        <p className="muted">
-          {/* °F everywhere (owner decision, 9 Oct): shown in the chosen unit; the steps stay half a degree Celsius. */}
-          {t('prefs.safetyMax', {
-            value: formatTemp(draft.safety.cooling.maxC, getTempUnit()),
-            min: String(toDisplayTemp(limits.cooling.maxC.min, getTempUnit())),
-            max: formatTemp(limits.cooling.maxC.max, getTempUnit()),
-          })}
-        </p>
-      </fieldset>
+    <CardShell
+      title={t('prefs.title')}
+      {...(badge !== undefined && { origin: badge })}
+      // Pages instead of scrolling (owner, 10 Oct): comfort, the safe room, then the order and the contacts; Save stays.
+      pages={[
+        <Fragment key="comfort">
+          <fieldset className="prefs-group">
+            <legend className="eyebrow">{t('prefs.comfort')}</legend>
+            <div className="stepper">
+              <StepButton
+                label={t('prefs.cooler')}
+                unavailable={cooling <= coolingMin}
+                onPress={() => {
+                  setCooling(Math.max(coolingMin, cooling - SETPOINT_STEP_C));
+                }}
+              >
+                −
+              </StepButton>
+              <span className="stepper-value" data-testid="comfort-value" aria-live="polite">
+                {t('prefs.degrees', { value: formatTemp(cooling, getTempUnit()) })}
+              </span>
+              <StepButton
+                label={t('prefs.warmer')}
+                unavailable={cooling >= coolingMax}
+                onPress={() => {
+                  setCooling(Math.min(coolingMax, cooling + SETPOINT_STEP_C));
+                }}
+              >
+                +
+              </StepButton>
+            </div>
+            <p className="muted">
+              {/* °F everywhere (owner decision, 9 Oct): shown in the chosen unit; the steps stay half a degree Celsius. */}
+              {t('prefs.safetyMax', {
+                value: formatTemp(draft.safety.cooling.maxC, getTempUnit()),
+                min: String(toDisplayTemp(limits.cooling.maxC.min, getTempUnit())),
+                max: formatTemp(limits.cooling.maxC.max, getTempUnit()),
+              })}
+            </p>
+          </fieldset>
+        </Fragment>,
+        <Fragment key="safe-room">
+          <fieldset className="prefs-group">
+            <legend className="eyebrow">{t('prefs.safeRoom')}</legend>
+            {roomList.map((room) => (
+              <label key={room.id} className="choice">
+                <input
+                  type="radio"
+                  name="safe-room"
+                  checked={draft.safeRoomId === room.id}
+                  onChange={() => {
+                    setDraft({ ...draft, safeRoomId: room.id, roomPriority: [room.id, ...draft.roomPriority.filter((id) => id !== room.id)] });
+                  }}
+                />
+                {room.name}
+              </label>
+            ))}
+          </fieldset>
+        </Fragment>,
+        <Fragment key="order">
+          <div className="prefs-group">
+            <p className="eyebrow">{t('prefs.priority')}</p>
+            <p className="muted">{t('prefs.priorityHint')}</p>
+            <ol className="priority" aria-label={t('prefs.priority')}>
+              {draft.roomPriority.map((id, i) => (
+                <li key={id} className="priority-row">
+                  <span data-testid="room-name">{nameOf(id)}</span>
+                  {i > 0 && (
+                    <span className="priority-moves">
+                      {(['up', 'down'] as const).map((direction) => (
+                        <StepButton
+                          key={direction}
+                          label={t(direction === 'up' ? 'prefs.moveUp' : 'prefs.moveDown', { room: nameOf(id) })}
+                          unavailable={direction === 'up' ? i === 1 : i === draft.roomPriority.length - 1}
+                          buttonRef={(el) => {
+                            if (el === null) moveButtons.current.delete(`${id}:${direction}`);
+                            else moveButtons.current.set(`${id}:${direction}`, el);
+                          }}
+                          onPress={() => {
+                            move(i, direction);
+                          }}
+                        >
+                          {direction === 'up' ? '↑' : '↓'}
+                        </StepButton>
+                      ))}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
 
-      <fieldset className="prefs-group">
-        <legend className="eyebrow">{t('prefs.safeRoom')}</legend>
-        {roomList.map((room) => (
-          <label key={room.id} className="choice">
-            <input
-              type="radio"
-              name="safe-room"
-              checked={draft.safeRoomId === room.id}
-              onChange={() => {
-                setDraft({ ...draft, safeRoomId: room.id, roomPriority: [room.id, ...draft.roomPriority.filter((id) => id !== room.id)] });
-              }}
-            />
-            {room.name}
-          </label>
-        ))}
-      </fieldset>
+          {outlook !== undefined && <p className="muted">{t('prefs.reserve', { hours: formatHours(outlook.reserveHoursAtEssential) })}</p>}
 
-      <div className="prefs-group">
-        <p className="eyebrow">{t('prefs.priority')}</p>
-        <p className="muted">{t('prefs.priorityHint')}</p>
-        <ol className="priority" aria-label={t('prefs.priority')}>
-          {draft.roomPriority.map((id, i) => (
-            <li key={id} className="priority-row">
-              <span data-testid="room-name">{nameOf(id)}</span>
-              {i > 0 && (
-                <span className="priority-moves">
-                  {(['up', 'down'] as const).map((direction) => (
-                    <StepButton
-                      key={direction}
-                      label={t(direction === 'up' ? 'prefs.moveUp' : 'prefs.moveDown', { room: nameOf(id) })}
-                      unavailable={direction === 'up' ? i === 1 : i === draft.roomPriority.length - 1}
-                      buttonRef={(el) => {
-                        if (el === null) moveButtons.current.delete(`${id}:${direction}`);
-                        else moveButtons.current.set(`${id}:${direction}`, el);
-                      }}
-                      onPress={() => {
-                        move(i, direction);
-                      }}
-                    >
-                      {direction === 'up' ? '↑' : '↓'}
-                    </StepButton>
-                  ))}
-                </span>
-              )}
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      {outlook !== undefined && <p className="muted">{t('prefs.reserve', { hours: formatHours(outlook.reserveHoursAtEssential) })}</p>}
-
-      <p className="eyebrow" id={contactsId}>
-        {t('prefs.contacts', { count: String(draft.contacts.length), max: String(MAX_CONTACTS) })}
-      </p>
-      <ul className="contacts" aria-labelledby={contactsId}>
-        {draft.contacts.map((c, i) => (
-          <li key={i}>{`${roleLabel(c.role)} · ${t(`prefs.channel.${c.channel}`)}`}</li>
-        ))}
-      </ul>
-
+          <p className="eyebrow" id={contactsId}>
+            {t('prefs.contacts', { count: String(draft.contacts.length), max: String(MAX_CONTACTS) })}
+          </p>
+          <ul className="contacts" aria-labelledby={contactsId}>
+            {draft.contacts.map((c, i) => (
+              <li key={i}>{`${roleLabel(c.role)} · ${t(`prefs.channel.${c.channel}`)}`}</li>
+            ))}
+          </ul>
+        </Fragment>,
+      ]}
+    >
       {problem !== null && <p role="alert">{problem}</p>}
       {notice !== null && (
         <p className="muted" role="status">

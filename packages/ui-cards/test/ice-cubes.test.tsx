@@ -30,6 +30,11 @@ describe('IceCubesCard', () => {
     expect(screen.getByTestId('origin-badge').textContent).toContain('SIMULATED');
   });
 
+  it('the cubes come right under the big number of hours (owner, 1 Oct: the signature element stays in the first view)', () => {
+    render(<IceCubesCard outlook={outlook()} />);
+    expect(screen.getByTestId('cube-hours').nextElementSibling?.classList.contains('cubes')).toBe(true);
+  });
+
   it('describes the cubes in words for screen readers', () => {
     render(<IceCubesCard outlook={outlook()} />);
     const cubes = screen.getByRole('img', { name: '9½ hours: 9 full cubes and part of one more.' });

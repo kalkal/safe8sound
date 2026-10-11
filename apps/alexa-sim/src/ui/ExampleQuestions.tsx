@@ -27,9 +27,11 @@ export interface ExampleState {
 }
 
 /** The home read wins; before it, the scenario decides (#268). */
+/** Whether the home is in the storm: what the home said wins, otherwise the scenario (#268). */
+export const isGridDown = (state: ExampleState): boolean => (state.gridAvailable === undefined ? state.scenarioId === 'storm-blackout' : !state.gridAvailable);
+
 export function examplesFor(state: ExampleState): readonly ExampleQuestion[] {
-  const gridDown = state.gridAvailable === undefined ? state.scenarioId === 'storm-blackout' : !state.gridAvailable;
-  return gridDown ? STORM_EXAMPLE_QUESTIONS : EXAMPLE_QUESTIONS;
+  return isGridDown(state) ? STORM_EXAMPLE_QUESTIONS : EXAMPLE_QUESTIONS;
 }
 
 export function ExampleQuestions({ onPick, examples = EXAMPLE_QUESTIONS }: { onPick: (question: string) => void; examples?: readonly ExampleQuestion[] }) {

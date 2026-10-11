@@ -1,5 +1,5 @@
 import type { HomeStatus } from '@cold-reserve/contracts';
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useId, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import { t } from './text.js';
 
 // "Show my home" (#204): the floor plan with the rooms, temperatures, battery, solar and grid, behind one button so the
@@ -17,54 +17,61 @@ export interface HomePanelProps {
   onRetry?: () => void;
 }
 
-export function HomePanel({ status, renderCard, load = 'idle', onOpen, onRetry }: HomePanelProps) {
+/**
+ * Three bands (owner, 10 Oct): the button goes in the header band, the home in the content band, in place of the
+ * answer. `view` is null while the home is closed.
+ */
+export function useHomePanel({ status, renderCard, load = 'idle', onOpen, onRetry }: HomePanelProps): { button: ReactElement; view: ReactElement | null; close: () => void } {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const titleId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  // Escape on the button or anywhere in the home closes it. Inside the card frame the card has its own keys.
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== 'Escape') return;
+    if (event.key !== 'Escape' || !open) return;
     setOpen(false);
     buttonRef.current?.focus();
   };
-  return (
-    // Escape anywhere in the block (the button or the panel) closes it. Inside the card frame the card has its own keys.
-    <div className="home-panel" onKeyDown={onKeyDown}>
-      <button
-        ref={buttonRef}
-        type="button"
-        className="chip-button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => {
-          if (!open) onOpen?.();
-          setOpen(!open);
-        }}
-      >
-        {t(open ? 'home.hide' : 'home.show')}
-      </button>
-      {open && (
-        <section id={panelId} className="home-panel-body" aria-labelledby={titleId}>
-          <h2 id={titleId} className="visually-hidden">
-            {t('home.title')}
-          </h2>
-          {load === 'loading' && (
-            <p className="notice" role="status">
-              {t('home.loading')}
-            </p>
-          )}
-          {load === 'failed' && (
-            <div className="failure" role="alert">
-              <p>{t('home.failed')}</p>
-              <button type="button" className="button" onClick={() => onRetry?.()}>
-                {t('chat.retry')}
-              </button>
-            </div>
-          )}
-          {/* After a failed read the old home is not shown as if it were now. */}
-          {status === undefined || load === 'failed' ? load === 'idle' && <p className="notice">{t('home.empty')}</p> : renderCard(status)}
-        </section>
-      )}
-    </div>
+  const button = (
+    <button
+      ref={buttonRef}
+      type="button"
+      className="chip-button"
+      aria-expanded={open}
+      aria-controls={panelId}
+      onKeyDown={onKeyDown}
+      onClick={() => {
+        if (!open) onOpen?.();
+        setOpen(!open);
+      }}
+    >
+      {t(open ? 'home.hide' : 'home.show')}
+    </button>
   );
+  const view = open ? (
+    <section id={panelId} className="home-panel-body" aria-labelledby={titleId} onKeyDown={onKeyDown}>
+      <h2 id={titleId} className="visually-hidden">
+        {t('home.title')}
+      </h2>
+      {load === 'loading' && (
+        <p className="notice" role="status">
+          {t('home.loading')}
+        </p>
+      )}
+      {load === 'failed' && (
+        <div className="failure" role="alert">
+          <p>{t('home.failed')}</p>
+          <button type="button" className="button" onClick={() => onRetry?.()}>
+            {t('chat.retry')}
+          </button>
+        </div>
+      )}
+      {/* After a failed read the old home is not shown as if it were now. */}
+      {status === undefined || load === 'failed' ? load === 'idle' && <p className="notice">{t('home.empty')}</p> : renderCard(status)}
+    </section>
+  ) : null;
+  const close = useCallback(() => {
+    setOpen(false);
+  }, []);
+  return { button, view, close };
 }

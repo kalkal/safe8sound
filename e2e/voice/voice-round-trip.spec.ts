@@ -40,7 +40,9 @@ test('ask by voice → the answer is shown and read aloud, then the mic is free 
   const spoken = await voice(page, (d) => d.spoken());
   expect(spoken).toHaveLength(1);
   expect(await page.getByTestId('answer').locator('.answer-text').textContent()).toBe(spoken[0]);
-  await expect(page.getByRole('button', { name: 'Speak', exact: true })).toBeDisabled();
+  // While the answer is read, Stop speaking takes the place of Speak (three bands, 10 Oct).
+  await expect(page.getByRole('button', { name: 'Speak', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Stop speaking' })).toBeVisible();
 
   await voice(page, (d) => {
     d.startAudio();

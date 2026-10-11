@@ -19,7 +19,7 @@ describe('GuardReceipt', () => {
 
   it('says in one plain line what the safety check is, at the top of the slip (owner feedback, 6 Oct)', () => {
     render(<GuardReceipt plan={hotDayPlan()} />);
-    expect(screen.getByRole('region', { name: 'Safety check' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Safety check', hidden: true })).toBeTruthy();
     expect(screen.getByTestId('receipt-explain').textContent).toBe(
       "An automatic check — not the AI — verified this plan against 5 safety rules. If one fails, the plan can't be applied.",
     );

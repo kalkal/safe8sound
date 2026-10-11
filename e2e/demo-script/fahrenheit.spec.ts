@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 
 // °F everywhere (owner decision, 9 Oct): the judge picks °F in the settings drawer and every card follows: the home
@@ -27,7 +28,10 @@ test('Houston starts in °F: choosing the place switches the unit, and the judge
   await expect(units.getByRole('radio', { name: '°F' })).toBeChecked();
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Show my home' }).click();
-  const rooms = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]').getByRole('list', { name: 'Rooms' });
+  const homeCard = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]');
+  // The rooms are the home card's page 2 (pages instead of scrolling, owner 10 Oct).
+  await toCardPage(homeCard, 2);
+  const rooms = homeCard.getByRole('list', { name: 'Rooms' });
   await expect(rooms).toContainText('°F');
 
   await pickUnits(page, '°C');
@@ -41,12 +45,15 @@ test('°F in the drawer: the floor plan and the safe room follow, and a card on 
 
   await page.getByRole('button', { name: 'Show my home' }).click();
   const home = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]');
+  await toCardPage(home, 2);
   const rooms = home.getByRole('list', { name: 'Rooms' });
   await expect(rooms).toContainText('°F');
   await expect(rooms).not.toContainText('°C');
 
   await ask(page, "The power's out");
   const safeRoom = page.frameLocator('iframe[title="Safe room card"]');
+  // The facts are the safe-room card's page 2.
+  await toCardPage(safeRoom, 2);
   await expect(safeRoom.getByRole('list', { name: 'In the safe room' })).toContainText('Now: 80.2 °F');
 
   // A card already on screen follows the switch back to °C.

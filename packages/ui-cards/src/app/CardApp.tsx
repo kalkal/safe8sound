@@ -9,8 +9,9 @@ import { ManualControlCard } from '../ManualControlCard.js';
 import { SafeRoomCard } from '../SafeRoomCard.js';
 import { homeClock } from '../plan-model.js';
 import { t } from '../text.js';
-import { DisplayToggle, type DisplayControl } from '../CardShell.js';
+import { DisplaySlot, DisplayToggle, type DisplayControl } from '../CardShell.js';
 import { CardErrorBoundary } from './CardErrorBoundary.js';
+import { Fit } from './Fit.js';
 import type { CardState } from './card-kinds.js';
 
 /**
@@ -31,13 +32,17 @@ export interface CardAppProps {
   notice?: { ok: boolean; text: string };
   /** Full screen for the whole frame, when the host offers it (#200). */
   display?: DisplayControl;
+  /** The height the host gives this frame (MCP Apps containerDimensions): the card fits itself in it. */
+  maxHeight?: number | undefined;
 }
 
 /** The content of one ui:// frame. The host owns the conversation; the card only shows and asks. */
-export function CardApp({ notice, display, ...props }: CardAppProps) {
+export function CardApp({ notice, display, maxHeight, ...props }: CardAppProps) {
   return (
     <CardErrorBoundary>
-      {display !== undefined && <DisplayToggle display={display} />}
+      <Fit maxHeight={maxHeight}>
+      {/* "Full screen" sits in the first card's title row; a frame without a card (waiting, an error) has none. */}
+      <DisplaySlot.Provider value={display === undefined ? null : <DisplayToggle display={display} />}>
       {notice !== undefined &&
         (notice.ok ? (
           <p className="notice" role="status">
@@ -47,6 +52,8 @@ export function CardApp({ notice, display, ...props }: CardAppProps) {
           <p role="alert">{notice.text}</p>
         ))}
       <CardContent {...props} />
+      </DisplaySlot.Provider>
+      </Fit>
     </CardErrorBoundary>
   );
 }
@@ -67,6 +74,8 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
           <PlanCard
             plan={state.data}
             timeZone={timeZone}
+            // The safety check is the plan's last page (pages instead of scrolling, owner 10 Oct).
+            extraPages={[<GuardReceipt key="receipt" plan={state.data} />]}
             {...(canAct && {
               onApply: (planId: string) => {
                 onCallTool('apply_plan', { planId });
@@ -74,7 +83,6 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
             })}
           />
           {!canAct && <p className="muted">{t('card.noActions')}</p>}
-          <GuardReceipt plan={state.data} />
         </>
       );
     case 'refused':
@@ -175,9 +183,8 @@ function AppliedPlan({ result, timeZone, fromThisFrame, canConfirm, onConfirm }:
       </div>
       {/* The real home is read-only during the hackathon: the splits are set by hand (plan §11.6). */}
       {advisoryOnly && manualInstructions.length > 0 && <ManualControlCard instructions={manualInstructions} reason="read_only" />}
-      <PlanCard plan={plan} timeZone={timeZone} />
-      {/* Every plan keeps its safety check in sight once applied (owner feedback, 6 Oct; a last resort since CE-22). */}
-      <GuardReceipt plan={plan} />
+      {/* Every plan keeps its safety check once applied (owner feedback, 6 Oct; a last resort since CE-22): its last page. */}
+      <PlanCard plan={plan} timeZone={timeZone} extraPages={[<GuardReceipt key="receipt" plan={plan} />]} />
     </>
   );
 }

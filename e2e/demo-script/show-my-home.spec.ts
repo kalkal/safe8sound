@@ -1,8 +1,11 @@
 import type { Page } from '@playwright/test';
+import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 
 // "Show my home" (#204): behind one button the floor plan with the rooms, their temperatures, the battery, the solar
 // and the grid, all SIMULATED. It follows the scene: a plan applied, the storm. Keyboard: Escape closes it.
+// Three bands (10 Oct): the home and the answers share the content band, so a new answer takes the band and the
+// home is opened again to see it.
 
 const ask = async (page: Page, question: string) => {
   await page.getByLabel('Ask a question').fill(question);
@@ -22,17 +25,24 @@ for (const width of [375, 1280]) {
     const region = home.getByRole('region', { name: 'The home right now' });
     await expect(region.getByTestId('origin-badge')).toContainText('SIMULATED');
     await expect(region.getByRole('list', { name: 'Energy' }).getByRole('listitem')).toHaveText(['Battery 78%', 'Solar 3.2 kW', 'Grid: sending 1.1 kW', 'Level: Comfort (weather)']);
+    // The rooms are the home card's page 2 (pages instead of scrolling, owner 10 Oct).
+    await toCardPage(home, 2);
     await expect(region.getByRole('listitem', { name: 'Bedroom 1' })).toContainText('Served');
     await expect(region.getByRole('listitem', { name: 'Bedroom 2' })).toContainText('Waiting: switched off by you');
 
     // A plan applied by touch in its card: the second bedroom is pre-cooled too.
     await ask(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+    await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
     await page.frameLocator('iframe[title="Plan card"]').getByRole('button', { name: 'Apply plan' }).click();
+    await page.getByRole('button', { name: 'Show my home' }).click();
+    await toCardPage(homeCard(page), 2);
     await expect(homeCard(page).getByRole('listitem', { name: 'Bedroom 2' })).toContainText('Served');
 
     // The storm: the grid is down, the other rooms wait for the level.
     await ask(page, "The power's out");
+    await page.getByRole('button', { name: 'Show my home' }).click();
     await expect(homeCard(page).getByRole('list', { name: 'Energy' })).toContainText('Grid down');
+    await toCardPage(homeCard(page), 2);
     await expect(homeCard(page).getByRole('listitem', { name: 'Living' })).toContainText('Waiting: the level cools fewer rooms right now');
 
     expect(await page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(width);

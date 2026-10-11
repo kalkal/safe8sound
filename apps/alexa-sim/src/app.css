@@ -90,10 +90,6 @@
     color: var(--text-secondary);
   }
 
-  .voice-row {
-    min-block-size: var(--target-min);
-  }
-
   .facts {
     margin: 0;
   }
@@ -184,7 +180,8 @@
     }
 
     & input {
-      flex: 1;
+      /* Room to type on a phone: Stop speaking goes to the next line rather than squeeze the field. */
+      flex: 1 1 10rem;
       min-inline-size: 0;
       min-block-size: var(--target-min);
       padding-inline: var(--space-4);
@@ -196,8 +193,14 @@
     }
   }
 
+  /* Speak and Stop take the same place: the row never moves when the voice starts or stops (#246). */
+  .voice-button {
+    min-inline-size: 7rem;
+  }
+
   .ask-row {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
   }
 
@@ -267,6 +270,12 @@
 
   .theme-toggle {
     justify-self: end;
+  }
+
+  .chip-button:disabled {
+    /* Not a design token on purpose: a state dimming, as on .button. */
+    opacity: 0.6;
+    cursor: default;
   }
 }
 
@@ -425,9 +434,22 @@
     isolation: isolate;
   }
 
+  /* Three bands (owner, 10 Oct): on a phone and on a small Echo (960 × 480) the screen is the window's height, below
+     the scenario badge; the page scrolls only to reach the family phone under it. */
+  .echo-screen {
+    block-size: 100dvh;
+  }
+
+  .echo-stage:has(> .echo-top) .echo-screen {
+    block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-6));
+  }
+
   .echo-scroll {
     position: relative;
-    padding: var(--space-4) var(--space-3);
+    box-sizing: border-box;
+    block-size: 100%;
+    overflow: clip;
+    padding: var(--space-3);
   }
 
   /* On a phone the family phone panel follows the device, inside the page margins. */
@@ -436,6 +458,13 @@
   }
 
   .echo-screen .surface {
+    /* The Echo screen is landscape: the bands use its width (the reading measure is for the plain page). */
+    max-inline-size: none;
+    box-sizing: border-box;
+    block-size: 100%;
+    /* One row, the screen's height: the bands share it. */
+    grid-template-rows: minmax(0, 1fr);
+    padding: var(--space-4);
     border-radius: var(--radius-card);
     background: var(--surface-card);
   }
@@ -519,6 +548,7 @@
       transform: translateZ(0);
       /* 16:10 like the Echo Show 15, as large as the window allows. */
       inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5) * 1.6), 80rem);
+      block-size: auto;
       aspect-ratio: 16 / 10;
       /* Keeps the 16:10 box whatever the content: the content scrolls inside it. */
       min-block-size: 0;
@@ -528,13 +558,10 @@
     /* With the scenario badge above the device, its row comes out of the screen's height (B1). */
     .echo-stage:has(> .echo-top) .echo-screen {
       inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5 - var(--target-min) - var(--space-3)) * 1.6), 80rem);
+      block-size: auto;
     }
 
     .echo-scroll {
-      /* Padding inside the 100%: a taller scroller hid its last 48 px under the bezel, out of reach (#258). */
-      box-sizing: border-box;
-      block-size: 100%;
-      overflow: auto;
       padding: var(--space-6);
     }
   }
@@ -556,16 +583,221 @@
   }
 }
 
-/* "Show my home" (#204): one button; the panel opens under it, full width, with the home card. */
+/* Three fixed bands (owner, 10 Oct): header (title, home, theme) / one content (the answer on screen, or the home)
+   / actions (examples, question, Ask, Speak). The screen never scrolls: the header and the question box are always
+   in view. The content band still scrolls inside until its cards page themselves (next steps of the same item). */
 @layer surfaces {
-  .home-panel {
+  .bands {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     gap: var(--space-3);
-    justify-items: start;
+    block-size: 100%;
+  }
+
+  .band-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+
+    & h1 {
+      flex: 1 1 auto;
+    }
+  }
+
+  .band-content {
+    align-content: start;
+    min-block-size: 0;
+    overflow-y: auto;
+  }
+
+  .welcome {
+    margin: 0;
+    font-size: var(--font-size-lead);
+  }
+
+  /* A short landscape Echo (960 × 480): the reserve clock is the idle screen's one element; the hint stays for screen
+     readers (the field's description) and "Try saying:" with the examples says what to ask. */
+  @media (width >= 56rem) and (height < 40rem) {
+    /* Every pixel of height goes to the content band: tighter gaps and margins than the roomier screens. */
+    .echo-stage {
+      row-gap: var(--space-2);
+    }
+
+    .echo-stage:has(> .echo-top) .echo-screen {
+      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-2));
+    }
+
+    .echo-screen .surface {
+      padding: var(--space-3);
+    }
+
+    .bands {
+      gap: var(--space-2);
+    }
+
+    .echo-screen .welcome {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  /* Echo screens up to the Show 8 (1280 × 800): the content band is the card's. */
+  @media (width >= 56rem) and (height < 52rem) {
+    /* The answer's frame is only its card here: no padding, no border. */
+    .echo-screen .answer {
+      padding: 0;
+      border: 0;
+      background: none;
+    }
+
+    /* Two examples on one row: a third one pushed the actions band to two rows. */
+    .echo-screen .examples > :nth-child(n + 3) {
+      display: none;
+    }
+
+    /* The question and the answer's words are spoken: on a short screen they stay for screen readers only, and the
+       card owns the content band. */
+    .echo-screen .bubble,
+    .echo-screen .answer-text {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  .try-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .try-saying {
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .privacy-notice {
+    font-size: var(--font-size-min);
+  }
+
+  /* A landscape Echo screen: what to say and the question side by side, so the content band keeps the height. */
+  @media (width >= 56rem) {
+    .echo-screen .band-actions {
+      /* The examples take what they need; the question row (field, Ask, Speak) keeps room to type: long examples wrap. */
+      grid-template-columns: minmax(0, max-content) minmax(28rem, 1fr);
+      align-items: center;
+      column-gap: var(--space-4);
+
+      & > :not(.try-row, .ask-row) {
+        grid-column: 1 / -1;
+      }
+    }
+  }
+
+  .card-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+
+    & [aria-selected="true"] {
+      border-color: var(--accent);
+      background: var(--surface-card);
+      font-weight: var(--font-weight-medium);
+    }
+  }
+
+  /* In the header band, at its end. */
+  .answer-pager {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-inline-start: auto;
+  }
+
+  .answer-pager-where {
+    color: var(--text-secondary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
   }
 
   .home-panel-body {
     justify-self: stretch;
+  }
+
+  /* The cold reserve clock on the idle screen (owner, 11 Oct): the same 56 px ice cubes as the cards (signature
+     element 2), one per hour of the reserve; in the storm the cube of the hour being used empties once, slowly. */
+  .reserve-clock {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--space-2) var(--space-3);
+
+    & h2 {
+      margin: 0;
+      color: var(--text-secondary);
+      font-family: var(--font-data);
+      font-size: var(--font-size-min);
+      font-weight: inherit;
+      text-transform: uppercase;
+    }
+  }
+
+  .reserve-hours {
+    margin: 0;
+    font-size: var(--font-size-hero-min);
+    font-weight: var(--font-weight-bold);
+    line-height: 1;
+  }
+
+  /* One row whatever the hours: 56 px cubes on an Echo, narrower only where they do not fit (a phone). */
+  .reserve-clock .cubes {
+    display: flex;
+    grid-column: 1 / -1;
+    gap: var(--space-1);
+  }
+
+  .reserve-clock .cube {
+    position: relative;
+    overflow: hidden;
+    flex: 0 1 var(--cube-size);
+    box-sizing: border-box;
+    min-inline-size: 0;
+    aspect-ratio: 1;
+    border: var(--border-thin) solid var(--cube-edge);
+    border-radius: var(--radius-cube);
+    background: var(--surface-card-raised);
+
+    &::after {
+      position: absolute;
+      inset: auto 0 0;
+      block-size: calc(var(--fill) * 100%);
+      background: var(--cube-fill);
+      content: "";
+    }
+
+    &[data-melting="true"]::after {
+      animation: reserve-cube-melt var(--duration-melt) ease-in-out forwards;
+    }
+  }
+
+  @keyframes reserve-cube-melt {
+    from {
+      block-size: 100%;
+    }
+
+    to {
+      block-size: calc(var(--fill) * 100%);
+    }
   }
 
   .visually-hidden {

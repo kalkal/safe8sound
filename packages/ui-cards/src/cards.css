@@ -37,9 +37,81 @@
     }
   }
 
+  /* The card inside the height its host gives it (Fit): a page that does not fit is scaled down from the top centre. */
+  .fit {
+    overflow: clip;
+  }
+
+  .fit-inner {
+    transform-origin: top center;
+  }
+
+  .hero-row {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  /* A short frame (data-fit-tight, set by Fit): smallest giant numbers, the time beside its cubes, tighter spacing,
+     so the first page keeps its full size instead of being scaled down. */
+  :root[data-fit-tight] {
+    & .hero-value {
+      font-size: var(--font-size-hero-min);
+    }
+
+    & .hero-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    & .card {
+      gap: var(--space-2);
+      padding: var(--space-3);
+    }
+
+    & .card-page {
+      gap: var(--space-2);
+    }
+  }
+
+  /* Pages instead of scrolling (owner, 10 Oct): "Previous / 1 of 3 / Next" in the title row; one page shown. */
+  .page-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .page-where {
+    color: var(--text-secondary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+    white-space: nowrap;
+  }
+
+  .card-page {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .card-page[hidden] {
+    display: none;
+  }
+
+  .button-secondary:disabled {
+    /* Not a design token on purpose: a state dimming, as on the page's buttons. */
+    opacity: 0.6;
+    cursor: default;
+  }
+
   /* The "Full screen" row keeps the same gap above the card as the other button rows (owner, 10 Oct). */
   .display-toggle {
     margin-block-end: var(--space-3);
+  }
+
+  /* In the card's title row (pages instead of scrolling, owner 10 Oct): no row of its own. */
+  .card-head .display-toggle {
+    margin-block-end: 0;
   }
 
   /* The toggle sits at the frame's edge: an outside ring would be clipped, so it is drawn inside the button. */

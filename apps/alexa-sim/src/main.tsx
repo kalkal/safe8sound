@@ -1,6 +1,6 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import './app.css';
-import type { HomeStatus, SetScenarioInput } from '@cold-reserve/contracts';
+import type { HomeStatus, ReserveOutlook, SetScenarioInput } from '@cold-reserve/contracts';
 import { getLocale, setLocale, subscribeLocale, type Locale } from '@cold-reserve/i18n';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -18,9 +18,11 @@ import { createScriptedPhone, type PhoneFeed } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
 import { CardFrame } from './host/CardFrame.js';
 import { EchoFrame } from './ui/EchoFrame.js';
-import { examplesFor } from './ui/ExampleQuestions.js';
+import { examplesFor, isGridDown } from './ui/ExampleQuestions.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
-import { HomePanel } from './ui/HomePanel.js';
+import { useHomePanel } from './ui/HomePanel.js';
+import { ReserveClock } from './ui/ReserveClock.js';
+import { fetchReserve } from './ui/reserve.js';
 import { SHIPPED_PLACES, applyChange, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario, type DemoSettingsView } from './ui/demo-settings.js';
 import { DemoSettingsControl } from './ui/SettingsDrawer.js';
 import { readLocale, saveLocale } from './ui/locale-setting.js';
@@ -109,14 +111,6 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const [home, setHome] = useState(() => initialHome(homeMode));
   // Scripted mode (#268): whether an answer has said what the home is since the scenario was chosen.
   const [homeTold, setHomeTold] = useState(false);
-  const onAnswer = useCallback(
-    (answer: AgentAnswer) => {
-      setSky((previous) => skyFor(answer.cards ?? [], config.homeTimeZone, previous));
-      setHome((previous) => homeFor(answer.cards ?? [], previous, homeMode));
-      if (homeFor(answer.cards ?? [], undefined, homeMode) !== undefined) setHomeTold(true);
-    },
-    [config.homeTimeZone, homeMode],
-  );
   // Remote mode (#262): the panel reads the home on demand, each time it opens and after a plan is applied.
   const [homeLoad, setHomeLoad] = useState<'idle' | 'loading' | 'failed'>('idle');
   const loadHome = useCallback(() => {
@@ -127,6 +121,19 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       setHomeLoad(read.ok ? 'idle' : 'failed');
     });
   }, [agent, homeMode]);
+  // Three bands (owner, 10 Oct): the home button in the header band, the home in the content band.
+  const homePanel = useHomePanel({ status: home, renderCard: (status) => <HomeCard status={status} />, load: homeLoad, onOpen: loadHome, onRetry: loadHome });
+  const closeHome = homePanel.close;
+  const onAnswer = useCallback(
+    (answer: AgentAnswer) => {
+      setSky((previous) => skyFor(answer.cards ?? [], config.homeTimeZone, previous));
+      setHome((previous) => homeFor(answer.cards ?? [], previous, homeMode));
+      if (homeFor(answer.cards ?? [], undefined, homeMode) !== undefined) setHomeTold(true);
+      // A new answer takes the content band: the home closes (its button says so).
+      closeHome();
+    },
+    [config.homeTimeZone, homeMode, closeHome],
+  );
   const onCardAction = useCallback(
     (name: string) => {
       if (name !== 'apply_plan') return;
@@ -180,10 +187,30 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // The example buttons follow the home (#268). Remote mode: the home read from sim-api wins over the scenario.
   // Scripted mode: the scenario decides (its home starts calm whatever the scenario) until an answer says what the
   // home is (a storm starting, or the power coming back); that answer then wins (review of #301).
-  const examples = examplesFor({
+  const homeState = {
     ...(demoSettings === undefined ? {} : { scenarioId: demoSettings.scenarioId }),
     ...(home === undefined || (homeMode !== 'remote' && !homeTold) ? {} : { gridAvailable: home.gridAvailable }),
-  });
+  };
+  const examples = examplesFor(homeState);
+  // The cold reserve clock on the idle screen (owner, 11 Oct): read on load and when the scenario or the grid changes,
+  // never polled; a failed read leaves no clock, quietly (fetchReserve logs it). Its storm is the
+  // examples' storm.
+  const gridDown = isGridDown(homeState);
+  const [reserve, setReserve] = useState<ReserveOutlook | undefined>(undefined);
+  const scenarioId = demoSettings?.scenarioId;
+  useEffect(() => {
+    // A new scenario or grid: the old hours go first (never a calm day's hours beside a melting cube), and a reply
+    // that comes after the next change is dropped.
+    setReserve(undefined);
+    if (!scripted && sessionToken === undefined) return undefined;
+    let current = true;
+    void fetchReserve(agent, { correlationId: crypto.randomUUID() }).then((read) => {
+      if (current && read.ok) setReserve(read.value);
+    });
+    return () => {
+      current = false;
+    };
+  }, [agent, scripted, sessionToken, scenarioId, gridDown]);
   const settingsControl = (
       <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onSettingsChange} locale={locale} onLocale={onLocale} />
   );
@@ -195,21 +222,37 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   );
   return (
     <EchoFrame sky={sky} aside={phonePanel} top={settingsControl}>
-      <Title />
-      <button
-        type="button"
-        className="link-button theme-toggle"
-        aria-pressed={theme === 'light'}
-        onClick={() => {
-          setTheme(theme === 'light' ? 'dark' : 'light');
-        }}
-      >
-        {t('theme.toggle')}
-      </button>
       <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', onCardAction }}>
-        <HomePanel status={home} renderCard={(status) => <HomeCard status={status} />} load={homeLoad} onOpen={loadHome} onRetry={loadHome} />
         <QueryClientProvider client={queryClient}>
-          <Conversation agent={agent} turnBudgetMs={config.turnBudgetMs} timeZone={config.homeTimeZone} voice={config.voice} demo={config.demo} onAnswer={onAnswer} examples={examples} {...(session === undefined ? {} : { session })} {...(studioVoice === undefined ? {} : { studioVoice })} />
+          <Conversation
+            agent={agent}
+            turnBudgetMs={config.turnBudgetMs}
+            timeZone={config.homeTimeZone}
+            voice={config.voice}
+            demo={config.demo}
+            onAnswer={onAnswer}
+            examples={examples}
+            head={
+              <>
+                <Title />
+                {homePanel.button}
+                <button
+                  type="button"
+                  className="link-button theme-toggle"
+                  aria-pressed={theme === 'light'}
+                  onClick={() => {
+                    setTheme(theme === 'light' ? 'dark' : 'light');
+                  }}
+                >
+                  {t('theme.toggle')}
+                </button>
+              </>
+            }
+            homeView={homePanel.view}
+            {...(reserve === undefined ? {} : { idle: <ReserveClock outlook={reserve} storm={gridDown} /> })}
+            {...(session === undefined ? {} : { session })}
+            {...(studioVoice === undefined ? {} : { studioVoice })}
+          />
         </QueryClientProvider>
       </CardHostProvider>
     </EchoFrame>

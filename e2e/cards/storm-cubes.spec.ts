@@ -20,6 +20,8 @@ const powerOut = async (page: import('@playwright/test').Page) => {
 };
 
 test('in the storm the cubes are 56 px and one of them melts to what is left of its hour', async ({ page }) => {
+  // The Echo Show 8 profile (1280 × 800), where the safe room's first page fits at full size.
+  await page.setViewportSize({ width: 1280, height: 800 });
   const card = await powerOut(page);
   const cube = card.locator('.cube').first();
   await expect(cube).toBeVisible();
