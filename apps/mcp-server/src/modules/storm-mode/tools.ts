@@ -66,10 +66,13 @@ export async function startStormMode(deps: StormModeDeps, input: StartStormModeI
   });
 }
 
-/** get_safe_room_status: the safe room now and its safe hours. Read-only: no session write, no message. */
-export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext): Promise<Result<SafeRoomStatus, ErrorEnvelope>> {
-  // A read: it degrades to the live reading when the store cannot be reached (#114); the writes stay fail-closed.
-  const o = await readHome(deps, ctx, true);
+/**
+ * get_safe_room_status: the safe room now and its safe hours. Read-only: no session write, no message. With `degrade`
+ * (the tool's read, #114) it falls back to the live reading when the store cannot be reached; the family phone reads
+ * strictly (#342).
+ */
+export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext, degrade = true): Promise<Result<SafeRoomStatus, ErrorEnvelope>> {
+  const o = await readHome(deps, ctx, degrade);
   if (!o.ok) return o;
   const { safeRoom, snapshot, session } = o.value;
   // The family's latest reply in this storm, by role only; its time on the home's clock (queue item 3).
@@ -89,6 +92,7 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext): Pro
     origin: snapshot.origin,
     homeLink: snapshot.homeLink,
     ...(o.value.storeUnavailable === true ? { storeUnavailable: true as const } : {}),
+    ...(o.value.stricterNightLimit === true ? { stricterNightLimit: true as const } : {}),
   });
 }
 
@@ -161,7 +165,8 @@ export async function familyReply(deps: StormModeDeps, input: { reply: PhoneRepl
   }
   // "Check status" reads the room first: a reply is recorded only when the phone gets its whole answer, so a
   // failed read never leaves a recorded reply that makes the retry "too soon" (#194 review).
-  const status = input.reply === 'check_status' ? await safeRoomStatus(deps, ctx) : undefined;
+  // Strict (#342): the phone never gets a degraded answer; a store that is down is an error it can retry.
+  const status = input.reply === 'check_status' ? await safeRoomStatus(deps, ctx, false) : undefined;
   if (status !== undefined && !status.ok) return status;
   const recorded = { role, reply: input.reply, at: new Date(nowMs).toISOString() };
   // TODO(#197): a plain put of the whole session; the storm detector and the phone are two writers.

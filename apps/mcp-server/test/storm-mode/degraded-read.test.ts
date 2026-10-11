@@ -1,4 +1,4 @@
-import { err, pct, toolError } from '@cold-reserve/contracts';
+import { celsius, err, pct, toolError } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import type { StormModeDeps } from '../../src/modules/storm-mode/deps.js';
 import { safeRoomSummary } from '../../src/modules/storm-mode/summaries.js';
@@ -26,16 +26,52 @@ describe('get_safe_room_status with the store down (#114)', () => {
     const degraded = await safeRoomStatus(storeDown(w.deps), w.ctx);
     if (!degraded.ok) throw new Error(degraded.error.message);
     expect(normal.value.storeUnavailable).toBeUndefined();
-    expect(degraded.value).toMatchObject({ storeUnavailable: true, safeRoomId: normal.value.safeRoomId, tempC: normal.value.tempC });
+    expect(degraded.value).toMatchObject({ storeUnavailable: true, stricterNightLimit: true, safeRoomId: normal.value.safeRoomId, tempC: normal.value.tempC });
+    expect(normal.value.stricterNightLimit).toBeUndefined();
     // The stricter night limit (24 °C) never gives more hours than the standard one.
     expect(degraded.value.safeHours).toBeLessThan(normal.value.safeHours);
     const degradedLines = w.logs.filter((l) => l.message === 'storm_read_degraded');
-    expect(degradedLines).toMatchObject([{ level: 'warn', correlationId: 'test-correlation', code: 'store_unavailable', details: { unreachable: 'preferences' } }]);
+    expect(degradedLines).toMatchObject([{ level: 'warn', correlationId: 'test-correlation', code: 'store_unavailable', details: { unreachable: 'preferences', errorName: 'store_unavailable' } }]);
+    // #342: the error name, never the sandbox id or a key.
+    expect(Object.keys(degradedLines[0]?.details ?? {}).sort()).toEqual(['errorName', 'event', 'unreachable']);
     const text = safeRoomSummary(degraded.value);
     expect(text).toMatch(/^The saved settings and the storm state are not reachable right now: this is the live reading only\. /);
     expect(text).toContain('on the battery alone, at the stricter night limit for an older person, it would hold about');
     expect(text).not.toContain('Safe for about');
     expect(text).toContain('Storm mode could not be checked.');
+  });
+
+  it('#342: with the grid down, the sentence gives the hours and the time at the stricter older-person night limit', async () => {
+    const w = world(4);
+    const degraded = await safeRoomStatus(storeDown(w.deps), w.ctx);
+    if (!degraded.ok) throw new Error(degraded.error.message);
+    expect(degraded.value.gridAvailable).toBe(false);
+    const text = safeRoomSummary(degraded.value);
+    expect(text).toMatch(/ At the stricter night limit for an older person, it holds for about [\d.]+ hours, until \d{1,2}:\d\d(?: [AP]M)?\. /);
+    expect(text).not.toContain('Safe for about');
+    expect(text).not.toContain('The grid powers the safe room');
+  });
+
+  it('#342: in the heating season the older-person night limit changes nothing, so the reading says the live hours plainly', async () => {
+    const w = world(4);
+    // A cold week: the forecast never gets above the heating comfort, so the hold keeps the heating minimum.
+    const cold: StormModeDeps = {
+      ...w.deps,
+      homes: (h) => {
+        const home = w.deps.homes(h);
+        return home && { ...home, forecast: () => ({ ...home.forecast(), hourly: home.forecast().hourly.map((x) => ({ ...x, tempOutC: celsius(5) })) }) };
+      },
+    };
+    const degraded = await safeRoomStatus(storeDown(cold), w.ctx);
+    if (!degraded.ok) throw new Error(degraded.error.message);
+    expect(degraded.value.storeUnavailable).toBe(true);
+    expect(degraded.value.stricterNightLimit).toBeUndefined();
+    const text = safeRoomSummary(degraded.value);
+    expect(text).not.toMatch(/stricter|older person/);
+    expect(text).toMatch(/ From the live reading, it holds for about [\d.]+ hours, until \d{1,2}:\d\d(?: [AP]M)?\. /);
+    const gridUp = safeRoomSummary({ ...degraded.value, gridAvailable: true });
+    expect(gridUp).toContain('The grid powers the safe room; on the battery alone it would hold about');
+    expect(gridUp).not.toMatch(/stricter|older person/);
   });
 
   it('a storm session that cannot be read: the reading still comes, without a storm phase', async () => {

@@ -62,12 +62,14 @@ export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: R
     s.lastCheckIn === undefined
       ? ''
       : ` Last check-in: your ${s.lastCheckIn.role} ${s.lastCheckIn.reply === 'on_my_way' ? 'is on the way' : 'checked the status'} (${localTimeText(s.lastCheckIn.at)}).`;
+  // #342: the older-person night limit only plays outside the heating season; when heating, a neutral line.
+  const strict = degraded && s.stricterNightLimit === true;
   // With the grid up the safe room is not on the battery: its hours are only a what-if (#273).
   const hours =
     s.gridAvailable === true
-      ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone${degraded ? ', at the stricter night limit for an older person,' : ''} it would hold about ${one(s.safeHours)} hours.`
+      ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone${strict ? ', at the stricter night limit for an older person,' : ''} it would hold about ${one(s.safeHours)} hours.`
       : degraded
-        ? `At the stricter night limit for an older person, it holds for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`
+        ? `${strict ? 'At the stricter night limit for an older person' : 'From the live reading'}, it holds for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`
         : `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`;
   const head = degraded ? 'The saved settings and the storm state are not reachable right now: this is the live reading only. ' : '';
   return (

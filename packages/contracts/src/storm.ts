@@ -143,6 +143,11 @@ export const SafeRoomStatusSchema = z.strictObject({
    * safe room, no storm session, and the hours at the stricter night limit. Absent when the store answered.
    */
   storeUnavailable: z.literal(true).optional(),
+  /**
+   * #342 (additive): with `storeUnavailable`, the hours are at the stricter older-person night limit. Absent in the
+   * heating season, where that limit changes nothing (the hold keeps the heating minimum), and when the store answered.
+   */
+  stricterNightLimit: z.literal(true).optional(),
 });
 export type SafeRoomStatus = z.infer<typeof SafeRoomStatusSchema>;
 

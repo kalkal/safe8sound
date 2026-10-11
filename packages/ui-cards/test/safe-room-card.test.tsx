@@ -37,10 +37,18 @@ describe('SafeRoomCard', () => {
   });
 
   it('#114: with the store down, the time is at the stricter older-person limit and the card says it is the live reading only', () => {
-    render(<SafeRoomCard status={{ ...safeRoomCalm(), storeUnavailable: true }} />);
+    render(<SafeRoomCard status={{ ...safeRoomCalm(), storeUnavailable: true, stricterNightLimit: true }} />);
     expect(screen.getByText('At the stricter older-person limit, at least until')).toBeTruthy();
     expect(screen.queryByText('Comfortable at least until')).toBeNull();
     expect(screen.getByTestId('store-down').textContent).toBe('The saved settings and the storm state cannot be read right now: this is the live reading only.');
+  });
+
+  it('#342: with the store down in the heating season, the eyebrow is neutral: no older-person limit, no comfort promise', () => {
+    render(<SafeRoomCard status={{ ...safeRoomCalm(), storeUnavailable: true }} />);
+    expect(screen.getByText('From the live reading, at least until')).toBeTruthy();
+    expect(screen.queryByText('At the stricter older-person limit, at least until')).toBeNull();
+    expect(screen.queryByText('Comfortable at least until')).toBeNull();
+    expect(screen.getByTestId('store-down')).toBeTruthy();
   });
 
   it('gives the hours as an estimate, "at least until", with the clock of the home', () => {

@@ -1,4 +1,4 @@
-import { PhoneReplyOutputSchema, type HomeId } from '@cold-reserve/contracts';
+import { PhoneReplyOutputSchema, err, toolError, type HomeId } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { familyReply, safeRoomStatus, startStormMode } from '../../src/modules/storm-mode/tools.js';
 import { world } from './support.js';
@@ -48,6 +48,23 @@ describe('a reply from the family phone', () => {
     const session = await w.store.getLatestStormSession();
     expect(session.ok && session.value?.familyReplies).toBeUndefined();
     expect((await familyReply(w.deps, { reply: 'check_status' }, phoneCtx(w))).ok).toBe(true);
+  });
+
+  it('#342: "Check status" reads strictly: a store down on the status read is an error to the phone, never a degraded answer', async () => {
+    const w = world(4);
+    await startStormMode(w.deps, { mode: 'active' }, w.ctx);
+    // The reply's own reading works; the store is gone for the status read that follows.
+    let reads = 0;
+    const flaky = {
+      ...w.deps,
+      preferencesFor: (...a: Parameters<typeof w.deps.preferencesFor>) =>
+        ++reads === 1 ? w.deps.preferencesFor(...a) : Promise.resolve(err(toolError('store_unavailable', 'The saved settings are not reachable right now; try again shortly.'))),
+    };
+    const out = await familyReply(flaky, { reply: 'check_status' }, phoneCtx(w));
+    expect(out).toMatchObject({ ok: false, error: { code: 'store_unavailable' } });
+    expect(w.logs.filter((l) => l.message === 'storm_read_degraded')).toEqual([]);
+    const session = await w.store.getLatestStormSession();
+    expect(session.ok && session.value?.familyReplies).toBeUndefined();
   });
 
   it('a second reply from the same role within minReplySeconds is refused with when to retry; it is not recorded', async () => {

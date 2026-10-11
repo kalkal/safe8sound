@@ -41,7 +41,10 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
               {t('safeRoom.storm')}
             </p>
           )}
-          <p className="eyebrow">{t(status.storeUnavailable === true ? 'safeRoom.untilStrict' : 'safeRoom.until')}</p>
+          {/* #342: the older-person limit only outside the heating season; when heating, a neutral eyebrow. */}
+          <p className="eyebrow">
+            {t(status.storeUnavailable !== true ? 'safeRoom.until' : status.stricterNightLimit === true ? 'safeRoom.untilStrict' : 'safeRoom.untilLive')}
+          </p>
           {/* The big time and the cubes: one row on a short screen (data-fit-tight), so both stay at full size. */}
           <div className="hero-row">
             <p className="hero-value" data-testid="safe-until">

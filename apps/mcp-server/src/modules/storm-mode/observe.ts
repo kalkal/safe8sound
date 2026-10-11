@@ -13,6 +13,7 @@ import {
   type Preferences,
   type Result,
   type RoomReading,
+  type Season,
   type SendableTransition,
   type Snapshot,
   type StormNotification,
@@ -48,6 +49,8 @@ export interface Observed {
   readonly session: StormSession | undefined;
   /** #114: the store could not be read (preferences or the storm session): the live reading, the default safe room, no session. */
   readonly storeUnavailable?: true;
+  /** #342: degraded outside the heating season, so the hours are at the stricter older-person night limit. */
+  readonly stricterNightLimit?: true;
   /** Who asked: the correlation id and the home of the log lines. */
   readonly ctx: ToolContext;
 }
@@ -71,7 +74,7 @@ function holdHours(
   forecast: Forecast,
   preferences: Preferences,
   strictest = false,
-): Result<{ hours: number; untilMs: number }, ErrorEnvelope> {
+): Result<{ hours: number; untilMs: number; season: Season }, ErrorEnvelope> {
   // Never assume an EPS load (#107): the projection would quietly count none.
   const eps = epsBaseLoadW(profile);
   if (!eps.ok) return eps;
@@ -88,7 +91,7 @@ function holdHours(
   );
   if (!held.ok) return held;
   const untilMs = held.value.safeUntil?.ms ?? toMs;
-  return ok({ hours: Math.round(((untilMs - nowMs) / HOUR_MS) * 100) / 100, untilMs });
+  return ok({ hours: Math.round(((untilMs - nowMs) / HOUR_MS) * 100) / 100, untilMs, season: frame.season });
 }
 
 export function messageFields(o: Observed, session: StormSession | undefined): StormMessageFields {
@@ -162,9 +165,11 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext, degrade = 
   const snapshot = await home.source.snapshot();
   if (!snapshot.ok) return snapshot;
   const unreachable: string[] = [];
+  const errorNames = new Set<string>();
   const canDegrade = (e: ErrorEnvelope, what: string): boolean => {
     if (!degrade || e.code !== 'store_unavailable') return false;
     unreachable.push(what);
+    errorNames.add(e.code);
     return true;
   };
   let preferences = await deps.preferencesFor(ctx.homeId, home.profile);
@@ -191,7 +196,8 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext, degrade = 
       code: 'store_unavailable',
       category: 'dependency_unavailable',
       ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
-      details: { event: 'storm_read_degraded', unreachable: unreachable.join(','), ...homeDetail(ctx.homeId) },
+      // #342: the error name of the reads that failed; never the sandbox id or a key.
+      details: { event: 'storm_read_degraded', unreachable: unreachable.join(','), errorName: [...errorNames].join(','), ...homeDetail(ctx.homeId) },
     });
   }
   return ok({
@@ -205,6 +211,8 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext, degrade = 
     safeUntilMs: hours.value.untilMs,
     session: latest.value,
     ...(degraded ? { storeUnavailable: true as const } : {}),
+    // In the heating season the hold keeps the heating minimum: the older-person night limit changes nothing.
+    ...(degraded && hours.value.season !== 'heating' ? { stricterNightLimit: true as const } : {}),
     ctx,
   });
 }
