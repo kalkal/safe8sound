@@ -16,7 +16,7 @@ import { settableClock } from '../comfort-plan/support.js';
 import { TOKEN } from '../helpers.js';
 import { preferences } from '../storm-mode/support.js';
 
-// The last-resort plan end to end (#160 acceptance): the storm-blackout scenario with the battery at 30 % and
+// The last-resort plan end to end (#160 acceptance): the storm-blackout scenario with the battery at 20 % and
 // grandpa in the safe room, the official SDK client over real HTTP, the production registry, F5's in-memory
 // store and the simulated phone. No plan keeps the room under the 24 °C night limit: plan_comfort proposes the
 // safest one with its honest window and the zero-energy actions; a plain apply_plan only returns a token; the
@@ -27,7 +27,7 @@ const DEMO = HomeIdSchema.parse('demo');
 const textOf = (r: Record<string, unknown>): string => (r['content'] as { type: string; text: string }[] | undefined)?.[0]?.text ?? '';
 const clock = (iso: string) => new Intl.DateTimeFormat('en-US', { timeZone: demoProfile().location.tz, hour: 'numeric', minute: '2-digit' }).format(Date.parse(iso));
 
-describe('storm, battery 30 %: the last resort, confirmed twice, tells the family', () => {
+describe('storm, battery 20 %: the last resort, confirmed twice, tells the family', () => {
   it('runs through MCP: window, actions, two yeses, the alert, and a model plan past the physical limits still refused', async () => {
     const wall = settableClock(Date.parse('2026-09-30T10:00:00Z'));
     const startH = 3;
@@ -39,14 +39,14 @@ describe('storm, battery 30 %: the last resort, confirmed twice, tells the famil
     if (!stormMode.ok) throw new Error(stormMode.error.message);
     const comfortPlan = comfortPlanWiring({ storeFor, preferences: loaded.value, clock: wall, notifier: stormMode.value.notifier });
     if (!comfortPlan.ok) throw new Error(comfortPlan.error.message);
-    // The same seeded simulator as the app, with the battery at 30 %.
+    // The same seeded simulator as the app, with the battery at 20 %.
     const scenario = builtInScenario('storm-blackout');
     const t0 = wall.now();
     const sim = new SimulatorSource({ profile: demoProfile(), scenario, params: defaultSimParams(), clock: fixedClock(Date.parse(scenario.startAt)) });
     const source = {
       snapshot: () => {
         const at = Date.parse(scenario.startAt) + startH * H + (wall.now() - t0);
-        return Promise.resolve(ok({ ...sim.snapshotAt(at), batterySocPct: pct(30) }));
+        return Promise.resolve(ok({ ...sim.snapshotAt(at), batterySocPct: pct(20) }));
       },
     };
     const app = createApp(

@@ -58,7 +58,7 @@ describe('local entry: one scenario clock for everything', () => {
 
   it('a local-only start battery level reaches the last resort in the storm; a bad value stops the start', async () => {
     const wall = settableClock(Date.parse('2026-10-03T10:00:00Z'));
-    const env = { MCP_CLIENTS: `agent@demo=${TOKEN}`, MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '4', MCP_SCENARIO_START_SOC_PCT: '30' };
+    const env = { MCP_CLIENTS: `agent@demo=${TOKEN}`, MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '4', MCP_SCENARIO_START_SOC_PCT: '20' };
     const local = createLocalApp(env, { wallClock: wall, logger: { log: () => undefined } });
     if (!local.ok) throw new Error(local.error.message);
     const server = await startNodeServer(local.value.app.handler, { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: local.value.app.config.maxBodyBytes });

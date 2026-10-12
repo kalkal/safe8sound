@@ -219,7 +219,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   };
 
   it('the first yes applies nothing: the plan stays proposed and a token comes back, valid at most 10 minutes and never past the plan', async () => {
-    const w = stormAt(30);
+    const w = stormAt(20);
     const plan = await lastResort(w);
     const { out } = await firstYes(w, plan);
     expect(ApplyPlanOutputSchema.parse(out)).toMatchObject({ alreadyApplied: false, plan: { id: plan.id, status: 'proposed' } });
@@ -231,7 +231,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   });
 
   it('the second yes with that token applies it, once', async () => {
-    const w = stormAt(30);
+    const w = stormAt(20);
     const plan = await lastResort(w);
     const { token } = await firstYes(w, plan);
     const r = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
@@ -243,7 +243,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   });
 
   it('a plain yes twice is never the second yes: each one only issues a new token', async () => {
-    const w = stormAt(30);
+    const w = stormAt(20);
     const plan = await lastResort(w);
     await firstYes(w, plan);
     const second = await firstYes(w, plan);
@@ -252,7 +252,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   });
 
   it('refuses a wrong token, a replaced one and an expired one, applying nothing', async () => {
-    const w = stormAt(30);
+    const w = stormAt(20);
     const plan = await lastResort(w);
     const wrong = await applyPlan(w.deps, { planId: plan.id, lastResortToken: `lr_${'x'.repeat(32)}` }, w.ctx);
     expect(!wrong.ok && wrong.error).toMatchObject({ code: 'last_resort_token_invalid', category: 'validation' });
@@ -270,7 +270,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   });
 
   it('refuses a token whose confirmation was issued for another version of the plan: the token is burnt, nothing applied (#167 review)', async () => {
-    const w = stormAt(30);
+    const w = stormAt(20);
     const plan = await lastResort(w);
     const token = `lr_${'y'.repeat(32)}`;
     const saved = await w.store.saveLastResortConfirmation({ planId: plan.id, tokenHash: sha256Hex(token), planHash: 'f'.repeat(64), expiresAt: new Date(w.clock.now() + 5 * MIN).toISOString() }, w.clock.now());
@@ -282,13 +282,13 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   });
 
   it('never lets the token outlive the plan, nor the configured minutes', async () => {
-    const long = stormAt(30);
+    const long = stormAt(20);
     const longDeps = { ...long.deps, config: { ...long.deps.config, planTtlMinutes: 60, lastResortConfirmMinutes: 10 } };
     const p1 = await planComfort(longDeps, { goal: 'cool' }, long.ctx);
     if (!p1.ok) throw new Error(p1.error.message);
     const a1 = await applyPlan(longDeps, { planId: p1.value.id }, long.ctx);
     expect(a1.ok && Date.parse(a1.value.confirmation?.expiresAt ?? '')).toBe(long.clock.now() + 10 * MIN);
-    const short = stormAt(30);
+    const short = stormAt(20);
     const shortDeps = { ...short.deps, config: { ...short.deps.config, planTtlMinutes: 10, lastResortConfirmMinutes: 30 } };
     const p2 = await planComfort(shortDeps, { goal: 'cool' }, short.ctx);
     if (!p2.ok) throw new Error(p2.error.message);
@@ -298,7 +298,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   });
 
   it('a first yes at a whole second + 500 ms: the time told is the time stored, and the token works until just before it', async () => {
-    const w = stormAt(30);
+    const w = stormAt(20);
     const deps = { ...w.deps, config: { ...w.deps.config, planTtlMinutes: 60, lastResortConfirmMinutes: 10 } };
     const p = await planComfort(deps, { goal: 'cool' }, w.ctx);
     if (!p.ok) throw new Error(p.error.message);
@@ -319,7 +319,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   });
 
   it('a token already used, on a plan applied meanwhile (a stale read, a retry), returns the applied plan (#168 review)', async () => {
-    const w = stormAt(30);
+    const w = stormAt(20);
     const plan = await lastResort(w);
     const { token } = await firstYes(w, plan);
     expect((await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx)).ok).toBe(true);
@@ -347,7 +347,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
       new Intl.DateTimeFormat('en-US', { timeZone: w.profile.location.tz, hour: 'numeric', minute: '2-digit' }).format(Date.parse(iso));
 
     it('every registered contact gets the fixed text, with until when the plan keeps the safe room safe', async () => {
-      const w = stormAt(30);
+      const w = stormAt(20);
       const plan = await lastResort(w);
       const { token } = await firstYes(w, plan);
       expect(await w.inbox()).toEqual([]);
@@ -365,7 +365,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
     });
 
     it('in the unit the sandbox chose: a °F sandbox alerts the family in °F (#306)', async () => {
-      const w = stormAt(30, { units: 'F' });
+      const w = stormAt(20, { units: 'F' });
       const plan = await lastResort(w);
       const { token } = await firstYes(w, plan);
       await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
@@ -375,7 +375,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
     });
 
     it('on the real home too: the alert is a message, not a command to the home, and the person hears it went out', async () => {
-      const w = stormAt(30, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, origin: live }) });
+      const w = stormAt(20, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, origin: live }) });
       const plan = await lastResort(w);
       const r = await applyPlan(w.deps, { planId: plan.id }, w.ctx);
       expect((await w.inbox()).map((m) => m.transition)).toEqual(['last_resort_applied']);
@@ -384,14 +384,14 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
     });
 
     it('the result says how it went: sent once, nothing on a repeat, failed when the phone is down, zero with no contact', async () => {
-      const w = stormAt(30);
+      const w = stormAt(20);
       const plan = await lastResort(w);
       const { token } = await firstYes(w, plan);
       const done = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
       expect(done.ok && done.value.familyAlert).toEqual({ sent: 1, failed: 0 });
       const repeat = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
       expect(repeat.ok && repeat.value.familyAlert).toBeUndefined();
-      const nobody = stormAt(30, { preferences: PreferencesSchema.parse({ ...preferences, familyContacts: [] }) });
+      const nobody = stormAt(20, { preferences: PreferencesSchema.parse({ ...preferences, familyContacts: [] }) });
       const p2 = await lastResort(nobody);
       const t2 = await firstYes(nobody, p2);
       const none = await applyPlan(nobody.deps, { planId: p2.id, lastResortToken: t2.token }, nobody.ctx);
@@ -409,7 +409,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
 
     it('a failed alert does not undo the plan: it is logged as a warning with its code', async () => {
       const down = { send: () => Promise.resolve(err(toolError('store_unavailable', 'The phone is down.'))) };
-      const w = stormAt(30, { notifier: down });
+      const w = stormAt(20, { notifier: down });
       const plan = await lastResort(w);
       const { token } = await firstYes(w, plan);
       const r = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
@@ -430,7 +430,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   });
 
   it('logs that a token was issued and used, never the token itself', async () => {
-    const w = stormAt(30);
+    const w = stormAt(20);
     const plan = await lastResort(w);
     const { token } = await firstYes(w, plan);
     await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
@@ -443,7 +443,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   });
 
   it('on the real home the last resort stays advice: manual steps at once, no token', async () => {
-    const w = stormAt(30, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, origin: live }) });
+    const w = stormAt(20, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, origin: live }) });
     const plan = await lastResort(w);
     const r = await applyPlan(w.deps, { planId: plan.id }, w.ctx);
     expect(r.ok && ApplyPlanOutputSchema.parse(r.value)).toMatchObject({ advisoryOnly: true, plan: { status: 'applied' } });

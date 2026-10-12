@@ -1,6 +1,8 @@
-import { PreferencesSchema, pct } from '@cold-reserve/contracts';
+import { PreferencesSchema, celsius, pct } from '@cold-reserve/contracts';
+import { nightMetrics } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
-import { holdSafeRoom, safeRoomLimitAt, safeRoomLimitKindAt, type HeldSafeRoom, type HoldSafeRoomInput } from '../src/hold-safe-room.js';
+import { bestHold, holdSafeRoom, leavesLimitsMs, safeRoomLimitAt, safeRoomLimitKindAt, type HeldSafeRoom, type HoldSafeRoomInput } from '../src/hold-safe-room.js';
+import { projectFrom } from '../src/context.js';
 import { H, T0, input, preferences, profile, snapshot } from './support.js';
 
 // One physics for "how long can the safe room hold" (#160, #24): the safe room's split held at the limit in
@@ -185,5 +187,116 @@ describe('holdSafeRoom', () => {
     const step = input().config.projection.stepMinutes * 60_000;
     expect(r.driesAt(T0 + step)).toBe(true);
     expect(r.driesAt(T0)).toBe(false);
+  });
+});
+
+// Grid down with a battery that ends before the night does (#332 study): the hold does not dry a room the heat
+// index does not require drying, may aim at the comfort setpoint while there is energy, and keeps the alternative
+// with the most night hours under the threshold.
+describe('holdSafeRoom with the grid down and a battery too low for the night', () => {
+  const adult = (o: { socPct: number; rh?: number; gridAvailable?: boolean }) => {
+    const s = snapshot({ tempC: 26, socPct: o.socPct, gridAvailable: o.gridAvailable ?? false });
+    return input({
+      nightRecoveryMode: 'standard',
+      snapshot: { ...s, rooms: s.rooms.map((r) => (r.id === 'bedroom-1' ? { ...r, humidityPct: pct(o.rh ?? 70), occupants: ['daughter'] } : r)) },
+    });
+  };
+  const nightHours = (i: HoldSafeRoomInput, points: HeldSafeRoom['points']) =>
+    nightMetrics(points, { roomId: 'bedroom-1', tz: i.profile.location.tz, stepMinutes: i.config.projection.stepMinutes, thresholdC: 26, config: i.config.nightRecovery })?.achievedHours ?? 0;
+
+  it('on a battery that runs out at night, a humid room is cooled, not dried, while heat and humidity are not dangerous together', () => {
+    const i = adult({ socPct: 14 });
+    const r = held(i);
+    expect(r.safeUntil).toBeDefined();
+    // 70 % is above the planner's band, but at 26 °C the heat index stays under the limit: drying would only spend
+    // the battery (a fixed share of the nominal input) the night needs.
+    expect(safeMode(r, T0)).toBe('cool');
+    expect(r.points.every((p) => !r.driesAt(p.ms))).toBe(true);
+  });
+
+  it('with the grid up nothing changes: the humidity band still dries a humid room', () => {
+    expect(safeMode(held(adult({ socPct: 14, gridAvailable: true })), T0)).toBe('dry');
+  });
+
+  it.each([10, 14, 20])('at %i percent the hold keeps at least the night hours of cooling to the comfort setpoint all night, with the same battery floor', (socPct) => {
+    const i = adult({ socPct });
+    const r = held(i);
+    const comfortC = i.preferences.comfortC.cooling;
+    const naive = projectFrom(
+      { ...i, plan: { horizonAt: i.snapshot.ts, steps: [], ladder: [] } },
+      () => i.profile.rooms.map((room) => (room.id === 'bedroom-1' ? { id: room.id, hvac: { mode: 'cool' as const, setpointC: celsius(comfortC) }, fanOn: false } : { id: room.id, fanOn: false })),
+      { toMs: opts.toMs, dischargeFloorPct: opts.dischargeFloorPct },
+    );
+    expect(nightHours(i, r.points)).toBeGreaterThanOrEqual(nightHours(i, naive) - 1e-9);
+    // The battery floor stays a floor: the hold never discharges under it.
+    expect(Math.min(...r.points.map((p) => p.socPct))).toBeGreaterThanOrEqual(opts.dischargeFloorPct - 1e-6);
+  });
+
+  it('never aims the split under the comfort setpoint, nor above the limit minus the margin', () => {
+    const i = adult({ socPct: 14 });
+    const r = held(i);
+    const limitAt = safeRoomLimitAt(i);
+    for (const p of r.points) {
+      const sp = setpointAt(r, p.ms);
+      if (sp === undefined) continue;
+      expect(sp).toBeGreaterThanOrEqual(Math.min(i.preferences.comfortC.cooling, limitAt(p.ms) - opts.marginK) - 1e-9);
+      expect(sp).toBeLessThanOrEqual(limitAt(p.ms) - opts.marginK + 1e-9);
+    }
+  });
+});
+
+describe('bestHold', () => {
+  const i = input({ nightRecoveryMode: 'standard' });
+  const night = Date.parse('2026-07-15T22:00:00+02:00');
+  const step = i.config.projection.stepMinutes * 60_000;
+  /** A hold whose safe room is at `tempAt(ms)` every step from 20:00 to 08:00, ending as given. */
+  const hold = (tempAt: (ms: number) => number, end?: { ms: number; limitedBy: 'battery' | 'temperature' }): HeldSafeRoom => {
+    const points: HeldSafeRoom['points'] = [];
+    for (let ms = T0; ms <= T0 + 12 * H; ms += step) {
+      points.push({ ms, socPct: pct(50), rooms: [{ id: 'bedroom-1', tempC: celsius(tempAt(ms)), humidityPct: pct(50) }], flows: { pvW: 0, loadW: 0, hvacW: 0, chargeW: 0, dischargeW: 0, gridImportW: 0, gridExportW: 0, unservedLoadW: 0 } } as unknown as HeldSafeRoom['points'][number]);
+    }
+    return { points, safeUntil: end, controlsAt: () => [], driesAt: () => false };
+  };
+  const coolUntil = (ms: number) => (t: number) => (t < ms ? 25 : 26.5);
+
+  it('a variant that ends earlier on the heat never wins, whatever its night hours (#332 review)', () => {
+    // Held at 25 °C, then under the 26 °C night limit to the morning, but too hot at 22:00: its safe hours end at
+    // 22:00 on the temperature, while the first hold's room leaves its limits only at 00:00.
+    const first = hold(coolUntil(night + 2 * H), { ms: night + 20 * 60_000, limitedBy: 'battery' });
+    const hotAtTen = hold((t) => (t >= night && t < night + 20 * 60_000 ? 26.4 : 25), { ms: night, limitedBy: 'temperature' });
+    expect(bestHold(i, first, [hotAtTen])).toBe(first);
+  });
+
+  it('a variant whose battery ends earlier wins when the room it leaves stays inside its limits longer', () => {
+    const longerBattery = hold(coolUntil(night + 2 * H), { ms: night + H, limitedBy: 'battery' });
+    const coolerRoom = hold(coolUntil(night + 5 * H), { ms: night, limitedBy: 'battery' });
+    expect(bestHold(i, longerBattery, [coolerRoom])).toBe(coolerRoom);
+    expect(leavesLimitsMs(coolerRoom, 'bedroom-1', safeRoomLimitAt(i))).toBe(night + 5 * H);
+  });
+
+  it('on the same time out of the limits, the most night hours, then the later end of the safe hours, then the first', () => {
+    const never = { ms: night, limitedBy: 'battery' as const };
+    // Both leave the 26 °C night limit at 01:00; one is back under it from 02:00.
+    const stays = hold(coolUntil(night + 3 * H), never);
+    const back = hold((t) => (t >= night + 3 * H && t < night + 4 * H ? 26.5 : 25), never);
+    expect(bestHold(i, stays, [back])).toBe(back);
+    const same = hold(() => 25, never);
+    const later = hold(() => 25, { ms: night + H, limitedBy: 'battery' });
+    expect(bestHold(i, same, [later])).toBe(later);
+    const twin = hold(() => 25, { ms: night + H, limitedBy: 'battery' });
+    expect(bestHold(i, later, [twin])).toBe(later);
+  });
+});
+
+describe('holdSafeRoom: more battery never brings the room out of its limits earlier (#332 review)', () => {
+  it.each(['standard', 'elderly'] as const)('%s night limit, 12 to 30 percent, grid down, 20:00', (mode) => {
+    let previous = Number.NEGATIVE_INFINITY;
+    for (let socPct = 12; socPct <= 30; socPct++) {
+      const s = snapshot({ tempC: 26, socPct, gridAvailable: false });
+      const i = input({ nightRecoveryMode: mode, snapshot: { ...s, rooms: s.rooms.map((x) => (x.id === 'bedroom-1' ? { ...x, humidityPct: pct(65) } : x)) } });
+      const leaves = leavesLimitsMs(held(i), 'bedroom-1', safeRoomLimitAt(i));
+      expect(leaves, `${String(socPct)} %`).toBeGreaterThanOrEqual(previous);
+      previous = leaves;
+    }
   });
 });

@@ -64,8 +64,8 @@ describe('what the model reads', () => {
       const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
       if (!r.ok) throw new Error(r.error.message);
       const text = planSummary(r.value, F);
-      // 24 °C is 75.2 °F; 24.7 °C is 76.46 °F, said 76.5.
-      expect(text).toContain('The battery lasts until 11:40 PM; the safe room stays at or below its 75.2 °F night limit until about 2:15 AM, then warms up to 76.5 °F by 6:20 AM.');
+      // 24 °C is 75.2 °F; 24.5 °C is 76.1 °F.
+      expect(text).toContain('The battery lasts until 12:50 AM; the safe room stays at or below its 75.2 °F night limit until about 3:35 AM, then warms up to 76.1 °F by 6:10 AM.');
       const counterfactual = text.split(/(?<=\.) /).find((x) => x.startsWith('Without the plan')) ?? '';
       expect(counterfactual).toMatch(/would peak at \d+(\.\d)? °F at /);
       expect(counterfactual).toContain('heat-index °F-hours');
@@ -208,7 +208,7 @@ describe('what the model reads', () => {
   });
 
   it('plan_comfort: a last resort says until when the room is safe and why, and that it takes two explicit yeses', async () => {
-    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(35) }) });
+    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(20) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const text = planSummary(r.value, NIGHT);
@@ -221,7 +221,7 @@ describe('what the model reads', () => {
   });
 
   it('plan_comfort: when the battery ends it, says until when the battery lasts and how far the room then goes, every number (#160)', async () => {
-    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(30), rooms: x.rooms.map((r) => ({ ...r, occupants: r.occupants.length > 0 ? ['daughter', 'son'] : [] })) }) });
+    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(20), rooms: x.rooms.map((r) => ({ ...r, occupants: r.occupants.length > 0 ? ['daughter', 'son'] : [] })) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const lr = r.value.lastResort;
@@ -236,13 +236,13 @@ describe('what the model reads', () => {
     expect(text).not.toContain('hours from now');
   });
 
-  it('the 22:00 storm at 17 % of the guided test: the battery at 11:40 PM, the room under 24 °C until about 2:15 AM, in one sentence (#272)', async () => {
-    // The night-recovery count (3.67 h at or below 24 °C) starts at 22:00 with the room just above 24 °C in the grace
-    // period; the room then holds 24 °C by inertia after the battery runs out, until it crosses it at 2:15 AM.
+  it('the 22:00 storm at 17 % of the guided test: the battery at 12:50 AM, the room under 24 °C until about 3:35 AM, in one sentence (#272)', async () => {
+    // The night-recovery count (5 h at or below 24 °C) starts at 22:00 with the room just above 24 °C in the grace
+    // period; the room then holds 24 °C by inertia after the battery runs out, until it crosses it at 3:35 AM.
     const w = world('storm-blackout', 10, { snapshot: (x) => ({ ...x, batterySocPct: pct(17) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
-    expect(planSummary(r.value, NIGHT)).toContain('The battery lasts until 11:40 PM; the safe room stays at or below its 24 °C night limit until about 2:15 AM, then warms up to 24.7 °C by 6:20 AM.');
+    expect(planSummary(r.value, NIGHT)).toContain('The battery lasts until 12:50 AM; the safe room stays at or below its 24 °C night limit until about 3:35 AM, then warms up to 24.5 °C by 6:10 AM.');
   });
 
   it('the guided storm: the whole summary has one end time and at most one hours figure for 24 °C (#272 review)', async () => {
@@ -253,15 +253,15 @@ describe('what the model reads', () => {
     const about24 = text.split(/(?<=\.) /).filter((s) => s.includes('24 °C'));
     expect(about24.length).toBeGreaterThan(0);
     expect(about24.flatMap((s) => s.match(/\d+(\.\d+)? hours/g) ?? []).length).toBeLessThanOrEqual(1);
-    // Every sentence that carries a duration (#299): only the battery's, both ending at 11:40 PM like the window says;
+    // Every sentence that carries a duration (#299): only the battery's, both ending at 12:50 AM like the window says;
     // none for the room's threshold, the counterfactual's night hours included.
     const durations = text.split(/(?<=\.) /).filter((s) => /\d+(\.\d+)? (night )?(hours?|minutes?|min|h)\b/.test(s));
     expect(durations).toEqual([
-      expect.stringMatching(/^pacing_on_track FAILS: At this pace the battery runs out at 23:40, \d+ min before the next recharge at 08:00\.$/),
-      'Warning: No plan keeps the Bedroom within its limits until the next recharge: safe for about 1.67 hours, until 11:40 PM; then the battery runs out.',
+      expect.stringMatching(/^pacing_on_track FAILS: At this pace the battery runs out at 00:50, \d+ min before the next recharge at 08:00\.$/),
+      'Warning: No plan keeps the Bedroom within its limits until the next recharge: safe for about 2.83 hours, until 12:50 AM; then the battery runs out.',
     ]);
     expect(text).not.toContain('night hours');
-    // The night count (3.67 h, grace minutes included) stays in nightRecovery for the card, not in the text.
+    // The night count (5 h, grace minutes included) stays in nightRecovery for the card, not in the text.
     expect(text).not.toContain('Night recovery (');
     expect(text).not.toContain('hours from now');
     expect(r.value.nightRecovery?.achievedHours).toBeGreaterThan(0);
@@ -375,8 +375,8 @@ describe('what the model reads', () => {
     );
   });
 
-  it('plan_comfort, end to end: grandpa in the safe room at 30 % hears the honest window of the hold, first sentence first', async () => {
-    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(30) }) });
+  it('plan_comfort, end to end: grandpa in the safe room at 20 % hears the honest window of the hold, first sentence first', async () => {
+    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(20) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const lr = r.value.lastResort;
@@ -448,7 +448,7 @@ describe('what the model reads', () => {
   });
 
   it('apply_plan, first yes to a last resort: nothing applied, the risk to read, the family alert, and the second call only after a second yes (#160)', async () => {
-    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(30) }) });
+    const w = world('storm-blackout', 3, { snapshot: (x) => ({ ...x, batterySocPct: pct(20) }) });
     const p = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!p.ok) throw new Error(p.error.message);
     const r = await applyPlan(w.deps, { planId: p.value.id }, w.ctx);

@@ -193,21 +193,29 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
   // hold is the last resort even when the hold itself fails only the pace, so the plan and the storm card name
   // the same time (#24 decision A; #248, approved in #248).
   const holds = chosen === undefined && !overridden ? holdAttempts(deps, guardInput, holdFailed) : [];
-  const needed = [...tried, ...holds].some(needsLastResort);
+  // On a low battery the hold may keep every guarantee where the ladder did not (it cools without drying and
+  // keeps the most night hours): then it is a plan like any other, never a last resort.
+  const heldPlan = holds.find((h) => h.verdict.ok);
+  if (chosen === undefined && heldPlan !== undefined) chosen = heldPlan;
+  const needed = chosen === undefined && [...tried, ...holds].some(needsLastResort);
   const fromHold = needed ? lastResortOf(holds, deps, guardInput, { anyFailure: true }) : undefined;
   const safest = fromHold ?? (chosen === undefined && !overridden ? lastResortOf(tried, deps, guardInput) : undefined);
   if (chosen === undefined && safest !== undefined) chosen = safest.attempt;
   // A plan the model proposed and the guard refused (#202): when the planner's own plan holds, that plan is the
   // answer, saved and applicable, with a short note of the refusal. Never only a refusal when a plan holds.
   let refusedProposal: { code: ErrorEnvelope['code']; message: string } | undefined;
+  // The planner's own search and hold for a refused proposal: the same answer plan_comfort with only the goal gives.
+  const own: Attempt[] = [];
+  let ownHolds: Attempt[] = [];
   if (chosen === undefined && overridden && last !== undefined) {
     const refusal = rejectionOf(last.verdict, guardInput.displayUnit);
-    const holds = refusal === undefined ? undefined : firstPassing(deps, guardInput, ladder);
-    if (refusal !== undefined && holds !== undefined) {
+    if (refusal !== undefined) ownHolds = holdAttempts(deps, guardInput, () => undefined);
+    const passing = refusal === undefined ? undefined : (firstPassing(deps, guardInput, ladder, (a) => own.push(a)) ?? ownHolds.find((h) => h.verdict.ok));
+    if (refusal !== undefined && passing !== undefined) {
       // The guard's no to the proposal stays in the audit trail.
       await recordRejection(store, last.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId });
       refusedProposal = { code: refusal.code, message: refusal.message };
-      chosen = holds;
+      chosen = passing;
     }
   }
   if (chosen === undefined) {
@@ -215,8 +223,14 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     // The receipt's badge and its "simulated data" notice (#198 review): the data origin, and the real home as a
     // flag, never a home id (a sandbox id stays out of tool output).
     // A refused proposal when only the last resort is left: the model asks again with only the goal, so the
-    // person hears the last resort and its two yeses (#202 follow-up). The hold's failure is logged by that call.
-    const lastResortLeft = refused !== undefined && overridden && lastResortOf(holdAttempts(deps, guardInput, () => undefined), deps, guardInput) !== undefined;
+    // person hears the last resort and its two yeses (#202 follow-up). The same rule as that call: a candidate of
+    // the planner's own search (or the hold) needs a last resort, and the hold qualifies, else the candidates.
+    // The hold's failure is logged by that call.
+    const ownNeeded = [...own, ...ownHolds].some(needsLastResort);
+    const lastResortLeft =
+      refused !== undefined &&
+      overridden &&
+      ((ownNeeded && lastResortOf(ownHolds, deps, guardInput, { anyFailure: true }) !== undefined) || lastResortOf(own, deps, guardInput) !== undefined);
     // The hint is for the model: it reaches the text it reads, never the message a card shows (#272).
     const rejection =
       refused === undefined
@@ -609,14 +623,15 @@ const rank = (order: readonly string[], id: string) => {
   return i < 0 ? order.length : i;
 };
 
-/** The planner's own search, without the model's overrides: the first plan that holds every guarantee. */
-function firstPassing(deps: ComfortPlanDeps, guardInput: GuardInput, ladder: LevelStep[]): Attempt | undefined {
+/** The planner's own search, without the model's overrides: the first plan that holds every guarantee; `onTry` sees every candidate tried. */
+function firstPassing(deps: ComfortPlanDeps, guardInput: GuardInput, ladder: LevelStep[], onTry: (a: Attempt) => void = () => undefined): Attempt | undefined {
+  const tried = (a: Attempt): Attempt => (onTry(a), a);
   for (let i = 0; i < ladder.length; i++) {
     const rung = ladder[i];
     if (rung === undefined) continue;
-    const withNight = tryRung(deps, guardInput, ladder.slice(i), rung, false, undefined, undefined, true);
+    const withNight = tried(tryRung(deps, guardInput, ladder.slice(i), rung, false, undefined, undefined, true));
     if (withNight.verdict.ok) return withNight;
-    const plain = tryRung(deps, guardInput, ladder.slice(i), rung, false);
+    const plain = tried(tryRung(deps, guardInput, ladder.slice(i), rung, false));
     if (plain.verdict.ok) return plain;
   }
   const essential = ladder.length - 1;
@@ -624,9 +639,9 @@ function firstPassing(deps: ComfortPlanDeps, guardInput: GuardInput, ladder: Lev
   if (rung === undefined) return undefined;
   for (const cycle of deps.config.planner.dutyCycles) {
     // With night cooling first, then without it, as the planner's own search does.
-    const withNight = tryRung(deps, guardInput, ladder.slice(essential), rung, false, undefined, cycle, true);
+    const withNight = tried(tryRung(deps, guardInput, ladder.slice(essential), rung, false, undefined, cycle, true));
     if (withNight.verdict.ok) return withNight;
-    const plain = tryRung(deps, guardInput, ladder.slice(essential), rung, false, undefined, cycle);
+    const plain = tried(tryRung(deps, guardInput, ladder.slice(essential), rung, false, undefined, cycle));
     if (plain.verdict.ok) return plain;
   }
   return undefined;

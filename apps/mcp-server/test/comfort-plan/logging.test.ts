@@ -31,7 +31,7 @@ describe('comfort-plan logging', () => {
   });
 
   it('a last resort leaves an audit trail: the refusal in the store and an info line in the log', async () => {
-    const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(35) }) });
+    const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(20) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     expect(r.value.lastResort).toBeDefined();
@@ -44,7 +44,7 @@ describe('comfort-plan logging', () => {
 
   it('a visitor sandbox never reaches the last-resort lines: it is said as "sandbox" (#168 review)', async () => {
     const sandbox = HomeIdSchema.parse('demo#0123456789abcdef');
-    const w = world('storm-blackout', 3, { homeId: sandbox, snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
+    const w = world('storm-blackout', 3, { homeId: sandbox, snapshot: (s) => ({ ...s, batterySocPct: pct(20) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const first = await applyPlan(w.deps, { planId: r.value.id }, w.ctx);

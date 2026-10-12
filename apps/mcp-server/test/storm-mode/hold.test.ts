@@ -55,13 +55,13 @@ describe('storm safe hours on the guard\'s hold', () => {
   });
 
   it('while preparing with the grid still up, counts the battery alone: what the storm will have', async () => {
-    const w = world(1, { snapshot: (snap) => ({ ...snap, batterySocPct: pct(20) }) });
+    const w = world(1, { snapshot: (snap) => ({ ...snap, batterySocPct: pct(12) }) });
     expect(w.snapshot().gridAvailable).toBe(true);
     const out = await safeRoomStatus(w.deps, w.ctx);
     if (!out.ok) throw new Error(out.error.message);
     const held = expectedHold({ snapshot: w.snapshot(), forecast: w.forecast(), profile: w.profile, preferences, config: stormConfig() });
     expect(out.value.safeHours).toBe(held.hours);
-    // With the grid counted the battery would never empty: on battery alone, 20 % does not reach the cap.
+    // With the grid counted the battery would never empty: on battery alone, 12 % does not reach the cap.
     expect(Date.parse(out.value.safeUntil)).toBeLessThan(Date.parse(w.snapshot().ts) + stormConfig().capHours * H);
   });
 });

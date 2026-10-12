@@ -71,7 +71,7 @@ describe('plan_comfort (two-phase: propose)', () => {
   });
 
   it('checks exactly what the model proposed: when nothing holds, the guard says no, with the nearest allowed value; nothing is saved', async () => {
-    const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
+    const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(20) }) });
     // Cooling to only 29 °C lets the safe room reach 27.8 °C, above its 27 °C maximum.
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
     expect(r.ok).toBe(false);
@@ -88,7 +88,7 @@ describe('plan_comfort (two-phase: propose)', () => {
   });
 
   it('when only a last resort is left, the refusal tells the model to ask again with only the goal (#202 follow-up)', async () => {
-    const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
+    const w = world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(20) }) });
     // Cooling to only 29 °C lets the safe room reach 27.8 °C, above its 27 °C maximum.
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
     if (r.ok) throw new Error('expected a refusal');
@@ -102,7 +102,7 @@ describe('plan_comfort (two-phase: propose)', () => {
 
   it('a refusal says where its data came from; on a sandbox it carries neither the demo# id nor realHome (#198 review)', async () => {
     const sandbox = HomeIdSchema.parse('demo#0123456789abcdef');
-    const w = world('storm-blackout', 3, { homeId: sandbox, snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
+    const w = world('storm-blackout', 3, { homeId: sandbox, snapshot: (s) => ({ ...s, batterySocPct: pct(20) }) });
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(18), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, { ...w.ctx, homeId: sandbox });
     if (r.ok) throw new Error('expected a refusal');
     expect(r.error.details?.origin).toMatchObject({ energy: 'simulated', rooms: 'simulated', weather: 'simulated' });
@@ -111,7 +111,7 @@ describe('plan_comfort (two-phase: propose)', () => {
   });
 
   it('a refusal on the real home says so, for the "simulated data" notice of the receipt', async () => {
-    const w = world('storm-blackout', 3, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, batterySocPct: pct(30) }) });
+    const w = world('storm-blackout', 3, { homeId: REAL, readOnly: true, snapshot: (s) => ({ ...s, batterySocPct: pct(20) }) });
     // Cooling to only 29 °C lets the safe room reach 27.8 °C, above its 27 °C maximum.
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
     if (r.ok) throw new Error('expected a refusal');
@@ -266,8 +266,8 @@ describe('last resort (approved in #19: proposal only)', () => {
   const HARD = ['storm_reserve', 'inverter_limit', 'battery_power'];
   const stormAt = (soc: number) => world('storm-blackout', 3, { snapshot: (s) => ({ ...s, batterySocPct: pct(soc) }) });
 
-  it('in a storm with a 35 % battery no plan holds until the recharge: proposes the safest one, with until when and why', async () => {
-    const w = stormAt(35);
+  it('in a storm with a 20 % battery no plan holds until the recharge: proposes the safest one, with until when and why', async () => {
+    const w = stormAt(20);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     const p = PlanSchema.parse(r.value);
@@ -332,7 +332,7 @@ describe('last resort (approved in #19: proposal only)', () => {
   });
 
   it('the last resort IS the hold of the safe room (#24, decision A): the safe room alone at essential, every other room off', async () => {
-    const w = stormAt(30);
+    const w = stormAt(20);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const p = PlanSchema.parse(r.value);
@@ -378,8 +378,33 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(proposal.error.message).not.toContain('Call plan_comfort again');
   });
 
+  it('on 30 % the hold that cools without drying keeps every guarantee: a plan like any other, not a last resort (#332 study)', async () => {
+    const w = stormAt(30);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
+    const p = PlanSchema.parse(r.value);
+    expect(p.lastResort).toBeUndefined();
+    expect(p.guarantees.every((g) => g.ok)).toBe(true);
+    // It is the hold: the safe room alone at essential, cooling, every other room off.
+    expect(p.ladder.map((x) => x.level)).toEqual(['essential']);
+    expect(p.steps.filter((s) => s.roomId === 'bedroom-1').every((s) => s.hvacMode === 'cool')).toBe(true);
+    expect(p.steps.filter((s) => s.roomId !== 'bedroom-1').every((s) => s.hvacMode === 'off')).toBe(true);
+    expect(w.logger.lines.some((l) => l.details?.['event'] === 'last_resort_proposed')).toBe(false);
+  });
+
+  it('a refused proposal on 30 %: the hold that keeps every guarantee is the answer, with the refusal noted (#202)', async () => {
+    const w = stormAt(30);
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
+    if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
+    expect(r.value.refusedProposal?.message).toMatch(/Nearest allowed/);
+    expect(r.value.lastResort).toBeUndefined();
+    expect(r.value.guarantees.every((g) => g.ok)).toBe(true);
+    const own = await planComfort(stormAt(30).deps, { goal: 'cool' }, w.ctx);
+    expect(own.ok && own.value.steps).toEqual(r.value.steps);
+  });
+
   it('the safe hours start now and end at the time given', async () => {
-    const w = stormAt(35);
+    const w = stormAt(20);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const snap = await w.deps.homes(w.ctx.homeId)?.source.snapshot();
@@ -400,8 +425,8 @@ describe('last resort (approved in #19: proposal only)', () => {
       return { plan: r.value, lr, warning: r.value.warnings?.find((x) => x.code === 'last_resort_plan')?.message ?? '' };
     };
 
-    it('at 30 % the battery ends the safe hours at night: the window names the 26 °C night limit, and the zero-energy actions', async () => {
-      const { lr } = await lastResortOf(noElderly(30));
+    it('at 20 % the battery ends the safe hours at night: the window names the 26 °C night limit, and the zero-energy actions', async () => {
+      const { lr } = await lastResortOf(noElderly(20));
       expect(lr.limitedBy).toBe('battery');
       expect(lr.loweredLimitC).toBeUndefined();
       expect(lr.comfortLimitC).toBe(26);
@@ -422,16 +447,16 @@ describe('last resort (approved in #19: proposal only)', () => {
 
     it('a safety maximum of 30 °C still says 26 °C at night', async () => {
       const hot = PreferencesSchema.parse({ ...preferences, safety: { ...preferences.safety, cooling: { maxC: 30 } } });
-      const { lr } = await lastResortOf(noElderly(30, hot));
+      const { lr } = await lastResortOf(noElderly(20, hot));
       expect(lr.comfortLimitC).toBe(26);
     });
 
     it('with an elderly person the hold pre-cools to the 24 °C night limit: safe past 22:00, and the window says how far above it the room goes', async () => {
-      const { lr } = await lastResortOf(stormAt(30));
+      const { lr } = await lastResortOf(stormAt(20));
       // Without pre-cooling the 24 °C night limit ended his hours at 22:00 with charge left.
       expect(Date.parse(lr.safeUntil)).toBeGreaterThan(Date.parse('2026-07-17T22:00:00+02:00'));
-      // Pinned: pre-cooled, his room holds the 24 °C night limit until the battery runs out at 00:40.
-      expect({ safeUntil: lr.safeUntil, limitedBy: lr.limitedBy }).toEqual({ safeUntil: '2026-07-18T00:40:00+02:00', limitedBy: 'battery' });
+      // Pinned: pre-cooled, his room holds the 24 °C night limit until the battery runs out at 02:15.
+      expect({ safeUntil: lr.safeUntil, limitedBy: lr.limitedBy }).toEqual({ safeUntil: '2026-07-18T02:15:00+02:00', limitedBy: 'battery' });
       expect(lr.comfortLimitC).toBe(24);
       expect(lr.worstC).toBeGreaterThan(24);
       expect(Date.parse(lr.worstAt ?? '')).toBeGreaterThanOrEqual(Date.parse(lr.safeUntil));
@@ -449,7 +474,7 @@ describe('last resort (approved in #19: proposal only)', () => {
   });
 
   it('is not applied by a plain apply_plan: the first yes only returns a token (#160)', async () => {
-    const w = stormAt(35);
+    const w = stormAt(20);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const applied = await applyPlan(w.deps, { planId: r.value.id }, w.ctx);
@@ -664,7 +689,7 @@ describe('in a °F sandbox (#306): every text in °F, every number and decision 
     expect(f.value.guarantees.map((g) => [g.id, g.ok, g.measured, g.limit])).toEqual(c.value.guarantees.map((g) => [g.id, g.ok, g.measured, g.limit]));
     const words = JSON.stringify({ warnings: f.value.warnings, guarantees: f.value.guarantees.map((g) => g.reason) });
     expect(words).not.toContain('°C');
-    expect(f.value.warnings?.find((w) => w.code === 'night_recovery_infeasible')?.message).toBe('Tonight the Bedroom stays at or below 75.2 °F until about 2:15 AM, then it warms up.');
+    expect(f.value.warnings?.find((w) => w.code === 'night_recovery_infeasible')?.message).toBe('Tonight the Bedroom stays at or below 75.2 °F until about 3:35 AM, then it warms up.');
   });
 
   it('a setpoint that can only be °F is refused, with the °C to send: inputs are always °C (#306 review)', async () => {
@@ -679,7 +704,7 @@ describe('in a °F sandbox (#306): every text in °F, every number and decision 
   });
 
   it('a refused proposal says the refusal and its nearest allowed value in °F', async () => {
-    const [c, f] = await both({ snapshot: (x) => ({ ...x, batterySocPct: pct(30) }) }, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
+    const [c, f] = await both({ snapshot: (x) => ({ ...x, batterySocPct: pct(20) }) }, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
     if (c.ok || f.ok) throw new Error('expected refusals');
     expect(f.error.code).toBe(c.error.code);
     // The details' guarantees carry the guard's reasons, in °F: everything but the strings is the same.
