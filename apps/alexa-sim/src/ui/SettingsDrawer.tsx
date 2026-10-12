@@ -125,7 +125,18 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
         }}
       >
         <span aria-hidden="true">≈ </span>
-        {settings === undefined ? t('settings.open') : badgeText(settings)}
+        {settings === undefined ? (
+          t('settings.open')
+        ) : (
+          <>
+            {/* The whole badge names the button; a narrow top row shows the scenario alone (app.css), so the row
+                stays one target high beside the language icon. */}
+            <span className="badge-long">{badgeText(settings)}</span>
+            <span className="badge-short" aria-hidden="true">
+              {t(`settings.scenario.${settings.scenarioId}`)}
+            </span>
+          </>
+        )}
         <span aria-hidden="true"> ▾</span>
       </button>
       {open && (

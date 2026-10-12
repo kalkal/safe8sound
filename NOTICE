@@ -6,10 +6,10 @@ Weather data by Open-Meteo.com (https://open-meteo.com/), licensed under CC BY 4
 Copernicus Climate Change Service (C3S). Hourly values for July 2024, fetched once on 2026-10-04 by
 packages/adapters/source-simulator/scripts/fetch-location.ts; values rounded, nothing else changed.
 
-Icons (packages/ui-cards/src/DeviceIcon.tsx, apps/alexa-sim/src/phone/PhonePanel.tsx):
-outlines of the Lucide icons battery, solar-panel, utility-pole, air-vent and smartphone
-(https://lucide.dev/, lucide-static 1.55.0), copied as inline SVG path data; the charge bar, the cross
-and the message dot are ours, and only live parts are shown or hidden.
+Icons (packages/ui-cards/src/icons.tsx, used by the cards and the simulator):
+outlines of the Lucide icons battery, solar-panel, utility-pole, air-vent, smartphone and languages
+(https://lucide.dev/, lucide-static 1.55.0), copied as inline SVG path data; the charge bar, the cross,
+the message dot and the back chevron are ours, and only live parts are shown or hidden.
 
 ISC License
 

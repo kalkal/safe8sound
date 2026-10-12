@@ -27,6 +27,13 @@ describe('DemoSettingsControl', () => {
     expect(screen.getByRole('dialog', { name: 'Demo settings' })).toBeTruthy();
   });
 
+  it('on a phone the badge can show the scenario alone; its name keeps the place and the scenario', () => {
+    const { badge } = setup();
+    expect(badge.querySelector('.badge-short')?.textContent).toBe('Heat wave');
+    expect(badge.querySelector('.badge-short')?.getAttribute('aria-hidden')).toBe('true');
+    expect(badge.querySelector('.badge-long')?.textContent).toBe('SCENARIO · Reference home (central Italy) · Heat wave');
+  });
+
   it('each setting is a radio group with the current choice checked', () => {
     const { badge } = setup();
     fireEvent.click(badge);
@@ -65,7 +72,7 @@ describe('DemoSettingsControl', () => {
     setLocale('it-IT');
     render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={() => Promise.resolve(true)} locale="it-IT" onLocale={onLocale} />);
     fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
-    expect(screen.getByTestId('language-note').textContent).toBe('Alexa risponde ancora in inglese: le risposte in italiano arriveranno presto.');
+    expect(screen.getByTestId('language-note').textContent).toBe('Alexa risponde ancora in inglese: per ora l’italiano vale per le scritte della pagina e delle card.');
     setLocale('en-US');
   });
 

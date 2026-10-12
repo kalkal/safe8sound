@@ -1,3 +1,4 @@
+import { BackChevron, IconFrame } from '@cold-reserve/ui-cards/icons';
 import { useEffect, useRef } from 'react';
 import { STEPS, type Step } from './steps.js';
 import { t } from './text.js';
@@ -39,9 +40,9 @@ export function StepNav({ step, onBack, onFocusLost }: StepNavProps) {
           if (event.relatedTarget !== null) hadFocus.current = false;
         }}
       >
-        <svg className="back-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M15 5 8 12l7 7" />
-        </svg>
+        <IconFrame className="back-arrow">
+          <BackChevron />
+        </IconFrame>
         {t('nav.back')}
       </button>
       <ol className="step-dots" aria-label={t('steps.list')} data-step={step}>

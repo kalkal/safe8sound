@@ -859,10 +859,131 @@
 /* The judge's demo settings (B1): the scenario badge above the device (never inside its 16:10 screen), and the
    drawer: at the side on a wide screen, a sheet from the bottom on a phone. Rows of 56 px; the choice is marked ✓. */
 @layer surfaces {
+  /* The badge at the start, the language at the end (owner, 10 Oct). */
   .echo-top {
+    display: flex;
     grid-column: 1 / -1;
-    justify-self: start;
+    justify-self: stretch;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-inline-size: 0;
     padding: var(--space-3) var(--space-3) 0;
+  }
+
+  /* The language icon at the top (owner, 10 Oct): quiet, the icon and the other language's name. */
+  .language-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    padding-inline: var(--space-3);
+    font-size: var(--font-size-min);
+  }
+
+  .language-icon {
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Another language than English: one quiet line before the button says the answers are still in English. On the
+     card surface like the badge (the bezel is dark in both themes), one line, never bright. */
+  .language-top-note {
+    overflow: hidden;
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    margin: 0 0 0 auto;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card-raised);
+    color: var(--text-secondary);
+    font-size: var(--font-size-min);
+    line-height: var(--space-4);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The badge's short form (the scenario alone), shown only where the top row is narrow (below). */
+  .badge-short {
+    display: none;
+  }
+
+  /* Where the note shares the row with a long badge, the badge shows the scenario alone so the note fits. */
+  @media (width < 80rem) {
+    .echo-top:has(> .language-top-note) .badge-long {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .echo-top:has(> .language-top-note) .badge-short {
+      display: inline;
+    }
+  }
+
+  /* On a phone: the icon alone (a target-sized circle), the badge with the scenario alone on one line, so the row stays
+     one target high; the names stay for screen readers. The note takes a second line of its own in the gap
+     above the screen. */
+  @media (width < 48rem) {
+    .echo-top {
+      flex-wrap: wrap;
+    }
+
+    .echo-top > .scenario-badge {
+      overflow: hidden;
+      min-inline-size: 0;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .echo-top .badge-short {
+      display: inline;
+    }
+
+    .language-toggle {
+      justify-content: center;
+      min-inline-size: var(--target-min);
+      padding-inline: 0;
+    }
+
+    .language-name,
+    .echo-top .badge-long {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .echo-top:has(> .language-top-note) {
+      row-gap: var(--space-1);
+    }
+
+    .language-top-note {
+      flex-basis: 100%;
+      order: 3;
+      box-sizing: border-box;
+      margin: 0;
+      padding-block: 0;
+    }
+
+    /* The note's line (4 + 16 + 4 px) takes the place of the gap above the screen (24 px): the screen keeps its height. */
+    .echo-stage:has(> .echo-top > .language-top-note) {
+      row-gap: var(--space-1);
+    }
+
+    .echo-stage:has(> .echo-top > .language-top-note) .echo-screen {
+      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-1) - var(--space-4) - var(--space-1));
+    }
   }
 
   .scenario-badge {

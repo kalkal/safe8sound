@@ -1,5 +1,6 @@
 import { formatTemp, type InboxMessage, type PhoneReply, type TempUnit } from '@cold-reserve/contracts';
 import { PRODUCT_NAME } from '@cold-reserve/i18n';
+import { IconFrame, MessageDot, SmartphoneOutline } from '@cold-reserve/ui-cards/icons';
 import { useId, useRef, useState, useSyncExternalStore } from 'react';
 import { t } from '../ui/text.js';
 import type { PhoneFeed, PhoneReplyResult } from './phone-feed.js';
@@ -70,12 +71,11 @@ function Replies({ reply, timeZone, units }: { reply: NonNullable<PhoneFeed['rep
 /** Ana's phone as a connected device (owner feedback, 6 Oct): Lucide "smartphone" (ISC, see NOTICE) beside the title, hidden from screen readers. */
 function PhoneIcon({ alert }: { alert: boolean }) {
   return (
-    <svg className="phone-icon" data-device="phone" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <rect x="5" y="2" width="14" height="20" rx="2" className="phone-icon-line" />
-      <path d="M12 18h.01" className="phone-icon-line" />
+    <IconFrame className="phone-icon" data={{ device: 'phone' }}>
+      <SmartphoneOutline className="phone-icon-line" />
       {/* A message has arrived: the dot, as on a real phone (the list says it in words). */}
-      {alert && <circle cx="18" cy="5" r="4" className="phone-icon-dot" />}
-    </svg>
+      {alert && <MessageDot className="phone-icon-dot" />}
+    </IconFrame>
   );
 }
 

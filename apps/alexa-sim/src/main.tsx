@@ -28,6 +28,7 @@ import { isAppliedPlan } from './ui/steps.js';
 import { fetchReserve } from './ui/reserve.js';
 import { SHIPPED_PLACES, applyChange, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario, type DemoSettingsView } from './ui/demo-settings.js';
 import { DemoSettingsControl } from './ui/SettingsDrawer.js';
+import { LanguageToggle, nextLocale } from './ui/LanguageToggle.js';
 import { readLocale, saveLocale } from './ui/locale-setting.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { skyFor, type Sky } from './ui/sky.js';
@@ -234,7 +235,11 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     };
   }, [agent, scripted, sessionToken, scenarioId, gridDown]);
   const settingsControl = (
+    <>
       <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onSettingsChange} locale={locale} onLocale={onLocale} />
+      {/* The language icon at the top (owner, 10 Oct), at the end of the row, quiet beside the badge. */}
+      <LanguageToggle locale={locale} onLocale={onLocale} />
+    </>
   );
   // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
   const phonePanel = (
@@ -259,6 +264,9 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
               { id: 'home_hide', phrases: [t('home.hide')], run: homePanel.close },
               { id: 'theme_light', phrases: [t('theme.toggle')], run: () => {
                   setTheme('light');
+                } },
+              { id: 'language', phrases: [t(`settings.language.${nextLocale(locale)}`)], run: () => {
+                  onLocale(nextLocale(locale));
                 } },
               { id: 'theme_dark', phrases: [t('theme.darkUtterance')], run: () => {
                   setTheme('dark');
