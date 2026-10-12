@@ -42,6 +42,24 @@
     }
   }
 
+  /* Sober colours (owner, 10 Oct): one bright button per screen, the final action (Apply plan, Retry, Confirm).
+     Everyday controls such as Ask and Speak are quiet: the card's surface, a thin line, the accent only while active. */
+  .button-quiet {
+    border: var(--border-thin) solid var(--surface-card-line);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+
+    &:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: var(--surface-card-raised);
+    }
+
+    &[aria-pressed="true"] {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+  }
+
   .link-button {
     min-block-size: var(--target-min);
     border: 0;
@@ -299,18 +317,20 @@
     }
   }
 
-  /* Ana's phone as a connected device (owner feedback, 6 Oct): big, in the text colour, the dot in the accent. */
+  /* Ana's phone as a connected device (owner feedback, 6 Oct), 32 px like the other devices (owner, 10 Oct): the Lucide
+     outline with the same round 2 px stroke as the card's devices; the dot in the accent. */
   .phone-icon {
     flex: none;
-    inline-size: var(--target-min);
-    block-size: var(--target-min);
+    inline-size: var(--icon-device);
+    block-size: var(--icon-device);
   }
 
   .phone-icon-line {
     fill: none;
     stroke: currentcolor;
-    stroke-width: 2.5;
+    stroke-width: 2;
     stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .phone-icon-dot {

@@ -348,7 +348,7 @@ export function Conversation({
               setDraft(e.target.value);
             }}
           />
-          <button type="submit" className="button" disabled={thinking}>
+          <button type="submit" className="button button-quiet" disabled={thinking}>
             {t('chat.send')}
           </button>
           {/* Three bands: stopping the voice is an action in this row, in the place of Speak (disabled while the answer
@@ -357,7 +357,7 @@ export function Conversation({
             <button
               ref={stopSpeakingRef}
               type="button"
-              className="button voice-button"
+              className="button button-quiet voice-button"
               aria-label={t('voice.stopSpeaking')}
               onClick={() => {
                 sendAndRefocus({ type: 'CANCEL' });
@@ -370,7 +370,7 @@ export function Conversation({
             <button
               ref={micRef}
               type="button"
-              className="button voice-button"
+              className="button button-quiet voice-button"
               aria-pressed={listening}
               disabled={thinking || speaking}
               onClick={() => {

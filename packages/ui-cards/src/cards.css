@@ -626,23 +626,24 @@
 
 /* The thermal floor plan and the manual-control card (plan §11.6). */
 @layer components {
-  /* The connected devices, drawn (owner feedback, 6 Oct): big, in the text colour, the charge and the air in tokens. */
+  /* The connected devices, drawn (owner feedback, 6 Oct): Lucide outlines (ISC, see NOTICE) in the text colour with
+     one round 2 px stroke, the live parts in tokens (warm sun, green charge, cool air, red cross).
+     32 px beside their words (owner, 10 Oct): a drawing, never a tap target. */
   .device-icon {
     flex: none;
-    inline-size: var(--target-min);
-    block-size: var(--target-min);
+    inline-size: var(--icon-device);
+    block-size: var(--icon-device);
   }
 
-  .device-line {
+  .device-line,
+  .device-sun,
+  .device-cross,
+  .device-air {
     fill: none;
     stroke: currentcolor;
-    stroke-width: 2.5;
+    stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
-  }
-
-  .device-solid {
-    fill: currentcolor;
   }
 
   .device-charge {
@@ -650,26 +651,20 @@
   }
 
   .device-sun {
-    fill: var(--status-warn);
+    stroke: var(--status-warn);
   }
 
-  /* The grid down: the pylon dimmed and crossed out in the alert colour (the words say "Grid down" too). */
+  /* The grid down: the pole dimmed and crossed out in the alert colour (the words say "Grid down" too). */
   .device-off {
     opacity: 0.45;
   }
 
   .device-cross {
-    fill: none;
     stroke: var(--status-alert);
-    stroke-width: 3;
-    stroke-linecap: round;
   }
 
   .device-air {
-    fill: none;
     stroke: var(--accent);
-    stroke-width: 2.5;
-    stroke-linecap: round;
   }
 
   .energy-facts li {

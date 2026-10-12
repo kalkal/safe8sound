@@ -1,12 +1,17 @@
-// The connected devices, drawn (owner feedback, 6 Oct): big inline SVG pictures beside the words, so the home reads at
-// a glance. Inline only (the card CSP has no images); lines follow the text colour and fills use tokens, so both themes
-// work. They sit beside words that already say everything, so they are hidden from screen readers.
+// The connected devices, drawn (owner feedback, 6 Oct): inline SVG pictures beside the words, so the home reads at a
+// glance. The outlines are Lucide icons (ISC licence, see NOTICE): battery, solar-panel, utility-pole, air-vent, on
+// their 24 × 24 grid with one round 2 px stroke. Only the live parts are ours: the charge, the sun, the cross, the air.
+// Inline only (the card CSP has no images or fetches); lines follow the text colour and the live parts use tokens, so
+// both themes work. They sit beside words that already say everything, so they are hidden from screen readers.
 
 export type Device = 'battery' | 'solar' | 'grid' | 'split';
 
+/** The battery's inner width in the 24 × 24 grid: the charge bar is this wide at 100 %. */
+export const BATTERY_CHARGE_WIDTH = 11;
+
 export function DeviceIcon({ device, level, on }: { device: Device; /** Battery charge, 0–100. */ level?: number; /** A split blowing. */ on?: boolean }) {
   return (
-    <svg className="device-icon" data-device={device} {...(on === undefined ? {} : { 'data-on': String(on) })} viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+    <svg className="device-icon" data-device={device} {...(on === undefined ? {} : { 'data-on': String(on) })} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       {device === 'battery' && <Battery level={level ?? 0} />}
       {device === 'solar' && <Solar on={on !== false} />}
       {device === 'grid' && <Grid on={on !== false} />}
@@ -15,44 +20,48 @@ export function DeviceIcon({ device, level, on }: { device: Device; /** Battery 
   );
 }
 
+/** Lucide "battery", filled from the left as far as the charge goes. */
 function Battery({ level }: { level: number }) {
   const pct = Math.max(0, Math.min(100, Math.round(level)));
-  const height = (30 * pct) / 100;
+  const width = (BATTERY_CHARGE_WIDTH * pct) / 100;
   return (
     <>
-      <rect x="18" y="3" width="12" height="5" rx="1" className="device-solid" />
-      <rect x="11" y="8" width="26" height="37" rx="4" className="device-line" />
-      <rect x="15" y={12 + (30 - height)} width="18" height={height} rx="2" className="device-charge" data-level={String(pct)} />
+      <rect x="4.5" y="8.5" width={width} height="7" rx="1" className="device-charge" data-level={String(pct)} />
+      <rect x="2" y="6" width="16" height="12" rx="2" className="device-line" />
+      <path d="M22 14v-4" className="device-line" />
     </>
   );
 }
 
-/** The sun only while the panels produce (review of #286: no sun at 0 W). */
+/** Lucide "solar-panel": its sun only while the panels produce (review of #286: no sun at 0 W), in the warm accent. */
 function Solar({ on }: { on: boolean }) {
   return (
     <>
-      {on && <circle cx="39" cy="9" r="5" className="device-sun" />}
-      <path d="M5 30 L13 14 H40 L32 30 Z M9 22 H36 M19 14 L15 30 M27 14 L23 30 M22 30 V41 M14 41 H30" className="device-line" />
+      {on && <path d="M11 2h2 M3 10v2 M7 2a4 4 0 0 1-4 4 M8.66 7.66l1.41 1.41" className="device-sun" />}
+      <path
+        d="m14.28 14-4.56 8 M21 22l-1.558-4H4.558 M6.245 15.04A2 2 0 0 1 8 14h12a1 1 0 0 1 .864 1.505l-3.11 5.457A2 2 0 0 1 16 22H4a1 1 0 0 1-.863-1.506z"
+        className="device-line"
+      />
     </>
   );
 }
 
-/** The pylon, crossed out while the grid is down (review of #286); the words say "Grid down" too. */
+/** Lucide "utility-pole", dimmed and crossed out while the grid is down (review of #286); the words say "Grid down" too. */
 function Grid({ on }: { on: boolean }) {
   return (
     <>
-      <path d="M24 4 L13 44 M24 4 L35 44 M16 36 H32 M18 28 H30 M20 20 H28 M7 12 H41 M7 12 V17 M41 12 V17" className={on ? 'device-line' : 'device-line device-off'} />
-      {!on && <path d="M6 6 L42 42" className="device-cross" />}
+      <path d="M12 2v20 M2 5h20 M3 3v2 M7 3v2 M17 3v2 M21 3v2 M19 5l-7 7-7-7" className={on ? 'device-line' : 'device-line device-off'} />
+      {!on && <path d="M3 3 21 21" className="device-cross" />}
     </>
   );
 }
 
+/** Lucide "air-vent": the unit always, its two curls of air only while the room is served. */
 function Split({ on }: { on: boolean }) {
   return (
     <>
-      <rect x="4" y="8" width="40" height="16" rx="4" className="device-line" />
-      <path d="M10 19 H38" className="device-line" />
-      {on && <path d="M14 30 q4 4 0 9 M24 30 q4 4 0 9 M34 30 q4 4 0 9" className="device-air" />}
+      <path d="M6 12H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 8h12" className="device-line" />
+      {on && <path d="M18 17.5a2.5 2.5 0 1 1-4 2.03V12 M6.6 15.572A2 2 0 1 0 10 17v-5" className="device-air" />}
     </>
   );
 }

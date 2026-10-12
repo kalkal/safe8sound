@@ -2,6 +2,7 @@
 import { HomeStatusSchema } from '@cold-reserve/contracts';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { BATTERY_CHARGE_WIDTH } from '../src/DeviceIcon.js';
 import { FloorPlanCard } from '../src/FloorPlanCard.js';
 import { homeCalm, homeInStorm } from '../src/home-fixtures.js';
 import { setTempUnit } from '../src/temp-unit.js';
@@ -71,16 +72,16 @@ describe('FloorPlanCard (signature element 3: the thermal floor plan, generated 
   });
 
   it('review of #286: the battery fill follows the charge (78 % and 48 % differ, in proportion)', () => {
-    const height = (status: Parameters<typeof FloorPlanCard>[0]['status']) => {
+    const fill = (status: Parameters<typeof FloorPlanCard>[0]['status']) => {
       const { container } = render(<FloorPlanCard status={status} />);
-      const h = Number(container.querySelector('svg[data-device="battery"] [data-level]')?.getAttribute('height'));
+      const w = Number(container.querySelector('svg[data-device="battery"] [data-level]')?.getAttribute('width'));
       cleanup();
-      return h;
+      return w;
     };
-    const full = height(homeCalm());
-    const storm = height(homeInStorm());
-    expect(full).toBeCloseTo((30 * 78) / 100);
-    expect(storm).toBeCloseTo((30 * 48) / 100);
+    const full = fill(homeCalm());
+    const storm = fill(homeInStorm());
+    expect(full).toBeCloseTo((BATTERY_CHARGE_WIDTH * 78) / 100);
+    expect(storm).toBeCloseTo((BATTERY_CHARGE_WIDTH * 48) / 100);
   });
 
   it('review of #286: no sun at 0 W of solar, and the pylon crossed out while the grid is down', () => {

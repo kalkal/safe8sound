@@ -32,7 +32,7 @@ function outcomeText(reply: PhoneReply, result: PhoneReplyResult, timeZone: stri
   return t(reply === 'on_my_way' ? 'phone.sentOnMyWay' : 'phone.sentCheck');
 }
 
-/** The family's closed set of replies, by touch; one call at a time. */
+/** The family's closed set of replies, by touch; one call at a time. "On my way" is the one bright button (sober colours, owner 10 Oct). */
 function Replies({ reply, timeZone, units }: { reply: NonNullable<PhoneFeed['reply']>; timeZone: string; units: TempUnit }) {
   const [sending, setSending] = useState(false);
   const [said, setSaid] = useState<string | undefined>(undefined);
@@ -55,7 +55,7 @@ function Replies({ reply, timeZone, units }: { reply: NonNullable<PhoneFeed['rep
         }}>
         {t('phone.onMyWay')}
       </button>
-      <button type="button" className="button" disabled={sending} onClick={() => {
+      <button type="button" className="button button-quiet" disabled={sending} onClick={() => {
           send('check_status');
         }}>
         {t('phone.checkStatus')}
@@ -67,14 +67,14 @@ function Replies({ reply, timeZone, units }: { reply: NonNullable<PhoneFeed['rep
   );
 }
 
-/** Ana's phone as a connected device (owner feedback, 6 Oct): a drawing beside the title, hidden from screen readers. */
+/** Ana's phone as a connected device (owner feedback, 6 Oct): Lucide "smartphone" (ISC, see NOTICE) beside the title, hidden from screen readers. */
 function PhoneIcon({ alert }: { alert: boolean }) {
   return (
-    <svg className="phone-icon" data-device="phone" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-      <rect x="13" y="3" width="22" height="42" rx="5" className="phone-icon-line" />
-      <path d="M20 8 H28 M21 39 H27" className="phone-icon-line" />
+    <svg className="phone-icon" data-device="phone" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="5" y="2" width="14" height="20" rx="2" className="phone-icon-line" />
+      <path d="M12 18h.01" className="phone-icon-line" />
       {/* A message has arrived: the dot, as on a real phone (the list says it in words). */}
-      {alert && <circle cx="33" cy="12" r="6" className="phone-icon-dot" />}
+      {alert && <circle cx="18" cy="5" r="4" className="phone-icon-dot" />}
     </svg>
   );
 }

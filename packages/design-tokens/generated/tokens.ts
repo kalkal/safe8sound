@@ -4,6 +4,7 @@ export const TOKEN_NAMES = [
   "radius-pill",
   "radius-cube",
   "target-min",
+  "icon-device",
   "border-thin",
   "space-1",
   "space-2",
