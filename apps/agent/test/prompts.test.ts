@@ -10,7 +10,7 @@ describe('system prompt (versioned, short: cost rule)', () => {
   const prompt = buildSystemPrompt();
 
   it('is versioned and matches the snapshot, so every change shows up in review', () => {
-    expect(PROMPT_VERSION).toBe('v2');
+    expect(PROMPT_VERSION).toBe('v3');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -73,7 +73,7 @@ describe('the system prompt inside the code (G1a: it must survive the CJS bundle
     const read = async (version: string) => (await readFile(new URL(`../prompts/system.${version}.md`, import.meta.url), 'utf8')).trim();
     const { SYSTEM_PROMPTS } = await import('../src/prompts.generated.js');
     // A new version is a new file (#215 review): the old ones stay, unchanged, next to it.
-    expect(Object.keys(SYSTEM_PROMPTS)).toEqual(['v1', 'v2']);
+    expect(Object.keys(SYSTEM_PROMPTS)).toEqual(['v1', 'v2', 'v3']);
     for (const [version, text] of Object.entries(SYSTEM_PROMPTS)) expect(text).toBe(await read(version));
     expect(SYSTEM_PROMPT_TEMPLATE).toBe(await read(PROMPT_VERSION));
   });

@@ -60,18 +60,41 @@ describe('get_home_status on a visitor sandbox (#101)', () => {
 });
 
 describe('the get_home_status text', () => {
+  it('#271: the demo names its fictional grandpa, the real home never names anyone', async () => {
+    const textOf = async (headers: Record<string, string> = {}) => {
+      const result = await toolResult(await post(app().handler, callTool('get_home_status', {}), headers));
+      return result.content[0]?.text ?? '';
+    };
+    expect(await textOf()).toContain('Leo (grandpa)');
+    const real = await textOf({ authorization: `Bearer ${HOME_TOKEN}` });
+    expect(real).toContain('grandpa');
+    expect(real).not.toContain('Leo');
+  });
+
   const status = (grid: { gridAvailable: boolean; gridW: number }) => ({ batterySocPct: 10, level: 'essential', rooms: [], origin: { energy: 'simulated' }, homeLink: 'ok', ...grid }) as unknown as HomeStatus;
 
   it('lists every room as "Name (id)" with whether it is served or waiting, so the model never guesses an id (#274)', () => {
     const s = {
       batterySocPct: 100, level: 'comfort', origin: { energy: 'simulated' }, homeLink: 'ok', gridAvailable: true, gridW: 300,
       rooms: [
-        { roomId: 'bedroom-1', state: 'served' },
-        { roomId: 'living', state: 'waiting', waitingReason: 'level' },
+        { roomId: 'bedroom-1', state: 'served', occupants: [] },
+        { roomId: 'living', state: 'waiting', waitingReason: 'level', occupants: [] },
       ],
     } as unknown as HomeStatus;
     const text = homeStatusSummary(s, 'Europe/Rome', { 'bedroom-1': 'Bedroom', living: 'Living room' });
     expect(text).toContain('Rooms: Bedroom (bedroom-1) served, Living room (living) waiting.');
+  });
+
+  it('#271: says who is in each room, a fictional name with its role, "Leo (grandpa)"', () => {
+    const s = {
+      batterySocPct: 100, level: 'comfort', origin: { energy: 'simulated' }, homeLink: 'ok', gridAvailable: true, gridW: 300,
+      rooms: [
+        { roomId: 'bedroom-1', state: 'served', occupants: ['grandpa'] },
+        { roomId: 'study', state: 'served', occupants: ['adult'] },
+      ],
+    } as unknown as HomeStatus;
+    const text = homeStatusSummary(s, 'Europe/Rome', { 'bedroom-1': 'Bedroom', study: 'Study' }, { grandpa: 'Leo' });
+    expect(text).toContain('Rooms: Bedroom (bedroom-1) served with Leo (grandpa), Study (study) served with adult.');
   });
 
   it('says whether the grid is on, in words, with what it draws or takes (#273): the model reads only the text', () => {

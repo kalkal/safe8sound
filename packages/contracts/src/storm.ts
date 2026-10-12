@@ -122,6 +122,10 @@ export const StartStormModeOutputSchema = z
     }
   });
 
+/** What sets the safe room's temperature limit at an instant (the guard's safeRoomLimitKindAt). */
+export const SafeRoomLimitKindSchema = z.enum(['maximum', 'night', 'older_person_cap', 'heat_index_cap', 'minimum']);
+export type SafeRoomLimitKindName = z.infer<typeof SafeRoomLimitKindSchema>;
+
 export const SafeRoomStatusSchema = z.strictObject({
   safeRoomId: EntityIdSchema,
   tempC: CelsiusSchema,
@@ -148,6 +152,10 @@ export const SafeRoomStatusSchema = z.strictObject({
    * heating season, where that limit changes nothing (the hold keeps the heating minimum), and when the store answered.
    */
   stricterNightLimit: z.literal(true).optional(),
+  /** #271 (additive, approved in #271): the safe room's limit in force now and what sets it, so a room above it is said so. */
+  limitNow: z.strictObject({ limitC: CelsiusSchema, kind: SafeRoomLimitKindSchema }).optional(),
+  /** #271 (additive, approved in #271): the fictional names of the occupants that have one in a demo or sandbox home. */
+  people: z.array(z.strictObject({ role: RoleSchema, name: z.string().min(1).max(30) })).max(10).optional(),
 });
 export type SafeRoomStatus = z.infer<typeof SafeRoomStatusSchema>;
 

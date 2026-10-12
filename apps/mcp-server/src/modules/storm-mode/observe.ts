@@ -20,7 +20,7 @@ import {
   type StormSession,
 } from '@cold-reserve/contracts';
 import { epsBaseLoadW, planNotifications, prepareDevices, stormReduce, type DeviceFailure, type NotificationPlan, type StateStore, type StormContext, type StormEvent } from '@cold-reserve/core';
-import { holdSafeRoom } from '@cold-reserve/guard';
+import { holdSafeRoom, safeRoomLimitKindAt, type SafeRoomLimitKind } from '@cold-reserve/guard';
 import { stormMessage, type Locale, type StormMessageFields } from '@cold-reserve/i18n';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
@@ -46,6 +46,8 @@ export interface Observed {
   readonly safeHours: number;
   /** When the hold ends (or the cap): the projection's own time, from the home's reading. */
   readonly safeUntilMs: number;
+  /** #271: the safe room's limit in force at the reading and what sets it, from the same guard frame as the hours. */
+  readonly limitNow: { limitC: number; kind: SafeRoomLimitKind };
   readonly session: StormSession | undefined;
   /** #114: the store could not be read (preferences or the storm session): the live reading, the default safe room, no session. */
   readonly storeUnavailable?: true;
@@ -74,7 +76,7 @@ function holdHours(
   forecast: Forecast,
   preferences: Preferences,
   strictest = false,
-): Result<{ hours: number; untilMs: number; season: Season }, ErrorEnvelope> {
+): Result<{ hours: number; untilMs: number; season: Season; limitNow: { limitC: number; kind: SafeRoomLimitKind } }, ErrorEnvelope> {
   // Never assume an EPS load (#107): the projection would quietly count none.
   const eps = epsBaseLoadW(profile);
   if (!eps.ok) return eps;
@@ -91,7 +93,9 @@ function holdHours(
   );
   if (!held.ok) return held;
   const untilMs = held.value.safeUntil?.ms ?? toMs;
-  return ok({ hours: Math.round(((untilMs - nowMs) / HOUR_MS) * 100) / 100, untilMs, season: frame.season });
+  // #271: the limit in force now, on the same frame (at the stricter night limit when the store is down, #114).
+  const limitNow = safeRoomLimitKindAt({ preferences, profile, config: deps.guard, ...frame })(nowMs);
+  return ok({ hours: Math.round(((untilMs - nowMs) / HOUR_MS) * 100) / 100, untilMs, season: frame.season, limitNow });
 }
 
 export function messageFields(o: Observed, session: StormSession | undefined): StormMessageFields {
@@ -209,6 +213,7 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext, degrade = 
     nowMs,
     safeHours: hours.value.hours,
     safeUntilMs: hours.value.untilMs,
+    limitNow: hours.value.limitNow,
     session: latest.value,
     ...(degraded ? { storeUnavailable: true as const } : {}),
     // In the heating season the hold keeps the heating minimum: the older-person night limit changes nothing.
@@ -297,4 +302,10 @@ export async function runStormDetector(deps: StormModeDeps, ctx: ToolContext, ki
   if (!o.ok) return o;
   // A storm that starts on this very reading is told first; the essential level follows at the next one.
   return detect(deps, o.value, kind === 'essential' ? essentialEvent(o.value) : readingEvent(o.value));
+}
+
+/** The fictional names of the safe room's occupants that have one (#271): demo and sandbox homes only. */
+export function namedPeople(o: Observed): { role: string; name: string }[] {
+  const people = o.home.profile.people ?? [];
+  return people.filter((p) => o.safeRoom.occupants.includes(p.role)).map((p) => ({ role: p.role, name: p.name }));
 }

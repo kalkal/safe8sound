@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
+import { celsius } from '@cold-reserve/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SafeRoomCard, clockOf, roomLabel } from '../src/SafeRoomCard.js';
 import { safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
@@ -34,6 +35,25 @@ describe('SafeRoomCard', () => {
     render(<SafeRoomCard status={safeRoomInStorm()} />);
     expect(safeRoomInStorm().level).toBe('essential');
     expect(screen.getAllByRole('alert')).toHaveLength(1);
+  });
+
+  it('#271: past the limit in force the card says so on its own strip, the big time keeps a neutral label, and it names the grandpa as Leo', () => {
+    const above = { ...safeRoomCalm(), tempC: celsius(27), occupantRoles: ['grandpa'], people: [{ role: 'grandpa', name: 'Leo' }], limitNow: { limitC: celsius(24), kind: 'night' as const } };
+    render(<SafeRoomCard status={above} />);
+    expect(screen.getByTestId('over-limit').textContent).toContain('Above the night limit (24.0 °C) now');
+    // Over the limit the time label never says "comfortable": it says what the time is, the battery's hold.
+    expect(screen.getByText('The battery holds the room until')).toBeTruthy();
+    expect(screen.queryByText('Comfortable at least until')).toBeNull();
+    expect(screen.getByText('Who: Leo, grandpa')).toBeTruthy();
+    cleanup();
+    setTempUnit('F');
+    render(<SafeRoomCard status={above} />);
+    expect(screen.getByTestId('over-limit').textContent).toContain('Above the night limit (75.2 °F) now');
+    cleanup();
+    setTempUnit('C');
+    render(<SafeRoomCard status={{ ...above, tempC: celsius(23) }} />);
+    expect(screen.getByText('Comfortable at least until')).toBeTruthy();
+    expect(screen.queryByTestId('over-limit')).toBeNull();
   });
 
   it('#114: with the store down, the time is at the stricter older-person limit and the card says it is the live reading only', () => {

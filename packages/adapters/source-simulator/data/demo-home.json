@@ -79,6 +79,7 @@
   ],
   "epsCircuits": ["safe-room", "router", "fridge"],
   "epsBaseLoadW": 150,
+  "people": [{ "role": "grandpa", "name": "Leo" }],
   "stormDevices": [
     { "entityId": "lawn_mower.garden", "domain": "lawn_mower" },
     { "entityId": "cover.living_room", "domain": "cover" }

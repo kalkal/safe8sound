@@ -121,7 +121,8 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const startHMs = scenarioStartMs - Date.parse(builtIn.startAt);
 
   const demo = demoProfile();
-  const home = HomeProfileSchema.parse({ ...demo, homeId: HOME });
+  // The real home never gets the demo's fictional names (#271).
+  const home = HomeProfileSchema.parse({ ...demo, homeId: HOME, people: undefined });
   const simulator = (profile: typeof demo) => new SimulatorSource({ profile, scenario, params, clock });
   const demoSim = simulator(demo);
   const homeSim = simulator(home);

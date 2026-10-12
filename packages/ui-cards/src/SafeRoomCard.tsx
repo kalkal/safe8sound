@@ -25,7 +25,20 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
     status.humidityPct === undefined
       ? t('safeRoom.now', { temp: formatTempFixed(status.tempC, getTempUnit()) })
       : t('safeRoom.nowRh', { temp: formatTempFixed(status.tempC, getTempUnit()), rh: String(Math.round(status.humidityPct)) });
-  const who = status.occupantRoles.length > 0 ? status.occupantRoles.join(', ') : t('safeRoom.nobody');
+  // #271: a fictional name with its role ("Leo, grandpa"), so a name and a role are one person.
+  const names = new Map((status.people ?? []).map((p) => [p.role, p.name]));
+  const who =
+    status.occupantRoles.length > 0
+      ? status.occupantRoles.map((r) => { const name = names.get(r); return name === undefined ? r : `${name}, ${r}`; }).join('; ')
+      : t('safeRoom.nobody');
+  // #271: past the limit in force now (24 °C at night with an older person) the card says so on its own line.
+  const limit = status.limitNow;
+  const pastLimit = limit !== undefined && (limit.kind === 'minimum' ? status.tempC < limit.limitC : status.tempC > limit.limitC);
+  const overLimit = limit !== undefined && pastLimit ? t(`safeRoom.past.${limit.kind}`, { temp: formatTempFixed(limit.limitC, getTempUnit()) }) : undefined;
+  // #342: the older-person limit only outside the heating season; when heating, a neutral eyebrow. It always labels the big time.
+  // #271: over the limit the room is not comfortable: the time is when the battery hold (back inside the limit after
+  // the grace period) stops keeping it, said plainly.
+  const eyebrow = t(status.storeUnavailable !== true ? (overLimit === undefined ? 'safeRoom.until' : 'safeRoom.untilHeld') : status.stricterNightLimit === true ? 'safeRoom.untilStrict' : 'safeRoom.untilLive');
   return (
     <CardShell
       title={t('safeRoom.title', { room: roomLabel(status.safeRoomId) })}
@@ -41,10 +54,14 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
               {t('safeRoom.storm')}
             </p>
           )}
-          {/* #342: the older-person limit only outside the heating season; when heating, a neutral eyebrow. */}
-          <p className="eyebrow">
-            {t(status.storeUnavailable !== true ? 'safeRoom.until' : status.stricterNightLimit === true ? 'safeRoom.untilStrict' : 'safeRoom.untilLive')}
-          </p>
+          {/* #271: past the limit in force now, its own strip; the eyebrow stays the label of the big time. */}
+          {overLimit !== undefined && (
+            <p className="limit-strip" data-testid="over-limit">
+              <span aria-hidden="true">⚠</span>
+              {overLimit}
+            </p>
+          )}
+          <p className="eyebrow">{eyebrow}</p>
           {/* The big time and the cubes: one row on a short screen (data-fit-tight), so both stay at full size. */}
           <div className="hero-row">
             <p className="hero-value" data-testid="safe-until">

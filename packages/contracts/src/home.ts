@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EntityIdSchema, HomeIdSchema, uniqueBy } from './common.js';
+import { EntityIdSchema, HomeIdSchema, RoleSchema, uniqueBy } from './common.js';
 import { StormDeviceSchema } from './storm-prep.js';
 import { KilowattSchema, PctSchema, RatioSchema, WattHourSchema, WattSchema } from './units.js';
 
@@ -88,6 +88,15 @@ export const HomeProfileSchema = z
     epsBaseLoadW: z.number().min(0).max(5000).brand<'Watt'>().optional(),
     /** Devices made safe when a storm is prepared (queue item 7, approved in #24); simulated only. */
     stormDevices: z.array(StormDeviceSchema).max(10).optional(),
+    /**
+     * #271 (additive, approved in #271): fictional display names of the people who live in a demo or sandbox home
+     * ("Leo" the grandpa), so "Leo" and "grandpa" are one person. Never on the real home; never a family contact.
+     */
+    people: z
+      .array(z.strictObject({ role: RoleSchema, name: z.string().min(1).max(30) }))
+      .max(10)
+      .refine((people) => uniqueBy(people, (p) => p.role), { message: 'One name per role' })
+      .optional(),
     /** Rounded to one decimal (about 10 km): never the precise location. */
     location: z.strictObject({
       latRounded: z.number().min(-90).max(90).refine(roundedToOneDecimal, { message: 'Round to one decimal' }),

@@ -179,3 +179,13 @@ export function safeRoomCalm(): SafeRoomStatus {
   delete status.stormPhase;
   return SafeRoomStatusSchema.parse(status);
 }
+
+/** #271: the demo home's grandpa by his fictional name, Leo, at night with the room above the 24 °C night limit. */
+export function safeRoomAboveNightLimit(): SafeRoomStatus {
+  return SafeRoomStatusSchema.parse({
+    ...safeRoomCalm(),
+    tempC: 27,
+    people: [{ role: 'grandpa', name: 'Leo' }],
+    limitNow: { limitC: 24, kind: 'night' },
+  });
+}

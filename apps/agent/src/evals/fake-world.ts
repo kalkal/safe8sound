@@ -38,7 +38,8 @@ const RULES: readonly [RegExp, (typeof PLAN_TOOLS)[number], Record<string, unkno
   [/\bcool|heatwave/, 'plan_comfort', { goal: 'cool' }],
   [/weather|forecast/, 'get_energy_forecast', {}],
   [/storm/, 'start_storm_mode', { mode: 'prepare' }],
-  [/grandpa/, 'get_safe_room_status', {}],
+  // A person by role or by the home's fictional name (#271): Leo is the grandpa.
+  [/grandpa|grandma|\bleo\b/, 'get_safe_room_status', {}],
   [/battery|solar|power/, 'get_home_status', {}],
   [/set to|temperature is/, 'get_preferences', {}],
 ];

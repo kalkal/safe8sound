@@ -28,6 +28,6 @@ export { SafeRoomCard } from './SafeRoomCard.js';
 export { DEMO_CONTEXT_KEY, TAP_MARK_MS, installTapMarks, isDemoContext } from './demo-taps.js';
 export { UNITS_CONTEXT_KEY, getTempUnit, setTempUnit, unitOfContext } from './temp-unit.js';
 export { homeCalm, homeInStorm } from './home-fixtures.js';
-export { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, planThatHolds, rejectedPlan, safeRoomCalm, safeRoomInStorm, stormPlan, stormReserveRefusal, surplusPlan } from './fixtures.js';
+export { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, planThatHolds, rejectedPlan, safeRoomAboveNightLimit, safeRoomCalm, safeRoomInStorm, stormPlan, stormReserveRefusal, surplusPlan } from './fixtures.js';
 export { homeClock, levelSpans, pacingGeometry } from './plan-model.js';
 export { cardThemeFor, type CardTheme } from './theme.js';

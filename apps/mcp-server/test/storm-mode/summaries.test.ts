@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { celsius } from '@cold-reserve/contracts';
 import { notifySummary, safeRoomSummary, startSummary } from '../../src/modules/storm-mode/summaries.js';
 import { stormModeModule } from '../../src/modules/storm-mode/index.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
@@ -42,7 +43,7 @@ describe('what the model reads', () => {
     if (!out.ok) throw new Error(out.error.message);
     const s = out.value;
     const text = safeRoomSummary(s);
-    expect(text).toContain(`Safe room ${s.safeRoomId}: ${one(s.tempC)} °C, ${String(s.humidityPct)} % humidity, occupants: grandpa.`);
+    expect(text).toContain(`Safe room ${s.safeRoomId}: ${one(s.tempC)} °C, ${String(s.humidityPct)} % humidity, occupants: Leo (grandpa).`);
     expect(text).toContain('Level essential (reason: storm).');
     expect(text).toContain(`Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`);
     expect(text).not.toMatch(/Giulia|phone-/);
@@ -62,6 +63,22 @@ describe('what the model reads', () => {
     if (room === undefined) throw new Error('no safe room in the profile');
     expect(said('start_storm_mode', started.value)).toContain(`The safe room, ${room.name} (${room.id}), is covered`);
     expect(said('get_safe_room_status', status.value)).toContain(`Safe room ${room.name} (${room.id}): `);
+  });
+
+  it('#271: at 22:00 with an older person, 27 °C is said above the night limit of 24 °C, and the grandpa by his fictional name', async () => {
+    const w = world(22, { snapshot: (s) => ({ ...s, rooms: s.rooms.map((r) => (r.occupants.includes('grandpa') ? { ...r, tempC: celsius(27) } : r)) }) }, 'heatwave');
+    const out = await safeRoomStatus(w.deps, w.ctx);
+    if (!out.ok) throw new Error(out.error.message);
+    expect(out.value.limitNow).toEqual({ limitC: 24, kind: 'night' });
+    expect(out.value.people).toEqual([{ role: 'grandpa', name: 'Leo' }]);
+    const text = safeRoomSummary(out.value);
+    expect(text).toContain('occupants: Leo (grandpa). It is above the night limit of 24.0 °C now.');
+    expect(safeRoomSummary(out.value, 'F')).toContain('It is above the night limit of 75.2 °F now.');
+    // Inside the limit nothing is added.
+    const cool = world(22, { snapshot: (s) => ({ ...s, rooms: s.rooms.map((r) => (r.occupants.includes('grandpa') ? { ...r, tempC: celsius(23) } : r)) }) }, 'heatwave');
+    const fine = await safeRoomStatus(cool.deps, cool.ctx);
+    if (!fine.ok) throw new Error(fine.error.message);
+    expect(safeRoomSummary(fine.value)).not.toContain('above the');
   });
 
   it('in °F (#306): the safe room in °F, and the family told in °F too', async () => {

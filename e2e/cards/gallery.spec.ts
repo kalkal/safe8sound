@@ -23,6 +23,8 @@ for (const size of SIZES) {
       for (const title of ['Plan', 'Safety check', 'Cold reserve', 'Preferences', 'Safe room · Bedroom 1']) {
         await expect(page.getByRole('heading', { name: title, exact: true }).first()).toBeVisible();
       }
+      // #271: Leo above the night limit: the eyebrow says the limit in force, never "comfortable".
+      await expect(page.getByText('Above the night limit (24.0 °C) now')).toBeVisible();
       await expect(page.locator('html')).toHaveAttribute('data-card-theme', `pawnio-${theme}`);
       // String expressions: the e2e tsconfig has no DOM types.
       const overflow = await page.evaluate<number>('document.documentElement.scrollWidth - document.documentElement.clientWidth');

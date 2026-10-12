@@ -19,6 +19,7 @@ import {
   planThatHolds,
   rejectedPlan,
   homeInStorm,
+  safeRoomAboveNightLimit,
   safeRoomCalm,
   safeRoomInStorm,
   stormPlan,
@@ -72,6 +73,8 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       <SafeRoomCard status={{ ...safeRoomCalm(), homeLink: 'stale' }} />
       {/* #114: the store cannot be read: the live reading only, at the stricter older-person limit. */}
       <SafeRoomCard status={{ ...safeRoomCalm(), storeUnavailable: true, stricterNightLimit: true }} />
+      {/* #271: Leo, the grandpa, at night above the 24 °C night limit: the card says so instead of "comfortable". */}
+      <SafeRoomCard status={safeRoomAboveNightLimit()} />
     </div>
   );
 }

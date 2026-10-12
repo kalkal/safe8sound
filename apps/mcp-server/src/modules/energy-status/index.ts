@@ -27,7 +27,12 @@ export interface EnergyStatusDeps {
 /** Rooms as "Name (id)": people hear the name, the model reads the id it must pass (#274). */
 export const roomLabel = (id: string, names: Readonly<Record<string, string>>): string => (names[id] === undefined ? id : `${names[id]} (${id})`);
 
-export function homeStatusSummary(s: HomeStatus, timeZone: string, roomNames: Readonly<Record<string, string>> = {}): string {
+export function homeStatusSummary(
+  s: HomeStatus,
+  timeZone: string,
+  roomNames: Readonly<Record<string, string>> = {},
+  people: Readonly<Record<string, string>> = {},
+): string {
   const served = s.rooms.filter((r) => r.state === 'served').length;
   const data = s.origin.energy === 'simulated' ? 'simulated data' : 'live data';
   const lastLive = s.lastLiveAt === undefined ? '' : `, last live reading at ${localTimeText(localIso(Date.parse(s.lastLiveAt), timeZone))}`;
@@ -39,7 +44,9 @@ export function homeStatusSummary(s: HomeStatus, timeZone: string, roomNames: Re
     : s.gridW < 0
       ? `The grid is on: the home sends ${String(w)} W to it.`
       : `The grid is on: the home draws ${String(w)} W from it.`;
-  const rooms = s.rooms.length === 0 ? '' : ` Rooms: ${s.rooms.map((r) => `${roomLabel(r.roomId, roomNames)} ${r.state}`).join(', ')}.`;
+  // Who is in each room (#271): a fictional name with its role, "Leo (grandpa)", so the model never thinks they are two people.
+  const who = (roles: readonly string[]) => (roles.length === 0 ? '' : ` with ${roles.map((r) => (people[r] === undefined ? r : `${people[r]} (${r})`)).join(' and ')}`);
+  const rooms = s.rooms.length === 0 ? '' : ` Rooms: ${s.rooms.map((r) => `${roomLabel(r.roomId, roomNames)} ${r.state}${who(r.occupants)}`).join(', ')}.`;
   return `Battery at ${s.batterySocPct}%, ${s.level} level; ${served} of ${s.rooms.length} rooms served (${data}). ${grid}${rooms}${link}`;
 }
 
@@ -58,7 +65,7 @@ export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {
         output: HomeStatusSchema,
         summarize: (s) => {
           const profile = deps.homes(s.homeId)?.profile;
-          return homeStatusSummary(s, profile?.location.tz ?? 'UTC', Object.fromEntries((profile?.rooms ?? []).map((r) => [r.id, r.name])));
+          return homeStatusSummary(s, profile?.location.tz ?? 'UTC', Object.fromEntries((profile?.rooms ?? []).map((r) => [r.id, r.name])), Object.fromEntries((profile?.people ?? []).map((p) => [p.role, p.name])));
         },
         handler: async (_args, ctx) => {
           const home = deps.homes(ctx.homeId);

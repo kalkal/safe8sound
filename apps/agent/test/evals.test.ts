@@ -25,9 +25,9 @@ const byId = (id: string) => {
 };
 
 describe('eval suite v1 (plan §10.2: 20 utterances, threshold 90%)', () => {
-  it('has 23 cases with unique ids and a 0.9 threshold (20 from plan §10.2, plus #273 "Is the power back?", #274 scene 2b and a °F setpoint, #306)', () => {
-    expect(EVAL_SUITE.cases).toHaveLength(23);
-    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(23);
+  it('has 25 cases with unique ids and a 0.9 threshold (20 from plan §10.2, plus #273 "Is the power back?", #274 scene 2b, a °F setpoint (#306), and #271 "Keep Leo safe" and no invented name)', () => {
+    expect(EVAL_SUITE.cases).toHaveLength(25);
+    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(25);
     expect(EVAL_SUITE.threshold).toBe(0.9);
   });
 
@@ -123,7 +123,7 @@ describe('scoreCase (metrics: tool choice, trajectory, no invented numbers)', ()
 describe('runEvals on the Strands loop with the fake model (no Bedrock: cost rule)', () => {
   it('scores the reference policy at or above the threshold', async () => {
     const report = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: new FakeModel(referencePolicy), tools: stubTools() }));
-    expect(report.results).toHaveLength(23);
+    expect(report.results).toHaveLength(25);
     expect(report.passRate).toBeGreaterThanOrEqual(0.9);
     expect(report.passed).toBe(true);
   });

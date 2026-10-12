@@ -10,6 +10,8 @@
     {"id":"hot-heatwave-plan","category":"hot_day","utterance":"A heatwave is coming this week, can you plan the cooling?","expect":{"firstToolIn":["plan_comfort","get_energy_forecast"]}},
     {"id":"storm-coming","category":"storm","utterance":"A storm is coming tonight.","expect":{"firstToolIn":["start_storm_mode","get_energy_forecast"]}},
     {"id":"storm-outage","category":"storm","utterance":"The power's out","expect":{"firstToolIn":["get_home_status","start_storm_mode"]}},
+    {"id":"storm-keep-leo","category":"storm","utterance":"A storm is here and the power is out. Keep Leo safe.","expect":{"firstToolIn":["get_safe_room_status","start_storm_mode","get_home_status"],"mustNotMatch":["(change|move) the safe room","not (listed|in the safe room)"]}},
+    {"id":"status-no-invented-name","category":"status","utterance":"How is grandma doing?","expect":{"firstToolIn":["get_safe_room_status","get_home_status"],"mustNotMatch":["\\b(Ana|Rosa|Maria|Anna)\\b"]}},
     {"id":"storm-hours","category":"storm","utterance":"How long can the safe room stay cool if the power goes out?","expect":{"firstToolIn":["get_guarantees","get_home_status"]}},
     {"id":"storm-grandpa","category":"storm","utterance":"How is Grandpa doing?","expect":{"firstToolIn":["get_safe_room_status"]}},
     {"id":"storm-power-back","category":"storm","utterance":"Is the power back?","expect":{"firstToolIn":["get_home_status","get_safe_room_status"],"mustNotMatch":["\\bstill out\\b"]}},

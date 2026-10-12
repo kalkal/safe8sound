@@ -1,4 +1,5 @@
 import {
+  celsius,
   err,
   ok,
   toolError,
@@ -21,7 +22,7 @@ import type { ToolContext } from '../../tool.js';
 import type { StormModeDeps } from './deps.js';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import { localIso } from '@cold-reserve/core';
-import { deliver, detect, levelOf, localeOf, messageFields, readHome, readingEvent, type Observed } from './observe.js';
+import { deliver, detect, levelOf, localeOf, messageFields, namedPeople, readHome, readingEvent, type Observed } from './observe.js';
 
 
 /** Never called: prepareDevices does not touch the adapter on a read-only home. */
@@ -77,6 +78,8 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext, degr
   const { safeRoom, snapshot, session } = o.value;
   // The family's latest reply in this storm, by role only; its time on the home's clock (queue item 3).
   // Once the storm has ended, an old "on my way" is not news any more.
+  const people = namedPeople(o.value);
+  const limit = o.value.limitNow;
   const reply = session?.phase === 'ended' ? undefined : session?.familyReplies?.at(-1);
   return ok({
     safeRoomId: safeRoom.id,
@@ -93,6 +96,8 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext, degr
     homeLink: snapshot.homeLink,
     ...(o.value.storeUnavailable === true ? { storeUnavailable: true as const } : {}),
     ...(o.value.stricterNightLimit === true ? { stricterNightLimit: true as const } : {}),
+    limitNow: { limitC: celsius(limit.limitC), kind: limit.kind },
+    ...(people.length === 0 ? {} : { people }),
   });
 }
 

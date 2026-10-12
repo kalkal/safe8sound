@@ -5,7 +5,8 @@ import { localTimeText } from '@cold-reserve/core';
 
 // The text content of each storm tool result. The agent (Strands) reads only this text (F7 finding):
 // safe hours, until when, the level and its reason, and the roles told or skipped are all here.
-// Contacts appear by role only; names and handles never reach the model.
+// Family contacts appear by role only; their names and handles never reach the model. The fictional occupants of a
+// demo or sandbox home may carry their demo name with the role, "Leo (grandpa)" (#271).
 
 const one = (x: number) => x.toFixed(1);
 
@@ -54,7 +55,9 @@ export function startSummary(o: StartOutput, room: RoomLabel = idOnly): string {
 /** The safe room now, in the unit the sandbox chose (#306); the structured status stays in °C. */
 export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: RoomLabel = idOnly): string {
   const humidity = s.humidityPct === undefined ? '' : `, ${String(s.humidityPct)} % humidity`;
-  const occupants = s.occupantRoles.length > 0 ? s.occupantRoles.join(', ') : 'nobody';
+  // #271: a fictional name with its role, "Leo (grandpa)", so a name and a role are one person.
+  const named = new Map((s.people ?? []).map((p) => [p.role, p.name]));
+  const occupants = s.occupantRoles.length > 0 ? s.occupantRoles.map((r) => { const name = named.get(r); return name === undefined ? r : `${name} (${r})`; }).join(', ') : 'nobody';
   // #114: the store could not be read: no storm session is known, and the hours are only at the stricter night limit.
   const degraded = s.storeUnavailable === true;
   const storm = degraded ? 'Storm mode could not be checked.' : s.stormPhase === undefined ? 'No storm mode.' : `Storm mode: ${s.stormPhase}.`;
@@ -74,7 +77,7 @@ export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: R
   const head = degraded ? 'The saved settings and the storm state are not reachable right now: this is the live reading only. ' : '';
   return (
     head +
-    `Safe room ${room(s.safeRoomId)}: ${formatTempFixed(s.tempC, unit)}${humidity}, occupants: ${occupants}. Level ${s.level} (reason: ${s.levelReason}). ` +
+    `Safe room ${room(s.safeRoomId)}: ${formatTempFixed(s.tempC, unit)}${humidity}, occupants: ${occupants}.${pastLimit(s, unit)} Level ${s.level} (reason: ${s.levelReason}). ` +
     `${hours} ${storm}${checkIn} Home link ${s.homeLink}, ${dataText(s.origin)}.`
   );
 }
@@ -85,4 +88,21 @@ export function notifySummary(o: z.output<typeof NotifyFamilyOutputSchema>): str
   const sent = o.sent.length > 0 ? `Message sent to: ${o.sent.map((s) => `${s.role} (${s.channel})`).join(', ')}.` : 'No message was sent.';
   const skipped = o.skipped.length > 0 ? ` Not sent to: ${o.skipped.map((s) => `${s.role} (${SKIP_TEXT[s.reason]})`).join(', ')}.` : '';
   return `${sent}${skipped} Message: ${o.preview}`;
+}
+
+const LIMIT_WORDS: Readonly<Record<NonNullable<SafeRoomStatus['limitNow']>['kind'], string>> = {
+  maximum: 'the safety maximum',
+  night: 'the night limit',
+  older_person_cap: 'the older-person limit',
+  heat_index_cap: 'the heat-index cap',
+  minimum: 'the safety minimum',
+};
+
+/** #271: a safe room past the limit in force now is said so, never "inside the limits" (24 °C at night with an older person). */
+function pastLimit(s: SafeRoomStatus, unit: TempUnit): string {
+  if (s.limitNow === undefined) return '';
+  const { limitC, kind } = s.limitNow;
+  const past = kind === 'minimum' ? s.tempC < limitC : s.tempC > limitC;
+  if (!past) return '';
+  return ` It is ${kind === 'minimum' ? 'below' : 'above'} ${LIMIT_WORDS[kind]} of ${formatTempFixed(limitC, unit)} now.`;
 }

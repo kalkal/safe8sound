@@ -485,6 +485,7 @@
 
   /* Safe room (storm screen): storm mode said in words and an icon, never by colour alone (plan §11.2 p.13). */
   .storm-banner,
+  .limit-strip,
   .advice,
   .info-strip {
     margin: 0;
@@ -504,6 +505,15 @@
 
   .info-strip {
     border-inline-start-color: var(--status-neutral);
+  }
+
+  /* #271: past the limit in force now, said in words and an icon on its own line; the big time keeps its own label. */
+  .limit-strip {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    border-inline-start-color: var(--status-warn);
+    font-weight: var(--font-weight-bold);
   }
 
   .facts {
