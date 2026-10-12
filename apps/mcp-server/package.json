@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node --import tsx src/local.ts",
-    "bench": "node scripts/bench.mjs 100 3316"
+    "bench": "node scripts/bench.mjs 100 3316",
+    "nights": "node --import tsx scripts/nights.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.1141.0",
