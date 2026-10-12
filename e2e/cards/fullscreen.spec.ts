@@ -2,6 +2,7 @@ import { expect, test } from '../no-network.js';
 
 // Full screen only when the person asks (plan §11.2 p.2, #200): the card's "Full screen" asks the host, the frame
 // covers the page, "Back to the conversation" or Escape returns it inline, focus follows. At phone width, with no sideways scroll.
+// Only dense views (plan, applied plan, home) offer it; short answers stay inline (idea 6).
 
 test('a card goes full screen on request and back with "Back to the conversation" or Escape, at 375 px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
@@ -67,4 +68,14 @@ test('full screen is modal: Tab stays in the card, keyboard Enter goes in and ba
   // Back inline, the page is usable again.
   await ask.focus();
   await expect(ask).toBeFocused();
+});
+
+test('a short answer stays inline: the cold reserve card offers no "Full screen" (idea 6)', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Ask a question').fill('How long does the cold reserve last?');
+  await page.getByRole('button', { name: 'Ask' }).click();
+  const card = page.frameLocator('iframe[title="Cold reserve card"]');
+  await expect(card.getByRole('region', { name: 'Cold reserve' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Full screen' })).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });

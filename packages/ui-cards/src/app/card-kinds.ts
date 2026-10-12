@@ -65,6 +65,15 @@ export function isStormState(state: CardState): boolean {
   return false;
 }
 
+/**
+ * Small in the conversation, big when it helps (idea 6): only the dense views (the plan with its pages, the applied
+ * plan, the home's floor plan) offer "Full screen". Short answers (reserve, safe room, preferences, a refusal, an
+ * error) stay inline. Full screen is still only on request: nothing here switches the mode.
+ */
+export function offersFullScreen(kind: CardState['kind']): boolean {
+  return kind === 'plan' || kind === 'applied' || kind === 'home';
+}
+
 /** The part of an MCP CallToolResult a card reads. */
 export interface ToolResultLike {
   isError?: boolean | undefined;

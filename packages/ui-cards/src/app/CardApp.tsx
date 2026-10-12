@@ -12,7 +12,7 @@ import { t } from '../text.js';
 import { CardShell, DisplaySlot, DisplayToggle, type DisplayControl } from '../CardShell.js';
 import { CardErrorBoundary } from './CardErrorBoundary.js';
 import { Fit } from './Fit.js';
-import type { CardState } from './card-kinds.js';
+import { offersFullScreen, type CardState } from './card-kinds.js';
 
 /**
  * The height a host first gives a card frame, kept while the card waits for its result: a card that reported the
@@ -38,11 +38,14 @@ export interface CardAppProps {
 
 /** The content of one ui:// frame. The host owns the conversation; the card only shows and asks. */
 export function CardApp({ notice, display, maxHeight, ...props }: CardAppProps) {
+  // Only dense views offer "Full screen" (idea 6); a frame already full screen always keeps its way back, whatever
+  // it now shows (e.g. a refusal after Apply).
+  const toggle = display !== undefined && (display.fullscreen || offersFullScreen(props.state.kind)) ? <DisplayToggle display={display} /> : null;
   return (
     <CardErrorBoundary>
       <Fit maxHeight={maxHeight}>
       {/* "Full screen" sits in the first card's title row; a frame without a card (waiting, an error) has none. */}
-      <DisplaySlot.Provider value={display === undefined ? null : <DisplayToggle display={display} />}>
+      <DisplaySlot.Provider value={toggle}>
       {notice !== undefined &&
         (notice.ok ? (
           <p className="notice" role="status">

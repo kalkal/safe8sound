@@ -257,6 +257,26 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       expect(toggle).toHaveBeenCalledTimes(2);
     });
 
+    it('only dense views offer it (idea 6): the home yes; the reserve, the safe room, a refusal stay inline', () => {
+      const display = { canFullscreen: true, fullscreen: false, toggle: vi.fn() };
+      const offered = (state: CardState) => {
+        cleanup();
+        render(<CardApp state={state} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} display={display} />);
+        return screen.queryByRole('button', { name: 'Full screen' }) !== null;
+      };
+      expect(offered({ kind: 'home', data: homeInStorm() })).toBe(true);
+      expect(offered({ kind: 'reserve', data: ReserveOutlookSchema.parse(exampleReserveOutlook()) })).toBe(false);
+      expect(offered({ kind: 'storm', data: safeRoomInStorm() })).toBe(false);
+      expect(offered({ kind: 'refused', data: inverterRefusal() })).toBe(false);
+    });
+
+    it('a frame already full screen keeps its way back, even when it now shows a short answer', () => {
+      const toggle = vi.fn();
+      render(<CardApp state={{ kind: 'refused', data: inverterRefusal() }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} display={{ canFullscreen: true, fullscreen: true, toggle }} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Back to the conversation' }));
+      expect(toggle).toHaveBeenCalledTimes(1);
+    });
+
     it('Escape inline does nothing; a host without full screen gets no button at all', () => {
       const toggle = vi.fn();
       view({ canFullscreen: true, fullscreen: false, toggle });
