@@ -145,6 +145,8 @@ export const enUS = {
   'card.back': 'Back to the conversation',
   'card.loading': 'Loading…',
   'card.failed': 'This card could not be shown.',
+  // The title of a card whose tool failed (#353): the reason follows in words.
+  'card.errorTitle': 'Something went wrong',
   'card.noActions': 'Card actions are not available here: say it instead.',
   // Pages instead of scrolling (owner, 10 Oct): one card at a time, a tab per card, named by what it shows.
   'cardTab.list': 'Cards of this answer',

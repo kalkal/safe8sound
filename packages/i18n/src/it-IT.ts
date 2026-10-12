@@ -133,6 +133,7 @@ export const itIT = {
   'card.back': 'Torna alla conversazione',
   'card.loading': 'Carico…',
   'card.failed': 'Questa scheda non si può mostrare.',
+  'card.errorTitle': 'Qualcosa non è andato',
   'card.noActions': 'Card actions are not available here: say it instead.',
   'cardTab.list': 'Schede di questa risposta',
   'card.pages': 'Pagine di questa scheda',

@@ -257,7 +257,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       expect(toggle).toHaveBeenCalledTimes(2);
     });
 
-    it('only dense views offer it (idea 6): the home yes; the reserve, the safe room, a refusal stay inline', () => {
+    it('only dense views offer it (idea 6): the home and an applied plan yes; the reserve, the safe room, a refusal, the preferences, an error stay inline', () => {
       const display = { canFullscreen: true, fullscreen: false, toggle: vi.fn() };
       const offered = (state: CardState) => {
         cleanup();
@@ -268,6 +268,9 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       expect(offered({ kind: 'reserve', data: ReserveOutlookSchema.parse(exampleReserveOutlook()) })).toBe(false);
       expect(offered({ kind: 'storm', data: safeRoomInStorm() })).toBe(false);
       expect(offered({ kind: 'refused', data: inverterRefusal() })).toBe(false);
+      expect(offered({ kind: 'applied', data: { plan: { ...hotDayPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] } })).toBe(true);
+      expect(offered({ kind: 'preferences', data: { preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) } })).toBe(false);
+      expect(offered({ kind: 'error', message: 'The plan expired: ask for a new one.', retryable: false })).toBe(false);
     });
 
     it('a frame already full screen keeps its way back, even when it now shows a short answer', () => {
@@ -275,6 +278,16 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       render(<CardApp state={{ kind: 'refused', data: inverterRefusal() }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} display={{ canFullscreen: true, fullscreen: true, toggle }} />);
       fireEvent.click(screen.getByRole('button', { name: 'Back to the conversation' }));
       expect(toggle).toHaveBeenCalledTimes(1);
+    });
+
+    it('an error in full screen keeps the way back: "Back to the conversation" and Escape (#353)', () => {
+      const toggle = vi.fn();
+      render(<CardApp state={{ kind: 'error', message: 'Apply failed: try again.', retryable: true }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} display={{ canFullscreen: true, fullscreen: true, toggle }} />);
+      expect(screen.getByRole('alert').textContent).toBe('Apply failed: try again.');
+      fireEvent.click(screen.getByRole('button', { name: 'Back to the conversation' }));
+      expect(toggle).toHaveBeenCalledTimes(1);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(toggle).toHaveBeenCalledTimes(2);
     });
 
     it('Escape inline does nothing; a host without full screen gets no button at all', () => {

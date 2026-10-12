@@ -44,7 +44,7 @@ export function CardApp({ notice, display, maxHeight, ...props }: CardAppProps) 
   return (
     <CardErrorBoundary>
       <Fit maxHeight={maxHeight}>
-      {/* "Full screen" sits in the first card's title row; a frame without a card (waiting, an error) has none. */}
+      {/* "Full screen" sits in the first card's title row; an error is a card too, so a frame in full screen keeps its way back (#353); only "Loading…" has none. */}
       <DisplaySlot.Provider value={toggle}>
       {notice !== undefined &&
         (notice.ok ? (
@@ -70,7 +70,12 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
         </p>
       );
     case 'error':
-      return <p role="alert">{state.message}</p>;
+      // Still a card with its title row (#353): in full screen "Back to the conversation" and Escape stay.
+      return (
+        <CardShell title={t('card.errorTitle')}>
+          <p role="alert">{state.message}</p>
+        </CardShell>
+      );
     case 'plan':
       return <ProposedPlan key={state.data.id} plan={state.data} timeZone={timeZone} canAct={canAct} onCallTool={onCallTool} />;
     case 'refused':
