@@ -1,4 +1,4 @@
-import { HomeStatusSchema, err, ok, toolError, type HomeId, type HomeProfile, type HomeStatus } from '@cold-reserve/contracts';
+import { HomeStatusSchema, demoPeopleOf, err, ok, toolError, type HomeId, type HomeProfile, type HomeStatus } from '@cold-reserve/contracts';
 import type { Clock, HomeDataSource } from '@cold-reserve/core';
 import { z } from 'zod';
 import type { CapabilityModule } from '../../registry.js';
@@ -65,7 +65,7 @@ export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {
         output: HomeStatusSchema,
         summarize: (s) => {
           const profile = deps.homes(s.homeId)?.profile;
-          return homeStatusSummary(s, profile?.location.tz ?? 'UTC', Object.fromEntries((profile?.rooms ?? []).map((r) => [r.id, r.name])), Object.fromEntries((profile?.people ?? []).map((p) => [p.role, p.name])));
+          return homeStatusSummary(s, profile?.location.tz ?? 'UTC', Object.fromEntries((profile?.rooms ?? []).map((r) => [r.id, r.name])), Object.fromEntries((profile === undefined ? [] : demoPeopleOf(profile)).map((p) => [p.role, p.name])));
         },
         handler: async (_args, ctx) => {
           const home = deps.homes(ctx.homeId);

@@ -19,6 +19,12 @@ export const HOME_HEADER = 'x-cold-reserve-home';
 /** A visitor sandbox home, `demo#<16 lowercase hex>` (plan §3.2); still a HomeId. Approved in #101. */
 export const SandboxHomeIdSchema = HomeIdSchema.refine((id) => /^demo#[0-9a-f]{16}$/.test(id), { message: 'Only a demo#<16 hex> sandbox home' });
 
+/** The seeded demo home (fictional, simulated): with the sandboxes, the only homes whose people may have names (R17). */
+export const DEMO_HOME_ID = 'demo';
+
+/** Whether a home is invented (the demo or a visitor sandbox), never the real one: only these may carry names (#271, R17). */
+export const isDemoHomeId = (homeId: string): boolean => homeId === DEMO_HOME_ID || SandboxHomeIdSchema.safeParse(homeId).success;
+
 export const EntityIdSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/);
 
 /** An occupant or contact role ("grandpa", "daughter"); names never reach the tools (plan §3.1). */

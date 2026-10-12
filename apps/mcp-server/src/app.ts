@@ -21,7 +21,7 @@ import { createSandboxes } from './sandboxes.js';
 import { refreshFrom, shippedPlace, withHousehold, type SandboxPlay } from './sandbox-play.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
 import { envNumber, scenarioStartFor, scenarioTimelineFor, type ScenarioTimeline } from './scenario-clock.js';
-import { logClientScopes, logMetadataMode, logSourceEvent, warnMissingEpsLoad } from './startup-log.js';
+import { homeProfileOf, logClientScopes, logMetadataMode, logSourceEvent, warnMissingEpsLoad } from './startup-log.js';
 
 // Where they lived before #319: the entries and tests still import them from here.
 export { scenarioAnchor, scenarioClockFor, scenarioPlayFor, scenarioTimelineFor, type ScenarioTimeline } from './scenario-clock.js';
@@ -121,8 +121,10 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const startHMs = scenarioStartMs - Date.parse(builtIn.startAt);
 
   const demo = demoProfile();
-  // The real home never gets the demo's fictional names (#271).
-  const home = HomeProfileSchema.parse({ ...demo, homeId: HOME, people: undefined });
+  // The real home never gets the demo's fictional names (#271): the schema refuses them there (R17).
+  const homeProfile = homeProfileOf({ ...demo, homeId: HOME, people: undefined }, opts.logger, 'startup');
+  if (!homeProfile.ok) return homeProfile;
+  const home = homeProfile.value;
   const simulator = (profile: typeof demo) => new SimulatorSource({ profile, scenario, params, clock });
   const demoSim = simulator(demo);
   const homeSim = simulator(home);

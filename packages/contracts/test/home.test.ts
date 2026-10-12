@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { exampleHomeProfile } from '../src/fixtures.js';
-import { HOME_HEADER, HOME_SCHEMA_VERSION, HomeIdSchema, HomeProfileSchema, HvacUnitSchema, RoomSchema, SandboxHomeIdSchema, type HomeId } from '../src/index.js';
+import { HOME_HEADER, HOME_SCHEMA_VERSION, HomeIdSchema, HomeProfileSchema, HvacUnitSchema, REAL_HOME_ID, RoomSchema, SandboxHomeIdSchema, demoPeopleOf, isDemoHomeId, type HomeId } from '../src/index.js';
 
 describe('HomeProfileSchema', () => {
   it('parses the example profile of the real plant (values are data, not constants)', () => {
@@ -59,6 +59,43 @@ describe('HomeProfileSchema', () => {
   it('rejects unknown fields such as serial numbers', () => {
     const input = { ...exampleHomeProfile(), serialNumber: 'X' };
     expect(HomeProfileSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+// R17: fictional names belong to the invented occupants only; the real home never carries them, so the model never gets any there.
+describe('people names only on a demo or sandbox home', () => {
+  const people = [{ role: 'grandpa', name: 'Leo' }];
+  const sandbox = 'demo#0123456789abcdef';
+
+  it('refuses names on the real home, as a value with the path of the field', () => {
+    const parsed = HomeProfileSchema.safeParse({ ...exampleHomeProfile(), homeId: REAL_HOME_ID, people });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map((i) => i.path)).toEqual([['people']]);
+  });
+
+  it('refuses them on any other home that is not invented', () => {
+    expect(HomeProfileSchema.safeParse({ ...exampleHomeProfile(), homeId: 'demo#short', people }).success).toBe(false);
+    expect(HomeProfileSchema.safeParse({ ...exampleHomeProfile(), homeId: 'demox', people }).success).toBe(false);
+  });
+
+  it('accepts them on the demo home and on a visitor sandbox', () => {
+    expect(HomeProfileSchema.parse({ ...exampleHomeProfile(), homeId: 'demo', people }).people).toEqual(people);
+    expect(HomeProfileSchema.parse({ ...exampleHomeProfile(), homeId: sandbox, people }).people).toEqual(people);
+  });
+
+  it('accepts the real home without names', () => {
+    expect(HomeProfileSchema.parse({ ...exampleHomeProfile(), homeId: REAL_HOME_ID }).people).toBeUndefined();
+  });
+
+  it('tells an invented home from the real one', () => {
+    expect([REAL_HOME_ID, 'demo', sandbox, 'demo#short'].map(isDemoHomeId)).toEqual([false, true, true, false]);
+  });
+
+  it('reads no names off a real-home profile even if one was built without the schema', () => {
+    const homeId = HomeIdSchema.parse(REAL_HOME_ID);
+    expect(demoPeopleOf({ homeId, people })).toEqual([]);
+    expect(demoPeopleOf({ homeId: HomeIdSchema.parse('demo'), people })).toEqual(people);
+    expect(demoPeopleOf({ homeId: HomeIdSchema.parse('demo') })).toEqual([]);
   });
 });
 

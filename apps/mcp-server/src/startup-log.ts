@@ -1,8 +1,9 @@
-import { categoryOf, type HomeId, type HomeProfile } from '@cold-reserve/contracts';
+import { HomeProfileSchema, categoryOf, err, isDemoHomeId, ok, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Result } from '@cold-reserve/contracts';
 import { epsBaseLoadW } from '@cold-reserve/core';
 import type { SourceEvent } from '@cold-reserve/source-fallback';
 import type { ServerConfig } from './config.js';
 import type { Logger } from './handler.js';
+import { isSandbox } from './sandbox-log.js';
 
 // What the server says at start-up and when the real home's link changes (out of app.ts, #319).
 
@@ -88,4 +89,27 @@ export function logMetadataMode(config: ServerConfig, logger: Logger): void {
     correlationId: 'startup',
     details: { event: 'protected_resource_metadata', mode, authorizationServers: pr?.authorizationServers.length ?? 0 },
   });
+}
+
+/**
+ * A home profile as a value (R17): the real home with the demo's fictional names, or any other invalid profile, is
+ * refused with `invalid_config` and one error line naming the fields, never their values nor a sandbox's id.
+ */
+export function homeProfileOf(raw: unknown, logger: Logger, correlationId: string): Result<HomeProfile, ErrorEnvelope> {
+  const parsed = HomeProfileSchema.safeParse(raw);
+  if (parsed.success) return ok(parsed.data);
+  const homeId = typeof raw === 'object' && raw !== null && 'homeId' in raw && typeof raw.homeId === 'string' ? raw.homeId : '';
+  const home = isSandbox(homeId) ? 'sandbox' : isDemoHomeId(homeId) ? 'demo' : 'real';
+  const fields = [...new Set(parsed.error.issues.map((i) => i.path.map(String).join('.')))];
+  logger.log({
+    ts: new Date().toISOString(),
+    level: 'error',
+    component: 'mcp-server',
+    code: 'invalid_config',
+    category: categoryOf('invalid_config'),
+    message: 'A home profile was refused: names belong only to a demo or sandbox home, and every field must be valid.',
+    correlationId,
+    details: { event: 'home_profile_refused', home, fields },
+  });
+  return err(toolError('invalid_config', 'The home profile is not valid.'));
 }

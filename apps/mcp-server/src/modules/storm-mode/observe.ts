@@ -1,6 +1,7 @@
 import {
   SendableTransitionSchema,
   categoryOf,
+  demoPeopleOf,
   err,
   ok,
   pct,
@@ -305,6 +306,5 @@ export async function runStormDetector(deps: StormModeDeps, ctx: ToolContext, ki
 
 /** The fictional names of the safe room's occupants that have one (#271): demo and sandbox homes only. */
 export function namedPeople(o: Observed): { role: string; name: string }[] {
-  const people = o.home.profile.people ?? [];
-  return people.filter((p) => o.safeRoom.occupants.includes(p.role)).map((p) => ({ role: p.role, name: p.name }));
+  return demoPeopleOf(o.home.profile).filter((p) => o.safeRoom.occupants.includes(p.role));
 }

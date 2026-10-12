@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EntityIdSchema, HomeIdSchema, RoleSchema, uniqueBy } from './common.js';
+import { EntityIdSchema, HomeIdSchema, RoleSchema, isDemoHomeId, uniqueBy } from './common.js';
 import { StormDeviceSchema } from './storm-prep.js';
 import { KilowattSchema, PctSchema, RatioSchema, WattHourSchema, WattSchema } from './units.js';
 
@@ -90,7 +90,7 @@ export const HomeProfileSchema = z
     stormDevices: z.array(StormDeviceSchema).max(10).optional(),
     /**
      * #271 (additive, approved in #271): fictional display names of the people who live in a demo or sandbox home
-     * ("Leo" the grandpa), so "Leo" and "grandpa" are one person. Never on the real home; never a family contact.
+     * ("Leo" the grandpa), so "Leo" and "grandpa" are one person. Never on the real home (refused below, R17); never a family contact.
      */
     people: z
       .array(z.strictObject({ role: RoleSchema, name: z.string().min(1).max(30) }))
@@ -103,5 +103,13 @@ export const HomeProfileSchema = z
       lonRounded: z.number().min(-180).max(180).refine(roundedToOneDecimal, { message: 'Round to one decimal' }),
       tz: z.string().min(1).max(64),
     }),
-  });
+  })
+  // R17: names are for invented occupants only. A profile of the real home that carries them is refused, so they
+  // can never reach the model there.
+  .refine((p) => p.people === undefined || isDemoHomeId(p.homeId), { path: ['people'], message: 'Names only on a demo or sandbox home' });
 export type HomeProfile = z.infer<typeof HomeProfileSchema>;
+
+/** The fictional names of a profile's people (#271), and none unless the home is invented (R17, a second lock). */
+export function demoPeopleOf(profile: Pick<HomeProfile, 'homeId' | 'people'>): { role: string; name: string }[] {
+  return isDemoHomeId(profile.homeId) ? (profile.people ?? []).map((p) => ({ role: p.role, name: p.name })) : [];
+}
