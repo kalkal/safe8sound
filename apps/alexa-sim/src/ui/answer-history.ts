@@ -38,7 +38,10 @@ export function stepAnswer(history: AnswerHistory, delta: -1 | 1): AnswerHistory
 export const currentAnswer = (history: AnswerHistory): string | undefined => history.turns[history.index];
 
 export function historyPosition(history: AnswerHistory): HistoryPosition | undefined {
-  if (history.turns.length === 0) return undefined;
+  if (history.index < 0) return undefined;
   const of = history.turns.length;
   return { n: history.index + 1, of, hasPrevious: history.index > 0, hasNext: history.index < of - 1 };
 }
+
+/** Back from the first answer (idea 5): the first screen again; every answer is kept, the next one is added at the end. */
+export const backToStart = (history: AnswerHistory): AnswerHistory => ({ turns: history.turns, index: -1 });

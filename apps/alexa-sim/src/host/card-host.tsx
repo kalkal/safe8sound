@@ -15,8 +15,8 @@ export interface CardHost {
   demo?: boolean;
   /** The temperature unit the person chose (demo settings); °C when absent. */
   units?: TempUnit;
-  /** A card action that succeeded (its tool name): the page may update what it shows, e.g. the home panel. */
-  onCardAction?: (name: string) => void;
+  /** A card action that succeeded (its tool name, the turn of its card and its structured result): the page may update what it shows, e.g. the home panel, the steps. */
+  onCardAction?: (name: string, turnId: string, result: unknown) => void;
 }
 
 const CardHostContext = createContext<CardHost | null>(null);

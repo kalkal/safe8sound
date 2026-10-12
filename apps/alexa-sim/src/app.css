@@ -730,6 +730,60 @@
     font-size: var(--font-size-min);
   }
 
+  /* "Back" always there and the path of the steps (idea 5): Back at the start of the header band, then one dot per
+     step, the current one longer and named in words. */
+  .back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding-inline-start: var(--space-3);
+  }
+
+  .back-arrow {
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .step-dots {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .step-dot {
+    inline-size: 0.625rem;
+    block-size: 0.625rem;
+    border: var(--border-thin) solid var(--text-secondary);
+    border-radius: var(--radius-pill);
+  }
+
+  .step[aria-current="step"] .step-dot {
+    inline-size: 1.5rem;
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+
+  .step-name {
+    color: var(--text-secondary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+    text-transform: uppercase;
+  }
+
   .home-panel-body {
     justify-self: stretch;
   }

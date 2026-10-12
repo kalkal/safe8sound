@@ -13,7 +13,9 @@ import { useSlowTurn } from './slow-turn.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { pagerSayable, runScreenCommand, type ScreenCommand } from './screen-commands.js';
 import { AnswerCard } from './AnswerCard.js';
-import { addAnswer, currentAnswer, emptyHistory, historyPosition, stepAnswer } from './answer-history.js';
+import { addAnswer, backToStart, currentAnswer, emptyHistory, historyPosition, stepAnswer } from './answer-history.js';
+import { StepNav } from './StepNav.js';
+import { backAction, stepOf } from './steps.js';
 import { AnswerPager } from './AnswerPager.js';
 import { DemoCodeGate } from './DemoCodeGate.js';
 import { DemoOverlay } from './DemoOverlay.js';
@@ -46,9 +48,29 @@ export interface ConversationProps {
   homeView?: ReactNode;
   /** The idle screen's own content (the cold reserve clock, owner 11 Oct), under the first screen's hint. */
   idle?: ReactNode;
+  /** Back (idea 5) with the home open: closes it, back to what was under it. */
+  onCloseHome?: () => void;
+  /** The steps (idea 5): the turns whose plan was applied from its card, at "Confirm". */
+  appliedTurns?: ReadonlySet<string>;
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false, onAnswer, examples, commands = [], head, homeView, idle }: ConversationProps) {
+export function Conversation({
+  agent,
+  turnBudgetMs,
+  timeZone,
+  voice: voiceConfig,
+  session,
+  studioVoice,
+  demo = false,
+  onAnswer,
+  examples,
+  commands = [],
+  head,
+  homeView,
+  idle,
+  onCloseHome,
+  appliedTurns,
+}: ConversationProps) {
   const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
@@ -123,6 +145,10 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
   const position = historyPosition(history);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  // Back disabled under the keyboard focus (review of #350): the focus goes to the question field.
+  const focusQuestion = useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
   const micRef = useRef<HTMLButtonElement>(null);
   const stopSpeakingRef = useRef<HTMLButtonElement>(null);
   // A valid demo code brings the question field back: the focus goes there (review of #140).
@@ -153,11 +179,29 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
   // A turn on its way (or failed): the content band shows it, not an older answer.
   const busy = thinking || listening || snapshot.matches('failed');
   const homeShown = homeView !== undefined && homeView !== null && !busy;
-  // Nothing asked yet: the content band explains what to ask.
-  const firstScreen = !busy && !homeShown && history.turns.length === 0 && !snapshot.matches('speaking');
+  // Nothing asked yet, or Back from the first answer (idea 5): the content band explains what to ask.
+  const firstScreen = !busy && !homeShown && shownTurn === undefined && (history.turns.length > 0 || !snapshot.matches('speaking'));
   const step = (delta: 1 | -1) => {
     setHistory((previous) => stepAnswer(previous, delta));
   };
+  // "Back" always there and the path of the steps (idea 5).
+  const homeOpen = homeView !== undefined && homeView !== null;
+  const where = stepOf({
+    homeOpen: homeShown,
+    cards: busy || shown.data?.ok !== true ? undefined : shown.data.value.cards,
+    applied: shownTurn !== undefined && appliedTurns?.has(shownTurn) === true,
+  });
+  const back = backAction({ thinking, failed: snapshot.matches('failed'), homeOpen, answerIndex: history.index });
+  const goBack =
+    back === undefined
+      ? undefined
+      : () => {
+          // The voice stops reading the answer that is leaving the screen (review of #350).
+          if (snapshot.matches('speaking')) send({ type: 'CANCEL' });
+          if (back === 'close_home') onCloseHome?.();
+          else if (back === 'previous_answer') step(-1);
+          else setHistory(backToStart);
+        };
   // The answer pager's buttons, while it is on screen, then the header's (home, theme) from the frame.
   commandsRef.current = [
     ...(pagerSayable({ thinking, failed: snapshot.matches('failed'), homeOpen: homeView !== undefined && homeView !== null, hasAnswers: position !== undefined })
@@ -178,6 +222,7 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
           },
         ]
       : []),
+    ...(goBack === undefined ? [] : [{ id: 'back', phrases: [t('nav.back'), t('nav.backUtterance')], run: goBack }]),
     ...commands,
   ];
   // A cold start can take most of the browser's wait (#270): after a while the screen says so, honestly.
@@ -185,20 +230,19 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
 
   return (
     <div className="bands">
-      {(head !== undefined || position !== undefined) && (
-        <div className="band-head">
-          {head}
-          {/* Where we are among the answers: in the header band, so the content band is the answer's alone. */}
-          {!busy && !homeShown && position !== undefined && (
-            <AnswerPager
-              position={position}
-              onStep={(delta) => {
-                setHistory((previous) => stepAnswer(previous, delta));
-              }}
-            />
-          )}
-        </div>
-      )}
+      <div className="band-head">
+        <StepNav step={where} onBack={goBack} onFocusLost={focusQuestion} />
+        {head}
+        {/* Where we are among the answers: in the header band, so the content band is the answer's alone. */}
+        {!busy && !homeShown && position !== undefined && (
+          <AnswerPager
+            position={position}
+            onStep={(delta) => {
+              setHistory((previous) => stepAnswer(previous, delta));
+            }}
+          />
+        )}
+      </div>
       <section className="conversation band-content">
         {/* While a turn runs, its question; otherwise the question of the answer on screen. */}
         {busy && question !== null && !listening && <p className="bubble">{question}</p>}

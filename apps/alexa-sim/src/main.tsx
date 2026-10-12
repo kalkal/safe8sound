@@ -24,6 +24,7 @@ import { examplesFor, isGridDown } from './ui/ExampleQuestions.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { useHomePanel } from './ui/HomePanel.js';
 import { ReserveClock } from './ui/ReserveClock.js';
+import { isAppliedPlan } from './ui/steps.js';
 import { fetchReserve } from './ui/reserve.js';
 import { SHIPPED_PLACES, applyChange, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario, type DemoSettingsView } from './ui/demo-settings.js';
 import { DemoSettingsControl } from './ui/SettingsDrawer.js';
@@ -151,9 +152,13 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [config.homeTimeZone, homeMode, closeHome],
   );
+  // The steps (idea 5): the turns whose plan was applied from its card are at "Confirm"; a last resort's first step
+  // (still "proposed", waiting for the second yes) is not (review of #350).
+  const [appliedTurns, setAppliedTurns] = useState<ReadonlySet<string>>(() => new Set());
   const onCardAction = useCallback(
-    (name: string) => {
+    (name: string, turnId: string, result: unknown) => {
       if (name !== 'apply_plan') return;
+      if (isAppliedPlan(result)) setAppliedTurns((previous) => new Set(previous).add(turnId));
       setHome((previous) => homeAfterApply(previous, homeMode));
       loadHome();
     },
@@ -276,6 +281,8 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
               </>
             }
             homeView={homePanel.view}
+            onCloseHome={homePanel.close}
+            appliedTurns={appliedTurns}
             {...(reserve === undefined ? {} : { idle: <ReserveClock outlook={reserve} storm={gridDown} /> })}
             {...(session === undefined ? {} : { session })}
             {...(studioVoice === undefined ? {} : { studioVoice })}

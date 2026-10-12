@@ -99,7 +99,7 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
     const confirmation = confirmationFor(card);
     bridge.oncalltool = async ({ name, arguments: args }) => {
       const result = await answerCardCall({ name, arguments: args }, card, { agent, turnId, log, confirmation });
-      if (result.isError !== true) onCardActionRef.current?.(name);
+      if (result.isError !== true) onCardActionRef.current?.(name, turnId, result.structuredContent);
       return result;
     };
     const transport = new FrameTransport(frame, window, (reason) => {

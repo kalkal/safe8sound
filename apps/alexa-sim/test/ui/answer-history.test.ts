@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANSWER_HISTORY_MAX, addAnswer, currentAnswer, emptyHistory, historyPosition, stepAnswer } from '../../src/ui/answer-history.js';
+import { ANSWER_HISTORY_MAX, addAnswer, backToStart, currentAnswer, emptyHistory, historyPosition, stepAnswer } from '../../src/ui/answer-history.js';
 
 // Owner's choice (10 Oct): the screen shows one answer at a time; Previous / Next go through the earlier ones.
 
@@ -40,5 +40,15 @@ describe('answer history', () => {
     expect(h.turns).toHaveLength(ANSWER_HISTORY_MAX);
     expect(h.turns[0]).toBe('t3');
     expect(currentAnswer(h)).toBe(`t${String(ANSWER_HISTORY_MAX + 2)}`);
+  });
+
+  it('Back from the first answer (idea 5): the first screen, no answer shown, every answer kept', () => {
+    let h = backToStart(addAnswer(addAnswer(emptyHistory, 't1'), 't2'));
+    expect(currentAnswer(h)).toBeUndefined();
+    expect(historyPosition(h)).toBeUndefined();
+    expect(h.turns).toEqual(['t1', 't2']);
+    h = addAnswer(h, 't3');
+    expect(currentAnswer(h)).toBe('t3');
+    expect(historyPosition(h)).toEqual({ n: 3, of: 3, hasPrevious: true, hasNext: false });
   });
 });

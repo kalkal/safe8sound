@@ -38,6 +38,15 @@ export const enUS = {
   'answers.previousShort': 'Previous',
   'answers.nextShort': 'Next',
   'answers.position': 'Answer {n} of {of}',
+  // "Back" always there and the path of the steps (idea 5): the button's label is what a person would say.
+  'nav.back': 'Back',
+  /** Said aloud only: the other way to ask for Back. */
+  'nav.backUtterance': 'Go back',
+  'steps.list': 'Steps',
+  'steps.conversation': 'Conversation',
+  'steps.home': 'Home',
+  'steps.plan': 'Plan',
+  'steps.confirm': 'Confirm',
   'voice.speak': 'Speak',
   'voice.stop': 'Stop listening',
   'voice.listening': 'Listening…',
