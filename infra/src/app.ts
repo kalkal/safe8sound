@@ -3,6 +3,7 @@ import { AwsSolutionsChecks } from 'cdk-nag';
 import type { Construct } from 'constructs';
 import type { InfraConfig, StageName } from './config.js';
 import { AgentStack } from './agent-stack.js';
+import { AlexaStack } from './alexa-stack.js';
 import { DataStack } from './data-stack.js';
 import { McpStack } from './mcp-stack.js';
 import { SimApiStack } from './sim-api-stack.js';
@@ -19,7 +20,8 @@ export class FoundationStack extends Stack {
 }
 
 export class ColdReserveStage extends Stage {
-  constructor(scope: Construct, stageName: StageName, config: InfraConfig, siteDir: string) {
+  /** `alexaSkillId`: given at deploy time only (`-c alexaSkillId=...`); without it no skill function is created (#26). */
+  constructor(scope: Construct, stageName: StageName, config: InfraConfig, siteDir: string, alexaSkillId?: string) {
     super(scope, stageName, { env: { region: config.region } });
     const common = (name: string) => ({
       stackName: `cold-reserve-${stageName}-${name}`,
@@ -49,6 +51,10 @@ export class ColdReserveStage extends Stage {
       simApiUrl: simApi.functionUrl,
       originSecretParameter: config.simApi.originSecretParameter.replace('{stage}', stageName),
     });
+    // The classic Alexa skill (#26): only with a skill ID, and only on the stages the config names.
+    if (alexaSkillId !== undefined && config.alexa.stages.includes(stageName)) {
+      new AlexaStack(this, 'alexa-skill', { ...common('alexa-skill'), stage: stageName, alexa: config.alexa, skillId: alexaSkillId, mcpFunctionUrl: mcp.functionUrl });
+    }
   }
 }
 
@@ -58,8 +64,11 @@ export function applyGuardrails(app: App): App {
   return app;
 }
 
-/** `siteDir`: the built simulator (`pnpm --filter @cold-reserve/alexa-sim build:aws`), uploaded by each stage's web stack. */
-export function buildApp(app: App, config: InfraConfig, siteDir: string): App {
-  for (const stage of config.stages) new ColdReserveStage(app, stage, config, siteDir);
+/**
+ * `siteDir`: the built simulator (`pnpm --filter @cold-reserve/alexa-sim build:aws`), uploaded by each stage's web stack.
+ * `alexaSkillId`: the classic skill's ID (#26), from the command line only; absent, no stage gets the skill function.
+ */
+export function buildApp(app: App, config: InfraConfig, siteDir: string, alexaSkillId?: string): App {
+  for (const stage of config.stages) new ColdReserveStage(app, stage, config, siteDir, alexaSkillId);
   return applyGuardrails(app);
 }

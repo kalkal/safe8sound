@@ -1,0 +1,53 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "safe eight sound",
+      "intents": [
+        {
+          "name": "ReserveOutlookIntent",
+          "slots": [],
+          "samples": [
+            "how long the reserve lasts",
+            "how long does the reserve last",
+            "how long will the reserve last",
+            "how long will the battery last",
+            "how long does the battery last",
+            "how many hours are left",
+            "how many hours do we have",
+            "how much reserve is left",
+            "how much reserve do we have",
+            "what is the reserve",
+            "what's the reserve",
+            "the reserve",
+            "reserve outlook",
+            "how long can we keep cool"
+          ]
+        },
+        {
+          "name": "SafeRoomIntent",
+          "slots": [],
+          "samples": [
+            "how the safe room is doing",
+            "how is the safe room doing",
+            "how is the safe room",
+            "how hot is the safe room",
+            "is the safe room safe",
+            "is the safe room ok",
+            "how long is the safe room safe",
+            "how long does the safe room stay safe",
+            "what about the safe room",
+            "the safe room",
+            "safe room status",
+            "check the safe room"
+          ]
+        },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.NavigateHomeIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] }
+      ],
+      "types": []
+    }
+  }
+}

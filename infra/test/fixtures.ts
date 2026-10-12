@@ -10,6 +10,7 @@ export const exampleConfig = (): InfraConfig => ({
   region: 'us-east-1',
   stages: ['dev', 'demo'],
   turnTiming: { agentDeadlineMs: 12_000, agentMarginMs: 2000, browserTimeoutMs: 16_000, turnBudgetMs: 18_000 },
+  alexa: { stages: ['dev'], tokenParameter: '/cold-reserve/{stage}/alexa-skill/mcp-token', memoryMb: 256, timeoutSeconds: 7, logRetentionDays: 14, deadlineMs: 6000, ssmTimeoutMs: 1500, mcpTimeoutMs: 4000, tempUnit: 'C' },
   mcp: {
     clientsParameter: '/cold-reserve/{stage}/mcp-server/clients',
     memoryMb: 512,

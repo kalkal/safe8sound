@@ -61,17 +61,17 @@ export function logSourceEvent(logger: Logger, homeId: HomeId): (event: SourceEv
 }
 
 /**
- * The client scopes at start-up (#233): how many grants are agent, cards, phone or unscoped, counts only. After a
+ * The client scopes at start-up (#233): how many grants are agent, cards, phone, read or unscoped, counts only. After a
  * deploy it shows whether the agent:/cards: prefixes in the SSM client list took.
  */
 export function logClientScopes(config: ServerConfig, logger: Logger): void {
-  const counts = { agent: 0, cards: 0, phone: 0, unscoped: 0 };
+  const counts = { agent: 0, cards: 0, phone: 0, read: 0, unscoped: 0 };
   for (const grant of config.clients.values()) counts[grant.scope ?? 'unscoped'] += 1;
   logger.log({
     ts: new Date().toISOString(),
     level: 'info',
     component: 'mcp-server',
-    message: `Client scopes: ${String(counts.agent)} agent, ${String(counts.cards)} cards, ${String(counts.phone)} phone, ${String(counts.unscoped)} unscoped.`,
+    message: `Client scopes: ${String(counts.agent)} agent, ${String(counts.cards)} cards, ${String(counts.phone)} phone, ${String(counts.read)} read, ${String(counts.unscoped)} unscoped.`,
     correlationId: 'startup',
     details: { event: 'client_scopes', ...counts },
   });

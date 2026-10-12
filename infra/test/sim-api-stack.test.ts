@@ -242,7 +242,7 @@ describe('the app wires the sim-api stack in every stage', () => {
   it('reads its section from the CDK context, and refuses a config without it', () => {
     const config = exampleConfig();
     const context = (simApi: unknown) => (key: string) =>
-      ({ 'cold-reserve:region': config.region, 'cold-reserve:stages': config.stages, 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': config.agent, 'cold-reserve:simApi': simApi, 'cold-reserve:turnTiming': config.turnTiming })[key];
+      ({ 'cold-reserve:region': config.region, 'cold-reserve:stages': config.stages, 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': config.agent, 'cold-reserve:simApi': simApi, 'cold-reserve:turnTiming': config.turnTiming, 'cold-reserve:alexa': config.alexa })[key];
     expect(loadInfraConfig(context(config.simApi))).toEqual({ ok: true, value: config });
     expect(loadInfraConfig(context(undefined))).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });

@@ -119,7 +119,7 @@ describe('agent stack: the agent on AgentCore Runtime (G1b)', () => {
 
 describe('loadInfraConfig for the agent settings', () => {
   const context = (agent: unknown) => (key: string) =>
-    ({ 'cold-reserve:region': config.region, 'cold-reserve:stages': config.stages, 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': agent, 'cold-reserve:simApi': config.simApi, 'cold-reserve:turnTiming': config.turnTiming })[key];
+    ({ 'cold-reserve:region': config.region, 'cold-reserve:stages': config.stages, 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': agent, 'cold-reserve:simApi': config.simApi, 'cold-reserve:turnTiming': config.turnTiming, 'cold-reserve:alexa': config.alexa })[key];
 
   it('reads them from the CDK context', () => {
     expect(loadInfraConfig(context(config.agent))).toEqual({ ok: true, value: config });

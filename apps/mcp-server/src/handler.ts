@@ -27,7 +27,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { z } from 'zod';
 import { bearerAuthenticator } from './auth.js';
-import type { ServerConfig } from './config.js';
+import { READ_SCOPE_TOOLS, type ServerConfig } from './config.js';
 import type { ModuleRegistry, UiResource } from './registry.js';
 import type { Sandboxes } from './sandboxes.js';
 import { listTool, type HintedError, type ToolContext, type ToolDefinition } from './tool.js';
@@ -334,6 +334,22 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       });
       return problem(error, correlationId);
     }
+    // #26: a read-scoped client (the classic Alexa skill) calls only the read tools of READ_SCOPE_TOOLS, batches included.
+    if (grant.scope === 'read' && callsOutside(body, READ_SCOPE_TOOLS)) {
+      const error = toolError('wrong_client', 'This client may call only the read tools.');
+      deps.logger.log({
+        ts: new Date().toISOString(),
+        level: 'warn',
+        component: 'mcp-server',
+        code: error.code,
+        category: error.category,
+        message: error.message,
+        correlationId,
+        clientId: grant.clientId,
+        details: { event: 'read_client_call_refused' },
+      });
+      return problem(error, correlationId);
+    }
     const ctx: ToolContext = { correlationId, clientId: grant.clientId, homeId, ...(turn.value === undefined ? {} : { turnId: turn.value }) };
     const server = buildServer(ctx);
     // Stateless: no sessionIdGenerator (the documented `undefined` breaks exactOptionalPropertyTypes).
@@ -366,6 +382,21 @@ function isToolCall(body: string): boolean {
     return Array.isArray(parsed) ? parsed.some(isCall) : isCall(parsed);
   } catch {
     // Not JSON: the transport refuses it anyway, before any tool runs.
+    return false;
+  }
+}
+
+/** Whether the body (one message or a batch) holds a tools/call for a tool outside `allowed`. Not JSON: no call. */
+function callsOutside(body: string, allowed: ReadonlySet<string>): boolean {
+  const outside = (message: unknown) => {
+    if (typeof message !== 'object' || message === null || (message as { method?: unknown }).method !== 'tools/call') return false;
+    const name = (message as { params?: { name?: unknown } }).params?.name;
+    return typeof name !== 'string' || !allowed.has(name);
+  };
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return Array.isArray(parsed) ? parsed.some(outside) : outside(parsed);
+  } catch {
     return false;
   }
 }

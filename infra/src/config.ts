@@ -59,6 +59,37 @@ export const AgentConfigSchema = z.strictObject({
 });
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 
+/**
+ * The classic Alexa skill bridge (#26): a thin Lambda that calls the MCP server with its own `read:alexa@demo` token.
+ * Only the token parameter NAME lives here; the skill ID is given at deploy time (`-c alexaSkillId=...`), never
+ * committed, and without it the stack is not created at all.
+ */
+export const AlexaConfigSchema = z
+  .strictObject({
+    /** The stages that get the skill function when a skill ID is given. */
+    stages: z.array(StageNameSchema).min(1),
+    /** SSM SecureString with the skill's MCP token, under `/<project>/{stage}/alexa-skill/`. */
+    tokenParameter: z.string().regex(/^\/[a-z0-9-]+\/\{stage\}\/alexa-skill\/[A-Za-z0-9_.-]+$/),
+    memoryMb: z.number().int().min(128).max(10_240),
+    /** Alexa waits 8 s for the skill: the function stops before. */
+    timeoutSeconds: z.number().int().min(1).max(7),
+    logRetentionDays: z.enum(RetentionDays),
+    /** Optional, as for the other functions: a new account cannot reserve any until the quota is raised. */
+    reservedConcurrency: positiveInt.optional(),
+    /** The latency budget of one request: the whole request, the SSM read inside it, the MCP call inside it. */
+    deadlineMs: positiveInt,
+    ssmTimeoutMs: positiveInt,
+    mcpTimeoutMs: positiveInt,
+    /** The unit the skill says temperatures in (the demo home's own). */
+    tempUnit: z.enum(['C', 'F']),
+  })
+  .refine((a) => a.ssmTimeoutMs + a.mcpTimeoutMs <= a.deadlineMs, { path: ['deadlineMs'], message: 'The SSM read and the MCP call must fit in the deadline.' })
+  .refine((a) => a.deadlineMs < a.timeoutSeconds * 1000, { path: ['timeoutSeconds'], message: 'The function must outlive the deadline, so Alexa always gets our answer.' });
+export type AlexaConfig = z.infer<typeof AlexaConfigSchema>;
+
+/** An Alexa skill ID (`amzn1.ask.skill.<uuid>`), given only on the command line at deploy time. */
+export const AlexaSkillIdSchema = z.string().regex(/^amzn1\.ask\.skill\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+
 const simApiParameter = z.string().regex(/^\/[a-z0-9-]+\/\{stage\}\/sim-api\/[A-Za-z0-9_.-]+$/);
 /** An exact origin: scheme, host and optional port, no path (CORS compares origins exactly). */
 const origin = z.url().refine((u) => new URL(u).origin === u, { message: 'An origin has no path or trailing slash.' });
@@ -150,6 +181,7 @@ export const InfraConfigSchema = z.strictObject({
   agent: AgentConfigSchema,
   simApi: SimApiConfigSchema,
   turnTiming: TurnTimingSchema,
+  alexa: AlexaConfigSchema,
 })
   .superRefine((c, ctx) => {
     // The sim-api worst case (Copilot on #156): the SSM reads at a cold start, two DynamoDB calls with every
@@ -191,10 +223,11 @@ export function loadInfraConfig(context: (key: string) => unknown): Result<Infra
     agent: context('cold-reserve:agent'),
     simApi: context('cold-reserve:simApi'),
     turnTiming: context('cold-reserve:turnTiming'),
+    alexa: context('cold-reserve:alexa'),
   });
   if (parsed.success) return ok(parsed.data);
   return err(
-    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp, :state, :agent or :simApi.', {
+    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp, :state, :agent, :simApi, :turnTiming or :alexa.', {
       details: { issues: parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message.slice(0, 200) })) },
     }),
   );

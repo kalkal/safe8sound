@@ -14,7 +14,7 @@ const stacksOf = (app: App) => app.node.findAll().filter((c): c is Stack => Stac
 
 describe('loadInfraConfig (region and stages always from config)', () => {
   it('reads the cdk.json context', () => {
-    const context: Record<string, unknown> = { 'cold-reserve:region': 'us-east-1', 'cold-reserve:stages': ['dev', 'demo'], 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': config.agent, 'cold-reserve:simApi': config.simApi, 'cold-reserve:turnTiming': config.turnTiming };
+    const context: Record<string, unknown> = { 'cold-reserve:region': 'us-east-1', 'cold-reserve:stages': ['dev', 'demo'], 'cold-reserve:mcp': config.mcp, 'cold-reserve:state': config.state, 'cold-reserve:agent': config.agent, 'cold-reserve:simApi': config.simApi, 'cold-reserve:turnTiming': config.turnTiming, 'cold-reserve:alexa': config.alexa };
     expect(loadInfraConfig((key) => context[key])).toEqual({ ok: true, value: config });
   });
 

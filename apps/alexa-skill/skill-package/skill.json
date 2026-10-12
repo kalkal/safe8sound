@@ -1,0 +1,39 @@
+{
+  "manifest": {
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "Safe-8-Sound",
+          "summary": "Asks a simulated demo home how long its battery reserve keeps the safe room comfortable.",
+          "description": "Development skill of the Safe-8-Sound hackathon project. It reads a simulated demo home through the project's MCP server: the battery level, the reserve in hours and the safe room. Read-only: it never changes anything in the home.",
+          "examplePhrases": [
+            "Alexa, open safe eight sound",
+            "Alexa, ask safe eight sound how long the reserve lasts",
+            "Alexa, ask safe eight sound how the safe room is doing"
+          ],
+          "keywords": ["battery", "heat", "storm"]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "distributionCountries": ["US"],
+      "category": "SMART_HOME",
+      "testingInstructions": "Development only. The endpoint is the AlexaSkillFunctionArn output of the cold-reserve alexa-skill stack, set in the developer console."
+    },
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "arn:aws:lambda:us-east-1:000000000000:function:REPLACE-WITH-AlexaSkillFunctionArn"
+        },
+        "interfaces": []
+      }
+    }
+  }
+}

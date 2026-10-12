@@ -1,0 +1,18 @@
+{
+  "name": "@cold-reserve/alexa-skill",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Thin bridge from a classic Alexa custom skill to the MCP server: fixed English answers, no model.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*",
+    "@cold-reserve/i18n": "workspace:*",
+    "@cold-reserve/ssm-parameters": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.30.1",
+    "zod": "catalog:"
+  }
+}

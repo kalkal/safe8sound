@@ -11,6 +11,7 @@ export interface ClientGrant {
    * never a tool; listed in MCP_CLIENTS as `phone:<client>@<homeId>=<token>`, revocable on its own.
    * `agent`: the MCP endpoint, and every tool call names its turn (x-cold-reserve-turn), so the agent never passes for
    * the person's tap. `cards`: the MCP endpoint for card actions (sim-api), which never name a turn (#233).
+   * `read`: the MCP endpoint for the three read tools of READ_SCOPE_TOOLS only (the classic Alexa skill, #26).
    */
   readonly scope?: ClientScope;
 }
@@ -36,8 +37,11 @@ export interface ServerConfig {
   readonly protectedResource?: { readonly resource: string; readonly authorizationServers: readonly string[] };
 }
 
-export type ClientScope = 'phone' | 'agent' | 'cards';
-const SCOPES: readonly string[] = ['phone', 'agent', 'cards'] satisfies ClientScope[];
+export type ClientScope = 'phone' | 'agent' | 'cards' | 'read';
+const SCOPES: readonly string[] = ['phone', 'agent', 'cards', 'read'] satisfies ClientScope[];
+
+/** #26: the only tools a `read:` client (the classic Alexa skill) may call; written by hand, never derived from annotations. */
+export const READ_SCOPE_TOOLS: ReadonlySet<string> = new Set(['get_home_status', 'get_reserve_outlook', 'get_safe_room_status']);
 
 const MIN_TOKEN_LENGTH = 32;
 const CLIENT_ID = /^[a-z][a-z0-9-]{0,31}$/;
@@ -47,7 +51,7 @@ const DEFAULT_METRICS_NAMESPACE = 'ColdReserve/Mcp';
 const invalid = (message: string) => err(toolError('invalid_config', message));
 
 /**
- * Parses `MCP_CLIENTS` = `[phone:|agent:|cards:]<client>@<homeId>=<token>,...` (locally from `.env`, on Lambda from SSM).
+ * Parses `MCP_CLIENTS` = `[phone:|agent:|cards:|read:]<client>@<homeId>=<token>,...` (locally from `.env`, on Lambda from SSM).
  * Error messages name the client or the entry, never the token.
  */
 export function parseClients(raw: string | undefined): Result<ReadonlyMap<string, ClientGrant>, ErrorEnvelope> {
