@@ -26,10 +26,16 @@ let failContainer = false;
 function start(app: string, entry: string, env: Record<string, string>, found: (line: string) => string | undefined): Promise<string> {
   const child = spawn(process.execPath, ['--import', 'tsx', `src/${entry}`], { cwd: `${APPS}${app}`, env: { ...process.env, PORT: '0', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
   children.push(child);
+  // The apps log to stdout (#143): on a failed start, the error shows the last of it.
+  let seen = '';
+  const tail = () => (seen === '' ? '' : `; last output:\n${seen}`);
+  child.stdout.on('data', (d: Buffer) => {
+    seen = (seen + String(d)).slice(-2000);
+  });
   child.stderr.on('data', (d: Buffer) => process.stderr.write(`[${app}] ${String(d)}`));
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`${app} did not start within 40 s`));
+      reject(new Error(`${app} did not start within 40 s${tail()}`));
     }, 40_000);
     child.stdout.on('data', (d: Buffer) => {
       for (const line of String(d).split('\n')) {
@@ -40,7 +46,7 @@ function start(app: string, entry: string, env: Record<string, string>, found: (
       }
     });
     child.once('exit', (code) => {
-      reject(new Error(`${app} exited early with ${String(code)}`));
+      reject(new Error(`${app} exited early with ${String(code)}${tail()}`));
     });
   });
 }

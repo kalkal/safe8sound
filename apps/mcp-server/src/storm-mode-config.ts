@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { StormIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Preferences, type Result, type StormId } from '@cold-reserve/contracts';
-import type { Clock, DeviceAdapter, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, DeviceAdapter, StateStoreFactory, StoreScope } from '@cold-reserve/core';
 import { createInAppNotifier, type InAppNotifier } from '@cold-reserve/notifier-inapp';
 import { createSimulatedDevices } from '@cold-reserve/source-simulator';
 import type { GuardConfig } from '@cold-reserve/guard';
@@ -16,7 +16,8 @@ import { defaultPreferencesFor, type PreferencesConfig } from './preferences-con
 
 export interface StormModeWiring {
   readonly storeFor: StateStoreFactory;
-  readonly preferencesFor: (homeId: HomeId, profile: HomeProfile) => Promise<Result<Preferences, ErrorEnvelope>>;
+  /** `scope`: the turn's correlation id, so a failing read is logged by the store with it (review of #354). */
+  readonly preferencesFor: (homeId: HomeId, profile: HomeProfile, scope: StoreScope) => Promise<Result<Preferences, ErrorEnvelope>>;
   readonly defaultPreferencesFor: (homeId: HomeId, profile: HomeProfile) => Result<Preferences, ErrorEnvelope>;
   readonly clock: Clock;
   readonly config: StormModeConfig;
@@ -46,8 +47,8 @@ export function stormModeWiring(opts: { storeFor: StateStoreFactory; preferences
   if (!phone.ok) return phone;
   return ok({
     storeFor: opts.storeFor,
-    preferencesFor: async (homeId, profile) => {
-      const saved = await opts.storeFor(homeId).getPreferences();
+    preferencesFor: async (homeId, profile, scope) => {
+      const saved = await opts.storeFor(homeId, scope).getPreferences();
       if (!saved.ok) return saved;
       return saved.value === undefined ? defaultPreferencesFor(opts.preferences, profile, homeId) : ok(saved.value);
     },

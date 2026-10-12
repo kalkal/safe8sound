@@ -62,7 +62,7 @@ interface Attempt {
 export async function loadInputs(deps: ComfortPlanDeps, ctx: ToolContext): Promise<Result<Inputs, ErrorEnvelope>> {
   const home = deps.homes(ctx.homeId);
   if (home === undefined) return err(toolError('home_not_found', 'This client is not linked to a configured home.'));
-  const [snapshot, preferences] = await Promise.all([home.source.snapshot(), deps.preferencesFor(ctx.homeId, home.profile)]);
+  const [snapshot, preferences] = await Promise.all([home.source.snapshot(), deps.preferencesFor(ctx.homeId, home.profile, { correlationId: ctx.correlationId })]);
   if (!snapshot.ok) return snapshot;
   if (!preferences.ok) return preferences;
   // Every projection reads the weather hour by hour: without one it cannot run, so say so as a value (#238).

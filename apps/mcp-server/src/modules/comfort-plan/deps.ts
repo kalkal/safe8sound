@@ -1,5 +1,5 @@
 import type { ErrorEnvelope, Forecast, HomeId, HomeProfile, Preferences, Result, TempUnit } from '@cold-reserve/contracts';
-import type { Clock, HomeDataSource, Logger, Notifier, SimParams, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, HomeDataSource, Logger, Notifier, SimParams, StateStoreFactory, StoreScope } from '@cold-reserve/core';
 import type { GuardConfig } from '@cold-reserve/guard';
 import type { ComfortPlanConfig } from './config.js';
 
@@ -32,7 +32,8 @@ export interface ComfortPlanDeps {
   /** F5's StateStore: plans (write once, conditional idempotent apply) and the guard's rejections. */
   readonly storeFor: StateStoreFactory;
   /** The saved preferences, or the config defaults for this home. */
-  readonly preferencesFor: (homeId: HomeId, profile: HomeProfile) => Promise<Result<Preferences, ErrorEnvelope>>;
+  /** `scope`: the turn's correlation id, so a failing read is logged by the store with it (review of #354). */
+  readonly preferencesFor: (homeId: HomeId, profile: HomeProfile, scope: StoreScope) => Promise<Result<Preferences, ErrorEnvelope>>;
   /** The store's clock: plan creation and expiry use the same time as the conditional write. */
   readonly clock: Clock;
   /** Projection physics (the simulator parameters, config). */

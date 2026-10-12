@@ -169,14 +169,12 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext, degrade = 
   const snapshot = await home.source.snapshot();
   if (!snapshot.ok) return snapshot;
   const unreachable: string[] = [];
-  const errorNames = new Set<string>();
   const canDegrade = (e: ErrorEnvelope, what: string): boolean => {
     if (!degrade || e.code !== 'store_unavailable') return false;
     unreachable.push(what);
-    errorNames.add(e.code);
     return true;
   };
-  let preferences = await deps.preferencesFor(ctx.homeId, home.profile);
+  let preferences = await deps.preferencesFor(ctx.homeId, home.profile, { correlationId: ctx.correlationId });
   if (!preferences.ok && canDegrade(preferences.error, 'preferences')) preferences = deps.defaultPreferencesFor(ctx.homeId, home.profile);
   if (!preferences.ok) return preferences;
   const safeRoomId = preferences.value.safeRoomId;
@@ -200,8 +198,9 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext, degrade = 
       code: 'store_unavailable',
       category: 'dependency_unavailable',
       ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
-      // #342: the error name of the reads that failed; never the sandbox id or a key.
-      details: { event: 'storm_read_degraded', unreachable: unreachable.join(','), errorName: [...errorNames].join(','), ...homeDetail(ctx.homeId) },
+      // #344: which reads failed, never the sandbox id or a key. The code is the line's own `code` (only
+      // store_unavailable degrades); the cause's name is on the store's onError line, with the same correlation id.
+      details: { event: 'storm_read_degraded', unreachable: unreachable.join(','), ...homeDetail(ctx.homeId) },
     });
   }
   return ok({

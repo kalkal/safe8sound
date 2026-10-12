@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { PROBLEM_JSON_CONTENT_TYPE, toProblemDetails, toolError, type ErrorEnvelope, type HttpErrorStatus } from '@cold-reserve/contracts';
+import { causeFields, type Logger } from '@cold-reserve/core';
 import type { McpHandler } from './handler.js';
+import { stdoutLogger } from './stdout-logger.js';
 
 export interface RunningServer {
   readonly url: string;
@@ -15,10 +17,11 @@ export interface NodeServerOptions {
   readonly path: string;
   /** Reading stops as soon as the body goes past this size (413). */
   readonly maxBodyBytes: number;
+  /** Where the last-resort line goes (#143); one JSON line on stdout by default. */
+  readonly logger?: Logger;
 }
 
-function sendProblem(res: ServerResponse, error: ErrorEnvelope, status?: HttpErrorStatus, headers: Record<string, string> = {}) {
-  const correlationId = randomUUID();
+function sendProblem(res: ServerResponse, error: ErrorEnvelope, status?: HttpErrorStatus, headers: Record<string, string> = {}, correlationId: string = randomUUID()) {
   const body = toProblemDetails(error, { instance: `urn:uuid:${correlationId}`, ...(status === undefined ? {} : { status }) });
   if (!res.headersSent) res.writeHead(body.status, { 'content-type': PROBLEM_JSON_CONTENT_TYPE, 'x-correlation-id': correlationId, ...headers });
   res.end(JSON.stringify(body));
@@ -66,6 +69,7 @@ function localUrl(target: string | undefined, host: string, server: { address():
 }
 
 export function startNodeServer(handle: McpHandler, options: NodeServerOptions): Promise<RunningServer> {
+  const logger = options.logger ?? stdoutLogger();
   const server = createServer((req, res) => {
     void (async () => {
       const method = req.method ?? 'GET';
@@ -84,9 +88,20 @@ export function startNodeServer(handle: McpHandler, options: NodeServerOptions):
       res.writeHead(response.status, Object.fromEntries(response.headers));
       res.end(Buffer.from(await response.arrayBuffer()));
     })().catch((error: unknown) => {
-      // Last-resort boundary: log once and answer a Problem Details 500 without internals.
-      console.error(JSON.stringify({ level: 'error', component: 'mcp-server', code: 'unexpected_error', message: error instanceof Error ? error.name : 'unknown' }));
-      sendProblem(res, toolError('unexpected_error', 'The server hit an unexpected error.'));
+      // Last-resort boundary: log once, with the answer's correlation id and the error class (never its text),
+      // and answer a Problem Details 500 without internals.
+      const correlationId = randomUUID();
+      logger.log({
+        ts: new Date().toISOString(),
+        level: 'error',
+        component: 'mcp-server',
+        message: 'unhandled error in the local HTTP adapter',
+        correlationId,
+        code: 'unexpected_error',
+        category: 'internal',
+        ...causeFields(error, { withStack: false }),
+      });
+      sendProblem(res, toolError('unexpected_error', 'The server hit an unexpected error.'), undefined, {}, correlationId);
     });
   });
   server.keepAliveTimeout = 5_000;

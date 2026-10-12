@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { err, ok, toolError, type ErrorEnvelope, type HomeId, type HomeProfile, type Preferences, type Result } from '@cold-reserve/contracts';
-import type { Clock, Notifier, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, Notifier, StateStoreFactory, StoreScope } from '@cold-reserve/core';
 import { parseGuardConfig, type GuardConfig } from '@cold-reserve/guard';
 import guardFile from '@cold-reserve/guard/config/guard.json' with { type: 'json' };
 import file from '../config/comfort-plan.json' with { type: 'json' };
@@ -25,7 +25,8 @@ export function loadComfortPlanConfig(): Result<{ comfort: ComfortPlanConfig; gu
 
 export interface ComfortPlanWiring {
   readonly storeFor: StateStoreFactory;
-  readonly preferencesFor: (homeId: HomeId, profile: HomeProfile) => Promise<Result<Preferences, ErrorEnvelope>>;
+  /** `scope`: the turn's correlation id, so a failing read is logged by the store with it (review of #354). */
+  readonly preferencesFor: (homeId: HomeId, profile: HomeProfile, scope: StoreScope) => Promise<Result<Preferences, ErrorEnvelope>>;
   readonly clock: Clock;
   readonly config: ComfortPlanConfig;
   readonly guard: GuardConfig;
@@ -42,8 +43,8 @@ export function comfortPlanWiring(opts: { storeFor: StateStoreFactory; preferenc
   if (!config.ok) return config;
   return ok({
     storeFor: opts.storeFor,
-    preferencesFor: async (homeId, profile) => {
-      const saved = await opts.storeFor(homeId).getPreferences();
+    preferencesFor: async (homeId, profile, scope) => {
+      const saved = await opts.storeFor(homeId, scope).getPreferences();
       if (!saved.ok) return saved;
       return saved.value === undefined ? defaultPreferencesFor(opts.preferences, profile, homeId) : ok(saved.value);
     },

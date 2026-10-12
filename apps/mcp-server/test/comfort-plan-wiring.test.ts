@@ -39,11 +39,11 @@ describe('comfort-plan wiring', () => {
     const wiring = comfortPlanWiring({ storeFor, preferences: prefs(), clock, notifier: quietNotifier });
     if (!wiring.ok) throw new Error(wiring.error.message);
     const demo = HomeIdSchema.parse('demo');
-    const defaults = await wiring.value.preferencesFor(demo, demoProfile());
+    const defaults = await wiring.value.preferencesFor(demo, demoProfile(), {});
     expect(defaults.ok && defaults.value.safeRoomId).toBe('bedroom-1');
     const saved = PreferencesSchema.parse({ ...examplePreferences(), comfortC: { cooling: 24, heating: 20 } });
     await storeFor(demo).putPreferences(saved, []);
-    const read = await wiring.value.preferencesFor(demo, demoProfile());
+    const read = await wiring.value.preferencesFor(demo, demoProfile(), {});
     expect(read.ok && read.value.comfortC.cooling).toBe(24);
   });
 

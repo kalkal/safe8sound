@@ -34,7 +34,7 @@ function start(app: string, env: Record<string, string>): Promise<string> {
   child.stderr.on('data', (d: Buffer) => process.stderr.write(`[${app}] ${String(d)}`));
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`${app} did not start within 40 s`));
+      reject(new Error(`${app} did not start within 40 s; last output:\n${(stdout[app] ?? '').slice(-2000)}`));
     }, 40_000);
     child.stdout.on('data', (d: Buffer) => {
       // The URL ends at the closing quote of the JSON message, wherever the message sits in the line.
@@ -45,7 +45,7 @@ function start(app: string, env: Record<string, string>): Promise<string> {
       }
     });
     child.once('exit', (code) => {
-      reject(new Error(`${app} exited early with ${String(code)}`));
+      reject(new Error(`${app} exited early with ${String(code)}; last output:\n${(stdout[app] ?? '').slice(-2000)}`));
     });
   });
 }

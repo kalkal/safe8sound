@@ -1,5 +1,5 @@
 import type { ErrorEnvelope, HomeId, HomeProfile, Preferences, Result, StormId } from '@cold-reserve/contracts';
-import type { Clock, DeviceAdapter, Logger, Notifier, SimParams, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, DeviceAdapter, Logger, Notifier, SimParams, StateStoreFactory, StoreScope } from '@cold-reserve/core';
 import type { GuardConfig } from '@cold-reserve/guard';
 import type { ComfortPlanConfig } from '../comfort-plan/config.js';
 import type { ComfortHome } from '../comfort-plan/deps.js';
@@ -14,7 +14,8 @@ export interface StormModeDeps {
   /** F5's StateStore: the storm sessions, and the saved preferences through `preferencesFor`. */
   readonly storeFor: StateStoreFactory;
   /** The saved preferences (safe room, thresholds, contacts, language), or the config defaults. */
-  readonly preferencesFor: (homeId: HomeId, profile: HomeProfile) => Promise<Result<Preferences, ErrorEnvelope>>;
+  /** `scope`: the turn's correlation id, so a failing read is logged by the store with it (review of #354). */
+  readonly preferencesFor: (homeId: HomeId, profile: HomeProfile, scope: StoreScope) => Promise<Result<Preferences, ErrorEnvelope>>;
   /** The config defaults alone, for the read-only status when the store cannot be reached (#114). */
   readonly defaultPreferencesFor: (homeId: HomeId, profile: HomeProfile) => Result<Preferences, ErrorEnvelope>;
   /** Wall clock of the sessions and the messages; the same clock as the store's TTL. */

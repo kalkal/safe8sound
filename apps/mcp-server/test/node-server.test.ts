@@ -1,4 +1,5 @@
-import { ProblemDetailsSchema } from '@cold-reserve/contracts';
+import { LogEntrySchema, ProblemDetailsSchema } from '@cold-reserve/contracts';
+import { memoryLogger } from '@cold-reserve/core';
 import { request } from 'node:http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startNodeServer, type RunningServer } from '../src/node-server.js';
@@ -27,16 +28,19 @@ describe('startNodeServer (local entry adapter)', () => {
   });
 
   it('turns a handler crash into a valid 500 Problem Details with a correlation id, without internals', async () => {
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    server = await startNodeServer(() => Promise.reject(new Error('boom at /secret/path.ts')), { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: 100 });
+    const logger = memoryLogger();
+    server = await startNodeServer(() => Promise.reject(new Error('boom at /secret/path.ts')), { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: 100, logger });
     const res = await fetch(server.url, { method: 'POST', body: '{}' });
     expect(res.status).toBe(500);
     const body = ProblemDetailsSchema.parse(await res.json());
     expect(body).toMatchObject({ code: 'unexpected_error', status: 500 });
-    expect(body.instance).toBe(`urn:uuid:${res.headers.get('x-correlation-id') ?? ''}`);
+    const correlationId = res.headers.get('x-correlation-id') ?? '';
+    expect(body.instance).toBe(`urn:uuid:${correlationId}`);
     expect(JSON.stringify(body)).not.toContain('/secret/path');
-    expect(errors).toHaveBeenCalledOnce();
-    errors.mockRestore();
+    // #143: one shared LogEntry line, with the answer's correlation id and the error class, never its text.
+    expect(logger.lines).toHaveLength(1);
+    expect(LogEntrySchema.parse(logger.lines[0])).toMatchObject({ level: 'error', component: 'mcp-server', code: 'unexpected_error', category: 'internal', correlationId, errorName: 'Error' });
+    expect(JSON.stringify(logger.lines)).not.toContain('/secret/path');
   });
 
   it('builds the request URL from the path and query only: an absolute request target cannot name another host (#149)', async () => {

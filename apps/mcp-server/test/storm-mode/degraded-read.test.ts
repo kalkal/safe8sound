@@ -31,9 +31,10 @@ describe('get_safe_room_status with the store down (#114)', () => {
     // The stricter night limit (24 °C) never gives more hours than the standard one.
     expect(degraded.value.safeHours).toBeLessThan(normal.value.safeHours);
     const degradedLines = w.logs.filter((l) => l.message === 'storm_read_degraded');
-    expect(degradedLines).toMatchObject([{ level: 'warn', correlationId: 'test-correlation', code: 'store_unavailable', details: { unreachable: 'preferences', errorName: 'store_unavailable' } }]);
-    // #342: the error name, never the sandbox id or a key.
-    expect(Object.keys(degradedLines[0]?.details ?? {}).sort()).toEqual(['errorName', 'event', 'unreachable']);
+    expect(degradedLines).toMatchObject([{ level: 'warn', correlationId: 'test-correlation', code: 'store_unavailable', details: { event: 'storm_read_degraded', unreachable: 'preferences' } }]);
+    // #344: what could not be read, never the sandbox id or a key; the code is the line's own `code`, and the cause's
+    // name is on the store's onError line with the same correlation id.
+    expect(Object.keys(degradedLines[0]?.details ?? {}).sort()).toEqual(['event', 'unreachable']);
     const text = safeRoomSummary(degraded.value);
     expect(text).toMatch(/^The saved settings and the storm state are not reachable right now: this is the live reading only\. /);
     expect(text).toContain('on the battery alone, at the stricter night limit for an older person, it would hold about');
@@ -72,6 +73,25 @@ describe('get_safe_room_status with the store down (#114)', () => {
     const gridUp = safeRoomSummary({ ...degraded.value, gridAvailable: true });
     expect(gridUp).toContain('The grid powers the safe room; on the battery alone it would hold about');
     expect(gridUp).not.toMatch(/stricter|older person/);
+  });
+
+  it('#344: in a neutral season (neither cooling nor heating) the hours are at the stricter older-person night limit', async () => {
+    const w = world(4);
+    const prefs = w.deps.defaultPreferencesFor(w.ctx.homeId, w.profile);
+    if (!prefs.ok) throw new Error(prefs.error.message);
+    // A mild week: the forecast stays strictly between the heating and the cooling comfort.
+    const mild = celsius((prefs.value.comfortC.heating + prefs.value.comfortC.cooling) / 2);
+    const neutral: StormModeDeps = {
+      ...w.deps,
+      homes: (h) => {
+        const home = w.deps.homes(h);
+        return home && { ...home, forecast: () => ({ ...home.forecast(), hourly: home.forecast().hourly.map((x) => ({ ...x, tempOutC: mild })) }) };
+      },
+    };
+    const degraded = await safeRoomStatus(storeDown(neutral), w.ctx);
+    if (!degraded.ok) throw new Error(degraded.error.message);
+    expect(degraded.value).toMatchObject({ storeUnavailable: true, stricterNightLimit: true });
+    expect(safeRoomSummary(degraded.value)).toContain('stricter night limit for an older person');
   });
 
   it('a storm session that cannot be read: the reading still comes, without a storm phase', async () => {
