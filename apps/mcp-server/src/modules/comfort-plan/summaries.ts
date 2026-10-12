@@ -87,6 +87,23 @@ function surplusText(s: NonNullable<Plan['surplus']>, opts: PlanSummaryOptions):
   );
 }
 
+const TIP_LOAD = { washing: 'run the washing machine', cooking: 'cook' } as const;
+const TIP_CYCLE = { eco: 'an eco', normal: 'a normal', quick: 'a quick' } as const;
+
+/**
+ * The household tip from the surplus (#219): the load, its cycle and the window from the projection, never a brand.
+ * Low forecast confidence: "probably", and no end time (owner decision of 4/10).
+ */
+function householdTipText(t: NonNullable<Plan['householdTip']>): string {
+  const from = localTimeText(t.windowFrom);
+  const advice = 'Advice only, nothing is switched on.';
+  if (t.probable) {
+    return `Probably a good time to ${TIP_LOAD[t.load]} from ${from}${t.cycle === undefined ? '' : `: ${TIP_CYCLE[t.cycle]} cycle should fit`}. ${advice}`;
+  }
+  const fits = t.cycle === undefined ? '' : `${TIP_CYCLE[t.cycle]} cycle fits; `;
+  return `Good time to ${TIP_LOAD[t.load]} from ${from}: ${fits}the sun should cover it until about ${localTimeText(t.windowTo)}. ${advice}`;
+}
+
 /** The wall-clock hour of a time already in the home's zone (localIso), read from the text itself. */
 function wallHour(iso: string): number {
   const m = /T(\d\d):(\d\d)/.exec(iso);
@@ -150,6 +167,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
     `${head} (${commanded}), built on ${dataText(p.sourceOrigin)}.`,
     `What it does: ${roomSettings(p, opts.roomNames, opts.unit ?? 'C')}.`,
     ...(p.surplus === undefined ? [] : [surplusText(p.surplus, opts)]),
+    ...(p.householdTip === undefined ? [] : [householdTipText(p.householdTip)]),
     `Confirming it also allows these steps down if the battery falls behind: ${p.ladder.map(rungText).join('; ')}.`,
     `Guarantees: ${p.guarantees.map((g) => `${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`).join(' ')}`,
     `Storm reserve ${one(p.reserveWh / 1000)} kWh${p.reserveFloorSocPct === undefined ? '' : `: the battery stays at or above ${one(p.reserveFloorSocPct)} % while the grid is up`}.`,

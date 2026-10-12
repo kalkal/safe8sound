@@ -80,6 +80,24 @@ export const PlanSurplusSchema = z
     if (new Set(s.rooms.map((r) => r.roomId)).size !== s.rooms.length) ctx.addIssue({ code: 'custom', path: ['rooms'], message: 'Each room appears once' });
   });
 
+/**
+ * A household tip from the solar surplus (#219, approved in #219): the longest load that fits the
+ * window where the plan, battery full, still exports enough. Advice only, never a plan step, never a brand. When
+ * `probable` (low forecast confidence) the text gives no end time.
+ */
+export const PlanHouseholdTipSchema = z
+  .strictObject({
+    load: z.enum(['washing', 'cooking']),
+    cycle: z.enum(['eco', 'normal', 'quick']).optional(),
+    windowFrom: IsoDateTimeSchema,
+    windowTo: IsoDateTimeSchema,
+    probable: z.boolean(),
+  })
+  .superRefine((t, ctx) => {
+    if (epochMs(t.windowTo) <= epochMs(t.windowFrom)) ctx.addIssue({ code: 'custom', path: ['windowTo'], message: 'The window ends after it starts' });
+    if ((t.load === 'washing') !== (t.cycle !== undefined)) ctx.addIssue({ code: 'custom', path: ['cycle'], message: 'A cycle for the washing machine only, and always' });
+  });
+
 export const PlanSchema = z
   .strictObject({
     schemaVersion: z.literal(PLAN_SCHEMA_VERSION),
@@ -132,6 +150,8 @@ export const PlanSchema = z
      * cooling only, with the battery unable to take more. The guard checked the whole plan with it.
      */
     surplus: PlanSurplusSchema.optional(),
+    /** A good time to run the washing machine or cook on the solar surplus (optional, additive, approved in #219). */
+    householdTip: PlanHouseholdTipSchema.optional(),
     lastResort: z
       .strictObject({
         safeUntil: IsoDateTimeSchema,

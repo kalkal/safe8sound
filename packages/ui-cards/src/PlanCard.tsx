@@ -92,7 +92,7 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss, 
       )}
     </Fragment>
   );
-  const notes = (plan.warnings ?? []).length > 0 || plan.advisoryOnly || lastResort === undefined;
+  const notes = (plan.warnings ?? []).length > 0 || plan.advisoryOnly || lastResort === undefined || plan.householdTip !== undefined;
   const pages = [
     first,
     ...(notes
@@ -106,6 +106,7 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss, 
               </p>
             ))}
             {plan.advisoryOnly && <p className="muted">{t('plan.advisory')}</p>}
+            {plan.householdTip !== undefined && <HouseholdTip tip={plan.householdTip} timeZone={timeZone} />}
           </Fragment>,
         ]
       : []),
@@ -115,6 +116,19 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss, 
     ...extraPages,
   ];
   return <CardShell title={t('plan.title')} origin={isSimulated(plan) ? 'simulated' : 'live'} pages={pages} />;
+}
+
+/**
+ * A good time to run the washing machine or cook on the solar surplus (#219): the plan's own window on the home
+ * clock, the voice's words. Only probable (low forecast confidence): no end time.
+ */
+function HouseholdTip({ tip, timeZone }: { tip: NonNullable<Plan['householdTip']>; timeZone: string }) {
+  const values = { from: homeClock(tip.windowFrom, timeZone), to: homeClock(tip.windowTo, timeZone), cycle: tip.cycle === undefined ? '' : t(`tipCycle.${tip.cycle}`) };
+  return (
+    <p className="muted" data-testid="household-tip">
+      {t(tip.probable ? `plan.tipProbable.${tip.load}` : `plan.tip.${tip.load}`, values)}
+    </p>
+  );
 }
 
 type Surplus = NonNullable<Plan['surplus']>;

@@ -24,6 +24,7 @@ import {
   safeRoomInStorm,
   stormPlan,
   stormReserveRefusal,
+  surplusPlan,
 } from '@cold-reserve/ui-cards';
 
 // Dev-only style lab (plan §11.1bis point 8): every card on contract fixtures, in the theme the host
@@ -75,6 +76,8 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       <SafeRoomCard status={{ ...safeRoomCalm(), storeUnavailable: true, stricterNightLimit: true }} />
       {/* #271: Leo, the grandpa, at night above the 24 °C night limit: the card says so instead of "comfortable". */}
       <SafeRoomCard status={safeRoomAboveNightLimit()} />
+      {/* #203, #219: an ordinary sunny afternoon: where the surplus went, and on the next page a good time for a wash. */}
+      <PlanCard plan={surplusPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
     </div>
   );
 }

@@ -42,6 +42,27 @@ export const ComfortPlanConfigSchema = z.strictObject({
         elderlyOffsetK: z.number().min(0).max(3),
       })
       .refine((s) => s.elderlyOffsetK <= s.offsetK, { message: 'The safe room with an elderly person is cooled no further than the others' }),
+    /**
+     * Household tip from the solar surplus (#219): the loads it may suggest, tried in this order (longest cycle
+     * first). Durations and powers are config with their sources in the file, never constants in code.
+     */
+    householdTip: z.strictObject({
+      $comment: z.string().optional(),
+      options: z
+        .array(
+          z
+            .strictObject({
+              load: z.enum(['washing', 'cooking']),
+              cycle: z.enum(['eco', 'normal', 'quick']).optional(),
+              durationH: z.number().positive().max(6),
+              meanW: z.number().positive().max(5_000),
+              peakW: z.number().positive().max(5_000),
+            })
+            .refine((o) => (o.load === 'washing') === (o.cycle !== undefined), { message: 'A cycle for the washing machine only, and always' })
+            .refine((o) => o.meanW <= o.peakW, { message: 'The mean draw is not above the peak' }),
+        )
+        .max(8),
+    }),
   }),
   /** Average load at each level for the reserve outlook; Essential comes from the guard config. */
   outlook: z.strictObject({

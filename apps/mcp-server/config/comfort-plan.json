@@ -48,6 +48,15 @@
       "socFullPct": 95,
       "offsetK": 2,
       "elderlyOffsetK": 1
+    },
+    "householdTip": {
+      "$comment": "#219: loads the surplus tip may suggest, tried in order; one fits when the final plan exports at least meanW for durationH with the battery at or above surplus.socFullPct, and peakW plus the planned load stays within the inverter limit. Sourced: eco 40-60 lasts about 3.75 h (EU product information sheets under Delegated Regulation (EU) 2019/2014 show 3 h 38 min to 3 h 49 min at rated capacity; Topten lists 228-235 min); heater peak about 2 kW (typically 1.5-2.2 kW, vendor guides). Owner estimates of 4/10, not sourced data: normal 2 h, quick 1 h, cooking 1 h. Assumptions to calibrate, not sourced: meanW (eco about 0.75 kWh per cycle, normal about 1 kWh, quick about 0.4 kWh, cooking about 1 kWh in the hour).",
+      "options": [
+        { "load": "washing", "cycle": "eco", "durationH": 3.75, "meanW": 200, "peakW": 2000 },
+        { "load": "washing", "cycle": "normal", "durationH": 2, "meanW": 500, "peakW": 2000 },
+        { "load": "washing", "cycle": "quick", "durationH": 1, "meanW": 400, "peakW": 2000 },
+        { "load": "cooking", "durationH": 1, "meanW": 1000, "peakW": 2000 }
+      ]
     }
   },
   "outlook": {

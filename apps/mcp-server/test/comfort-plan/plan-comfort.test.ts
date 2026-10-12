@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { holdSafeRoom } from '@cold-reserve/guard';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
-import { alignedNightWarning, guardFrame, loadInputs, planComfort, roomsText, warningsOf } from '../../src/modules/comfort-plan/plan-comfort.js';
+import { alignedNightWarning, guardFrame, householdTipBeside, householdTipToday, loadInputs, planComfort, roomsText, warningsOf } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { REAL, preferences, world } from './support.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
@@ -568,6 +568,60 @@ describe('solar surplus at home instead of on the grid (#203)', () => {
     expect(proposed.ok && proposed.value.surplus).toBeUndefined();
     const own = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     expect(own.ok && own.value.surplus).toBeDefined();
+  });
+});
+
+describe('household tip from the solar surplus (#219)', () => {
+  const planned = async (w: ReturnType<typeof world>, input: Parameters<typeof planComfort>[1] = { goal: 'cool' }) => {
+    const r = await planComfort(w.deps, input, w.ctx);
+    if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
+    return PlanSchema.parse(r.value);
+  };
+
+  it('the hot day at 2 PM, battery full: a configured load whose window, from the projection, is long enough and today', async () => {
+    const w = world('heatwave', 14);
+    const p = await planned(w);
+    const tip = p.householdTip;
+    if (tip === undefined) throw new Error('no household tip on the hot day');
+    const option = w.deps.config.planner.householdTip.options.find((o) => o.load === tip.load && o.cycle === tip.cycle);
+    expect(option).toBeDefined();
+    expect(Date.parse(tip.windowTo) - Date.parse(tip.windowFrom)).toBeGreaterThanOrEqual((option?.durationH ?? Infinity) * 3_600_000);
+    const inputs = await loadInputs(w.deps, w.ctx);
+    if (!inputs.ok) throw new Error(inputs.error.message);
+    expect(Date.parse(tip.windowFrom)).toBeGreaterThanOrEqual(Date.parse(inputs.value.snapshot.ts));
+    expect(tip.windowFrom).toMatch(/\+02:00$/);
+    expect(tip.windowFrom.slice(0, 10)).toBe(tip.windowTo.slice(0, 10));
+    expect(tip.probable).toBe(p.forecastConfidence === 'low');
+    // Advice only: no step for the load.
+    expect(p.steps.every((s) => w.profile.rooms.some((r) => r.id === s.roomId))).toBe(true);
+  });
+
+  it('low forecast confidence: the tip is only probable', async () => {
+    const p = await planned(world('heatwave', 14, { forecast: (f) => ({ ...f, confidence: 'low' }) }));
+    expect(p.householdTip?.probable).toBe(true);
+  });
+
+  it('today only: a window on another day is never said, since the text gives clock times without a date (#346 review)', () => {
+    const option = { load: 'washing' as const, cycle: 'eco' as const, durationH: 3.75, meanW: 200, peakW: 2_000 };
+    const nowMs = Date.parse('2026-07-16T20:00:00+02:00');
+    const at = (from: string, to: string) => householdTipToday({ option, fromMs: Date.parse(from), toMs: Date.parse(to) }, { nowMs, tz: 'Europe/Rome', probable: false });
+    expect(at('2026-07-16T20:05:00+02:00', '2026-07-16T23:55:00+02:00').householdTip).toMatchObject({ windowFrom: '2026-07-16T20:05:00+02:00', cycle: 'eco' });
+    expect(at('2026-07-17T12:00:00+02:00', '2026-07-17T16:00:00+02:00')).toEqual({});
+    expect(at('2026-07-16T22:00:00+02:00', '2026-07-17T02:00:00+02:00')).toEqual({});
+  });
+
+  it('never beside a plan the guard refuses or a last resort (#346 review)', () => {
+    const householdTip = { load: 'cooking' as const, windowFrom: '2026-07-16T12:00:00+02:00', windowTo: '2026-07-16T13:30:00+02:00', probable: false };
+    expect(householdTipBeside({ verdict: { ok: true }, householdTip }, undefined)).toEqual({ householdTip });
+    expect(householdTipBeside({ verdict: { ok: false }, householdTip }, undefined)).toEqual({});
+    expect(householdTipBeside({ verdict: { ok: true }, householdTip }, { safeUntil: '2026-07-16T15:00:00+02:00' })).toEqual({});
+  });
+
+  it('no tip at night, off grid, or when heating', async () => {
+    expect((await planned(world('heatwave', 22))).householdTip).toBeUndefined();
+    expect((await planned(world('heatwave', 14, { snapshot: (x) => ({ ...x, gridAvailable: false }) }))).householdTip).toBeUndefined();
+    const coldSpell = (f: Forecast): Forecast => ({ ...f, hourly: f.hourly.map((h) => ({ ...h, tempOutC: celsius(12), humidityOutPct: pct(40) })) });
+    expect((await planned(world('heatwave', 14, { forecast: coldSpell }), { goal: 'heat' })).householdTip).toBeUndefined();
   });
 });
 

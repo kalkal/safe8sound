@@ -52,6 +52,8 @@ export function surplusPlan(): Plan {
         { roomId: 'living', setpointC: 25, reason: 'occupied', aboveTargetK: -0.4 },
       ],
     },
+    // With the battery full the sun keeps exporting after the cooling (#219): a load that fits, advice only.
+    householdTip: { load: 'washing', cycle: 'eco', windowFrom: '2026-07-15T15:10:00+02:00', windowTo: '2026-07-15T19:00:00+02:00', probable: false },
   });
 }
 

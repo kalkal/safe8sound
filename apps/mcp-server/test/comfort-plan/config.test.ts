@@ -31,4 +31,14 @@ describe('comfort-plan config', () => {
     const wrong = parseComfortPlanConfig({ ...raw, outlook: { levelLoadW: { comfort: 500, balanced: 900, saver: 650 } } });
     expect(!wrong.ok && wrong.error.details?.issues?.[0]?.path).toBe('outlook.levelLoadW');
   });
+
+  it('reads the household-tip options, longest cycle first, and refuses a washing option without a cycle or a mean above its peak (#219)', () => {
+    const c = parseComfortPlanConfig(raw);
+    expect(c.ok && c.value.planner.householdTip.options.map((o) => o.cycle ?? o.load)).toEqual(['eco', 'normal', 'quick', 'cooking']);
+    const [eco] = raw.planner.householdTip.options;
+    const tip = (o: object) => parseComfortPlanConfig({ ...raw, planner: { ...raw.planner, householdTip: { options: [{ ...eco, ...o }] } } });
+    expect(tip({ cycle: undefined }).ok).toBe(false);
+    expect(tip({ meanW: 3_000 }).ok).toBe(false);
+    expect(tip({ load: 'cooking', cycle: undefined }).ok).toBe(true);
+  });
 });

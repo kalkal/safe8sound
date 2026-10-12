@@ -116,6 +116,21 @@ describe('what the model reads', () => {
     expect(planSummary(examplePlan() as Plan, { ...NIGHT, roomNames: names })).not.toContain('Solar surplus');
   });
 
+  it('plan_comfort: the household tip from the surplus, its cycle, its window and every time in it (#219)', () => {
+    const tip = { load: 'washing' as const, cycle: 'eco' as const, windowFrom: '2026-07-16T12:00:00+02:00', windowTo: '2026-07-16T17:30:00+02:00', probable: false };
+    const text = planSummary({ ...examplePlan(), householdTip: tip } as Plan, { ...NIGHT, roomNames: {} });
+    expect(text).toContain('Good time to run the washing machine from 12:00 PM: an eco cycle fits; the sun should cover it until about 5:30 PM. Advice only, nothing is switched on.');
+    const normal = planSummary({ ...examplePlan(), householdTip: { ...tip, cycle: 'normal' } } as Plan, { ...NIGHT, roomNames: {} });
+    expect(normal).toContain('a normal cycle fits');
+    const cooking = planSummary({ ...examplePlan(), householdTip: { ...tip, load: 'cooking', cycle: undefined } } as Plan, { ...NIGHT, roomNames: {} });
+    expect(cooking).toContain('Good time to cook from 12:00 PM: the sun should cover it until about 5:30 PM.');
+    // Low forecast confidence: "probably", and no end time.
+    const probable = planSummary({ ...examplePlan(), householdTip: { ...tip, probable: true } } as Plan, { ...NIGHT, roomNames: {} });
+    expect(probable).toContain('Probably a good time to run the washing machine from 12:00 PM: an eco cycle should fit.');
+    expect(probable).not.toContain('5:30 PM');
+    expect(planSummary(examplePlan() as Plan, { ...NIGHT, roomNames: {} })).not.toContain('Good time');
+  });
+
   it('plan_comfort: plan id, level, horizon, every guarantee with its reason, the reserve, the night and the counterfactual', async () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);

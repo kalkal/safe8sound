@@ -199,6 +199,26 @@ describe('PlanSchema', () => {
       expect(PlanSchema.safeParse({ ...examplePlan(), surplus: { ...surplus, comfortC: 'warm' } }).success).toBe(false);
     });
   });
+
+  describe('household tip from the solar surplus (optional, additive, approved in #219)', () => {
+    const householdTip = { load: 'washing', cycle: 'eco', windowFrom: '2026-07-16T12:00:00+02:00', windowTo: '2026-07-16T17:30:00+02:00', probable: false };
+
+    it('carries the load, its cycle, the window from the forecast and whether it is only probable', () => {
+      expect(PlanSchema.parse({ ...examplePlan(), householdTip }).householdTip).toEqual(householdTip);
+      expect(PlanSchema.parse({ ...examplePlan(), householdTip: { ...householdTip, load: 'cooking', cycle: undefined } }).householdTip?.load).toBe('cooking');
+      expect(PlanSchema.parse(examplePlan()).householdTip).toBeUndefined();
+    });
+
+    it('a window that ends after it starts, a known load and cycle, a cycle only for the washing machine', () => {
+      const bad = (over: object) => PlanSchema.safeParse({ ...examplePlan(), householdTip: { ...householdTip, ...over } }).success;
+      expect(bad({ windowTo: householdTip.windowFrom })).toBe(false);
+      expect(bad({ load: 'dryer' })).toBe(false);
+      expect(bad({ cycle: 'sanitise' })).toBe(false);
+      expect(bad({ load: 'cooking' })).toBe(false);
+      expect(bad({ cycle: undefined })).toBe(false);
+      expect(bad({ brand: 'Acme' })).toBe(false);
+    });
+  });
 });
 
 describe('a plan that answers a refused proposal (#202)', () => {

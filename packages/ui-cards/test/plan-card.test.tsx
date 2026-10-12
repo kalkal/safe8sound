@@ -65,6 +65,18 @@ describe('PlanCard', () => {
     expect(screen.queryByRole('region', { name: /Solar surplus/ })).toBeNull();
   });
 
+  it('says the household tip from the surplus with its cycle and window on the home clock, and no end time when only probable (#219)', () => {
+    const householdTip = { load: 'washing' as const, cycle: 'eco' as const, windowFrom: '2026-07-15T12:00:00+02:00', windowTo: '2026-07-15T17:30:00+02:00', probable: false };
+    show({ ...surplusPlan(), householdTip });
+    expect(screen.getByTestId('household-tip').textContent).toBe('Good time to run the washing machine from 12:00: an eco cycle fits; the sun should cover it until about 17:30.');
+    cleanup();
+    show({ ...surplusPlan(), householdTip: { ...householdTip, load: 'cooking', cycle: undefined, probable: true } });
+    expect(screen.getByTestId('household-tip').textContent).toBe('Probably a good time to cook from 12:00.');
+    cleanup();
+    show(hotDayPlan());
+    expect(screen.queryByTestId('household-tip')).toBeNull();
+  });
+
   it('a plan that answers a refused proposal says the refusal inside the card, above the estimate (#202, #231)', () => {
     const { container } = show(planThatHolds());
     const note = screen.getByTestId('refused-proposal');

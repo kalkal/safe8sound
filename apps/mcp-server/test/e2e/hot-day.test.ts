@@ -83,6 +83,9 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       expect(surplus.rooms[0]?.reason).toBe('safe_room');
       expect(text).toMatch(/Solar surplus from \d{1,2}:\d\d [AP]M to \d{1,2}:\d\d [AP]M: [\d.]+ kWh kept at home instead of exported to the grid\. Where it went, in order: 1\) Bedroom \(safe room\), now [\d.]+ °C, [\d.]+ °C (above|below) the [\d.]+ °C comfort, cooling to [\d.]+ °C/);
       expect(text).toContain(`${surplus.keptKWh.toFixed(1)} kWh kept at home`);
+      // With the battery full the sun keeps exporting (#219): the text suggests a load and until when, advice only.
+      if (plan.householdTip === undefined) throw new Error('no household tip on the hot day');
+      expect(text).toMatch(/(Good time to (run the washing machine|cook) from \d{1,2}:\d\d [AP]M: .*the sun should cover it until about \d{1,2}:\d\d [AP]M\.|Probably a good time to .+ from \d{1,2}:\d\d [AP]M.*\.) Advice only, nothing is switched on\./);
 
       // 3. The person confirms; the agent retries after a timeout: one application only.
       const first = await call(TOKEN, 'apply_plan', { planId: plan.id });

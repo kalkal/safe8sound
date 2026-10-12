@@ -22,7 +22,7 @@ import {
   type Result,
   type Snapshot,
 } from '@cold-reserve/contracts';
-import { acLimitW, buildLadder, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, orderSurplusRooms, seasonFor, surplusWindow, unconvertedFahrenheit, withTargets, type HumidityMode } from '@cold-reserve/core';
+import { acLimitW, buildLadder, chooseHouseholdTip, epsBaseLoadW, candidateSteps, controlFromSteps, darkWindow, dutyCycle, humidityBandWithin, nextHumidityMode, nextNightWindow, orderSurplusRooms, seasonFor, surplusWindow, unconvertedFahrenheit, withTargets, type HouseholdTip, type HumidityMode } from '@cold-reserve/core';
 import { buildContext, counterfactualOf, currentControls, holdSafeRoom, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeRoomLimitKindAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import { withModelHint, type ToolContext } from '../../tool.js';
@@ -54,6 +54,8 @@ interface Attempt {
   readonly surplus?: NonNullable<Plan['surplus']>;
   /** The guarantees the plan with the surplus failed, when the guard refused it and the plan without it stands. */
   readonly surplusRefused?: readonly GuaranteeId[];
+  /** A good time to run the washing machine or cook on what the final plan still exports (#219): advice only. */
+  readonly householdTip?: NonNullable<Plan['householdTip']>;
 }
 
 /** The home, its latest snapshot, the forecast and the preferences; any failure comes back unchanged. */
@@ -258,6 +260,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     ...(ctx.turnId === undefined ? {} : { proposedInTurn: ctx.turnId }),
     ...(counterfactual === undefined ? {} : { counterfactual }),
     ...(chosen.surplus === undefined ? {} : { surplus: chosen.surplus }),
+    ...householdTipBeside(chosen, safest),
   };
   const parsed = PlanSchema.safeParse(draft);
   if (!parsed.success) return err(toolError('output_schema_violation', 'The proposed plan does not match its schema.'));
@@ -300,6 +303,17 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
 
 /** The guarantees a last resort may never break: only the comfort ones are relaxed (#160). */
 export const HARD_LIMITS: readonly GuaranteeId[] = ['storm_reserve', 'inverter_limit', 'battery_power'];
+
+/**
+ * The household tip stands only beside a plan the guard accepts that is not a last resort (#346 review): a person
+ * told the safe room cannot hold must never hear "good time to cook" in the same answer.
+ */
+export function householdTipBeside(
+  chosen: { readonly verdict: { readonly ok: boolean }; readonly householdTip?: NonNullable<Plan['householdTip']> },
+  lastResort: unknown,
+): { householdTip?: NonNullable<Plan['householdTip']> } {
+  return chosen.householdTip === undefined || !chosen.verdict.ok || lastResort !== undefined ? {} : { householdTip: chosen.householdTip };
+}
 
 interface LastResort {
   readonly attempt: Attempt;
@@ -464,14 +478,47 @@ function tryRung(
     const used = finish(surplus.steps);
     const keptKWh = Math.round(((exportWh(plain.context) - exportWh(used.context)) / 1000) * 10) / 10;
     if (used.verdict.ok && keptKWh > 0) {
-      return { candidate: used.candidate, verdict: used.verdict, guardInput, surplus: { ...surplus.info, keptKWh } };
+      return { candidate: used.candidate, verdict: used.verdict, guardInput, surplus: { ...surplus.info, keptKWh }, ...tipOf(used.context, deps, guardInput) };
     }
     if (!used.verdict.ok) {
       const refused = used.verdict.guarantees.filter((g) => !g.ok).map((g) => g.id);
-      return { candidate: plain.candidate, verdict: plain.verdict, guardInput, surplusRefused: refused };
+      return { candidate: plain.candidate, verdict: plain.verdict, guardInput, surplusRefused: refused, ...tipOf(plain.context, deps, guardInput) };
     }
   }
-  return { candidate: plain.candidate, verdict: plain.verdict, guardInput };
+  return { candidate: plain.candidate, verdict: plain.verdict, guardInput, ...tipOf(plain.context, deps, guardInput) };
+}
+
+/**
+ * The household tip (#219, decisions of 4/10): on what the final plan still exports with the battery full,
+ * the longest configured load that fits, within the inverter limit with the load already planned. Cooling, on
+ * grid, today only (the text says clock times, not dates). Advice only: never a plan step. Low forecast
+ * confidence makes it only probable.
+ */
+function tipOf(context: GuardContext, deps: ComfortPlanDeps, guardInput: GuardInput): { householdTip?: NonNullable<Plan['householdTip']> } {
+  const { snapshot, profile, season, forecast } = guardInput;
+  if (season !== 'cooling' || !snapshot.gridAvailable) return {};
+  const tip = chooseHouseholdTip(context.points, {
+    options: deps.config.planner.householdTip.options,
+    stepMs: deps.guard.projection.stepMinutes * 60_000,
+    acLimitW: acLimitW(profile, snapshot.gridAvailable),
+    minSocPct: deps.config.planner.surplus.socFullPct,
+  });
+  return householdTipToday(tip, { nowMs: Date.parse(snapshot.ts), tz: profile.location.tz, probable: forecast.confidence === 'low' });
+}
+
+/**
+ * The plan's tip in home time, today only: the text says clock times without a date, so a window on another day
+ * would be heard as today's (#346 review).
+ */
+export function householdTipToday(
+  tip: HouseholdTip | undefined,
+  opts: { readonly nowMs: number; readonly tz: string; readonly probable: boolean },
+): { householdTip?: NonNullable<Plan['householdTip']> } {
+  if (tip === undefined) return {};
+  const windowFrom = localIso(tip.fromMs, opts.tz);
+  const windowTo = localIso(tip.toMs, opts.tz);
+  if (windowFrom.slice(0, 10) !== localIso(opts.nowMs, opts.tz).slice(0, 10) || windowTo.slice(0, 10) !== windowFrom.slice(0, 10)) return {};
+  return { householdTip: { load: tip.option.load, ...(tip.option.cycle === undefined ? {} : { cycle: tip.option.cycle }), windowFrom, windowTo, probable: opts.probable } };
 }
 
 /** Energy the projection sends to the grid, in Wh. */
