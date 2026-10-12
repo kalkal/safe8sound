@@ -21,9 +21,8 @@ function wiring() {
 }
 
 describe('storm-mode wiring', () => {
-  it('loads the shipped config and starts with an empty phone', async () => {
+  it('starts with an empty phone', async () => {
     const w = wiring();
-    expect(w.config.capHours).toBe(24);
     expect(await w.inbox(HomeIdSchema.parse('demo'))).toEqual({ ok: true, value: [] });
   });
 

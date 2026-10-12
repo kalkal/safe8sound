@@ -3,11 +3,6 @@ import raw from '../../config/comfort-plan.json' with { type: 'json' };
 import { parseComfortPlanConfig } from '../../src/modules/comfort-plan/config.js';
 
 describe('comfort-plan config', () => {
-  it('parses the default file', () => {
-    const c = parseComfortPlanConfig(raw);
-    expect(c.ok && c.value.planner.dutyCycles[0]).toEqual({ onMinutes: 40, periodMinutes: 60 });
-  });
-
   it('refuses a cycle that runs longer than its period, and names the field', () => {
     const c = parseComfortPlanConfig({ ...raw, planner: { ...raw.planner, dutyCycles: [{ onMinutes: 70, periodMinutes: 60 }] } });
     expect(!c.ok && c.error).toMatchObject({ code: 'invalid_config', details: { issues: [{ path: 'planner.dutyCycles.0' }] } });
@@ -32,9 +27,8 @@ describe('comfort-plan config', () => {
     expect(!wrong.ok && wrong.error.details?.issues?.[0]?.path).toBe('outlook.levelLoadW');
   });
 
-  it('reads the household-tip options, longest cycle first, and refuses a washing option without a cycle or a mean above its peak (#219)', () => {
-    const c = parseComfortPlanConfig(raw);
-    expect(c.ok && c.value.planner.householdTip.options.map((o) => o.cycle ?? o.load)).toEqual(['eco', 'normal', 'quick', 'cooking']);
+  // The shipped order (longest cycle first) is checked in test/shipped-config.test.ts.
+  it('refuses a household-tip washing option without a cycle or a mean above its peak (#219)', () => {
     const [eco] = raw.planner.householdTip.options;
     const tip = (o: object) => parseComfortPlanConfig({ ...raw, planner: { ...raw.planner, householdTip: { options: [{ ...eco, ...o }] } } });
     expect(tip({ cycle: undefined }).ok).toBe(false);

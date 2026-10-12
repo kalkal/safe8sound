@@ -4,19 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { defaultPreferencesFor, loadPreferencesConfig, preferencesConfigFile } from '../src/preferences-config.js';
 
 describe('preferences config (hard limits and defaults, validated at startup)', () => {
-  it('accepts the shipped config file', () => {
-    const result = loadPreferencesConfig(preferencesConfigFile());
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        limits: { cooling: { maxC: { min: 24, max: 30, default: 27 } }, heating: { minC: { min: 16, max: 22, default: 18 } } },
-        comfortC: { cooling: 25, heating: 20 },
-        autoStormOnGridLoss: true,
-        language: 'en-US',
-      },
-    });
-  });
-
   it('stops with invalid_config on a broken file, naming the field', () => {
     const broken = { ...(preferencesConfigFile() as Record<string, unknown>), language: 'klingon' };
     expect(loadPreferencesConfig(broken)).toMatchObject({ ok: false, error: { code: 'invalid_config', details: { issues: [{ path: 'language' }] } } });

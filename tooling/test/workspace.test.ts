@@ -29,23 +29,33 @@ const packages = folders
     return { folder: folder.replaceAll('\\', '/'), dir, manifest, packageName };
   });
 
+// The packages without the skeleton constant `packageName`: a shared leaf (contracts, i18n), generated tokens and the CDK app.
+// Every other package must have it, and these must not (a stale exception fails), so a new package follows the strict rule without editing this test.
+const WITHOUT_PACKAGE_NAME = ['packages/contracts', 'packages/design-tokens', 'packages/i18n', 'infra'];
+
 describe('workspace packages', () => {
-  it('finds every package of the workspace, 22 of them with a packageName constant', () => {
-    expect(packages.map((p) => p.folder)).toEqual(expect.arrayContaining(['packages/core', 'packages/adapters/store-memory', 'apps/mcp-server', 'infra']));
-    expect(packages.length).toBeGreaterThanOrEqual(26);
-    expect(packages.filter((p) => p.packageName !== undefined)).toHaveLength(22);
+  it('finds at least one package for every glob of pnpm-workspace.yaml', () => {
+    expect(globs.length).toBeGreaterThan(0);
+    const empty = globs.filter((glob) => !packages.some((p) => p.folder === glob || p.folder.startsWith(glob.replace(/\*$/, ''))));
+    expect(empty).toEqual([]);
   });
 
-  // A package with the packageName constant exports exactly ./src/index.ts; the others (design-tokens) any TypeScript source.
+  it('lists only existing packages as exceptions to the strict rule', () => {
+    expect(WITHOUT_PACKAGE_NAME.filter((folder) => !packages.some((p) => p.folder === folder))).toEqual([]);
+  });
+
+  // The strict rule (packageName constant, main entry exactly ./src/index.ts) holds for every package but the listed exceptions,
+  // which still need a TypeScript source as main entry.
   it('are private ESM packages named after their folder, whose main entry is a TypeScript source (no build step)', () => {
     const wrong = packages.flatMap(({ folder, dir, manifest, packageName }) => {
       const main = manifest.exports?.['.'] ?? '';
+      const strict = !WITHOUT_PACKAGE_NAME.includes(folder);
       const problems = [
         manifest.name === `@cold-reserve/${basename(dir)}` ? '' : `name ${manifest.name}`,
         manifest.private === true ? '' : 'not private',
         manifest.type === 'module' ? '' : `type ${String(manifest.type)}`,
-        (packageName === undefined ? /^\.\/.+\.ts$/.test(main) : main === './src/index.ts') && existsSync(join(dir, main)) ? '' : `main entry "${main}"`,
-        packageName === undefined || packageName === manifest.name ? '' : `packageName ${packageName}`,
+        (strict ? main === './src/index.ts' : /^\.\/.+\.ts$/.test(main)) && existsSync(join(dir, main)) ? '' : `main entry "${main}"`,
+        (strict ? packageName === manifest.name : packageName === undefined) ? '' : `packageName ${String(packageName)}`,
       ].filter(Boolean);
       return problems.length === 0 ? [] : [`${folder}: ${problems.join(', ')}`];
     });

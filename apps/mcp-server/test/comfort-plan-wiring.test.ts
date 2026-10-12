@@ -18,13 +18,6 @@ const prefs = () => {
 };
 
 describe('comfort-plan wiring', () => {
-  it('loads the shipped configs (comfort plan and guard)', () => {
-    const c = loadComfortPlanConfig();
-    expect(c.ok && c.value.comfort.planTtlMinutes).toBe(10);
-    expect(c.ok && c.value.comfort.lastResortConfirmMinutes).toBe(10);
-    expect(c.ok && c.value.guard.reserve.essentialLoadW).toBeGreaterThan(0);
-  });
-
   it('caps the window for the second yes to a last resort at 10 whole minutes', () => {
     const c = loadComfortPlanConfig();
     if (!c.ok) throw new Error(c.error.message);

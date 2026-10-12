@@ -3,11 +3,6 @@ import raw from '../../config/storm-mode.json' with { type: 'json' };
 import { parseStormModeConfig } from '../../src/modules/storm-mode/config.js';
 
 describe('storm-mode config', () => {
-  it('parses the default file', () => {
-    const c = parseStormModeConfig(raw);
-    expect(c.ok && c.value).toMatchObject({ capHours: 24, stableGridMinutes: 10, minIntervalMinutes: 60, minReplySeconds: 30, inApp: { maxPerHome: 50 } });
-  });
-
   it.each([
     ['capHours', { capHours: 0 }],
     ['stableGridMinutes', { stableGridMinutes: 1.5 }],
