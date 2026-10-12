@@ -39,9 +39,9 @@ function setup(onSave = vi.fn(), preferences: Preferences = PreferencesSchema.pa
 }
 
 const button = (name: string) => screen.getByRole('button', { name });
-/** Pages instead of scrolling (owner, 10 Oct): comfort on page 1, the safe room on page 2, the order and contacts on 3. */
+/** Pages instead of scrolling (owner, 10 Oct): comfort on page 1, the safe room on 2, the order on 3, the contacts on 4 (12 Oct). */
 function toPage(n: number) {
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const where = screen.getByRole('navigation', { name: 'Pages of this card' }).textContent;
     if (where.includes(`${String(n)} of`)) return;
     fireEvent.click(button(Number(/(\d) of/.exec(where)?.[1]) < n ? 'Next page' : 'Previous page'));
@@ -120,7 +120,9 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
 
   it('shows contacts by role and channel only, in words, never names or handles', () => {
     setup();
-    toPage(3);
+    toPage(4);
+    // Their own page (owner, 12 Oct): the order and the contacts together were too tall for an Echo frame.
+    expect(screen.getByRole('navigation', { name: 'Pages of this card' }).textContent).toContain('4 of 4');
     const contacts = screen.getByRole('list', { name: 'Family contacts, 1 of 3' });
     expect(contacts.textContent).toBe('Daughter · in-app');
     expect(document.body.textContent).not.toContain('Example Contact');

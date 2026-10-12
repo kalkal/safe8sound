@@ -275,6 +275,22 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       expect(offered({ kind: 'error', message: 'The plan expired: ask for a new one.', retryable: false })).toBe(false);
     });
 
+    it('a card too tall for its height even at the readable scale offers it too, whatever its kind (owner, 12 Oct)', () => {
+      // jsdom has no layout: every element measures 900 px, far taller than the 300 px the host gives.
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(900);
+      const preferences = { preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };
+      const { container } = render(
+        <CardApp state={{ kind: 'preferences', data: preferences }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} maxHeight={300} display={{ canFullscreen: true, fullscreen: false, toggle: vi.fn() }} />,
+      );
+      expect(screen.getByRole('button', { name: 'Full screen' })).toBeTruthy();
+      // Never a thumbnail: the readable scale, cut at the height the host gives.
+      const fit = container.querySelector('.fit');
+      expect(fit?.getAttribute('data-scale')).toBe('0.8');
+      expect(fit?.getAttribute('data-cramped')).toBe('true');
+      expect(fit?.getAttribute('style')).toContain('block-size: 300px');
+      vi.restoreAllMocks();
+    });
+
     it('a frame already full screen keeps its way back, even when it now shows a short answer', () => {
       const toggle = vi.fn();
       render(<CardApp state={{ kind: 'refused', data: inverterRefusal() }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} display={{ canFullscreen: true, fullscreen: true, toggle }} />);

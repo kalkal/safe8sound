@@ -440,6 +440,8 @@
    the sky and keeps its AA contrast. Below the device width the bezel goes and the sky stays behind the column. */
 @layer surfaces {
   .echo-stage {
+    /* The window's height with its padding, not plus it: the page scrolled by the padding at 1920 × 1080 (owner, 12 Oct). */
+    box-sizing: border-box;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-6);
@@ -720,6 +722,42 @@
 
       & > :not(.try-row, .ask-row) {
         grid-column: 1 / -1;
+      }
+    }
+
+    /* An answer with cards (owner, 12 Oct: the plan shrank to a thumbnail under the battery and the tabs): the height
+       goes to the card. One giant number per view, and the card brings its own: the battery is one line, and the card
+       tabs share its row. */
+    .echo-screen .answer:has(> .tool-cards) {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+
+      & > *,
+      & > .tool-cards > * {
+        grid-column: 1 / -1;
+      }
+
+      & > .tool-cards {
+        display: contents;
+      }
+
+      & > .facts:has(+ .tool-cards > .card-tabs) {
+        grid-column: 1;
+      }
+
+      & > .facts + .tool-cards > .card-tabs {
+        grid-column: 2;
+        justify-content: end;
+      }
+
+      & .fact {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+      }
+
+      & .fact-value {
+        font-size: var(--font-size-lead);
       }
     }
   }

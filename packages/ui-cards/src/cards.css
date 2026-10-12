@@ -46,6 +46,19 @@
     transform-origin: top center;
   }
 
+  /* Too tall even at the readable scale (owner, 12 Oct: never a thumbnail): cut at the height, the end fading out, and
+     "Full screen" in the title row shows the whole page. */
+  .fit[data-cramped="true"] {
+    mask: linear-gradient(to bottom, currentcolor calc(100% - var(--space-6)), transparent);
+  }
+
+  /* A card inside a page of another card (the plan's safety check) is that page's content, not a second frame. */
+  .card-page .card {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
   .hero-row {
     display: grid;
     gap: var(--space-3);
@@ -72,6 +85,35 @@
 
     & .card-page {
       gap: var(--space-2);
+    }
+
+    & .card-page .card {
+      padding: 0;
+    }
+
+    /* The plan's first page in a short frame (owner, 12 Oct: cut at 960 × 480): the confidence beside the time, and
+       "valid until" on the row of its buttons. */
+    & .plan-hero {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      column-gap: var(--space-4);
+
+      & > * {
+        grid-column: 2;
+      }
+
+      & > .eyebrow {
+        grid-column: 1 / -1;
+      }
+
+      & > .hero-value {
+        grid-row: span 2;
+        grid-column: 1;
+      }
+    }
+
+    & .plan-actions p {
+      flex-basis: auto;
     }
   }
 
@@ -480,6 +522,94 @@
     &[data-approved="false"] {
       border-color: var(--receipt-fail);
       color: var(--receipt-fail);
+    }
+  }
+
+  /* A wide card (an Echo screen, a laptop): the safety check uses the width instead of the height (owner, 12 Oct: it
+     was shrunk to a thumbnail). Its title and the three steps on one row; on the paper the explanation across the
+     top, then the stamp on the left and the five rules on the right, one line each. */
+  @container (width >= 40rem) {
+    .card-page .card:has(> .flow) {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+
+      & > * {
+        grid-column: 1 / -1;
+      }
+
+      & > .card-head {
+        grid-column: 1;
+      }
+
+      & > .flow {
+        grid-column: 2;
+      }
+    }
+
+    .receipt {
+      grid-template-areas:
+        "explain explain"
+        "title rows"
+        "subtitle rows"
+        "summary rows"
+        "stamp rows";
+      grid-template-rows: auto auto auto auto 1fr;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      column-gap: var(--space-6);
+    }
+
+    .receipt-explain {
+      grid-area: explain;
+    }
+
+    .receipt-title {
+      grid-area: title;
+    }
+
+    .receipt-subtitle {
+      grid-area: subtitle;
+    }
+
+    .receipt-summary {
+      grid-area: summary;
+    }
+
+    .receipt-stamp {
+      grid-area: stamp;
+      align-self: center;
+    }
+
+    .receipt-rows {
+      grid-area: rows;
+      align-content: center;
+      gap: var(--space-2);
+      padding: 0 0 0 var(--space-6);
+      border-block: 0;
+      border-inline-start: var(--border-thin) dashed var(--receipt-rule);
+    }
+
+    .receipt-row {
+      grid-template-areas:
+        "name reason verdict"
+        "numbers numbers numbers";
+      grid-template-columns: max-content minmax(0, 1fr) auto;
+      row-gap: 0;
+    }
+
+    .receipt-name {
+      grid-area: name;
+    }
+
+    .receipt-verdict {
+      grid-area: verdict;
+    }
+
+    .receipt-reason {
+      grid-area: reason;
+    }
+
+    .receipt-numbers {
+      grid-area: numbers;
     }
   }
 

@@ -39,11 +39,13 @@ export interface CardAppProps {
 /** The content of one ui:// frame. The host owns the conversation; the card only shows and asks. */
 export function CardApp({ notice, display, maxHeight, ...props }: CardAppProps) {
   // Only dense views offer "Full screen" (idea 6); a frame already full screen always keeps its way back, whatever
-  // it now shows (e.g. a refusal after Apply).
-  const toggle = display !== undefined && (display.fullscreen || offersFullScreen(props.state.kind)) ? <DisplayToggle display={display} /> : null;
+  // it now shows (e.g. a refusal after Apply). A page too tall for its frame even at the readable scale offers it too
+  // (owner, 12 Oct): never a thumbnail, and the whole page one tap away.
+  const [cramped, setCramped] = useState(false);
+  const toggle = display !== undefined && (display.fullscreen || offersFullScreen(props.state.kind) || cramped) ? <DisplayToggle display={display} /> : null;
   return (
     <CardErrorBoundary display={display}>
-      <Fit maxHeight={maxHeight}>
+      <Fit maxHeight={maxHeight} onCramped={setCramped}>
       {/* "Full screen" sits in the first card's title row; "Loading…", an error and a crash are cards too, so a frame in full screen keeps its way back (#353, #356). */}
       <DisplaySlot.Provider value={toggle}>
       {notice !== undefined &&

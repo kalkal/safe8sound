@@ -116,7 +116,7 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave }: Prefer
     <CardShell
       title={t('prefs.title')}
       {...(badge !== undefined && { origin: badge })}
-      // Pages instead of scrolling (owner, 10 Oct): comfort, the safe room, then the order and the contacts; Save stays.
+      // Pages instead of scrolling (owner, 10 Oct): comfort, the safe room, the order, the contacts; Save stays.
       pages={[
         <Fragment key="comfort">
           <fieldset className="prefs-group">
@@ -204,7 +204,9 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave }: Prefer
               ))}
             </ol>
           </div>
-
+        </Fragment>,
+        // Their own page (owner, 12 Oct): with the order they were too tall for an Echo frame, shrunk to a thumbnail.
+        <Fragment key="contacts">
           {outlook !== undefined && <p className="muted">{t('prefs.reserve', { hours: formatHours(outlook.reserveHoursAtEssential) })}</p>}
 
           <p className="eyebrow" id={contactsId}>
