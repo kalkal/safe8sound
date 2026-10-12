@@ -138,7 +138,7 @@ export const enUS = {
   'lastResort.sign.hotSkin': 'Hot skin that is not sweating',
   'lastResort.sign.fastBreathing': 'Fast heartbeat or fast breathing',
   'lastResort.sign.faint': 'Fainting, or a seizure (fit)',
-  'lastResort.call': 'If you are worried, call 112.',
+  'lastResort.call': 'If you are worried, call {emergency}.',
   'lastResort.notMedical': 'These are general tips, not medical advice.',
   // The whole frame, through the host (plan §11.2 p.2, #200): the words say what happens.
   'card.fullScreen': 'Full screen',

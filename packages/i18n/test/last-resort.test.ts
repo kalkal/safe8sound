@@ -1,6 +1,6 @@
 import { LAST_RESORT_ACTIONS } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { lastResortAdvice } from '../src/index.js';
+import { emergencyNumberOf, lastResortAdvice } from '../src/index.js';
 
 // The fixed list on the last-resort card (#160): zero-energy actions and the signs of heat illness,
 // from public-health guidance (docs/heat-advice.md). Never presented as medical protection.
@@ -27,6 +27,17 @@ describe('last-resort advice', () => {
     expect(advice.signs.length).toBeGreaterThanOrEqual(4);
     expect(advice.signs).toContain('Confusion or lack of coordination');
     expect(advice.call).toBe('If you are worried, call 112.');
+  });
+
+  it('the number to call follows the place, not the language (#366): 911 in Houston, 112 in Turin and the reference home', () => {
+    expect(emergencyNumberOf('houston')).toBe('911');
+    expect(emergencyNumberOf('turin')).toBe('112');
+    expect(emergencyNumberOf('reference')).toBe('112');
+    expect(lastResortAdvice('en-US', [], 'F', 'houston').call).toBe('If you are worried, call 911.');
+    expect(lastResortAdvice('it-IT', [], 'F', 'houston').call).toBe('Se sei preoccupato, chiama il 911.');
+    expect(lastResortAdvice('en-US', [], 'C', 'turin').call).toBe('If you are worried, call 112.');
+    expect(lastResortAdvice('it-IT', [], 'C', 'turin').call).toBe('Se sei preoccupato, chiama il 112.');
+    expect(lastResortAdvice('it-IT', []).call).toBe('Se sei preoccupato, chiama il 112.');
   });
 
   it('never claims to protect, prevent or treat', () => {

@@ -128,7 +128,7 @@ export const itIT = {
   'lastResort.sign.hotSkin': 'Pelle calda che non suda',
   'lastResort.sign.fastBreathing': 'Battito o respiro accelerati',
   'lastResort.sign.faint': 'Svenimento o convulsioni',
-  'lastResort.call': 'Se sei preoccupato, chiama il 112.',
+  'lastResort.call': 'Se sei preoccupato, chiama il {emergency}.',
   'lastResort.notMedical': 'Sono consigli generali, non un parere medico.',
   'card.fullScreen': 'Schermo intero',
   'card.back': 'Torna alla conversazione',

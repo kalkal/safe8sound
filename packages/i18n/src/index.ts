@@ -1,4 +1,4 @@
-import { err, formatTemp, formatTempFixed, ok, type LastResortAction, type TempUnit, type Result, type SendableTransition, type StormMessageText } from '@cold-reserve/contracts';
+import { err, formatTemp, formatTempFixed, ok, type LastResortAction, type LocationId, type TempUnit, type Result, type SendableTransition, type StormMessageText } from '@cold-reserve/contracts';
 import { enUS, type MessageKey } from './en-US.js';
 import { itIT } from './it-IT.js';
 
@@ -124,9 +124,12 @@ export interface LastResortAdvice {
   readonly notMedical: string;
 }
 
-export function lastResortAdvice(locale: Locale, actions: readonly LastResortAction[], unit: TempUnit = 'C'): LastResortAdvice {
-  // The fan rule is 35 °C, said in the unit the person chose (#306).
-  const text = (key: MessageKey): string => CATALOGS[locale][key].replace('{fanMax}', formatTemp(35, unit));
+/** The emergency number follows the place, not the language (#366): the US 911 in Houston, the European 112 elsewhere (Turin, the reference home). */
+export const emergencyNumberOf = (place: LocationId): string => (place === 'houston' ? '911' : '112');
+
+export function lastResortAdvice(locale: Locale, actions: readonly LastResortAction[], unit: TempUnit = 'C', place: LocationId = 'reference'): LastResortAdvice {
+  // The fan rule is 35 °C, said in the unit the person chose (#306); the number to call is the place's (#366).
+  const text = (key: MessageKey): string => CATALOGS[locale][key].replace('{fanMax}', formatTemp(35, unit)).replace('{emergency}', emergencyNumberOf(place));
   return {
     title: text('lastResort.title'),
     actions: actions.map((a) => text(`lastResort.action.${a}`)),

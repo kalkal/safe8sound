@@ -627,7 +627,7 @@ describe('household tip from the solar surplus (#219)', () => {
   });
 
   it('today only: a window on another day is never said, since the text gives clock times without a date (#346 review)', () => {
-    const option = { load: 'washing' as const, cycle: 'eco' as const, durationH: 3.75, meanW: 200, peakW: 2_000 };
+    const option = { load: 'washing' as const, cycle: 'eco' as const, durationH: 3.75, meanW: 150, peakW: 2_000 };
     const nowMs = Date.parse('2026-07-16T20:00:00+02:00');
     const at = (from: string, to: string) => householdTipToday({ option, fromMs: Date.parse(from), toMs: Date.parse(to) }, { nowMs, tz: 'Europe/Rome', probable: false });
     expect(at('2026-07-16T20:05:00+02:00', '2026-07-16T23:55:00+02:00').householdTip).toMatchObject({ windowFrom: '2026-07-16T20:05:00+02:00', cycle: 'eco' });
