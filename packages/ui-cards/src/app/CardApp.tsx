@@ -9,7 +9,7 @@ import { ManualControlCard } from '../ManualControlCard.js';
 import { SafeRoomCard } from '../SafeRoomCard.js';
 import { homeClock } from '../plan-model.js';
 import { t } from '../text.js';
-import { DisplaySlot, DisplayToggle, type DisplayControl } from '../CardShell.js';
+import { CardShell, DisplaySlot, DisplayToggle, type DisplayControl } from '../CardShell.js';
 import { CardErrorBoundary } from './CardErrorBoundary.js';
 import { Fit } from './Fit.js';
 import type { CardState } from './card-kinds.js';
@@ -69,22 +69,7 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
     case 'error':
       return <p role="alert">{state.message}</p>;
     case 'plan':
-      return (
-        <>
-          <PlanCard
-            plan={state.data}
-            timeZone={timeZone}
-            // The safety check is the plan's last page (pages instead of scrolling, owner 10 Oct).
-            extraPages={[<GuardReceipt key="receipt" plan={state.data} />]}
-            {...(canAct && {
-              onApply: (planId: string) => {
-                onCallTool('apply_plan', { planId });
-              },
-            })}
-          />
-          {!canAct && <p className="muted">{t('card.noActions')}</p>}
-        </>
-      );
+      return <ProposedPlan key={state.data.id} plan={state.data} timeZone={timeZone} canAct={canAct} onCallTool={onCallTool} />;
     case 'refused':
       return (
         <>
@@ -125,6 +110,55 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
         </>
       );
   }
+}
+
+interface ProposedPlanProps {
+  plan: Extract<CardState, { kind: 'plan' }>['data'];
+  timeZone: string;
+  canAct: boolean;
+  onCallTool: CardAppProps['onCallTool'];
+}
+
+/**
+ * A proposed plan. "Not now" (#348) stays inside this frame: no tool call, so nothing in the home changes and a last
+ * resort is never applied by it. The card folds to one line that says so; the person can ask again by voice.
+ */
+function ProposedPlan({ plan, timeZone, canAct, onCallTool }: ProposedPlanProps) {
+  const [dismissed, setDismissed] = useState(false);
+  const lineRef = useRef<HTMLParagraphElement>(null);
+  // The button the person tapped is gone: focus goes to what the card now says.
+  useEffect(() => {
+    if (dismissed) lineRef.current?.focus();
+  }, [dismissed]);
+  if (dismissed) {
+    // Still the plan card, with its title row: in full screen "Back to the conversation" and Escape stay (review of #351).
+    return (
+      <CardShell title={t('plan.title')}>
+        <p className="notice" role="status" tabIndex={-1} ref={lineRef} data-testid="plan-dismissed">
+          {t('plan.dismissed')}
+        </p>
+      </CardShell>
+    );
+  }
+  return (
+    <>
+      <PlanCard
+        plan={plan}
+        timeZone={timeZone}
+        // The safety check is the plan's last page (pages instead of scrolling, owner 10 Oct).
+        extraPages={[<GuardReceipt key="receipt" plan={plan} />]}
+        {...(canAct && {
+          onApply: (planId: string) => {
+            onCallTool('apply_plan', { planId });
+          },
+          onDismiss: () => {
+            setDismissed(true);
+          },
+        })}
+      />
+      {!canAct && <p className="muted">{t('card.noActions')}</p>}
+    </>
+  );
 }
 
 interface AppliedPlanProps {

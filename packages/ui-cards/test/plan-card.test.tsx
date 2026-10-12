@@ -130,6 +130,15 @@ describe('PlanCard', () => {
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 
+  it('"Not now" on a last resort only dismisses: it is never an apply (#348)', () => {
+    const onApply = vi.fn();
+    const onDismiss = vi.fn();
+    show(lastResortPlan(), { onApply, onDismiss });
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    expect(onDismiss).toHaveBeenCalledOnce();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
   it('offers no Apply once the plan is no longer proposed', () => {
     show({ ...hotDayPlan(), status: 'applied' }, { onApply: vi.fn() });
     expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();

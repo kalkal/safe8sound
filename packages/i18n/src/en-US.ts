@@ -206,6 +206,8 @@ export const enUS = {
   'plan.advisory': 'Advice only: nothing is switched automatically.',
   'plan.applyUtterance': 'Apply the plan',
   'plan.dismissUtterance': 'Not now',
+  // "Not now" on the plan card (#348): nothing is applied and nothing in the home changes.
+  'plan.dismissed': 'Plan not applied — ask again any time.',
   'plan.appliedAsAdvice': 'Applied as advice: nothing is changed automatically; follow the steps below.',
   'plan.applied': 'Plan applied.',
   'plan.alreadyApplied': 'The plan was already applied.',

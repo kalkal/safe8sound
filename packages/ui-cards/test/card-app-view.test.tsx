@@ -38,6 +38,25 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_7Hq2mX9vK3' });
   });
 
+  it.each([
+    ['a plan', hotDayPlan, 'Apply plan'],
+    ['a last resort', lastResortPlan, 'Apply the last-resort plan'],
+  ] as const)('"Not now" on %s collapses the card to one honest line and calls no tool (#348)', (_, plan, applyLabel) => {
+    const onCallTool = show({ kind: 'plan', data: plan() });
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    const line = screen.getByRole('status');
+    expect(line.textContent).toBe('Plan not applied — ask again any time.');
+    // The button the person tapped is gone: focus goes to what the card now says.
+    expect(document.activeElement).toBe(line);
+    // The card keeps its title (and its way back in full screen); the plan itself is gone.
+    expect(line.closest('section')?.querySelector('h2')?.textContent).toBe('Plan');
+    expect(screen.queryByTestId('plan-horizon')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Safety check', hidden: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: applyLabel })).toBeNull();
+    // Nothing reaches the host: no apply, no other tool, so nothing in the home changes.
+    expect(onCallTool).not.toHaveBeenCalled();
+  });
+
   it('a last-resort plan is applied by touch in two steps: the first tap asks, with no token (#160)', () => {
     const onCallTool = show({ kind: 'plan', data: lastResortPlan() });
     expect(screen.getByRole('region', { name: 'Safety check', hidden: true })).toBeTruthy();
@@ -225,6 +244,17 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       expect(screen.getByRole('button', { name: 'Back to the conversation' })).toBeTruthy();
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(toggle).toHaveBeenCalledTimes(1);
+    });
+
+    it('"Not now" in full screen keeps the way back: the folded card still has "Back to the conversation" and Escape (#348 review)', () => {
+      const toggle = vi.fn();
+      view({ canFullscreen: true, fullscreen: true, toggle });
+      fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+      expect(screen.getByRole('status').textContent).toBe('Plan not applied — ask again any time.');
+      fireEvent.click(screen.getByRole('button', { name: 'Back to the conversation' }));
+      expect(toggle).toHaveBeenCalledTimes(1);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(toggle).toHaveBeenCalledTimes(2);
     });
 
     it('Escape inline does nothing; a host without full screen gets no button at all', () => {

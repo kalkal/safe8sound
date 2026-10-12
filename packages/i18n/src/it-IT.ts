@@ -190,6 +190,7 @@ export const itIT = {
   'plan.advisory': 'Solo un consiglio: nulla viene acceso o spento in automatico.',
   'plan.applyUtterance': 'Applica il piano',
   'plan.dismissUtterance': 'Non ora',
+  'plan.dismissed': 'Piano non applicato — puoi richiederlo quando vuoi.',
   'plan.appliedAsAdvice': 'Applicato come consiglio: nulla cambia in automatico; segui i passi qui sotto.',
   'plan.applied': 'Piano applicato.',
   'plan.alreadyApplied': 'Il piano era già applicato.',
