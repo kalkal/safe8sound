@@ -28,7 +28,9 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(screen.getByRole('status').textContent).toBe('Loading…');
     // While it waits, the card keeps the height the host first gives its frame: it never shrinks and grows back, which
     // moved the page under a finger (#258, #246).
-    expect(screen.getByRole('status').style.minBlockSize).toBe(`${String(CARD_WAITING_MIN_PX)}px`);
+    // The minimum sits on the whole card, title row included, never on the paragraph inside it (#356).
+    expect(screen.getByTestId('card-waiting').style.minBlockSize).toBe(`${String(CARD_WAITING_MIN_PX)}px`);
+    expect(screen.getByRole('status').style.minBlockSize).toBe('');
   });
 
   it('shows the plan and the guard receipt; Apply calls apply_plan through the host', () => {
@@ -284,6 +286,29 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       const toggle = vi.fn();
       render(<CardApp state={{ kind: 'error', message: 'Apply failed: try again.', retryable: true }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} display={{ canFullscreen: true, fullscreen: true, toggle }} />);
       expect(screen.getByRole('alert').textContent).toBe('Apply failed: try again.');
+      fireEvent.click(screen.getByRole('button', { name: 'Back to the conversation' }));
+      expect(toggle).toHaveBeenCalledTimes(1);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(toggle).toHaveBeenCalledTimes(2);
+    });
+
+    it('"Loading…" in full screen keeps the way back: still a card, "Back to the conversation" and Escape (#356)', () => {
+      const toggle = vi.fn();
+      render(<CardApp state={{ kind: 'waiting' }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} display={{ canFullscreen: true, fullscreen: true, toggle }} />);
+      expect(screen.getByRole('status').textContent).toBe('Loading…');
+      expect(screen.getByRole('region', { name: 'One moment' })).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Back to the conversation' }));
+      expect(toggle).toHaveBeenCalledTimes(1);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(toggle).toHaveBeenCalledTimes(2);
+    });
+
+    it('a card that crashes in full screen keeps the way back: "Back to the conversation" and Escape (#356)', () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const toggle = vi.fn();
+      const broken = { ...hotDayPlan(), steps: null } as unknown as ReturnType<typeof hotDayPlan>;
+      render(<CardApp state={{ kind: 'plan', data: broken }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} display={{ canFullscreen: true, fullscreen: true, toggle }} />);
+      expect(screen.getByRole('alert').textContent).toBe('This card could not be shown.');
       fireEvent.click(screen.getByRole('button', { name: 'Back to the conversation' }));
       expect(toggle).toHaveBeenCalledTimes(1);
       fireEvent.keyDown(document, { key: 'Escape' });

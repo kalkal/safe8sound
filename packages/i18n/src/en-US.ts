@@ -143,6 +143,8 @@ export const enUS = {
   'card.fullScreen': 'Full screen',
   // Full screen shows only the card: the way out says where it goes (owner, 10 Oct: a bare "Back" was missed).
   'card.back': 'Back to the conversation',
+  // The title of a card still waiting for its tool result (#356): "Loading…" follows.
+  'card.waitingTitle': 'One moment',
   'card.loading': 'Loading…',
   'card.failed': 'This card could not be shown.',
   // The title of a card whose tool failed (#353): the reason follows in words.

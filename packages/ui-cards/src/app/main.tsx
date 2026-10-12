@@ -7,6 +7,7 @@ import { setTempUnit, unitOfContext } from '../temp-unit.js';
 import { t } from '../text.js';
 import { cardThemeFor } from '../theme.js';
 import { CardApp } from './CardApp.js';
+import { CardFailed } from './CardErrorBoundary.js';
 import { log, logUnhandled } from './card-log.js';
 import { isCardKind, isStormState, parseCardResult, parseSaveResult, safeTimeZone, type CardKind, type CardState } from './card-kinds.js';
 
@@ -106,7 +107,10 @@ function Card({ kind }: { kind: CardKind }) {
       });
   }, [app, fullscreen]);
 
-  if (error) return <p role="alert">{t('card.failed')}</p>;
+  const display = { canFullscreen: context.availableDisplayModes?.includes('fullscreen') === true, fullscreen, toggle: toggleDisplay };
+
+  // Still a card with its title row (#356): a frame in full screen keeps "Back" and Escape.
+  if (error) return <CardFailed display={display} />;
   return (
     <CardApp
       state={state}
@@ -114,7 +118,7 @@ function Card({ kind }: { kind: CardKind }) {
       canAct={app?.getHostCapabilities()?.serverTools !== undefined}
       // No scrolling on the Echo screen (owner, 10 Oct): inline, the height the host gives this frame.
       {...(fullscreen ? {} : { maxHeight: maxHeightOf(context.containerDimensions) })}
-      display={{ canFullscreen: context.availableDisplayModes?.includes('fullscreen') === true, fullscreen, toggle: toggleDisplay }}
+      display={display}
       {...(notice !== undefined && { notice })}
       onCallTool={(name, args) => {
         void app

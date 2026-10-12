@@ -42,9 +42,9 @@ export function CardApp({ notice, display, maxHeight, ...props }: CardAppProps) 
   // it now shows (e.g. a refusal after Apply).
   const toggle = display !== undefined && (display.fullscreen || offersFullScreen(props.state.kind)) ? <DisplayToggle display={display} /> : null;
   return (
-    <CardErrorBoundary>
+    <CardErrorBoundary display={display}>
       <Fit maxHeight={maxHeight}>
-      {/* "Full screen" sits in the first card's title row; an error is a card too, so a frame in full screen keeps its way back (#353); only "Loading…" has none. */}
+      {/* "Full screen" sits in the first card's title row; "Loading…", an error and a crash are cards too, so a frame in full screen keeps its way back (#353, #356). */}
       <DisplaySlot.Provider value={toggle}>
       {notice !== undefined &&
         (notice.ok ? (
@@ -64,10 +64,16 @@ export function CardApp({ notice, display, maxHeight, ...props }: CardAppProps) 
 function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps, 'notice'>) {
   switch (state.kind) {
     case 'waiting':
+      // A card with its title row (#356): a frame left full screen while it waits keeps "Back" and Escape. The height the
+      // host first gives the frame sits on the whole card, not on the paragraph, so the frame never grows (#258, #246).
       return (
-        <p className="muted" role="status" style={{ minBlockSize: `${String(CARD_WAITING_MIN_PX)}px` }}>
-          {t('card.loading')}
-        </p>
+        <div data-testid="card-waiting" style={{ minBlockSize: `${String(CARD_WAITING_MIN_PX)}px` }}>
+          <CardShell title={t('card.waitingTitle')}>
+            <p className="muted" role="status">
+              {t('card.loading')}
+            </p>
+          </CardShell>
+        </div>
       );
     case 'error':
       // Still a card with its title row (#353): in full screen "Back to the conversation" and Escape stay.

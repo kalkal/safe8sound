@@ -131,6 +131,7 @@ export const itIT = {
   'lastResort.notMedical': 'Sono consigli generali, non un parere medico.',
   'card.fullScreen': 'Schermo intero',
   'card.back': 'Torna alla conversazione',
+  'card.waitingTitle': 'Un momento',
   'card.loading': 'Carico…',
   'card.failed': 'Questa scheda non si può mostrare.',
   'card.errorTitle': 'Qualcosa non è andato',
