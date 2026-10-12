@@ -107,6 +107,9 @@ export const SimApiConfigSchema = z
       /** Phone panel reads per minute, per session and per demo code (#294): a panel polls every 5 s, 12 a minute. */
       phoneReadsPerSessionPerMinute: z.number().int().min(1).max(600),
       phoneReadsPerCodePerMinute: z.number().int().min(1).max(600),
+      /** Browser log lines (POST /v1/log, #125) per minute, per session and overall: a few lines a minute is a broken page. */
+      logLinesPerSessionPerMinute: z.number().int().min(1).max(600),
+      logLinesGlobalPerMinute: z.number().int().min(1).max(10_000),
     }),
     /** The studio voice (F8d, #25, approved in #25): on per stage, one voice, the S3 cache of spoken replies. */
     speech: z.strictObject({

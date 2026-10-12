@@ -2,7 +2,7 @@ import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import { createQuota, memoryQuotaStore, type QuotaLimits, type QuotaStore } from '../src/quota.js';
 
-const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, readCallsPerCodePerDay: 2, readCallsGlobalPerDay: 3, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 2, phoneReadsPerCodePerMinute: 3 };
+const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, readCallsPerCodePerDay: 2, readCallsGlobalPerDay: 3, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 2, phoneReadsPerCodePerMinute: 3, logLinesPerSessionPerMinute: 3, logLinesGlobalPerMinute: 5 };
 // 2026-10-01 23:59:00 UTC: one minute to the daily reset.
 const NOW = Date.UTC(2026, 9, 1, 23, 59, 0);
 
@@ -216,5 +216,29 @@ describe('phone reads per session and per code per minute (#294)', () => {
     await first.phoneRead('judges', 'tab-1');
     await first.phoneRead('judges', 'tab-1');
     expect((await quota(Date.UTC(2026, 9, 8, 18, 31, 0), store).phoneRead('judges', 'tab-1')).ok).toBe(true);
+  });
+});
+
+describe('browser log lines per session and overall per minute (#125)', () => {
+  it('counts the lines of each batch on the session, then overall; past either cap the batch is refused with the time to the next minute', async () => {
+    const q = quota(Date.UTC(2026, 9, 8, 18, 30, 15));
+    expect((await q.logLines('tab-1', 2)).ok).toBe(true);
+    expect(await q.logLines('tab-1', 2)).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', category: 'rate_limited', retryAfterMs: 45_000 } });
+    expect((await q.logLines('tab-1', 1)).ok).toBe(true);
+    expect((await q.logLines('tab-2', 2)).ok).toBe(true);
+    // Overall: 3 + 2 = 5 lines this minute; one more from a fresh session is refused.
+    expect(await q.logLines('tab-3', 1)).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded' } });
+  });
+
+  it('starts again the next minute', async () => {
+    const store = memoryQuotaStore();
+    const first = quota(Date.UTC(2026, 9, 8, 18, 30, 15), store);
+    await first.logLines('tab-1', 3);
+    expect((await quota(Date.UTC(2026, 9, 8, 18, 31, 0), store).logLines('tab-1', 3)).ok).toBe(true);
+  });
+
+  it('a throttled store answers store_unavailable, never an exception', async () => {
+    const throttled: QuotaStore = { consume: () => Promise.reject(Object.assign(new Error('x'), { name: 'ThrottlingException' })), release: () => Promise.resolve() };
+    expect(await quota(NOW, throttled).logLines('tab-1', 1)).toMatchObject({ ok: false, error: { code: 'store_unavailable' } });
   });
 });

@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { ApplyPlanOutputSchema } from '@cold-reserve/contracts';
+import { ApplyPlanOutputSchema, LogEntrySchema } from '@cold-reserve/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDemoSession } from '../../src/agent/demo-session.js';
 import { createRemoteAgent } from '../../src/agent/remote-agent.js';
+import { createLogger } from '../../src/log.js';
+import { createRemoteLogSink } from '../../src/remote-log.js';
 import { fetchReserve } from '../../src/ui/reserve.js';
 
 // Remote mode end to end (#101): the simulator's RemoteAgent and demo session against the REAL local
@@ -19,11 +21,16 @@ const AGENT_MCP = randomBytes(24).toString('hex');
 const SIM_MCP = randomBytes(24).toString('hex');
 const INVOKE = randomBytes(24).toString('hex');
 const children: ChildProcess[] = [];
+/** Everything each app wrote on stdout: its JSON log lines (#125 reads sim-api's). */
+const stdout: Record<string, string> = {};
 let simApi: string;
 
 function start(app: string, env: Record<string, string>): Promise<string> {
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/local.ts'], { cwd: join(APPS, app), env: { ...process.env, PORT: '0', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
   children.push(child);
+  child.stdout.on('data', (d: Buffer) => {
+    stdout[app] = (stdout[app] ?? '') + String(d);
+  });
   child.stderr.on('data', (d: Buffer) => process.stderr.write(`[${app}] ${String(d)}`));
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -187,4 +194,53 @@ describe('remote mode abuse cases are refused', () => {
     expect(res.status).toBe(403);
     expect(await code(res)).toBe('origin_not_allowed');
   });
+});
+
+describe('browser logs reach sim-api (#125): page logger -> remote sink -> POST /v1/log -> one server line', () => {
+  it("a page warning lands in sim-api's log with the turn's correlation id, the home as \"sandbox\", never the token", async () => {
+    const { session } = remote();
+    await session.start(CODE);
+    const token = session.token();
+    if (token === undefined) throw new Error('no session');
+    const sent: Promise<Response>[] = [];
+    const remoteLog = createRemoteLogSink({
+      url: `${simApi}/v1/log`,
+      token: () => session.token(),
+      fetchFn: (url, init) => {
+        const response = fetch(url, init);
+        sent.push(response);
+        return response;
+      },
+      schedule: () => undefined,
+      now: () => Date.now(),
+    });
+    const log = createLogger('alexa-sim', remoteLog.sink, { pageId: crypto.randomUUID() });
+    const turn = crypto.randomUUID();
+    log({ level: 'warn', code: 'phone_inbox_unreachable', correlationId: turn, error: new TypeError('Failed to fetch'), details: { step: 'poll' } });
+    remoteLog.flush();
+    expect((await sent[0])?.status).toBe(204);
+
+    const deadline = Date.now() + 5000;
+    const mine = () =>
+      (stdout['sim-api'] ?? '')
+        .split('\n')
+        .filter((l) => l.includes(turn))
+        .map((l) => JSON.parse(l) as unknown);
+    while (mine().length === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+    const [line] = mine();
+    expect(LogEntrySchema.parse(line)).toMatchObject({
+      level: 'warn',
+      component: 'alexa-sim',
+      message: 'phone_inbox_unreachable',
+      correlationId: turn,
+      code: 'agent_unavailable',
+      category: 'dependency_unavailable',
+      errorName: 'TypeError',
+      details: { step: 'poll', via: 'log_route', codeId: 'judges', home: 'sandbox' },
+    });
+    const text = JSON.stringify(line);
+    expect(text).not.toContain(token);
+    expect(text).not.toContain('demo#');
+    expect(text).not.toContain('Failed to fetch');
+  }, 60_000);
 });

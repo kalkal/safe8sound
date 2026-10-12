@@ -114,8 +114,9 @@ export function createBrowserRecognizer(ctor: RecognitionCtor, opts: { lang: str
       try {
         r.start();
       } catch (error) {
-        // start() throws when a session is still open: the person can press the mic again.
-        log({ level: 'warn', code: 'recognition_failed', error, details: { step: 'start' } });
+        // start() throws when a session is still open: the person can press the mic again (an info line, like every
+        // voice failure the UI handles).
+        log({ level: 'info', code: 'recognition_failed', error, details: { step: 'start' } });
         current = null;
         opts.send({ type: 'RECOGNITION_FAILED', code: 'recognition_failed' });
       }

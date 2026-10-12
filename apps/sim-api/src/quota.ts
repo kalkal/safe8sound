@@ -46,6 +46,9 @@ export interface QuotaLimits {
   readonly phoneReadsPerSessionPerMinute: number;
   /** Phone panel reads per demo code per minute, all its sessions together (#294): the judges may share one code. */
   readonly phoneReadsPerCodePerMinute: number;
+  /** Browser log lines (POST /v1/log, #125) per session (token jti) per minute, and overall per minute. */
+  readonly logLinesPerSessionPerMinute: number;
+  readonly logLinesGlobalPerMinute: number;
 }
 
 export type Quota = ReturnType<typeof createQuota>;
@@ -111,6 +114,20 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
       const perCode = await counted(() => store.consume(`PHONE#CODE#${codeId}#${minute.id}`, limits.phoneReadsPerCodePerMinute, minute.endMs));
       if (!perCode.ok) return perCode;
       return perCode.value ? ok(undefined) : tooOften();
+    },
+    /**
+     * The lines of one browser log batch (#125): per session, then overall. A batch the overall cap refuses keeps its
+     * session count: logs are best effort, and a page that floods only loses its own room sooner.
+     */
+    async logLines(jti: string, lines: number): Promise<Result<void, ErrorEnvelope>> {
+      const minute = window(MINUTE_MS);
+      const tooMany = () => over(minute.retryAfterMs, 'Too many log lines. Wait a moment.');
+      const perSession = await counted(() => store.consume(`LOG#SESSION#${jti}#${minute.id}`, limits.logLinesPerSessionPerMinute, minute.endMs, lines));
+      if (!perSession.ok) return perSession;
+      if (!perSession.value) return tooMany();
+      const overall = await counted(() => store.consume(`LOG#GLOBAL#${minute.id}`, limits.logLinesGlobalPerMinute, minute.endMs, lines));
+      if (!overall.ok) return overall;
+      return overall.value ? ok(undefined) : tooMany();
     },
     async turn(codeId: string): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);

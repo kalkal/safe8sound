@@ -252,6 +252,9 @@ importers:
       '@cold-reserve/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@cold-reserve/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@cold-reserve/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens

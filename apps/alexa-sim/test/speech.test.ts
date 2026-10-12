@@ -123,7 +123,7 @@ describe('createBrowserRecognizer', () => {
     const log = vi.fn();
     createBrowserRecognizer(Broken, { lang: 'en-US', send: (e) => events.push(e), newTurnId: () => 'v1', log }).start();
     expect(events).toEqual([{ type: 'RECOGNITION_FAILED', code: 'recognition_failed' }]);
-    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'warn', code: 'recognition_failed', error: expect.any(DOMException) as unknown, details: { step: 'start' } });
+    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'info', code: 'recognition_failed', error: expect.any(DOMException) as unknown, details: { step: 'start' } });
   });
 });
 

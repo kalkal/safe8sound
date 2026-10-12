@@ -494,6 +494,82 @@ describe('log lines: the shared LogEntry of L1 (#143)', () => {
   });
 });
 
+describe('POST /v1/log: browser warnings and errors reach the server log (#125)', () => {
+  const TURN = '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60';
+  const line = (over: Record<string, unknown> = {}) => ({
+    ts: '2026-10-01T11:59:58.000Z',
+    level: 'warn',
+    component: 'alexa-sim',
+    message: 'phone_inbox_unreachable',
+    correlationId: TURN,
+    code: 'agent_unavailable',
+    category: 'dependency_unavailable',
+    errorName: 'TypeError',
+    ...over,
+  });
+
+  it('answers 204 with no body and writes each line as a shared log line: the turn id, the code id, the home as "sandbox"', async () => {
+    const { send, session, logs } = setup();
+    const res = await send('/v1/log', { token: await session(), body: { lines: [line()] } });
+    expect(res.status).toBe(204);
+    expect(await res.text()).toBe('');
+    const written = logs.filter((l) => l.component === 'alexa-sim');
+    expect(written).toEqual([
+      {
+        ts: new Date(NOW).toISOString(),
+        level: 'warn',
+        component: 'alexa-sim',
+        message: 'phone_inbox_unreachable',
+        correlationId: TURN,
+        code: 'agent_unavailable',
+        category: 'dependency_unavailable',
+        errorName: 'TypeError',
+        details: { via: 'log_route', clientTs: '2026-10-01T11:59:58.000Z', codeId: 'judges', home: 'sandbox' },
+      },
+    ]);
+    for (const l of logs) expect(LogEntrySchema.safeParse(l).success).toBe(true);
+    expect(JSON.stringify(logs)).not.toContain('demo#');
+  });
+
+  it('needs the session token and the demo switched on, like every other route', async () => {
+    const { send, logs } = setup();
+    await problem(await send('/v1/log', { body: { lines: [line()] } }), 401, 'missing_token');
+    await problem(await send('/v1/log', { token: 'forged.token', body: { lines: [line()] } }), 401, 'invalid_signature');
+    const off = setup({ SIM_DEMO_ENABLED: 'false' });
+    await problem(await off.send('/v1/log', { token: 'x', body: { lines: [line()] } }), 403, 'demo_disabled');
+    expect(logs.filter((l) => l.component === 'alexa-sim')).toEqual([]);
+  });
+
+  it('refuses a line outside the strict schema with 400 and never echoes the body', async () => {
+    const { send, session, logs } = setup();
+    const res = await send('/v1/log', { token: await session(), body: { lines: [line({ details: { said: 'my address is 1 Main St' } })] } });
+    const body = await problem(res, 400, 'invalid_input');
+    expect(JSON.stringify(body)).not.toContain('Main St');
+    expect(JSON.stringify(logs)).not.toContain('Main St');
+  });
+
+  it('refuses a body over its own size cap with 413, before reading it', async () => {
+    const { send, session } = setup();
+    await problem(await send('/v1/log', { token: await session(), body: { lines: [line({ details: { pad: 'x' } })], pad: 'y'.repeat(9000) } }), 413, 'payload_too_large');
+  });
+
+  it('caps the lines per session per minute: past it 429 in RFC 9457 with the wait', async () => {
+    const { send, session } = setup({ SIM_LIMIT_LOG_LINES_PER_SESSION_PER_MINUTE: '2' });
+    const token = await session();
+    expect((await send('/v1/log', { token, body: { lines: [line(), line()] } })).status).toBe(204);
+    const refused = await problem(await send('/v1/log', { token, body: { lines: [line()] } }), 429, 'demo_quota_exceeded');
+    expect(refused.retryAfterMs).toBe(60_000);
+    // Another session has its own count.
+    expect((await send('/v1/log', { token: await session(), body: { lines: [line()] } })).status).toBe(204);
+  });
+
+  it('caps the lines of every session together per minute', async () => {
+    const { send, session } = setup({ SIM_LIMIT_LOG_LINES_GLOBAL_PER_MINUTE: '2' });
+    expect((await send('/v1/log', { token: await session(), body: { lines: [line(), line()] } })).status).toBe(204);
+    await problem(await send('/v1/log', { token: await session(), body: { lines: [line()] } }), 429, 'demo_quota_exceeded');
+  });
+});
+
 describe('GET /v1/phone/inbox: the sandbox family phone (#267)', () => {
   const message = { at: '2026-07-17T22:05:00+02:00', role: 'daughter', channel: 'in_app' as const, transition: 'storm_started' as const, text: 'Storm mode is on at home for Ana: the safe room is ready.' };
   const phone = (reply: Result<{ messages: (typeof message)[] }, ErrorEnvelope> = ok({ messages: [message] })) => {

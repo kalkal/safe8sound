@@ -13,7 +13,8 @@ import { parseConfig, type SimConfig } from './config.js';
 import { cardDocument } from './host/card-documents.js';
 import { CardHostProvider } from './host/card-host.js';
 import { Conversation } from './ui/Conversation.js';
-import { configErrorEvent, log, logUnhandled } from './log.js';
+import { addLogSink, configErrorEvent, log, logUnhandled } from './log.js';
+import { createRemoteLogSink } from './remote-log.js';
 import { createInboxPhone } from './phone/inbox-phone.js';
 import { createScriptedPhone, type PhoneFeed } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
@@ -45,6 +46,21 @@ const config = parseConfig(import.meta.env, window.location.search, import.meta.
 // dev server's proxy, which adds the phone token (the browser never holds it).
 // The demo session of remote mode (#101): the code is exchanged for a token, never stored.
 const session = config.ok ? buildSession(config.value) : undefined;
+// Remote mode (#125): the page's warnings and errors also reach sim-api's /v1/log, with the session token, in the
+// background; a closing page sends what is waiting.
+if (session !== undefined && config.ok && config.value.simApiUrl !== undefined) {
+  const remoteLog = createRemoteLogSink({
+    url: `${config.value.simApiUrl}/v1/log`,
+    token: () => session.token(),
+    fetchFn: (url, init) => fetch(url, init),
+    schedule: (run, ms) => {
+      setTimeout(run, ms);
+    },
+    now: () => Date.now(),
+  });
+  addLogSink(remoteLog.sink);
+  window.addEventListener('pagehide', remoteLog.flush);
+}
 // In remote mode (#267) the phone reads the visitor's sandbox inbox from sim-api with that session token.
 const remoteInboxUrl = config.ok && config.value.agent === 'remote' && config.value.simApiUrl !== undefined ? `${config.value.simApiUrl}/v1/phone/inbox` : undefined;
 const scriptedPhone = config.ok && config.value.phone === 'scripted' && remoteInboxUrl === undefined ? createScriptedPhone() : undefined;

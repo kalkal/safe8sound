@@ -20,7 +20,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('a reply that cannot be spoken: answer on screen, one notice, one voice log line for the turn, then calm', async ({ page }) => {
-  type Line = { component?: string; code?: string; correlationId?: string; details?: { phase?: string } };
+  type Line = { component?: string; message?: string; correlationId?: string; details?: { phase?: string } };
   const lines: Line[] = [];
   page.on('console', (message) => {
     try {
@@ -43,6 +43,6 @@ test('a reply that cannot be spoken: answer on screen, one notice, one voice log
   await page.waitForTimeout(1_500);
   const voice = lines.filter((line) => line.details?.phase === 'speaking');
   expect(voice).toHaveLength(1);
-  expect(voice[0]).toMatchObject({ code: 'speech_synthesis_failed', correlationId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+  expect(voice[0]).toMatchObject({ message: 'speech_synthesis_failed', correlationId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
   expect(lines).toHaveLength(1);
 });

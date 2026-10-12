@@ -120,6 +120,8 @@ export class SimApiStack extends Stack {
         SIM_LIMIT_SPEECH_CHARS_GLOBAL: String(simApi.limits.speechCharsGlobalPerDay),
         SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE: String(simApi.limits.phoneReadsPerSessionPerMinute),
         SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE: String(simApi.limits.phoneReadsPerCodePerMinute),
+        SIM_LIMIT_LOG_LINES_PER_SESSION_PER_MINUTE: String(simApi.limits.logLinesPerSessionPerMinute),
+        SIM_LIMIT_LOG_LINES_GLOBAL_PER_MINUTE: String(simApi.limits.logLinesGlobalPerMinute),
         SIM_SPEECH_ENABLED: String(simApi.speech.enabled[stage]),
         SIM_SPEECH_ENGINE: simApi.speech.engine,
         SIM_SPEECH_VOICE: simApi.speech.voice,

@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*",
     "@cold-reserve/design-tokens": "workspace:*",
     "@cold-reserve/i18n": "workspace:*",
     "@cold-reserve/ui-cards": "workspace:*",

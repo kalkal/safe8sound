@@ -60,6 +60,8 @@ const NumbersSchema = z.object({
   speechCharsGlobalPerDay: int(1, 10_000_000),
   phoneReadsPerSessionPerMinute: int(1, 600),
   phoneReadsPerCodePerMinute: int(1, 600),
+  logLinesPerSessionPerMinute: int(1, 600),
+  logLinesGlobalPerMinute: int(1, 10_000),
   maxBodyBytes: int(256, 1_048_576),
 });
 
@@ -99,6 +101,8 @@ export function loadPlainSimApiSettings(env: Readonly<Record<string, string | un
     speechCharsGlobalPerDay: env['SIM_LIMIT_SPEECH_CHARS_GLOBAL'] ?? '30000',
     phoneReadsPerSessionPerMinute: env['SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE'] ?? '20',
     phoneReadsPerCodePerMinute: env['SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE'] ?? '120',
+    logLinesPerSessionPerMinute: env['SIM_LIMIT_LOG_LINES_PER_SESSION_PER_MINUTE'] ?? '30',
+    logLinesGlobalPerMinute: env['SIM_LIMIT_LOG_LINES_GLOBAL_PER_MINUTE'] ?? '600',
     maxBodyBytes: env['SIM_MAX_BODY_BYTES'] ?? '16384',
   });
   if (!numbers.success) return invalid(`A SIM_* number is not valid: ${numbers.error.issues.map((i) => i.path.join('.')).join(', ')}.`);

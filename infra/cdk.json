@@ -72,7 +72,9 @@
         "speechCharsPerCodePerDay": 6000,
         "speechCharsGlobalPerDay": 30000,
         "phoneReadsPerSessionPerMinute": 20,
-        "phoneReadsPerCodePerMinute": 120
+        "phoneReadsPerCodePerMinute": 120,
+        "logLinesPerSessionPerMinute": 30,
+        "logLinesGlobalPerMinute": 600
       },
       "speech": {
         "enabled": {

@@ -24,6 +24,7 @@ import {
 import { CORRELATION_ID_HEADER, SandboxHomeIdSchema, correlationIdFrom } from '@cold-reserve/contracts';
 import type { Clock } from '@cold-reserve/core';
 import type { SimApiConfig, SpeechEngine } from './config.js';
+import { CLIENT_LOG_MAX_BODY_BYTES, ClientLogRequestSchema, clientLogEntries } from './client-log.js';
 import { createQuota, type QuotaStore } from './quota.js';
 import { signSpeechTicket, verifySpeechTicket } from './speech-ticket.js';
 import { signToken, verifyToken, type DemoClaims } from './token.js';
@@ -86,9 +87,12 @@ export interface PhoneInboxPort {
 /** GET: the phone panel polls it with the visitor's session token; no phone token ever reaches the browser (#267). */
 const PHONE_INBOX_PATH = '/v1/phone/inbox';
 
+/** POST: the browser's warnings and errors, in batches, with the visitor's session token (#125). */
+const CLIENT_LOG_PATH = '/v1/log';
+
 export type SimApiHandler = (req: Request, meta: { clientIp: string }) => Promise<Response>;
 
-const ROUTES = new Set(['/v1/session', '/v1/turns', '/v1/tools/call', '/v1/speech']);
+const ROUTES = new Set(['/v1/session', '/v1/turns', '/v1/tools/call', '/v1/speech', CLIENT_LOG_PATH]);
 const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unavailable', 'unauthorized', 'rate_limited']);
 const nameOf = (e: unknown): string => (e instanceof Error ? e.name : typeof e);
 
@@ -254,9 +258,11 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       if (req.method !== 'POST') return fail(toolError('method_not_allowed', 'This endpoint accepts POST only.'), 405, { allow: 'POST, OPTIONS' });
       if (!config.demoEnabled) return fail(toolError('demo_disabled', 'The demo is switched off right now.'));
 
+      // The log route has its own, smaller cap (#125).
+      const maxBytes = path === CLIENT_LOG_PATH ? Math.min(config.maxBodyBytes, CLIENT_LOG_MAX_BODY_BYTES) : config.maxBodyBytes;
       const declared = Number(req.headers.get('content-length') ?? 0);
-      const text = declared > config.maxBodyBytes ? '' : await req.text();
-      if (declared > config.maxBodyBytes || Buffer.byteLength(text) > config.maxBodyBytes) return fail(toolError('payload_too_large', 'The request is too large.'), 413);
+      const text = declared > maxBytes ? '' : await req.text();
+      if (declared > maxBytes || Buffer.byteLength(text) > maxBytes) return fail(toolError('payload_too_large', 'The request is too large.'), 413);
       let body: unknown;
       try {
         body = JSON.parse(text);
@@ -295,6 +301,16 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       codeIdOfRequest = codeId;
 
       if (path === '/v1/speech') return speak(body, codeId, jti);
+
+      if (path === CLIENT_LOG_PATH) {
+        // Never echoed back, never logged as received: only the lines the strict schema accepts are written.
+        const request = ClientLogRequestSchema.safeParse(body);
+        if (!request.success) return fail(toolError('invalid_input', 'Send {"lines": [...]} in the shared log line shape only.'));
+        const allowed = await quota.logLines(jti, request.data.lines.length);
+        if (!allowed.ok) return fail(allowed.error, undefined, {}, codeId);
+        for (const entry of clientLogEntries(request.data, { nowIso: new Date(deps.clock.now()).toISOString(), codeId })) deps.logger.log(entry);
+        return respond(204, null);
+      }
 
       if (path === '/v1/turns') {
         const request = TurnRequestSchema.safeParse(body);

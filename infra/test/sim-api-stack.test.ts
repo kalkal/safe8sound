@@ -82,6 +82,9 @@ describe('sim-api stack (#17)', () => {
       // The phone panel's caps (#294): per session and per demo code, from the CDK config.
       SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE: '20',
       SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE: '120',
+      // The browser log route's caps (#125): lines per session and overall per minute, from the CDK config.
+      SIM_LIMIT_LOG_LINES_PER_SESSION_PER_MINUTE: '30',
+      SIM_LIMIT_LOG_LINES_GLOBAL_PER_MINUTE: '600',
       STATE_TABLE_NAME: 'ColdReserve-dev',
       STATE_STORE_REQUEST_TIMEOUT_MS: '1500',
     });

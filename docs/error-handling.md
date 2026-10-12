@@ -88,6 +88,11 @@ A small CLI (`pnpm errors [--since 24h] [--code ...]`) reads the database log fo
 - The correlation id has one definition: `CORRELATION_ID_HEADER` and `CorrelationIdSchema` (a UUID). `correlationIdFrom(header, fresh)` keeps a well-formed id and makes a fresh one otherwise.
 - A store opened with `storeFor(homeId, { correlationId })` reports its failures with that id (`StoreErrorEvent.correlationId`).
 
+**The browser (#143, #125).**
+- The simulator writes the same `LogEntry` through the shared `Logger` (`apps/alexa-sim/src/log.ts`): to the console, and in remote mode to sim-api's `POST /v1/log` (docs/sim-api.md, "Browser logs"). A line of no turn carries the page's id as its correlation id.
+- A host event that is not a catalog code (`frame_message_rejected`, `unknown_card`, `phone_inbox_*`, `phone_reply_*`, `speech_timeout`, `speech_playback_failed`, `storage_unavailable`) is logged under the catalog code `HOST_EVENT_CODES` gives it, with the event name as the message; any other unknown warning code is logged as `unexpected_error`. So the same code can come from the browser or from a server: a search by code filters by `component` (and by `message` for the exact event). Browser lines never raise the sim-api internal-errors alarm, which watches `Component=sim-api` only. Voice failures the person hears about (no speech, a denied microphone) are info lines and stay in the browser.
+- Only warnings and errors are sent, batched and capped, dropped on any failure; sending never blocks the page and never logs.
+
 **Every tool call (G6, #146).**
 - Each MCP `tools/call` leaves one info line: `tools/call <tool>`, with the tool, `durationMs`, the outcome (`ok` or `error`, plus the error code), the correlation id and the home.
 - Each call also leaves one latency sample in CloudWatch Embedded Metric Format: metric `ToolLatency` in milliseconds, dimension `Tool`, namespace `MCP_METRICS_NAMESPACE` (default `ColdReserve/Mcp`).
