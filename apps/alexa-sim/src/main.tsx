@@ -233,6 +233,16 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
             demo={config.demo}
             onAnswer={onAnswer}
             examples={examples}
+            commands={[
+              { id: 'home_show', phrases: [t('home.show')], run: homePanel.open },
+              { id: 'home_hide', phrases: [t('home.hide')], run: homePanel.close },
+              { id: 'theme_light', phrases: [t('theme.toggle')], run: () => {
+                  setTheme('light');
+                } },
+              { id: 'theme_dark', phrases: [t('theme.darkUtterance')], run: () => {
+                  setTheme('dark');
+                } },
+            ]}
             head={
               <>
                 <Title />

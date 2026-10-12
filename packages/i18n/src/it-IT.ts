@@ -148,6 +148,7 @@ export const itIT = {
   'cardFrame.home': 'Scheda della casa',
   'cardFrame.preferences': 'Scheda delle preferenze',
   'theme.toggle': 'Tema chiaro',
+  'theme.darkUtterance': 'Tema scuro',
   'level.comfort': 'Comfort',
   'level.balanced': 'Equilibrato',
   'level.saver': 'Risparmio',

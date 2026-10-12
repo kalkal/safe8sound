@@ -45,6 +45,28 @@ describe('HomePanel', () => {
     expect(screen.getByTestId('content').contains(screen.getByRole('region', { name: 'My home' }))).toBe(true);
   });
 
+  it('said aloud (idea 4): open() does what the button does, and reads the home once', () => {
+    const onOpen = vi.fn();
+    function Said() {
+      const { button, view, open } = useHomePanel({ status: homeCalm(), renderCard: frame, onOpen });
+      return (
+        <>
+          {button}
+          <button type="button" onClick={open}>
+            say show
+          </button>
+          {view}
+        </>
+      );
+    }
+    render(<Said />);
+    fireEvent.click(screen.getByRole('button', { name: 'say show' }));
+    expect(screen.getByRole('button', { name: 'Hide my home' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByTestId('home-card')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'say show' }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
   it('Escape closes it and gives the focus back to the button', () => {
     render(<HomePanel status={homeCalm()} renderCard={frame} />);
     fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));

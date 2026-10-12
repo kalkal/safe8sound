@@ -21,7 +21,7 @@ export interface HomePanelProps {
  * Three bands (owner, 10 Oct): the button goes in the header band, the home in the content band, in place of the
  * answer. `view` is null while the home is closed.
  */
-export function useHomePanel({ status, renderCard, load = 'idle', onOpen, onRetry }: HomePanelProps): { button: ReactElement; view: ReactElement | null; close: () => void } {
+export function useHomePanel({ status, renderCard, load = 'idle', onOpen, onRetry }: HomePanelProps): { button: ReactElement; view: ReactElement | null; open: () => void; close: () => void } {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const titleId = useId();
@@ -73,5 +73,11 @@ export function useHomePanel({ status, renderCard, load = 'idle', onOpen, onRetr
   const close = useCallback(() => {
     setOpen(false);
   }, []);
-  return { button, view, close };
+  // Every button sayable (idea 4): saying "Show my home" does what tapping it does, and reads the home once.
+  const show = () => {
+    if (open) return;
+    onOpen?.();
+    setOpen(true);
+  };
+  return { button, view, open: show, close };
 }

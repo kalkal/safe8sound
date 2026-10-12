@@ -11,6 +11,7 @@ import { log, voiceFailureEvent } from '../log.js';
 import { useVoice, type StudioVoice } from '../voice/use-voice.js';
 import { useSlowTurn } from './slow-turn.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
+import { pagerSayable, runScreenCommand, type ScreenCommand } from './screen-commands.js';
 import { AnswerCard } from './AnswerCard.js';
 import { addAnswer, currentAnswer, emptyHistory, historyPosition, stepAnswer } from './answer-history.js';
 import { AnswerPager } from './AnswerPager.js';
@@ -37,6 +38,8 @@ export interface ConversationProps {
   onAnswer?: (answer: AgentAnswer) => void;
   /** The example buttons for the home's state (#268): storm examples with the grid down. */
   examples?: readonly ExampleQuestion[];
+  /** Every button sayable (idea 4): the header's buttons (home, theme), run when their label is said or typed. */
+  commands?: readonly ScreenCommand[];
   /** Three bands (owner, 10 Oct): what the header band shows (title, theme, the home button). */
   head?: ReactNode;
   /** The home, when open: shown in the content band in place of the answer. */
@@ -45,15 +48,23 @@ export interface ConversationProps {
   idle?: ReactNode;
 }
 
-export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false, onAnswer, examples, head, homeView, idle }: ConversationProps) {
+export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig, session, studioVoice, demo = false, onAnswer, examples, commands = [], head, homeView, idle }: ConversationProps) {
   const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
   // The voice adapters send machine events; the machine exists only after them, hence the ref.
   const sendRef = useRef<(event: ConversationEvent) => void>(() => undefined);
+  // The buttons on screen now, by their labels (idea 4); set at each render, read when something is said or typed.
+  const commandsRef = useRef<readonly ScreenCommand[]>([]);
+  /** A button's label, said or typed, taps that button: true when it did, so it is not asked to the agent. */
+  const runCommand = (text: string, turnId: string): boolean => runScreenCommand(text, turnId, commandsRef.current, log);
   const voice = useVoice(
     voiceConfig,
     (event) => {
+      if (event.type === 'SPEECH_RECOGNISED' && runCommand(event.transcript, event.turnId)) {
+        sendRef.current({ type: 'CANCEL' });
+        return;
+      }
       sendRef.current(event);
     },
     studioVoice,
@@ -134,7 +145,8 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
 
   const onSubmit = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    send({ type: 'TEXT_SUBMITTED', text: draft, turnId: crypto.randomUUID() });
+    const turnId = crypto.randomUUID();
+    if (!runCommand(draft, turnId)) send({ type: 'TEXT_SUBMITTED', text: draft, turnId });
     setDraft('');
   };
   const thinking = snapshot.matches('thinking');
@@ -143,6 +155,31 @@ export function Conversation({ agent, turnBudgetMs, timeZone, voice: voiceConfig
   const homeShown = homeView !== undefined && homeView !== null && !busy;
   // Nothing asked yet: the content band explains what to ask.
   const firstScreen = !busy && !homeShown && history.turns.length === 0 && !snapshot.matches('speaking');
+  const step = (delta: 1 | -1) => {
+    setHistory((previous) => stepAnswer(previous, delta));
+  };
+  // The answer pager's buttons, while it is on screen, then the header's (home, theme) from the frame.
+  commandsRef.current = [
+    ...(pagerSayable({ thinking, failed: snapshot.matches('failed'), homeOpen: homeView !== undefined && homeView !== null, hasAnswers: position !== undefined })
+      ? [
+          {
+            id: 'previous_answer',
+            phrases: [t('answers.previous'), t('answers.previousShort')],
+            run: () => {
+              step(-1);
+            },
+          },
+          {
+            id: 'next_answer',
+            phrases: [t('answers.next'), t('answers.nextShort')],
+            run: () => {
+              step(1);
+            },
+          },
+        ]
+      : []),
+    ...commands,
+  ];
   // A cold start can take most of the browser's wait (#270): after a while the screen says so, honestly.
   const slowTurn = useSlowTurn(thinking);
 

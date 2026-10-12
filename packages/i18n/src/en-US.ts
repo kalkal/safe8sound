@@ -159,6 +159,8 @@ export const enUS = {
   'cardFrame.home': 'Home card',
   'cardFrame.preferences': 'Preferences card',
   'theme.toggle': 'Light theme',
+  /** Said aloud only (idea 4, every button sayable): the way back from the light theme. */
+  'theme.darkUtterance': 'Dark theme',
   'level.comfort': 'Comfort',
   'level.balanced': 'Balanced',
   'level.saver': 'Saver',

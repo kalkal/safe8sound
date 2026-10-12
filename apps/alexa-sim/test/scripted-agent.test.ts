@@ -1,4 +1,5 @@
 import { PlanSchema, ReserveOutlookSchema } from '@cold-reserve/contracts';
+import { CATALOGS } from '@cold-reserve/i18n';
 import { describe, expect, it } from 'vitest';
 import { lastResortPlan } from '@cold-reserve/ui-cards';
 import { SCRIPTED_LAST_RESORT_TOKEN } from '../src/agent/script-fixtures.js';
@@ -111,6 +112,14 @@ describe('ScriptedAgent', () => {
     const card = reply.ok ? reply.value.cards?.[0] : undefined;
     expect(card?.tool).toBe('apply_plan');
     expect(card?.tool === 'apply_plan' ? card.result.plan.status : undefined).toBe('applied');
+  });
+
+  it('every button sayable (idea 4): the plan card button and the safe-room chip, said as shown, get their answer', async () => {
+    const a = agent();
+    const apply = await a.ask(CATALOGS['en-US']['plan.apply'], ctx);
+    expect(apply.ok ? apply.value.cards?.[0]?.tool : undefined).toBe('apply_plan');
+    const safe = await a.ask(CATALOGS['en-US']['examples.safeRoom'], ctx);
+    expect(safe.ok ? safe.value.cards?.[0]?.tool : undefined).toBe('get_safe_room_status');
   });
 
   it('rejects a script that points a card at an unknown fixture', () => {
