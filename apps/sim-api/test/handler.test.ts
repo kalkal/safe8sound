@@ -412,6 +412,20 @@ describe('refusals (review of #110)', () => {
     expect(called.map((c) => c.name)).toEqual(['get_reserve_outlook', 'get_home_status', 'apply_plan']);
   });
 
+  it('time pack: set_scenario, get_milestones and advance_clock go on the demo count: apply_plan stays available', async () => {
+    const { send, session, called } = setup({ SIM_LIMIT_TOOL_CALLS_PER_CODE: '1', SIM_LIMIT_DEMO_CALLS_PER_CODE: '3' });
+    const token = await session();
+    const demo = [
+      { name: 'set_scenario', arguments: { scenarioId: 'storm-blackout' } },
+      { name: 'get_milestones', arguments: {} },
+      { name: 'advance_clock', arguments: { hours: 1 } },
+    ];
+    for (const body of demo) expect((await send('/v1/tools/call', { token, body })).status).toBe(200);
+    await problem(await send('/v1/tools/call', { token, body: { name: 'advance_clock', arguments: { hours: 1 } } }), 429, 'demo_quota_exceeded');
+    expect((await send('/v1/tools/call', { token, body: { name: 'apply_plan', arguments: { planId: 'plan-0001' } } })).status).toBe(200);
+    expect(called.map((c) => c.name)).toEqual(['set_scenario', 'get_milestones', 'advance_clock', 'apply_plan']);
+  });
+
   it('#334: a read the overall cap refuses whose give-back fails is still a 429, and the failure is a warn line', async () => {
     const memory = memoryQuotaStore();
     const releaseFails: QuotaStore = {

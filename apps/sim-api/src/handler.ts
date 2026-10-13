@@ -92,6 +92,8 @@ const CLIENT_LOG_PATH = '/v1/log';
 
 export type SimApiHandler = (req: Request, meta: { clientIp: string }) => Promise<Response>;
 
+/** The simulated clock and the scenario (time pack): their own daily count per code, never apply_plan's writes. */
+const DEMO_CLOCK_TOOLS: ReadonlySet<string> = new Set(['set_scenario', 'get_milestones', 'advance_clock']);
 const ROUTES = new Set(['/v1/session', '/v1/turns', '/v1/tools/call', '/v1/speech', CLIENT_LOG_PATH]);
 const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unavailable', 'unauthorized', 'rate_limited']);
 const nameOf = (e: unknown): string => (e instanceof Error ? e.name : typeof e);
@@ -330,7 +332,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
 
       const request = ToolCallRequestSchema.safeParse(body);
       if (!request.success) return fail(toolError('invalid_input', 'Only card actions can be called here.'));
-      const allowed = await quota.toolCall(codeId, CARD_TOOL_ACCESS[request.data.name], (errorName) => {
+      const allowed = await quota.toolCall(codeId, DEMO_CLOCK_TOOLS.has(request.data.name) ? 'demo' : CARD_TOOL_ACCESS[request.data.name], (errorName) => {
         deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'warn', component: 'sim-api', message: 'read_refund_failed', correlationId, errorName, details: { codeId } });
       });
       if (!allowed.ok) return fail(allowed.error, undefined, {}, codeId);

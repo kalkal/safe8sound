@@ -78,6 +78,7 @@ describe('sim-api stack (#17)', () => {
       SIM_LIMIT_TOOL_CALLS_PER_CODE: '20',
       SIM_LIMIT_READ_CALLS_PER_CODE: '200',
       SIM_LIMIT_READ_CALLS_GLOBAL: '2000',
+      SIM_LIMIT_DEMO_CALLS_PER_CODE: '150',
       SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR: '10',
       // The phone panel's caps (#294): per session and per demo code, from the CDK config.
       SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE: '20',

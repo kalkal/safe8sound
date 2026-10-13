@@ -2,7 +2,7 @@ import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import { createQuota, memoryQuotaStore, type QuotaLimits, type QuotaStore } from '../src/quota.js';
 
-const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, readCallsPerCodePerDay: 2, readCallsGlobalPerDay: 3, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 2, phoneReadsPerCodePerMinute: 3, logLinesPerSessionPerMinute: 3, logLinesGlobalPerMinute: 5 };
+const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, readCallsPerCodePerDay: 2, readCallsGlobalPerDay: 3, demoCallsPerCodePerDay: 2, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 2, phoneReadsPerCodePerMinute: 3, logLinesPerSessionPerMinute: 3, logLinesGlobalPerMinute: 5 };
 // 2026-10-01 23:59:00 UTC: one minute to the daily reset.
 const NOW = Date.UTC(2026, 9, 1, 23, 59, 0);
 
@@ -43,6 +43,15 @@ describe('daily caps, checked before calling the agent (plan §13.2.4), reset at
     expect((await q.toolCall('judges', 'read')).ok).toBe(true);
     expect(await q.toolCall('judges', 'read')).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', retryable: true, retryAfterMs: 60_000 } });
     expect((await q.toolCall('judges', 'write')).ok).toBe(true);
+  });
+
+  it('time pack: the simulated clock and the scenario have their own count: a storm story never leaves apply_plan with a 429', async () => {
+    const q = quota();
+    expect((await q.toolCall('judges', 'demo')).ok).toBe(true);
+    expect((await q.toolCall('judges', 'demo')).ok).toBe(true);
+    expect(await q.toolCall('judges', 'demo')).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', retryable: true } });
+    expect((await q.toolCall('judges', 'write')).ok).toBe(true);
+    expect((await q.toolCall('judges', 'read')).ok).toBe(true);
   });
 
   it('#334: the overall read cap holds across codes, and a refused read gives its per-code count back', async () => {

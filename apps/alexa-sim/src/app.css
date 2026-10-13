@@ -897,16 +897,20 @@
 /* The judge's demo settings (B1): the scenario badge above the device (never inside its 16:10 screen), and the
    drawer: at the side on a wide screen, a sheet from the bottom on a phone. Rows of 56 px; the choice is marked ✓. */
 @layer surfaces {
-  /* The badge at the start, the language at the end (owner, 10 Oct). */
+  /* The badge and the simulated clock (time pack, 12 Oct) at the start, the language at the end (owner, 10 Oct). */
   .echo-top {
     display: flex;
     grid-column: 1 / -1;
     justify-self: stretch;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-2);
     min-inline-size: 0;
     padding: var(--space-3) var(--space-3) 0;
+  }
+
+  /* The first of the language note and icon takes the free space before it: the language sits at the end. */
+  .echo-top > :is(.language-toggle, .language-top-note):not(.language-top-note + *) {
+    margin-inline-start: auto;
   }
 
   /* The language icon at the top (owner, 10 Oct): quiet, the icon and the other language's name. */
@@ -951,9 +955,9 @@
     display: none;
   }
 
-  /* Where the note shares the row with a long badge, the badge shows the scenario alone so the note fits. */
+  /* Where the note or the simulated clock shares the row with a long badge, the badge shows the scenario alone so they fit. */
   @media (width < 80rem) {
-    .echo-top:has(> .language-top-note) .badge-long {
+    .echo-top:has(> .language-top-note, > .sim-clock) .badge-long {
       position: absolute;
       overflow: hidden;
       inline-size: 1px;
@@ -962,7 +966,7 @@
       white-space: nowrap;
     }
 
-    .echo-top:has(> .language-top-note) .badge-short {
+    .echo-top:has(> .language-top-note, > .sim-clock) .badge-short {
       display: inline;
     }
   }
@@ -1035,6 +1039,100 @@
     font-size: var(--font-size-min);
     text-align: start;
     cursor: pointer;
+  }
+
+  .echo-top > .scenario-badge {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The clock's line gives way first: the language note beside it is read in full. */
+  .sim-clock {
+    display: flex;
+    flex: 0 1000 auto;
+    align-items: center;
+    gap: var(--space-2);
+    box-sizing: border-box;
+    min-inline-size: 0;
+    min-block-size: var(--target-min);
+    padding-inline-start: var(--space-3);
+    /* An outline drawn inside, not a border: the pill stays one target high around its 48 px button. */
+    outline: var(--border-thin) solid var(--surface-card-line);
+    outline-offset: calc(var(--border-thin) * -1);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+    font-size: var(--font-size-min);
+  }
+
+  .sim-clock-time {
+    font-family: var(--font-data);
+    white-space: nowrap;
+
+    & time {
+      font-weight: var(--font-weight-bold);
+    }
+  }
+
+  .sim-clock-badge {
+    color: var(--text-secondary);
+  }
+
+  /* The short mark is the phone's (below). */
+  .sim-clock-short {
+    display: none;
+  }
+
+  .sim-clock-note {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--text-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sim-clock-skip {
+    flex: none;
+    font-size: var(--font-size-min);
+  }
+
+  /* A phone: the clock stays on the badge's row (the screen and its ice cubes keep their place): "SIM", the time and
+     the button's arrows; SIMULATED, the line and the button's words stay for screen readers (and can be said). */
+  @media (width < 48rem) {
+    .sim-clock {
+      flex: none;
+      gap: var(--space-1);
+    }
+
+    /* The badge takes what the clock and the icon leave (cut with an ellipsis): the row never wraps for it. */
+    .echo-top:has(> .sim-clock) > .scenario-badge {
+      flex: 1 1 0;
+      max-inline-size: max-content;
+    }
+
+    .sim-clock-long,
+    .sim-clock-note,
+    .sim-clock-words {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* "SIM" stays in sight: the time never looks like the real hour (review of #378). */
+    .sim-clock-short {
+      display: inline;
+    }
+
+    .sim-clock-skip {
+      min-inline-size: var(--target-min);
+      padding-inline: var(--space-2);
+    }
   }
 
   .settings-drawer {

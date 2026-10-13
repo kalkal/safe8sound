@@ -37,6 +37,8 @@ export interface QuotaLimits {
   /** Card reads (`CARD_TOOL_ACCESS` read) per demo code and overall per UTC day (#334): reads never use up the writes. */
   readonly readCallsPerCodePerDay: number;
   readonly readCallsGlobalPerDay: number;
+  /** The simulated clock and the scenario (set_scenario, get_milestones, advance_clock) per demo code per UTC day (time pack). */
+  readonly demoCallsPerCodePerDay: number;
   /** Wrong demo codes per client IP per hour (a right code gives its attempt back, review of #139). */
   readonly codeAttemptsPerIpPerHour: number;
   /** Characters spoken by Polly per demo code and overall per UTC day; cache hits are free (approved in #25). */
@@ -164,8 +166,14 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
      * One card call, on the counter of its kind (#334): a write on `TOOLS#`, a read on `READS#` per code, then on the
      * overall read count. A read the overall cap refuses gives its per-code count back, like the spoken characters.
      */
-    async toolCall(codeId: string, access: 'read' | 'write', onGiveBackFailed?: (errorName: string) => void): Promise<Result<void, ErrorEnvelope>> {
+    async toolCall(codeId: string, access: 'read' | 'write' | 'demo', onGiveBackFailed?: (errorName: string) => void): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);
+      // The simulated clock and the scenario (time pack): their own count, so a storm story never blocks apply_plan.
+      if (access === 'demo') {
+        const allowed = await counted(() => store.consume(`DEMO#${codeId}#${day.id}`, limits.demoCallsPerCodePerDay, day.endMs));
+        if (!allowed.ok) return allowed;
+        return allowed.value ? ok(undefined) : over(day.retryAfterMs, DAILY);
+      }
       if (access === 'write') {
         const allowed = await counted(() => store.consume(`TOOLS#${codeId}#${day.id}`, limits.toolCallsPerCodePerDay, day.endMs));
         if (!allowed.ok) return allowed;

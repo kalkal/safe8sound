@@ -131,6 +131,8 @@ export const SimApiConfigSchema = z
       /** Card reads (contracts CARD_TOOL_ACCESS) per demo code and overall per UTC day (#334): reads never use up the writes. */
       readCallsPerCodePerDay: z.number().int().min(1).max(10_000),
       readCallsGlobalPerDay: z.number().int().min(1).max(1_000_000),
+      /** The simulated clock and the scenario (set_scenario, get_milestones, advance_clock) per demo code per UTC day (time pack). */
+      demoCallsPerCodePerDay: z.number().int().min(1).max(10_000),
       codeAttemptsPerIpPerHour: z.number().int().min(1).max(1000),
       /** Characters Polly may speak per demo code and overall per UTC day; cache hits are free (approved in #25). */
       speechCharsPerCodePerDay: z.number().int().min(1).max(1_000_000),

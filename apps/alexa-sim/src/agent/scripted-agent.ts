@@ -5,6 +5,7 @@ import { log as defaultLog, type Log } from '../log.js';
 import { PHONE_FIXTURE_NAMES, phoneMessage } from '../phone/phone-fixtures.js';
 import type { ScriptedPhone } from '../phone/phone-feed.js';
 import { SCRIPT_FIXTURES, SCRIPT_FIXTURE_NAMES } from './script-fixtures.js';
+import { createScriptedClock } from './scripted-clock.js';
 import { refuseAction, scriptedToolCall } from './scripted-tools.js';
 import { StatusFactsSchema, type ToolName } from './wire.js';
 
@@ -76,11 +77,15 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
     .filter((entry) => options.degraded !== true || (entry.withStatus && entry.cards === undefined && entry.phone === undefined))
     .map((entry) => ({ ...entry, patterns: entry.patterns.map(normalise) }));
   const fallback = options.degraded === true ? script.degradedFallback : script.fallback;
+  // The simulated clock of the scripted home: the storm night's moments, the phone told on the way.
+  const clock = createScriptedClock(options.phone === undefined ? {} : { phone: options.phone });
 
   return ok({
     canCallTools: options.degraded !== true,
     callTool: (name, args, context) => {
       if (options.degraded === true) return Promise.resolve(refuseAction());
+      const clocked = clock.call(name, args);
+      if (clocked !== undefined) return Promise.resolve(clocked);
       const result = scriptedToolCall(name, args, script.status?.ts);
       // The card says the family was told (familyAlert.sent): the scripted phone gets that message, as the server sends it.
       const alert = result.structuredContent?.['familyAlert'];

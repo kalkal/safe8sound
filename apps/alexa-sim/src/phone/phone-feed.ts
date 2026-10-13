@@ -12,6 +12,8 @@ export interface PhoneFeed {
   readonly subscribe: (listener: () => void) => () => void;
   /** The family's reply (queue item 3, #24); absent when the phone cannot answer. */
   readonly reply?: (reply: PhoneReply) => Promise<PhoneReplyResult>;
+  /** Reads the messages now (the simulated clock moved), when the feed reads them from somewhere. */
+  readonly refresh?: () => void;
 }
 
 export interface ScriptedPhone extends PhoneFeed {

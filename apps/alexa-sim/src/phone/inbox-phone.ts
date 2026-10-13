@@ -140,6 +140,10 @@ export function createInboxPhone(options: InboxPhoneOptions): PhoneFeed {
     // Remote mode has no reply route yet (sim-api will add POST /v1/phone/reply): no buttons rather than buttons that fail.
     ...(options.inboxUrl === undefined ? { reply } : {}),
     messages: () => current,
+    // The clock moved (time pack): read now rather than at the next poll; the usual rules (one read, pause) apply.
+    refresh: () => {
+      if (listeners.size > 0) void poll();
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       if (timer === undefined) {

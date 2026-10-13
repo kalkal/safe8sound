@@ -27,9 +27,17 @@ export function chainEnv() {
   const agentMcp = secret('SITE_E2E_AGENT_MCP');
   const simMcp = secret('SITE_E2E_SIM_MCP');
   const invoke = secret('SITE_E2E_INVOKE');
+  // As deployed (#267): sim-api reads the visitor sandbox's family inbox with its own phone token.
+  const phone = secret('SITE_E2E_PHONE');
   const mcpUrl = `http://127.0.0.1:${String(PORTS.mcp)}/mcp`;
   return {
-    mcp: { PORT: String(PORTS.mcp), MCP_CLIENTS: `agent:agent@demo#*=${agentMcp},cards:simapi@demo#*=${simMcp}`, MCP_SCENARIO: 'clear-day', MCP_SCENARIO_START_H: '14', MCP_SCENARIO_SPEED: '0' },
+    // As deployed: a sandbox's day starts at the scenario's start (no start hour), so the storm lies ahead of a power cut.
+    mcp: {
+      PORT: String(PORTS.mcp),
+      MCP_CLIENTS: `agent:agent@demo#*=${agentMcp},cards:simapi@demo#*=${simMcp},phone:daughter@demo#*=${phone}`,
+      MCP_SCENARIO: 'clear-day',
+      MCP_SCENARIO_SPEED: '0',
+    },
     agent: { PORT: String(PORTS.agent), AGENT_MCP_URL: mcpUrl, AGENT_MCP_TOKEN: agentMcp, AGENT_INVOKE_TOKEN: invoke },
     simApi: {
       PORT: String(PORTS.simApi),
@@ -41,6 +49,7 @@ export function chainEnv() {
       AGENT_INVOKE_TOKEN: invoke,
       SIM_MCP_URL: mcpUrl,
       SIM_MCP_TOKEN: simMcp,
+      SIM_PHONE_TOKEN: phone,
       // As on AWS (#243): sim-api serves only what came through the distribution, which adds this secret.
       SIM_ORIGIN_SECRET: originSecret(), // gitleaks:allow (random per test run)
     },

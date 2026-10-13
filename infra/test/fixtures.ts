@@ -45,7 +45,7 @@ export const exampleConfig = (): InfraConfig => ({
     allowedOrigins: [],
     demoEnabled: { dev: true, demo: true },
     tokenTtlS: 3600,
-    limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, readCallsPerCodePerDay: 200, readCallsGlobalPerDay: 2000, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 20, phoneReadsPerCodePerMinute: 120, logLinesPerSessionPerMinute: 30, logLinesGlobalPerMinute: 600 },
+    limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, readCallsPerCodePerDay: 200, readCallsGlobalPerDay: 2000, demoCallsPerCodePerDay: 150, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 20, phoneReadsPerCodePerMinute: 120, logLinesPerSessionPerMinute: 30, logLinesGlobalPerMinute: 600 },
     speech: { enabled: { dev: false, demo: true }, engine: 'neural', voice: 'Joanna', pollyTimeoutMs: 2500, cacheTimeoutMs: 1000, cacheDays: 30 },
   },
 });

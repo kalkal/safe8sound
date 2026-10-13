@@ -115,6 +115,7 @@ export class SimApiStack extends Stack {
         SIM_LIMIT_TOOL_CALLS_PER_CODE: String(simApi.limits.toolCallsPerCodePerDay),
         SIM_LIMIT_READ_CALLS_PER_CODE: String(simApi.limits.readCallsPerCodePerDay),
         SIM_LIMIT_READ_CALLS_GLOBAL: String(simApi.limits.readCallsGlobalPerDay),
+        SIM_LIMIT_DEMO_CALLS_PER_CODE: String(simApi.limits.demoCallsPerCodePerDay),
         SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR: String(simApi.limits.codeAttemptsPerIpPerHour),
         SIM_LIMIT_SPEECH_CHARS_PER_CODE: String(simApi.limits.speechCharsPerCodePerDay),
         SIM_LIMIT_SPEECH_CHARS_GLOBAL: String(simApi.limits.speechCharsGlobalPerDay),

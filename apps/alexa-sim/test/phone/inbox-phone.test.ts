@@ -302,3 +302,18 @@ describe('createInboxPhone', () => {
     });
   });
 });
+
+describe('createInboxPhone refresh (time pack: the simulated clock moved)', () => {
+  it('reads at once while the panel is on screen, not at the next poll; nothing while it is not', async () => {
+    const { phone, calls } = setup(() => Promise.resolve(json(200, { messages: [phoneMessage('storm-started')] })));
+    phone.refresh?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toHaveLength(0);
+    phone.subscribe(() => undefined);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toHaveLength(1);
+    phone.refresh?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toHaveLength(2);
+  });
+});

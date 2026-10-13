@@ -5,6 +5,7 @@ import { useMachine } from '@xstate/react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SyntheticEvent } from 'react';
 import { fromPromise } from 'xstate';
 import type { Agent, AgentAnswer, DemoSession } from '../agent/index.js';
+import type { AskContext } from '../agent/agent.js';
 import type { VoiceConfig } from '../config.js';
 import { conversationMachine, type AskInput, type AskOutput, type ConversationEvent } from '../machine.js';
 import { log, voiceFailureEvent } from '../log.js';
@@ -52,6 +53,11 @@ export interface ConversationProps {
   onCloseHome?: () => void;
   /** The steps (idea 5): the turns whose plan was applied from its card, at "Confirm". */
   appliedTurns?: ReadonlySet<string>;
+  /**
+   * Runs before the question goes to the agent (time pack, 12 Oct): "Power cut" first makes the simulated grid go
+   * down. A failure fails the turn, honestly, and Retry runs it again.
+   */
+  prepareTurn?: (question: string, context: AskContext) => Promise<Result<void, ErrorEnvelope>>;
 }
 
 export function Conversation({
@@ -70,7 +76,11 @@ export function Conversation({
   idle,
   onCloseHome,
   appliedTurns,
+  prepareTurn,
 }: ConversationProps) {
+  // Read when a turn starts: the machine is built once, the frame may hand a new function at each render.
+  const prepareRef = useRef(prepareTurn);
+  prepareRef.current = prepareTurn;
   const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
@@ -100,7 +110,12 @@ export function Conversation({
           askAgent: fromPromise<Result<AskOutput, ErrorEnvelope>, AskInput>(async ({ input, signal }) => {
             const result = await queryClient.query<TurnResult>({
               queryKey: turnKey(input.turnId),
-              queryFn: () => agent.ask(input.question, { correlationId: input.turnId, signal, locale: getLocale() }),
+              queryFn: async () => {
+                const context = { correlationId: input.turnId, signal, locale: getLocale() };
+                const prepared = await prepareRef.current?.(input.question, context);
+                if (prepared !== undefined && !prepared.ok) return prepared;
+                return agent.ask(input.question, context);
+              },
               staleTime: Infinity,
               retry: false,
             });
