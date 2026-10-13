@@ -49,7 +49,35 @@
   /* Too tall even at the readable scale (owner, 12 Oct: never a thumbnail): cut at the height, the end fading out, and
      "Full screen" in the title row shows the whole page. */
   .fit[data-cramped="true"] {
+    /* Hidden, not clip: the cut frame is the box its button row sticks to (#371). Still never scrolled by a finger or a
+       wheel; only the focus can move it, so a control reached with Tab below the cut comes into view. */
+    overflow: hidden;
     mask: linear-gradient(to bottom, currentcolor calc(100% - var(--space-6)), transparent);
+  }
+
+  /* A cut page keeps its button row in view (#371): the bright button is never half cut, and Tab never lands on a
+     button nobody sees. The row stays at the frame's bottom edge over the cut content, which fades out just above it. */
+  .fit[data-cramped="true"]:has(.plan-actions:not([hidden] *)) {
+    mask: none;
+  }
+
+  .fit[data-cramped="true"] .plan-actions {
+    position: sticky;
+    inset-block-end: calc(-1 * var(--fit-overhang, 0px));
+    z-index: 1;
+    /* Room below for the focus ring, which the cut would clip. */
+    padding-block: var(--space-1) var(--space-2);
+    background: var(--surface-card);
+
+    &::before {
+      position: absolute;
+      inset-block-end: 100%;
+      inset-inline: 0;
+      block-size: var(--space-3);
+      background: linear-gradient(to bottom, transparent, var(--surface-card));
+      content: "";
+      pointer-events: none;
+    }
   }
 
   /* A card inside a page of another card (the plan's safety check) is that page's content, not a second frame. */

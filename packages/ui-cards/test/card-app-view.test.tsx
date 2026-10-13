@@ -288,6 +288,8 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       expect(fit?.getAttribute('data-scale')).toBe('0.8');
       expect(fit?.getAttribute('data-cramped')).toBe('true');
       expect(fit?.getAttribute('style')).toContain('block-size: 300px');
+      // #371: the button row stays at the cut, lowered by what the scaled page shows past 300 px (375 - 300).
+      expect(fit?.getAttribute('style')).toContain('--fit-overhang: 75px');
       vi.restoreAllMocks();
     });
 

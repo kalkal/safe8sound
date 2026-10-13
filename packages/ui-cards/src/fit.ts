@@ -15,6 +15,15 @@ export function fitScale(natural: number, maxHeight: number | undefined): number
   return Math.max(MIN_FIT_SCALE, Math.floor((maxHeight / natural) * 1000) / 1000);
 }
 
+/**
+ * How far the visible end of a page scaled by `scale` lies below the frame's `height`, in the page's unscaled px
+ * (#371: the browser places a sticky button row in those px). Rounded down, so the row never ends past the cut.
+ */
+export function fitOverhang(height: number, scale: number): number {
+  if (height <= 0 || scale <= 0 || scale >= 1) return 0;
+  return Math.floor(height / scale - height);
+}
+
 /** True when a page of `natural` px does not fit in `maxHeight` px even at MIN_FIT_SCALE. */
 export function fitCramped(natural: number, maxHeight: number | undefined): boolean {
   return known(natural, maxHeight) && natural * MIN_FIT_SCALE > maxHeight;

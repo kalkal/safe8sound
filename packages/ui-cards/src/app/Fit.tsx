@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { fitCramped, fitScale } from '../fit.js';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { fitCramped, fitOverhang, fitScale } from '../fit.js';
 
 /** Below this height the giant numbers drop to their smallest size (--font-size-hero-min). */
 const TIGHT_BELOW_PX = 420;
@@ -43,10 +43,17 @@ export function Fit({ maxHeight, onCramped, children }: { maxHeight: number | un
   }, [cramped]);
   const height = cramped && maxHeight !== undefined ? maxHeight : Math.floor(natural * scale);
   return (
-    <div className="fit" data-scale={scale} data-cramped={cramped} style={scale < 1 ? { blockSize: `${String(height)}px` } : undefined}>
+    <div className="fit" data-scale={scale} data-cramped={cramped} style={scale < 1 ? fitStyle(height, scale, cramped) : undefined}>
       <div ref={inner} className="fit-inner" style={scale < 1 ? { transform: `scale(${String(scale)})` } : undefined}>
         {children}
       </div>
     </div>
   );
+}
+
+/** The frame's height and, on a cut page, the overhang its button row is lowered by to stay at the cut (#371). */
+function fitStyle(height: number, scale: number, cramped: boolean): CSSProperties {
+  const style: Record<string, string> = { blockSize: `${String(height)}px` };
+  if (cramped) style['--fit-overhang'] = `${String(fitOverhang(height, scale))}px`;
+  return style;
 }

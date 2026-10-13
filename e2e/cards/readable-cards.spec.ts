@@ -57,6 +57,37 @@ async function expectEveryPageReadable(page: Page, card: FrameLocator, large: bo
   }
 }
 
+/** True when `inner` lies wholly inside `outer` (half a pixel of rounding allowed). */
+function inside(inner: { x: number; y: number; width: number; height: number } | null, outer: { x: number; y: number; width: number; height: number } | null): boolean {
+  if (inner === null || outer === null) return false;
+  return inner.y >= outer.y - 0.5 && inner.y + inner.height <= outer.y + outer.height + 0.5 && inner.x >= outer.x - 0.5 && inner.x + inner.width <= outer.x + outer.width + 0.5;
+}
+
+// #371: on a small Echo (960 × 480) the owner's answer cut the plan at the frame's height; Tab reached "Apply plan" below
+// the cut, its focus invisible, and the bright button showed half cut. The button row stays in view, whole.
+test("at 960 × 480 the plan under the owner's answer keeps its buttons whole and in view, and Tab on them is seen (#371)", async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 480 });
+  await askAsTheOwnerDid(page);
+  await page.getByRole('tab', { name: 'Plan' }).click();
+  const card = page.frameLocator('iframe[title="Plan card"]');
+  const apply = card.getByRole('button', { name: 'Apply plan' });
+  const notNow = card.getByRole('button', { name: 'Not now' });
+  await expect(apply).toBeVisible();
+  await expectScreenSettled(page);
+  const frame = await card.locator('.fit').boundingBox();
+  expect(inside(await apply.boundingBox(), frame), 'Apply plan whole inside the frame').toBe(true);
+  expect(inside(await notNow.boundingBox(), frame), 'Not now whole inside the frame').toBe(true);
+  // Keyboard: Tab from the title row's last control lands on the row, and the focused button is whole inside the frame.
+  const fullScreen = card.getByRole('button', { name: 'Full screen' });
+  await ((await fullScreen.count()) > 0 ? fullScreen : card.getByRole('button', { name: 'Next page' })).focus();
+  await page.keyboard.press('Tab');
+  await expect(apply).toBeFocused();
+  expect(inside(await apply.boundingBox(), frame), 'focused Apply plan inside the frame').toBe(true);
+  await page.keyboard.press('Tab');
+  await expect(notNow).toBeFocused();
+  expect(inside(await notNow.boundingBox(), frame), 'focused Not now inside the frame').toBe(true);
+});
+
 for (const [width, height, large] of [
   [1920, 1080, true],
   [1280, 800, true],

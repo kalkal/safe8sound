@@ -23,3 +23,18 @@ describe('focus ring on the display toggle', () => {
     expect(body).toMatch(/outline-offset:\s*calc\(var\(--border-thin\) \* -\d+\)/);
   });
 });
+
+// #371: on a page cut at the frame's height, Tab reached "Apply plan" below the cut and its focus ring was invisible.
+describe('button row on a cut page', () => {
+  it('sticks to the cut, lowered by the overhang Fit measures, on the card surface with room for the focus ring', () => {
+    const body = ruleBody(cards, '.fit[data-cramped="true"] .plan-actions');
+    expect(body).toMatch(/position:\s*sticky/);
+    expect(body).toMatch(/inset-block-end:\s*calc\(-1 \* var\(--fit-overhang, 0px\)\)/);
+    expect(body).toMatch(/background:\s*var\(--surface-card\)/);
+    expect(body).toMatch(/padding-block:\s*var\(--space-\d\)/);
+  });
+
+  it('the cut frame is a box the row can stick to (hidden, not clip)', () => {
+    expect(ruleBody(cards, '.fit[data-cramped="true"] {')).toMatch(/overflow:\s*hidden/);
+  });
+});

@@ -61,8 +61,9 @@ export const enUS = {
   'voice.micBlocked': 'The microphone is blocked or unavailable. Type your question instead.',
   'voice.silent': "I couldn't read the answer aloud. It's on the screen.",
   'voice.browserVoice': "When the studio voice isn't available, your browser's voice reads the answer instead.",
-  'voice.privacyStudio': "Your voice goes to your browser's speech service to be turned into text. The answers read aloud go to Amazon Polly, or to your browser's speech service when the studio voice isn't available.",
-  'voice.privacyStudioReplies': "The answers read aloud go to Amazon Polly, or to your browser's speech service when the studio voice isn't available.",
+  // One line under the input row (owner, 13 Oct): a longer note pushed the plan's button row out of a small Echo's card.
+  'voice.privacyStudio': "Voice: your browser's speech service; read aloud by Amazon Polly or your browser.",
+  'voice.privacyStudioReplies': "Answers read aloud by Amazon Polly or your browser's speech service.",
   // Demo code in remote mode (#101): never stored, wiped after the exchange.
   'demo.label': 'Demo code',
   'demo.start': 'Start',

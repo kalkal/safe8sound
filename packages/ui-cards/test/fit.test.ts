@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MIN_FIT_SCALE, fitCramped, fitScale } from '../src/fit.js';
+import { MIN_FIT_SCALE, fitCramped, fitOverhang, fitScale } from '../src/fit.js';
 
 // No scrolling anywhere on the Echo screen (owner, 10 Oct): the host gives the card its height (MCP Apps
 // containerDimensions.maxHeight); a page taller than that is scaled down inside the card, a page that fits never is.
@@ -26,6 +26,22 @@ describe('fitScale', () => {
   it('nothing measured yet keeps its size', () => {
     expect(fitScale(0, 400)).toBe(1);
     expect(fitScale(300, 0)).toBe(1);
+  });
+});
+
+// #371: a cut page keeps its button row at the frame's bottom edge. The browser places that sticky row in the page's
+// unscaled pixels, so it is lowered by what the scaled page shows beyond the frame's own height.
+describe('fitOverhang', () => {
+  it('is the visible height in unscaled pixels minus the frame height, rounded down so the row never ends past the cut', () => {
+    expect(fitOverhang(300, 0.8)).toBe(75);
+    expect(fitOverhang(142, 0.8)).toBe(35);
+    expect(fitOverhang(142, 0.8) * 0.8 + 142 * 0.8).toBeLessThanOrEqual(142);
+  });
+
+  it('is 0 at full size or with nothing measured', () => {
+    expect(fitOverhang(300, 1)).toBe(0);
+    expect(fitOverhang(0, 0.8)).toBe(0);
+    expect(fitOverhang(300, 0)).toBe(0);
   });
 });
 
