@@ -153,13 +153,15 @@ describe('replaying the storm in a sandbox (#239 review, #234)', () => {
     for (let i = 0; i < 3; i++) expect(await phase()).toBe('active');
     expect(await told()).toBe(1);
 
-    // The visitor plays the day again: a new playthrough, without the old storm and without telling anyone.
+    // The visitor plays the day again: a new playthrough, without the old storm and its message.
     wall.set(WALL + 60_000);
     expect(SetScenarioOutputSchema.parse((await a.call('set_scenario', { restart: true })).structuredContent).restarted).toBe(true);
-    for (let i = 0; i < 3; i++) expect(await phase()).toBeUndefined();
     expect(await told()).toBe(0);
 
-    // The storm again: told once, and the readings tell no one more.
+    // The new day starts with the grid down: its first read starts the storm on its own and tells the family once
+    // (#379); asking for storm mode and more readings tell no one more.
+    for (let i = 0; i < 3; i++) expect(await phase()).toBe('active');
+    expect(await told()).toBe(1);
     expect((await a.call('start_storm_mode', { mode: 'prepare' })).isError).not.toBe(true);
     for (let i = 0; i < 3; i++) expect(await phase()).toBe('active');
     expect(await told()).toBe(1);
@@ -181,6 +183,46 @@ describe('sandbox settings on the Lambda entry: two containers, one table', () =
     expect((await one.call('set_scenario', { scenarioId: 'storm-blackout' })).isError).not.toBe(true);
     expect(await planDay(two.call)).toBe('2026-07-17');
     expect(GetDemoSettingsOutputSchema.parse((await two.call('get_demo_settings')).structuredContent).settings.scenarioId).toBe('storm-blackout');
+  });
+
+  it('two containers reading a sandbox inside its outage at once tell the family once (#379)', async () => {
+    const table = createFakeTable();
+    const container = (seed: number) => {
+      const wall = settableClock(WALL);
+      const real = dynamoStateStoreFactory({ table, clock: wall, rng: seededRng(seed) });
+      // The storm session read answers late, so both containers read "no storm yet" before either writes: the race of #379.
+      const slow: typeof real = (home, scope) =>
+        new Proxy(real(home, scope), {
+          get: (target, key) => {
+            const value: unknown = Reflect.get(target, key);
+            if (typeof value !== 'function') return value;
+            const bound = (value as (...args: unknown[]) => unknown).bind(target);
+            if (key !== 'getLatestStormSession') return bound;
+            return async () => {
+              const read = await bound();
+              await new Promise((r) => setTimeout(r, 150));
+              return read;
+            };
+          },
+        });
+      const app = createLambdaApp({ ...ENV, MCP_SCENARIO_ANCHOR: 'daily' }, { wallClock: wall, logger: memoryLogger(), storeFor: slow });
+      if (!app.ok) throw new Error(app.error.message);
+      return app.value;
+    };
+    const one = await (await serve(container(1)))(A);
+    const two = await (await serve(container(2)))(A);
+    // The storm day at 10:00: the grid has been down since 03:00. The daughter is registered in the app.
+    expect((await one.call('set_scenario', { scenarioId: 'storm-blackout' })).isError).not.toBe(true);
+    await dynamoStateStoreFactory({ table, clock: settableClock(WALL), rng: seededRng(9) })(HomeIdSchema.parse(A)).putPreferences(preferences, []);
+    const started = async () => (await table.query(`HOME#${A}`, '')).filter((i) => i.SK.includes('INBOX#') && JSON.stringify(i).includes('storm_started')).length;
+    expect(await started()).toBe(0);
+
+    const reads = await Promise.all([one.call('get_safe_room_status'), two.call('get_safe_room_status'), one.call('get_home_status'), two.call('get_home_status')]);
+    expect(reads.every((r) => r.isError !== true)).toBe(true);
+    expect(await started()).toBe(1);
+    expect((await table.query(`HOME#${A}`, '')).filter((i) => i.SK.includes('STORM#'))).toHaveLength(1);
+    await Promise.all([one.call('get_safe_room_status'), two.call('get_safe_room_status')]);
+    expect(await started()).toBe(1);
   });
 
   it('°F chosen through one container is said by the other: the plan, the preferences and an unconverted number (#306, #324)', async () => {

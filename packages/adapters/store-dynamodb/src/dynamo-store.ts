@@ -289,6 +289,15 @@ class DynamoStateStore implements StateStore {
     });
   }
 
+  claimStormAlert(key: string) {
+    return this.#run('claimStormAlert', async () => {
+      if (key.length === 0) fail(toolError('invalid_input', 'A storm alert claim needs a key.', { details: { field: 'key' } }));
+      // SK = ALERT#<key>, one conditional put: of two containers at once, only one writes it.
+      const outcome = await this.#table.put(this.#item(`${this.#play}ALERT#${key}`, { key }, this.#retainedFor(this.#ttl.stormSessionDays)), [{ attr: 'PK', op: 'not_exists' }]);
+      return outcome === 'ok';
+    });
+  }
+
   getLatestStormSession() {
     return this.#run('getLatestStormSession', async () => {
       // SK = STORM#<startedAt in UTC>#<id>: the newest session is the highest key, one item read.

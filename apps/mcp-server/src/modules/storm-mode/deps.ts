@@ -35,4 +35,10 @@ export interface StormModeDeps {
   readonly devices?: DeviceAdapter;
   /** Where the module's warn lines go (a device that did not answer); the server's logger. */
   readonly logger: Logger;
+  /**
+   * #379: the key that tells the family of this storm start or power back once across containers (the scripted
+   * outage it belongs to), or undefined (the real home and the demo: one detector, nothing to claim). With a key, the
+   * alert is claimed in the store before it is sent, and only the request that claims it sends it.
+   */
+  readonly alertKey?: (homeId: HomeId, transition: 'storm_started' | 'power_back', nowMs: number) => string | undefined;
 }

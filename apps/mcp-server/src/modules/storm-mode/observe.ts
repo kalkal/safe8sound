@@ -30,8 +30,9 @@ import type { StormHome, StormModeDeps } from './deps.js';
 
 // What the storm tools share (plan §9.2): reading the home and counting the safe hours (no side
 // effects), and the storm detector, which runs an event through the session, sends the family message
-// of any transition it finds and saves the session. Only start_storm_mode and the tick run the
-// detector; a read tool never does. Messages follow transitions, never the model's wording.
+// of any transition it finds and saves the session. Only start_storm_mode, the tick, the judges' clock and a
+// sandbox's catch-up before each request (#379) run the detector; a read tool never does. Messages follow
+// transitions, never the model's wording.
 
 const HOUR_MS = 3_600_000;
 const MAX_NOTIFICATIONS = 50;
@@ -254,6 +255,17 @@ export async function detect(deps: StormModeDeps, o: Observed, event: StormEvent
   // The essential level keeps the same session object but has a message to send (#311): only a step with neither is a no-op.
   if (step.session === undefined || (step.session === o.session && step.transitions.length === 0)) return ok(o);
 
+  // #379: a sandbox's storm start and power back are claimed before they are sent: of two requests at once (two
+  // containers), only the one that claims it tells the family and saves the session; the other leaves it as it was.
+  for (const transition of step.transitions) {
+    if (transition !== 'storm_started' && transition !== 'power_back') continue;
+    const key = deps.alertKey?.(o.ctx.homeId, transition, o.nowMs);
+    if (key === undefined) continue;
+    const claimed = await o.store.claimStormAlert(key);
+    if (!claimed.ok) return claimed;
+    if (!claimed.value) return ok(o);
+  }
+
   let session = step.session;
   for (const transition of step.transitions) {
     const sendable = SendableTransitionSchema.safeParse(transition);
@@ -309,6 +321,38 @@ export async function runStormDetector(deps: StormModeDeps, ctx: ToolContext, ki
   if (!o.ok) return o;
   // A storm that starts on this very reading is told first; the essential level follows at the next one.
   return detect(deps, o.value, kind === 'essential' ? essentialEvent(o.value) : readingEvent(o.value));
+}
+
+/** What a catch-up pass told the family (#379), and whether a storm is still active after it. */
+export interface CaughtUp {
+  readonly transitions: readonly ('storm_started' | 'power_back')[];
+  readonly active: boolean;
+}
+
+/**
+ * The storm detector for a visitor sandbox whose own clock moved on with no jump (#379): one reading at its time now,
+ * on the same once-only rules as the jump. When the grid is back and the active storm has not seen it yet, the
+ * scenario's own return time (`gridBackAtMs`) starts the stable-grid window, as the jump's stop there does: the family
+ * hears power back at the first read past the stable window, not one window after it.
+ */
+export async function catchUpStorm(deps: StormModeDeps, ctx: ToolContext, gridBackAtMs?: number): Promise<Result<CaughtUp, ErrorEnvelope>> {
+  const read = await readHome(deps, ctx);
+  if (!read.ok) return read;
+  const before = read.value.session;
+  let o = read.value;
+  const activeAtMs = before?.phase === 'active' && before.activeAt !== undefined ? Date.parse(before.activeAt) : undefined;
+  if (activeAtMs !== undefined && before?.gridBackAt === undefined && o.snapshot.gridAvailable && gridBackAtMs !== undefined && gridBackAtMs >= activeAtMs && gridBackAtMs < o.nowMs) {
+    const { level } = levelOf(before);
+    const seeded = await detect(deps, o, { type: 'reading', at: new Date(gridBackAtMs).toISOString(), gridAvailable: true, level, previousLevel: level });
+    if (!seeded.ok) return seeded;
+    o = seeded.value;
+  }
+  const done = await detect(deps, o, readingEvent(o));
+  if (!done.ok) return done;
+  const after = done.value.session;
+  const transitions: CaughtUp['transitions'] =
+    before?.phase !== 'active' && after?.phase === 'active' ? ['storm_started'] : before?.phase === 'active' && after?.phase === 'ended' ? ['power_back'] : [];
+  return ok({ transitions, active: after?.phase === 'active' });
 }
 
 /** The fictional names of the safe room's occupants that have one (#271): demo and sandbox homes only. */

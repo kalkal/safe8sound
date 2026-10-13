@@ -146,6 +146,42 @@ describe('the judges clock on the local entry (#311)', () => {
     expect(await told()).toEqual([]);
   });
 
+  it('a sandbox left alone reaches its storm on its own clock: the next read tells the family once, power back once (#379)', async () => {
+    const { connect, told, phone, logger, wall } = await open();
+    const a = await connect(A);
+    const list = await milestones(a);
+    const storm = find(list, 'storm_start');
+    const back = find(list, 'power_back');
+    // No jump: the wall clock moves and the sandbox's day with it (speed 1), a minute past the grid going down.
+    const toWall = (atIso: string) => WALL + Date.parse(atIso) - Date.parse(list.now);
+    wall.set(toWall(storm.at) + 60_000);
+    expect(await told()).toEqual([]);
+
+    expect((await a.call('get_safe_room_status')).isError).not.toBe(true);
+    expect(await told()).toEqual(['storm_started']);
+    // More reads inside the storm tell no one more.
+    expect((await a.call('get_home_status')).isError).not.toBe(true);
+    wall.set(toWall(storm.at) + 2 * 3_600_000);
+    expect((await a.call('get_safe_room_status')).isError).not.toBe(true);
+    expect(await told()).toEqual(['storm_started']);
+
+    // Past power back with the grid stable: the next read tells the family, once.
+    wall.set(toWall(back.at) + 60_000);
+    expect((await a.call('get_home_status')).isError).not.toBe(true);
+    expect(await told()).toEqual(['power_back', 'storm_started']);
+    expect((await a.call('get_home_status')).isError).not.toBe(true);
+    expect(await told()).toEqual(['power_back', 'storm_started']);
+    expect((await phone()).map(([t]) => t)).toEqual(['power_back', 'storm_started']);
+
+    const caught = logger.lines.filter((l) => l.details?.['event'] === 'storm_caught_up');
+    expect(caught.map((l) => l.details?.['transition'])).toEqual(['storm_started', 'power_back']);
+    for (const line of caught) {
+      expect(line.correlationId).toEqual(expect.any(String));
+      expect(line.details?.['home']).toBe('sandbox');
+    }
+    expect(JSON.stringify(logger.lines)).not.toContain(A);
+  });
+
   it('the real home and demo have no such tools', async () => {
     const { connect } = await open();
     for (const home of ['demo', 'home']) {

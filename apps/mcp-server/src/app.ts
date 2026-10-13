@@ -12,12 +12,13 @@ import type { DemoClockDeps } from './modules/demo-clock.js';
 import { demoSettingsModule, type SandboxChoices } from './modules/demo-settings.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
 import { stormModeModule, type StormModeDeps } from './modules/storm-mode/index.js';
-import { runStormDetector } from './modules/storm-mode/observe.js';
+import { catchUpStorm, runStormDetector } from './modules/storm-mode/observe.js';
 import { familyReply } from './modules/storm-mode/tools.js';
 import type { PhoneReplyHandler } from './phone-inbox.js';
 import type { StormModeWiring } from './storm-mode-config.js';
 import { outagesOf } from './milestones.js';
-import { createSandboxes } from './sandboxes.js';
+import { createSandboxes, type Sandboxes } from './sandboxes.js';
+import { sandboxStorm } from './sandbox-storm.js';
 import { refreshFrom, shippedPlace, withHousehold, type SandboxPlay } from './sandbox-play.js';
 import { createRegistry, type CapabilityModule, type ModuleRegistry } from './registry.js';
 import { envNumber, scenarioStartFor, scenarioTimelineFor, type ScenarioTimeline } from './scenario-clock.js';
@@ -208,7 +209,39 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly, units, place, ...homeClock } : undefined;
   };
 
-  const stormDeps: StormModeDeps | undefined = opts.stormMode === undefined ? undefined : { ...opts.stormMode, model: params, homes: planningHome, logger: opts.logger };
+  // #379: a sandbox's storm start and power back belong to a scripted outage: its start names the alert, so every
+  // container claims the same key and the family hears each once. The real home and demo claim nothing.
+  const alertKey = (homeId: HomeId, transition: 'storm_started' | 'power_back', nowMs: number): string | undefined => {
+    const play = sandboxFor(homeId);
+    if (play === undefined) return undefined;
+    const outages = outagesOf(play.scenario).filter((o) => (transition === 'storm_started' ? o.fromMs <= nowMs : o.toMs <= nowMs));
+    const outage = outages.reduce<(typeof outages)[number] | undefined>((latest, o) => (latest === undefined || o.fromMs > latest.fromMs ? o : latest), undefined);
+    return outage === undefined ? undefined : `${transition}#${new Date(outage.fromMs).toISOString()}`;
+  };
+  const stormDeps: StormModeDeps | undefined = opts.stormMode === undefined ? undefined : { ...opts.stormMode, model: params, homes: planningHome, logger: opts.logger, alertKey };
+  const stableGridMs = (opts.stormMode?.config.stableGridMinutes ?? 0) * 60_000;
+
+  // #379: a sandbox's day runs on its own clock: each request that reads it checks its storm first, one pass at a time.
+  const stormWatch = sandboxStorm({
+    day: (homeId) => {
+      const play = sandboxFor(homeId);
+      const homeClock = play?.entry.clock;
+      if (play === undefined || homeClock === undefined) return undefined;
+      return { play, nowMs: homeClock.now(), outages: outagesOf(play.scenario) };
+    },
+    run: async (ctx, gridBackAtMs) => (stormDeps === undefined ? ok({ transitions: [], active: false }) : catchUpStorm(atHome(stormDeps, ctx.homeId), ctx, gridBackAtMs)),
+    stableGridMs,
+    logger: opts.logger,
+    wallClock: opts.wallClock,
+  });
+  const watched: Sandboxes<SandboxPlay> = {
+    admit: (homeId) => sandboxes.admit(homeId),
+    get: (homeId) => sandboxes.get(homeId),
+    refresh: async (homeId, correlationId) => {
+      await sandboxes.refresh(homeId, correlationId);
+      if (stormDeps !== undefined) await stormWatch.catchUp(homeId, correlationId);
+    },
+  };
 
   // The judges' clock (#311): a sandbox's day as played here, its plans, and the storm detector on its own clock.
   const comfortPlan = opts.comfortPlan;
@@ -238,10 +271,11 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
       comfortPlan === undefined ? Promise.resolve(err(toolError('plan_not_found', 'No such plan in this sandbox.'))) : comfortPlan.storeFor(homeId, { correlationId }).getPlan(planId),
     detect: async (ctx, kind) => {
       if (stormDeps === undefined) return ok(undefined);
-      const ran = await runStormDetector(atHome(stormDeps, ctx.homeId), ctx, kind);
+      // After any catch-up pass of the same sandbox (#379): the family is told once even when both run at once.
+      const ran = await stormWatch.serial(ctx.homeId, () => runStormDetector(atHome(stormDeps, ctx.homeId), ctx, kind));
       return ran.ok ? ok(undefined) : ran;
     },
-    stableGridMs: (opts.stormMode?.config.stableGridMinutes ?? 0) * 60_000,
+    stableGridMs,
     maxAdvancesPerDay: sandboxMaxAdvances.value,
   };
   const modules = [
@@ -273,14 +307,15 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   return ok({
     config: config.value,
     registry: registry.value,
-    handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes, ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }) }),
+    handler: createMcpHandler(config.value, { registry: registry.value, logger: opts.logger, sandboxes: watched, ...(opts.metrics === undefined ? {} : { metrics: opts.metrics }) }),
     ...(stormDeps === undefined ? {} : { familyReply: (input, ctx) => familyReply(atHome(stormDeps, ctx.homeId), input, ctx) }),
     homeClock: (homeId) => homeFor(homeId)?.clock,
     homeUnits: (homeId) => sandboxFor(homeId)?.units ?? 'C',
     admitSandbox: async (homeId, correlationId) => {
-      const admitted = sandboxes.admit(homeId);
+      const admitted = watched.admit(homeId);
       if (!admitted.ok) return admitted;
-      await sandboxes.refresh(homeId, correlationId);
+      // The family phone's read checks the storm too (#379): Ana's phone hears it even when the page asks nothing.
+      await watched.refresh(homeId, correlationId);
       return ok(undefined);
     },
   });

@@ -198,6 +198,15 @@ class MemoryStateStore implements StateStore {
     return Promise.resolve(ok(undefined));
   }
 
+  claimStormAlert(key: string): Promise<Result<boolean, ErrorEnvelope>> {
+    if (key.length === 0) return Promise.resolve(err(toolError('invalid_input', 'A storm alert claim needs a key.', { details: { field: 'key' } })));
+    // Same key and condition as store-dynamodb: written only if no one has.
+    const sk = `${this.#play}ALERT#${key}`;
+    if (this.#partition().has(sk)) return Promise.resolve(ok(false));
+    this.#put(sk, { value: { key }, expiresAtMs: this.#retainedFor(this.#ttl.stormSessionDays) });
+    return Promise.resolve(ok(true));
+  }
+
   getLatestStormSession(): Promise<Result<StormSession | undefined, ErrorEnvelope>> {
     const sessions = this.#readAll(this.#query<unknown>(`${this.#play}STORM#`), StormSessionSchema, 'STORM#');
     if (!sessions.ok) return Promise.resolve(sessions);
