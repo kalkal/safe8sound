@@ -3,6 +3,7 @@ import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { isLocale, setLocale } from '@cold-reserve/i18n';
 import { installTapMarks, isDemoContext } from '../demo-taps.js';
+import { placeOfContext, setPlace } from '../place-context.js';
 import { setTempUnit, unitOfContext } from '../temp-unit.js';
 import { t } from '../text.js';
 import { cardThemeFor } from '../theme.js';
@@ -24,6 +25,8 @@ function Card({ kind }: { kind: CardKind }) {
   const [demo, setDemo] = useState(false);
   // °F everywhere (owner decision, 9 Oct): the unit the host names; °C when it names none. Kept in state so the card redraws.
   const [units, setUnits] = useState<'C' | 'F'>('C');
+  // #376: the place the host names (the number to call on a last resort); kept in state so the card redraws.
+  const [place, setPlaceState] = useState<ReturnType<typeof placeOfContext>>(undefined);
 
   const { app, error } = useApp({
     appInfo: { name: 'cold-reserve-cards', version: '0.1.0' },
@@ -38,6 +41,11 @@ function Card({ kind }: { kind: CardKind }) {
         // #263: the card speaks the host's language (standard hostContext.locale); English otherwise.
         if (isLocale(locale)) setLocale(locale);
         if (isDemoContext(changed)) setDemo(true);
+        const named = placeOfContext(changed);
+        if (named !== undefined) {
+          setPlace(named);
+          setPlaceState(named);
+        }
         const unit = unitOfContext(changed);
         if (unit !== undefined) {
           setTempUnit(unit);
@@ -69,6 +77,9 @@ function Card({ kind }: { kind: CardKind }) {
       });
       if (isLocale(initial.locale)) setLocale(initial.locale);
       setDemo(isDemoContext(initial));
+      const named = placeOfContext(initial);
+      setPlace(named);
+      setPlaceState(named);
       const unit = unitOfContext(initial) ?? 'C';
       setTempUnit(unit);
       setUnits(unit);
@@ -80,6 +91,11 @@ function Card({ kind }: { kind: CardKind }) {
   useEffect(() => {
     document.documentElement.dataset['units'] = units;
   }, [units]);
+
+  useEffect(() => {
+    if (place === undefined) delete document.documentElement.dataset['place'];
+    else document.documentElement.dataset['place'] = place;
+  }, [place]);
 
   useEffect(() => {
     document.documentElement.dataset['cardTheme'] = cardThemeFor(context.theme);

@@ -65,7 +65,7 @@ describe('what the model reads', () => {
       if (!r.ok) throw new Error(r.error.message);
       const text = planSummary(r.value, F);
       // 24 °C is 75.2 °F; 24.5 °C is 76.1 °F.
-      expect(text).toContain('The battery lasts until 12:50 AM; the safe room stays at or below its 75.2 °F night limit until about 3:35 AM, then warms up to 76.1 °F by 6:10 AM.');
+      expect(text).toContain('The safe room stays at or below its 75.2 °F night limit until about 3:35 AM (the battery lasts until 12:50 AM), then warms up to 76.1 °F by 6:10 AM.');
       const counterfactual = text.split(/(?<=\.) /).find((x) => x.startsWith('Without the plan')) ?? '';
       expect(counterfactual).toMatch(/would peak at \d+(\.\d)? °F at /);
       expect(counterfactual).toContain('heat-index °F-hours');
@@ -215,7 +215,7 @@ describe('what the model reads', () => {
     expect(r.value.lastResort).toBeDefined();
     expect(text).toContain(r.value.warnings?.find((x) => x.code === 'last_resort_plan')?.message ?? 'missing');
     // It can be applied, only with two explicit yeses (#168): the text must not make the model refuse.
-    expect(text).toMatch(/Last resort: the safest plan there is, but not every guarantee holds\. It can be applied only with two explicit yeses: read the person the risk and until when the safe room is safe \(\d{1,2}:\d\d (AM|PM)\), ask; if they say yes, call apply_plan with planId \S+ and ask again with what it returns\./);
+    expect(text).toMatch(/Last resort: the safest plan there is, but not every guarantee holds\. It can be applied only with two explicit yeses: read the person the risk and until when the safe room stays within its limits \(\d{1,2}:\d\d (AM|PM)\), ask; if they say yes, call apply_plan with planId \S+ and ask again with what it returns\./);
     expect(text).not.toContain('cannot be applied');
     expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
   });
@@ -231,8 +231,8 @@ describe('what the model reads', () => {
     // One sentence, both times and no duration (#272): the battery runs out, the room holds the limit it then
     // crosses a while longer, then warms up.
     const text = planSummary(r.value, NIGHT);
-    expect(text).toContain(`The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room stays at or below its ${String(lr.limitCrossedC)} °C`);
-    expect(text).toContain(`limit until about ${localTimeText(lr.limitCrossedAt)}, then warms up to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}.`);
+    expect(text).toContain(`The safe room stays at or below its ${String(lr.limitCrossedC)} °C`);
+    expect(text).toContain(`limit until about ${localTimeText(lr.limitCrossedAt)} (the battery lasts until ${localTimeText(lr.safeUntil)}), then warms up to ${String(lr.worstC)} °C by ${localTimeText(lr.worstAt)}.`);
     expect(text).not.toContain('hours from now');
   });
 
@@ -242,7 +242,7 @@ describe('what the model reads', () => {
     const w = world('storm-blackout', 10, { snapshot: (x) => ({ ...x, batterySocPct: pct(17) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
-    expect(planSummary(r.value, NIGHT)).toContain('The battery lasts until 12:50 AM; the safe room stays at or below its 24 °C night limit until about 3:35 AM, then warms up to 24.5 °C by 6:10 AM.');
+    expect(planSummary(r.value, NIGHT)).toContain('The safe room stays at or below its 24 °C night limit until about 3:35 AM (the battery lasts until 12:50 AM), then warms up to 24.5 °C by 6:10 AM.');
   });
 
   it('the guided storm: the whole summary has one end time and at most one hours figure for 24 °C (#272 review)', async () => {
@@ -258,8 +258,9 @@ describe('what the model reads', () => {
     const durations = text.split(/(?<=\.) /).filter((s) => /\d+(\.\d+)? (night )?(hours?|minutes?|min|h)\b/.test(s));
     expect(durations).toEqual([
       expect.stringMatching(/^pacing_on_track FAILS: At this pace the battery runs out at 00:50, \d+ min before the next recharge at 08:00\.$/),
-      'Warning: No plan keeps the Bedroom within its limits until the next recharge: safe for about 2.83 hours, until 12:50 AM; then the battery runs out.',
     ]);
+    // #364: the warning says the room's time first and the battery's after it, with no duration.
+    expect(text).toContain('Warning: No plan keeps the Bedroom within its limits until the next recharge: within them until about 3:35 AM, the battery until 12:50 AM; then it warms up.');
     expect(text).not.toContain('night hours');
     // The night count (5 h, grace minutes included) stays in nightRecovery for the card, not in the text.
     expect(text).not.toContain('Night recovery (');
@@ -270,7 +271,7 @@ describe('what the model reads', () => {
   it('names the limit the room crosses, not the one at the worst point (#272 review)', () => {
     const lr = { safeUntil: '2026-07-17T20:10:00+02:00', safeHours: 1.5, limitedBy: 'battery' as const, comfortLimitC: 24, worstC: 27.4, worstAt: '2026-07-18T03:00:00+02:00', limitCrossedAt: '2026-07-17T20:40:00+02:00', limitCrossedC: 27 };
     const text = planSummary({ ...examplePlan(), lastResort: lr } as Plan, NIGHT);
-    expect(text).toContain('The battery lasts until 8:10 PM; the safe room stays at or below its 27 °C limit until about 8:40 PM, then warms up to 27.4 °C by 3:00 AM.');
+    expect(text).toContain('The safe room stays at or below its 27 °C limit until about 8:40 PM (the battery lasts until 8:10 PM), then warms up to 27.4 °C by 3:00 AM.');
   });
 
   it('the night warning and the last-resort window end at the same clock time, with no second duration (#272)', async () => {
@@ -284,12 +285,12 @@ describe('what the model reads', () => {
     expect(night).not.toMatch(/hours/);
     // The hours of the night under the limit stay in the structured data, for the card.
     expect(r.value.nightRecovery?.achievedHours).toBeGreaterThan(0);
-    expect(planSummary(r.value, NIGHT)).toContain(`until about ${localTimeText(crossed)}, then warms up`);
+    expect(planSummary(r.value, NIGHT)).toContain(`until about ${localTimeText(crossed)} (the battery lasts until`);
   });
 
   it('when the battery runs out but the room stays inside its limits to the next recharge, says that instead (#272)', () => {
     const p = { ...examplePlan(), lastResort: { safeUntil: '2026-07-18T04:00:00+02:00', safeHours: 6, limitedBy: 'battery' } } as Plan;
-    expect(planSummary(p, NIGHT)).toContain(`The battery lasts until 4:00 AM; the safe room still stays inside its temperature limit until ${localTimeText(p.horizonAt)}, the next recharge.`);
+    expect(planSummary(p, NIGHT)).toContain(`The safe room stays inside its temperature limit until ${localTimeText(p.horizonAt)}, the next recharge (the battery lasts until 4:00 AM).`);
   });
 
   it('a last resort opens with its honest window, never "level until" the horizon (CE-21)', () => {
@@ -299,7 +300,14 @@ describe('what the model reads', () => {
     expect(text.startsWith(`Proposed last-resort plan ${base.id}: the safe room alone, within its limits until ${localTimeText(lr.safeUntil)} (nothing changes until apply_plan)`)).toBe(true);
     expect(text).not.toContain(`level until ${localTimeText(base.horizonAt)}`);
     const battery = planSummary({ ...base, lastResort: { ...lr, limitedBy: 'battery' as const } } as Plan, NIGHT);
-    expect(battery.startsWith(`Proposed last-resort plan ${base.id}: the safe room alone, until the battery runs out at ${localTimeText(lr.safeUntil)}`)).toBe(true);
+    // #364: no window with the battery: the room stays inside its limits to the next recharge, said first.
+    expect(battery.startsWith(`Proposed last-resort plan ${base.id}: the safe room alone, within its limits until ${localTimeText(base.horizonAt)}, the next recharge, the battery until ${localTimeText(lr.safeUntil)} (`)).toBe(true);
+    const crossing = { ...lr, limitedBy: 'battery' as const, comfortLimitC: 24, worstC: 26.1, worstAt: '2026-07-18T06:00:00+02:00', limitCrossedAt: '2026-07-18T03:35:00+02:00', limitCrossedC: 24 };
+    const crossed = planSummary({ ...base, lastResort: crossing } as Plan, NIGHT);
+    expect(crossed.startsWith(`Proposed last-resort plan ${base.id}: the safe room alone, within its limits until about 3:35 AM, the battery until 1:20 AM (`)).toBe(true);
+    expect(crossed).toContain('until when the safe room stays within its limits (3:35 AM)');
+    const window = { ...lr, limitedBy: 'battery' as const, comfortLimitC: 24, worstC: 26.1, worstAt: '2026-07-18T06:00:00+02:00' };
+    expect(planSummary({ ...base, lastResort: window } as Plan, NIGHT).startsWith(`Proposed last-resort plan ${base.id}: the safe room alone, until the battery runs out at 1:20 AM`)).toBe(true);
     // A plan that holds keeps its first sentence.
     expect(planSummary(base as Plan, NIGHT).startsWith(`Proposed plan ${base.id}: `)).toBe(true);
   });
@@ -386,7 +394,8 @@ describe('what the model reads', () => {
     const until = localTimeText(lr.safeUntil);
     const text = planSummary(r.value, NIGHT);
     expect(text.startsWith(`Proposed last-resort plan ${r.value.id}: the safe room alone, `)).toBe(true);
-    expect(text).toContain(`${lr.limitedBy === 'battery' ? `The battery lasts until ${until}` : `Safe until ${until}`}; `);
+    if (lr.limitCrossedAt !== undefined) expect(text).toContain(`(the battery lasts until ${until}), then warms up`);
+    else expect(text).toContain(`${lr.limitedBy === 'battery' ? `The battery lasts until ${until}` : `Safe until ${until}`}; `);
     expect(text).toContain(`${String(lr.worstC)} °C`);
   });
 
@@ -518,5 +527,38 @@ describe('what the model reads', () => {
     expect(text.startsWith(`The safety check refused the plan you proposed: ${r.value.refusedProposal?.message ?? ''} This plan holds instead and is ready to apply. Proposed plan ${r.value.id}: `)).toBe(true);
     // Never sends the model back to propose again: the plan that holds is already here.
     expect(text).not.toMatch(/call plan_comfort again/);
+  });
+});
+
+describe('#376: the last-resort advice, with the number to call at the home place', () => {
+  const lr = { safeUntil: '2026-07-18T01:20:00+02:00', safeHours: 9.33, limitedBy: 'temperature' as const, actions: ['close_curtains', 'drink_water', 'fan_below_35c'] as const };
+
+  it.each([
+    ['houston', '911'],
+    ['turin', '112'],
+    ['reference', '112'],
+  ] as const)('%s: the card words, the signs and "call %s", never medical protection', (place, number) => {
+    const text = planSummary({ ...examplePlan(), lastResort: { ...lr, actions: [...lr.actions], place } } as Plan, NIGHT);
+    expect(text).toContain(`If you are worried, call ${number}.`);
+    expect(text).toContain('Keep cool without power: Close the curtains on the sunny side. Drink water often, even without thirst. Use a fan only while the room is below 35 °C.');
+    expect(text).toContain('Signs of heat stroke: Confusion or lack of coordination; Hot skin that is not sweating;');
+    expect(text).toContain('These are general tips, not medical advice.');
+    expect(text).not.toMatch(/\b(protects?|prevents?|treats?|cures?)\b/i);
+  });
+
+  it('in °F the fan rule is 95 °F; with no place no number at all', () => {
+    expect(planSummary({ ...examplePlan(), lastResort: { ...lr, actions: [...lr.actions], place: 'houston' } } as Plan, { ...NIGHT, unit: 'F' })).toContain('below 95 °F.');
+    const none = planSummary({ ...examplePlan(), lastResort: { ...lr, actions: [...lr.actions] } } as Plan, NIGHT);
+    expect(none).not.toMatch(/call (911|112)/);
+  });
+});
+
+describe('#364 review: heating never leads with a crossing under the minimum', () => {
+  it('the first words keep the battery time; no "within its limits until about"', () => {
+    const lr = { safeUntil: '2026-01-16T03:05:00+01:00', safeHours: 7.2, limitedBy: 'battery' as const, comfortLimitC: 18, worstC: 16.5, worstAt: '2026-01-16T07:00:00+01:00', limitCrossedAt: '2026-01-16T06:00:00+01:00', limitCrossedC: 18 };
+    const text = planSummary({ ...examplePlan(), lastResort: lr } as Plan, NIGHT);
+    expect(text).toContain('the safe room alone, until the battery runs out at 3:05 AM');
+    expect(text).not.toContain('until about 6:00 AM');
+    expect(text).toContain('until when the safe room stays within its limits (3:05 AM)');
   });
 });

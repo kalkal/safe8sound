@@ -65,6 +65,11 @@ export interface StormMessageFields {
   readonly atMs: number;
   /** Until when the safe room is covered (epoch ms); needed by the messages that quote it. */
   readonly safeUntilMs?: number;
+  /**
+   * #364: when the battery runs out at `safeUntilMs` and the room then stays within its limits a while, until when
+   * (epoch ms). Only with a real crossing: the room's time leads the message, the battery time follows.
+   */
+  readonly withinLimitsUntilMs?: number;
   /** When the grid came back (the session's gridBackAt, epoch ms); needed by power_back. */
   readonly powerBackAtMs?: number;
   /** The home's time zone, for the times in the message. */
@@ -74,8 +79,23 @@ export interface StormMessageFields {
 const clockTime = (locale: Locale, ms: number, timeZone: string) =>
   new Intl.DateTimeFormat(locale, { timeZone, hour: 'numeric', minute: '2-digit' }).format(ms);
 
+/**
+ * #364: when the battery ends the safe hours first and the room then holds its limits a while, the room's time leads
+ * and the battery time follows, as on the cards. Power back quotes neither.
+ */
+const STORM_WITHIN_KEYS = {
+  storm_started: 'storm.startedWithin',
+  essential_level: 'storm.essentialWithin',
+  last_resort_applied: 'storm.lastResortWithin',
+} as const satisfies Partial<Record<SendableTransition, MessageKey>>;
+
+const keyOf = (transition: SendableTransition, within: boolean): MessageKey =>
+  within && transition !== 'power_back' ? STORM_WITHIN_KEYS[transition] : STORM_KEYS[transition];
+
 function renderStorm(locale: Locale, transition: SendableTransition, addressee: string, fields: StormMessageFields): Result<string, FormatError> {
-  return format(locale, STORM_KEYS[transition], {
+  const within = fields.withinLimitsUntilMs;
+  return format(locale, keyOf(transition, within !== undefined), {
+    ...(within === undefined ? {} : { withinUntil: clockTime(locale, within, fields.timeZone) }),
     name: addressee,
     room: fields.roomName,
     temp: formatTempFixed(fields.tempC, fields.unit ?? 'C'),
@@ -127,7 +147,8 @@ export interface LastResortAdvice {
 /** The emergency number follows the place, not the language (#366): the US 911 in Houston, the European 112 elsewhere (Turin, the reference home). */
 export const emergencyNumberOf = (place: LocationId): string => (place === 'houston' ? '911' : '112');
 
-export function lastResortAdvice(locale: Locale, actions: readonly LastResortAction[], unit: TempUnit = 'C', place: LocationId = 'reference'): LastResortAdvice {
+/** The unit and the place are required (#376): the number to call is never a default. */
+export function lastResortAdvice(locale: Locale, actions: readonly LastResortAction[], unit: TempUnit, place: LocationId): LastResortAdvice {
   // The fan rule is 35 °C, said in the unit the person chose (#306); the number to call is the place's (#366).
   const text = (key: MessageKey): string => CATALOGS[locale][key].replace('{fanMax}', formatTemp(35, unit)).replace('{emergency}', emergencyNumberOf(place));
   return {

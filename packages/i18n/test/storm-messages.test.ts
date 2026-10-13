@@ -54,6 +54,24 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
     expect(stormMessage('en-US', 'last_resort_applied', 'Ana', noUntil)).toMatchObject({ ok: false, error: { missing: ['safeUntil'] } });
   });
 
+  it('#364: when the battery ends first, the time the room stays within its limits leads and the battery time follows', () => {
+    const within = { ...fields, withinLimitsUntilMs: Date.parse('2026-07-18T08:00:00Z') };
+    const lr = stormMessage('en-US', 'last_resort_applied', 'Ana', within);
+    expect(lr.ok && lr.value).toBe(
+      `${PRODUCT_NAME} alert for Ana: the home battery is low. Bedroom is at 26.4 °C and stays within its limits until about 10:00 AM (battery until 7:30 AM), then gets warmer. Please check on them.`,
+    );
+    const started = stormMessage('en-US', 'storm_started', 'Ana', within);
+    expect(started.ok && started.value).toBe(
+      `${PRODUCT_NAME} alert for Ana: a storm cut the power at home. Bedroom is at 26.4 °C and stays within its limits until about 10:00 AM (battery until 7:30 AM), then gets warmer. No action is needed now. Next message: when the level changes or power returns.`,
+    );
+    const essential = stormMessage('en-US', 'essential_level', 'Ana', within);
+    expect(essential.ok && essential.value).toContain('the battery switched to essential mode. Bedroom is at 26.4 °C and stays within its limits until about 10:00 AM (battery until 7:30 AM)');
+    const it = stormMessage('it-IT', 'last_resort_applied', 'Ana', within);
+    expect(it.ok && it.value).toContain('resta nei suoi limiti fino alle 10:00 circa (batteria fino alle 7:30), poi si scalda');
+    // Power back quotes neither time.
+    expect(stormMessage('en-US', 'power_back', 'Ana', within)).toEqual(stormMessage('en-US', 'power_back', 'Ana', fields));
+  });
+
   it('needs the safe-until time for the messages that quote it', () => {
     const noUntil = { roomName: fields.roomName, tempC: fields.tempC, atMs: fields.atMs, powerBackAtMs: fields.powerBackAtMs, timeZone: fields.timeZone };
     expect(stormMessage('en-US', 'storm_started', 'Ana', noUntil)).toMatchObject({ ok: false, error: { missing: ['safeUntil'] } });

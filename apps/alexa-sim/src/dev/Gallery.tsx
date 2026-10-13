@@ -16,10 +16,12 @@ import {
   hotDayPlan,
   inverterRefusal,
   lastResortPlan,
+  lastResortBatteryPlan,
   planThatHolds,
   rejectedPlan,
   homeInStorm,
   safeRoomAboveNightLimit,
+  safeRoomBatteryFirst,
   safeRoomCalm,
   safeRoomInStorm,
   stormPlan,
@@ -60,6 +62,9 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
       <PlanCard plan={stormPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <PlanCard plan={lastResortPlan()} timeZone={timeZone} batteryUsableWh={usableWh} />
       <GuardReceipt plan={lastResortPlan()} />
+      {/* #364, #376: the battery runs out first; the room time big, the battery below; then the advice page with 911. */}
+      <PlanCard plan={lastResortBatteryPlan('houston')} timeZone={timeZone} batteryUsableWh={usableWh} />
+      <SafeRoomCard status={safeRoomBatteryFirst()} />
       <RefusalReceipt refusal={stormReserveRefusal()} />
       <RefusalReceipt refusal={inverterRefusal()} />
       <SafeRoomCard status={safeRoomInStorm()} />

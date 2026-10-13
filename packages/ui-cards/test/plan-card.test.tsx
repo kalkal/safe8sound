@@ -2,13 +2,17 @@
 import type { Plan } from '@cold-reserve/contracts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { advisoryPlan, hotDayPlan, lastResortPlan, planThatHolds, rejectedPlan, stormPlan, surplusPlan } from '../src/fixtures.js';
+import { setLocale } from '@cold-reserve/i18n';
+import { advisoryPlan, hotDayPlan, lastResortBatteryPlan, lastResortPlan, planThatHolds, rejectedPlan, stormPlan, surplusPlan } from '../src/fixtures.js';
 import { PlanCard, type PlanCardProps } from '../src/PlanCard.js';
+import { setPlace } from '../src/place-context.js';
 import { setTempUnit } from '../src/temp-unit.js';
 
 afterEach(() => {
   cleanup();
   setTempUnit('C');
+  setPlace(undefined);
+  setLocale('en-US');
 });
 
 const TZ = 'Europe/Rome';
@@ -220,6 +224,39 @@ describe('PlanCard', () => {
       expect(screen.getByText('The battery lasts until')).toBeTruthy();
     });
 
+    it('#364: the battery runs out first and the room holds its limit: the room time big, the battery below, then how warm', () => {
+      show(lastResortBatteryPlan());
+      const eyebrow = screen.getByText('Under 24 °C until about');
+      const big = screen.getByTestId('plan-horizon');
+      const battery = screen.getByTestId('battery-until');
+      const window = screen.getByTestId('last-resort-window');
+      expect(big.textContent).toBe('06:00');
+      expect(battery.textContent).toBe('The battery lasts until 03:05.');
+      expect(window.textContent).toBe('Then up to 26.1 °C by 07:00, past the 24 °C limit.');
+      // In this order on the screen: label, big time, battery, then the warming.
+      for (const [a, b] of [[eyebrow, big], [big, battery], [battery, window]] as const) {
+        expect(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+      // Never "safe" without a time, never the battery time as the big number.
+      expect(screen.queryByText('The battery lasts until')).toBeNull();
+      cleanup();
+      setTempUnit('F');
+      show(lastResortBatteryPlan());
+      expect(screen.getByText('Under 75.2 °F until about')).toBeTruthy();
+    });
+
+    it('#364: the battery runs out and the room stays inside its limits to the next recharge: that time, "at least"', () => {
+      const plan = lastResortBatteryPlan();
+      const lr = plan.lastResort;
+      if (lr === undefined) throw new Error('fixture');
+      show({ ...plan, lastResort: { safeUntil: lr.safeUntil, safeHours: lr.safeHours, limitedBy: 'battery' } });
+      expect(screen.getByText('Within its limits at least until')).toBeTruthy();
+      expect(screen.getByTestId('plan-horizon').textContent).toBe('07:00');
+      expect(screen.getByTestId('battery-until').textContent).toBe('The battery lasts until 03:05.');
+      // It does not leave its limits before the recharge: never said it does.
+      expect(screen.queryByText('After that the safe room leaves its limits.')).toBeNull();
+    });
+
     it('without the window, never claims more than the time', () => {
       const { plan, lr } = lastResort();
       show({ ...plan, lastResort: { safeUntil: lr.safeUntil, safeHours: lr.safeHours, limitedBy: lr.limitedBy } });
@@ -245,5 +282,61 @@ describe('PlanCard', () => {
       expect(screen.queryByRole('button', { name: 'Apply the last-resort plan' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();
     });
+  });
+});
+
+describe('the last-resort advice page (#376): what to do without power and whom to call', () => {
+  const advice = () => screen.getByRole('region', { name: 'Keep cool without power', hidden: true });
+
+  it('its own page, right after the headline: the zero-energy actions, the heat-stroke signs, the place number, not medical', () => {
+    show(lastResortBatteryPlan('houston'));
+    const page = advice();
+    expect(page.closest('.card-page')?.getAttribute('data-page')).toBe('2');
+    expect(within(page).getAllByRole('listitem', { hidden: true }).map((li) => li.textContent)).toEqual([
+      'Close the curtains on the sunny side.',
+      'Drink water often, even without thirst.',
+      'Use a fan only while the room is below 35 °C.',
+      'Confusion or lack of coordination',
+      'Hot skin that is not sweating',
+      'Fast heartbeat or fast breathing',
+      'Fainting, or a seizure (fit)',
+    ]);
+    expect(within(page).getByTestId('emergency-call').textContent).toBe('If you are worried, call 911.');
+    expect(within(page).getByText('These are general tips, not medical advice.')).toBeTruthy();
+    expect(page.textContent).not.toMatch(/\b(protects?|prevents?|treats?|cures?)\b/i);
+  });
+
+  it('the number follows the place, not the language: 112 in Turin, also in Italian; °F for the fan rule', () => {
+    show(lastResortBatteryPlan('turin'));
+    expect(within(advice()).getByTestId('emergency-call').textContent).toBe('If you are worried, call 112.');
+    cleanup();
+    setLocale('it-IT');
+    show(lastResortBatteryPlan('turin'));
+    expect(screen.getByTestId('emergency-call').textContent).toBe('Se sei preoccupato, chiama il 112.');
+    cleanup();
+    setLocale('en-US');
+    setTempUnit('F');
+    show(lastResortBatteryPlan('houston'));
+    expect(within(advice()).getByText('Use a fan only while the room is below 95 °F.')).toBeTruthy();
+  });
+
+  it("the plan's own place first; the host's place for a plan without one; with neither, no page and no number", () => {
+    setPlace('turin');
+    show(lastResortBatteryPlan('houston'));
+    expect(screen.getByTestId('emergency-call').textContent).toBe('If you are worried, call 911.');
+    cleanup();
+    show(lastResortBatteryPlan());
+    expect(screen.getByTestId('emergency-call').textContent).toBe('If you are worried, call 112.');
+    cleanup();
+    setPlace(undefined);
+    show(lastResortBatteryPlan());
+    expect(screen.queryByRole('region', { name: 'Keep cool without power', hidden: true })).toBeNull();
+    expect(screen.queryByTestId('emergency-call')).toBeNull();
+  });
+
+  it('a plan that holds has no such page', () => {
+    setPlace('houston');
+    show(hotDayPlan());
+    expect(screen.queryByRole('region', { name: 'Keep cool without power', hidden: true })).toBeNull();
   });
 });

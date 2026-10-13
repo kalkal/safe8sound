@@ -1,4 +1,4 @@
-import { DATA_GROUPS, formatTempFixed, isFullyLive, type DataOrigin, type TempUnit, type NotifyFamilyOutputSchema, type SafeRoomStatus, type StartStormModeOutputSchema } from '@cold-reserve/contracts';
+import { DATA_GROUPS, formatTemp, formatTempFixed, isFullyLive, type DataOrigin, type TempUnit, type NotifyFamilyOutputSchema, type SafeRoomStatus, type StartStormModeOutputSchema } from '@cold-reserve/contracts';
 import { format } from '@cold-reserve/i18n';
 import type { z } from 'zod';
 import { localTimeText } from '@cold-reserve/core';
@@ -68,12 +68,14 @@ export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: R
   // #342: the older-person night limit only plays outside the heating season; when heating, a neutral line.
   const strict = degraded && s.stricterNightLimit === true;
   // With the grid up the safe room is not on the battery: its hours are only a what-if (#273).
+  // #364: the room's time when the battery runs out first, said wherever the card shows it big.
+  const within = withinText(s, unit);
   const hours =
     s.gridAvailable === true
-      ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone${strict ? ', at the stricter night limit for an older person,' : ''} it would hold about ${one(s.safeHours)} hours.`
+      ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone${strict ? ', at the stricter night limit for an older person,' : ''} it would hold about ${one(s.safeHours)} hours.${within === undefined ? '' : ` On the battery alone: ${within}`}`
       : degraded
-        ? `${strict ? 'At the stricter night limit for an older person' : 'From the live reading'}, it holds for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`
-        : `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`;
+        ? `${strict ? 'At the stricter night limit for an older person' : 'From the live reading'}, it holds for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.${within === undefined ? '' : ` ${within}`}`
+        : within ?? `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`;
   const head = degraded ? 'The saved settings and the storm state are not reachable right now: this is the live reading only. ' : '';
   return (
     head +
@@ -105,4 +107,17 @@ function pastLimit(s: SafeRoomStatus, unit: TempUnit): string {
   const past = kind === 'minimum' ? s.tempC < limitC : s.tempC > limitC;
   if (!past) return '';
   return ` It is ${kind === 'minimum' ? 'below' : 'above'} ${LIMIT_WORDS[kind]} of ${formatTempFixed(limitC, unit)} now.`;
+}
+
+/**
+ * #364: the battery runs out first and the room then holds its limits a while: the room's time first, as on the card,
+ * then the battery's, with the hours. Undefined when the battery is not what ends the safe hours.
+ */
+function withinText(s: SafeRoomStatus, unit: TempUnit): string | undefined {
+  const w = s.withinLimits;
+  if (w === undefined) return undefined;
+  const battery = `the battery lasts until ${localTimeText(s.safeUntil)} (about ${one(s.safeHours)} hours)`;
+  return w.limitC === undefined
+    ? `The safe room stays within its limits at least until ${localTimeText(w.until)}; ${battery}.`
+    : `The safe room stays at or below its ${formatTemp(w.limitC, unit)} limit until about ${localTimeText(w.until)}; ${battery}, then the room warms up.`;
 }

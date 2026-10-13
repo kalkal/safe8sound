@@ -156,6 +156,16 @@ export const SafeRoomStatusSchema = z.strictObject({
   limitNow: z.strictObject({ limitC: CelsiusSchema, kind: SafeRoomLimitKindSchema }).optional(),
   /** #271 (additive, approved in #271): the fictional names of the occupants that have one in a demo or sandbox home. */
   people: z.array(z.strictObject({ role: RoleSchema, name: z.string().min(1).max(30) })).max(10).optional(),
+  /**
+   * #364 (additive): the battery runs out at `safeUntil` and the room then stays within its limits until `until`, from
+   * the same hold; `limitC` is the limit it crosses there, absent when it stays within them to the end of the projection
+   * ("at least until"). Absent when the battery is not what ends the safe hours, or in the heating season.
+   */
+  withinLimits: z.strictObject({ until: IsoDateTimeSchema, limitC: CelsiusSchema.optional() }).optional(),
+}).superRefine((s, ctx) => {
+  if (s.withinLimits !== undefined && epochMs(s.withinLimits.until) <= epochMs(s.safeUntil)) {
+    ctx.addIssue({ code: 'custom', path: ['withinLimits', 'until'], message: 'The room stays within its limits past the battery time, or the field is absent' });
+  }
 });
 export type SafeRoomStatus = z.infer<typeof SafeRoomStatusSchema>;
 

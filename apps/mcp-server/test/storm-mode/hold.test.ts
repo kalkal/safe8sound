@@ -1,6 +1,7 @@
 import { pct, type HomeId } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { safeRoomStatus } from '../../src/modules/storm-mode/tools.js';
+import { runStormDetector } from '../../src/modules/storm-mode/observe.js';
 import { expectedHold } from './expected.js';
 import { preferences, stormConfig, world } from './support.js';
 
@@ -63,5 +64,40 @@ describe('storm safe hours on the guard\'s hold', () => {
     expect(out.value.safeHours).toBe(held.hours);
     // With the grid counted the battery would never empty: on battery alone, 12 % does not reach the cap.
     expect(Date.parse(out.value.safeUntil)).toBeLessThan(Date.parse(w.snapshot().ts) + stormConfig().capHours * H);
+  });
+});
+
+describe('#364: the battery runs out first, the room then holds its limits a while', () => {
+  /** The storm at 20:00 (hour 4) with the battery set at `soc` %: the status and the family message of the storm start. */
+  const at = async (soc: number) => {
+    const w = world(4, { snapshot: (s) => ({ ...s, batterySocPct: pct(soc) }) });
+    const status = await safeRoomStatus(w.deps, w.ctx);
+    if (!status.ok) throw new Error(status.error.message);
+    const started = await runStormDetector(w.deps, w.ctx);
+    if (!started.ok) throw new Error(started.error.message);
+    return { status: status.value, message: (await w.inbox()).find((m) => m.transition === 'storm_started')?.text ?? '' };
+  };
+
+  it('the status says until when the room stays within its limits, after the battery time, and so does the family', async () => {
+    const seen = [];
+    for (const soc of [12, 16, 20, 24, 28]) {
+      const { status, message } = await at(soc);
+      const within = status.withinLimits;
+      if (within === undefined) continue;
+      seen.push(soc);
+      expect(Date.parse(within.until)).toBeGreaterThan(Date.parse(status.safeUntil));
+      // In the home's zone, with its offset, as safeUntil.
+      expect(within.until.slice(-6)).toBe(status.safeUntil.slice(-6));
+      // The family reads the room's time first, the battery's after it, only with a real crossing.
+      if (within.limitC !== undefined) expect(message).toMatch(/stays within its limits until about \d{1,2}:\d\d [AP]M \(battery until \d{1,2}:\d\d [AP]M\), then gets warmer/);
+    }
+    // A property that never meets the case proves nothing.
+    expect(seen.length).toBeGreaterThan(0);
+  });
+
+  it('a full battery: the safe hours reach the cap, no room time to add', async () => {
+    const { status, message } = await at(100);
+    expect(status.withinLimits).toBeUndefined();
+    expect(message).toContain('the battery keeps it safe until');
   });
 });

@@ -11,3 +11,5 @@ When no plan keeps the safe room within its limits until the next recharge, the 
 | If you are worried, call 112 (911 in Houston). | WHO: call the emergency services first. The number follows the place, not the language (#366): 112 is the European emergency number (Turin and the reference home), 911 the US one (Houston); UKHSA says 999, the UK number. |
 
 Left out on purpose: actions with no source in this table, such as a wet cloth on the skin (#160).
+
+Where it shows (#376): its own page of the last-resort plan card, right after the headline. The place comes with the plan (`lastResort.place`, set by `plan_comfort` from the home's place); the simulator also names the place the judge chose in the card's host context (`coldReservePlace`) for plans that carry none. With no place at all the page is not shown: never a default number. The `plan_comfort` summary carries the same lines and the number, so the voice can say them.

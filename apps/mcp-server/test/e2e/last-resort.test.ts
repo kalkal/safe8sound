@@ -76,7 +76,15 @@ describe('storm, battery 20 %: the last resort, confirmed twice, tells the famil
       expect(lr.actions).toEqual(['close_curtains', 'drink_water', 'fan_below_35c']);
       expect(plan.guarantees.filter((g) => ['storm_reserve', 'inverter_limit', 'battery_power'].includes(g.id)).every((g) => g.ok)).toBe(true);
       // The first sentence carries the honest window (CE-21).
-      expect(textOf(planned)).toMatch(new RegExp(`^Proposed last-resort plan ${plan.id}: the safe room alone, (within its limits until|until the battery runs out at) ${localTimeText(lr.safeUntil)} `));
+      // #364: when the room holds its limit after the battery runs out, its time comes first, then the battery's.
+      const head =
+        lr.limitCrossedAt === undefined
+          ? `(within its limits until|until the battery runs out at) ${localTimeText(lr.safeUntil)} `
+          : `within its limits until about ${localTimeText(lr.limitCrossedAt)}, the battery until ${localTimeText(lr.safeUntil)} `;
+      expect(textOf(planned)).toMatch(new RegExp(`^Proposed last-resort plan ${plan.id}: the safe room alone, ${head}`));
+      // #376: the card's advice, with the number to call at the home's place (the local entry is the reference home).
+      expect(lr.place).toBe('reference');
+      expect(textOf(planned)).toContain('If you are worried, call 112.');
 
       // 2. The first yes applies nothing: a token, the risk to read, and the alert announced.
       const first = await call('apply_plan', { planId: plan.id });
@@ -96,7 +104,12 @@ describe('storm, battery 20 %: the last resort, confirmed twice, tells the famil
       expect(textOf(first)).not.toContain('family');
       const messages = await inbox();
       expect(messages.map((m) => `${m.transition}:${m.role}`)).toEqual(['last_resort_applied:daughter']);
-      expect(messages[0]?.text).toContain(`until ${clock(lr.safeUntil)}, then gets warmer. Please check on them.`);
+      // #364: the room's time first, the battery's after it, as on the card.
+      expect(messages[0]?.text).toContain(
+        lr.limitCrossedAt === undefined
+          ? `until ${clock(lr.safeUntil)}, then gets warmer. Please check on them.`
+          : `stays within its limits until about ${clock(lr.limitCrossedAt)} (battery until ${clock(lr.safeUntil)}), then gets warmer. Please check on them.`,
+      );
       expect(JSON.stringify(second)).not.toMatch(/Giulia|phone-/);
 
       // 4. A plan the model proposes past the physical limits is still a refusal, never a last resort.

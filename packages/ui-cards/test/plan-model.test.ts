@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { celsius } from '@cold-reserve/contracts';
 import { hotDayPlan } from '../src/fixtures.js';
-import { homeClock, levelSpans, pacingGeometry } from '../src/plan-model.js';
+import { homeClock, lastResortHeadline, levelSpans, pacingGeometry } from '../src/plan-model.js';
 
 const TZ = 'Europe/Rome';
 
@@ -58,5 +59,49 @@ describe('pacingGeometry (expected charge until the horizon)', () => {
     const plan = hotDayPlan();
     const { points } = pacingGeometry({ ...plan, horizonAt: plan.createdAt });
     expect(points.every((p) => Number.isFinite(p.x) && p.x >= 0 && p.x <= 100)).toBe(true);
+  });
+});
+
+describe('lastResortHeadline (#364): the big time of a last resort', () => {
+  const base = { safeUntil: '2026-07-16T03:05:00+02:00', safeHours: 7.2, limitedBy: 'battery' as const };
+  const horizonAt = '2026-07-16T08:00:00+02:00';
+
+  it('the battery runs out first and the room crosses its limit later: that crossing, with its limit', () => {
+    const lr = { ...base, comfortLimitC: celsius(24), worstC: celsius(26.1), worstAt: '2026-07-16T07:00:00+02:00', limitCrossedAt: '2026-07-16T06:00:00+02:00', limitCrossedC: celsius(24) };
+    expect(lastResortHeadline(lr, horizonAt)).toEqual({ kind: 'under', at: '2026-07-16T06:00:00+02:00', limitC: 24 });
+    // The limit crossed there, not the one at the worst point.
+    expect(lastResortHeadline({ ...lr, comfortLimitC: celsius(26) }, horizonAt)).toMatchObject({ limitC: 24 });
+  });
+
+  it('the battery runs out and the room stays inside its limits to the next recharge: the recharge, "at least"', () => {
+    expect(lastResortHeadline(base, horizonAt)).toEqual({ kind: 'within', at: horizonAt });
+  });
+
+  it('otherwise the end of the safe hours, said as the battery or as the limits', () => {
+    const window = { comfortLimitC: celsius(24), worstC: celsius(26.1), worstAt: '2026-07-16T07:00:00+02:00' };
+    expect(lastResortHeadline({ ...base, ...window }, horizonAt)).toEqual({ kind: 'battery', at: base.safeUntil });
+    expect(lastResortHeadline({ ...base, ...window, limitedBy: 'temperature' }, horizonAt)).toEqual({ kind: 'limits', at: base.safeUntil });
+    expect(lastResortHeadline({ ...base, limitedBy: 'humidity' }, horizonAt)).toEqual({ kind: 'limits', at: base.safeUntil });
+  });
+
+  it('never earlier than the battery time', () => {
+    const lr = { ...base, comfortLimitC: celsius(24), worstC: celsius(26.1), worstAt: '2026-07-16T07:00:00+02:00', limitCrossedAt: '2026-07-16T06:00:00+02:00', limitCrossedC: celsius(24) };
+    for (const l of [base, lr, { ...base, limitedBy: 'temperature' as const }]) expect(Date.parse(lastResortHeadline(l, horizonAt).at)).toBeGreaterThanOrEqual(Date.parse(base.safeUntil));
+  });
+});
+
+describe('lastResortHeadline when heating (#364 review): the room gets colder, never "under" its minimum', () => {
+  it('a crossing below the heating minimum keeps the battery time big, said as the battery', () => {
+    const lr = {
+      safeUntil: '2026-01-16T03:05:00+01:00',
+      safeHours: 7.2,
+      limitedBy: 'battery' as const,
+      comfortLimitC: celsius(18),
+      worstC: celsius(16.5),
+      worstAt: '2026-01-16T07:00:00+01:00',
+      limitCrossedAt: '2026-01-16T06:00:00+01:00',
+      limitCrossedC: celsius(18),
+    };
+    expect(lastResortHeadline(lr, '2026-01-16T08:00:00+01:00')).toEqual({ kind: 'battery', at: lr.safeUntil });
   });
 });

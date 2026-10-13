@@ -1,4 +1,4 @@
-import { formatTempFixed, type SafeRoomStatus } from '@cold-reserve/contracts';
+import { formatTemp, formatTempFixed, type SafeRoomStatus } from '@cold-reserve/contracts';
 import { Fragment } from 'react';
 import { CardShell } from './CardShell.js';
 import { CubeRow } from './CubeRow.js';
@@ -38,7 +38,15 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
   // #342: the older-person limit only outside the heating season; when heating, a neutral eyebrow. It always labels the big time.
   // #271: over the limit the room is not comfortable: the time is when the battery hold (back inside the limit after
   // the grace period) stops keeping it, said plainly.
-  const eyebrow = t(status.storeUnavailable !== true ? (overLimit === undefined ? 'safeRoom.until' : 'safeRoom.untilHeld') : status.stricterNightLimit === true ? 'safeRoom.untilStrict' : 'safeRoom.untilLive');
+  // #364 (owner, 12 Oct): when the battery runs out first and the room then holds its limits a while, the big time is
+  // the room's ("Under 24 °C until about 06:00"), the battery time goes below it.
+  const within = status.withinLimits;
+  const eyebrow =
+    within !== undefined
+      ? within.limitC === undefined
+        ? t('hold.withinAtLeast')
+        : t('hold.underUntil', { limit: formatTemp(within.limitC, getTempUnit()) })
+      : t(status.storeUnavailable !== true ? (overLimit === undefined ? 'safeRoom.until' : 'safeRoom.untilHeld') : status.stricterNightLimit === true ? 'safeRoom.untilStrict' : 'safeRoom.untilLive');
   return (
     <CardShell
       title={t('safeRoom.title', { room: roomLabel(status.safeRoomId) })}
@@ -65,11 +73,16 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
           {/* The big time and the cubes: one row on a short screen (data-fit-tight), so both stay at full size. */}
           <div className="hero-row">
             <p className="hero-value" data-testid="safe-until">
-              {clockOf(status.safeUntil)}
+              {clockOf(within?.until ?? status.safeUntil)}
             </p>
             {/* The signature element right under the big time, so it is in the first view on every screen (owner, 1 and 11 Oct). */}
             <CubeRow hours={status.safeHours} storm={inStorm} />
           </div>
+          {within !== undefined && (
+            <p className="muted" data-testid="battery-until">
+              {t('hold.batteryLine', { time: clockOf(status.safeUntil) })}
+            </p>
+          )}
         </Fragment>,
         <Fragment key="more">
           <p className="muted">{t('safeRoom.hours', { hours: formatHours(status.safeHours) })}</p>

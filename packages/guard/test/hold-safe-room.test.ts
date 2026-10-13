@@ -1,7 +1,7 @@
 import { PreferencesSchema, celsius, pct } from '@cold-reserve/contracts';
 import { nightMetrics } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
-import { bestHold, holdSafeRoom, leavesLimitsMs, safeRoomLimitAt, safeRoomLimitKindAt, type HeldSafeRoom, type HoldSafeRoomInput } from '../src/hold-safe-room.js';
+import { bestHold, holdSafeRoom, leavesLimitsMs, safeRoomLimitAt, safeRoomLimitKindAt, withinLimitsAfterBattery, type HeldSafeRoom, type HoldSafeRoomInput } from '../src/hold-safe-room.js';
 import { projectFrom } from '../src/context.js';
 import { H, T0, input, preferences, profile, snapshot } from './support.js';
 
@@ -298,5 +298,60 @@ describe('holdSafeRoom: more battery never brings the room out of its limits ear
       expect(leaves, `${String(socPct)} %`).toBeGreaterThanOrEqual(previous);
       previous = leaves;
     }
+  });
+});
+
+describe('withinLimitsAfterBattery: the big time on the cards (#364)', () => {
+  const i = input({ nightRecoveryMode: 'standard' });
+  const night = Date.parse('2026-07-15T22:00:00+02:00');
+  const step = i.config.projection.stepMinutes * 60_000;
+  const hold = (tempAt: (ms: number) => number, end?: { ms: number; limitedBy: 'battery' | 'temperature' }): HeldSafeRoom => {
+    const points: HeldSafeRoom['points'] = [];
+    for (let ms = T0; ms <= T0 + 12 * H; ms += step) {
+      points.push({ ms, socPct: pct(50), rooms: [{ id: 'bedroom-1', tempC: celsius(tempAt(ms)), humidityPct: pct(50) }], flows: { pvW: 0, loadW: 0, hvacW: 0, chargeW: 0, dischargeW: 0, gridImportW: 0, gridExportW: 0, unservedLoadW: 0 } } as unknown as HeldSafeRoom['points'][number]);
+    }
+    return { points, safeUntil: end, controlsAt: () => [], driesAt: () => false };
+  };
+  const toMs = T0 + 12 * H;
+
+  it('the battery runs out at 22:00 and the room crosses the 26 °C night limit at 01:00: 01:00, with that limit', () => {
+    const h = hold((t) => (t < night + 3 * H ? 25 : 26.5), { ms: night, limitedBy: 'battery' });
+    expect(withinLimitsAfterBattery(h, i, toMs)).toEqual({ ms: night + 3 * H, limitC: 26 });
+  });
+
+  it('the room stays inside its limits to the end of the projection: that end, "at least until", no limit named', () => {
+    expect(withinLimitsAfterBattery(hold(() => 25, { ms: night, limitedBy: 'battery' }), i, toMs)).toEqual({ ms: toMs });
+    // Capped at the end the card counts to, never past it.
+    expect(withinLimitsAfterBattery(hold(() => 25, { ms: night, limitedBy: 'battery' }), i, night + H)).toEqual({ ms: night + H });
+  });
+
+  it('nothing to add when the room ends the safe hours itself, when they never end, or when it is already out at the battery time', () => {
+    expect(withinLimitsAfterBattery(hold(() => 26.5, { ms: night, limitedBy: 'temperature' }), i, toMs)).toBeUndefined();
+    expect(withinLimitsAfterBattery(hold(() => 25), i, toMs)).toBeUndefined();
+    expect(withinLimitsAfterBattery(hold((t) => (t < night ? 25 : 26.5), { ms: night, limitedBy: 'battery' }), i, toMs)).toBeUndefined();
+  });
+
+  it('heating: never (the room only gets colder once the battery runs out)', () => {
+    const heating = input({ season: 'heating' });
+    expect(withinLimitsAfterBattery(hold(() => 20, { ms: night, limitedBy: 'battery' }), heating, toMs)).toBeUndefined();
+  });
+});
+
+describe('holdSafeRoom: the big time on the storm card never comes earlier with more battery (#364)', () => {
+  it.each(['standard', 'elderly'] as const)('%s night limit, 12 to 30 percent, grid down, 20:00', (mode) => {
+    let previous = Number.NEGATIVE_INFINITY;
+    let roomTimes = 0;
+    for (let socPct = 12; socPct <= 30; socPct++) {
+      const s = snapshot({ tempC: 26, socPct, gridAvailable: false });
+      const i = input({ nightRecoveryMode: mode, snapshot: { ...s, rooms: s.rooms.map((x) => (x.id === 'bedroom-1' ? { ...x, humidityPct: pct(65) } : x)) } });
+      const h = held(i);
+      if (withinLimitsAfterBattery(h, i, opts.toMs) !== undefined) roomTimes++;
+      // What the card shows big: the room's time when the battery runs out first, else the end of the safe hours, else the cap.
+      const big = withinLimitsAfterBattery(h, i, opts.toMs)?.ms ?? h.safeUntil?.ms ?? opts.toMs;
+      expect(big, `${String(socPct)} %`).toBeGreaterThanOrEqual(previous);
+      previous = big;
+    }
+    // A property where the room time never shows proves nothing.
+    expect(roomTimes).toBeGreaterThan(0);
   });
 });

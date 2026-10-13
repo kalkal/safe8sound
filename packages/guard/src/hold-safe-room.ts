@@ -144,6 +144,24 @@ export function leavesLimitsMs(h: HeldSafeRoom, roomId: string, limitAt: (ms: nu
 }
 
 /**
+ * The big time on the cards when the battery runs out first (#364): until when the room stays within its limits along
+ * the same hold (leavesLimitsMs), capped at `toMs`, with the limit it crosses there (absent when it stays within them
+ * to `toMs`: "at least until"). Undefined when the safe hours end on the room or never end, when the room is already
+ * out at the battery time, and when heating (the room only gets colder; leavesLimitsMs reads a cooling limit). So the
+ * card's big time, this or else the end of the safe hours or else `toMs`, is min(leavesLimitsMs, toMs): it never comes
+ * earlier with more battery (bestHold).
+ */
+export function withinLimitsAfterBattery(h: HeldSafeRoom, input: LimitInput, toMs: number): { readonly ms: number; readonly limitC?: number } | undefined {
+  const end = h.safeUntil;
+  if (end?.limitedBy !== 'battery' || input.season === 'heating') return undefined;
+  const limitAt = safeRoomLimitAt(input);
+  const leaves = leavesLimitsMs(h, input.preferences.safeRoomId, limitAt);
+  const ms = Math.min(leaves, toMs);
+  if (ms <= end.ms) return undefined;
+  return leaves <= toMs ? { ms, limitC: limitAt(ms) } : { ms };
+}
+
+/**
  * Among holds with the grid down, the one whose room leaves its limits latest (leavesLimitsMs): a variant that
  * ends earlier on the heat never wins, and with more battery that time never comes earlier (each variant's only
  * moves later with more charge). A variant may end its safe hours earlier only because the battery runs out, when

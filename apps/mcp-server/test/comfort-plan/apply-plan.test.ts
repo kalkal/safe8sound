@@ -364,6 +364,22 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
       expect(await w.inbox()).toHaveLength(1);
     });
 
+    it('#364: when the room holds its limit after the battery runs out, the family reads the room time first, then the battery time', async () => {
+      let checked = 0;
+      for (const soc of [14, 17, 20, 24]) {
+        const w = stormAt(soc);
+        const plan = await lastResort(w);
+        const crossed = plan.lastResort?.limitCrossedAt;
+        if (crossed === undefined) continue;
+        checked++;
+        const { token } = await firstYes(w, plan);
+        await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+        const text = (await w.inbox())[0]?.text ?? '';
+        expect(text).toContain(`stays within its limits until about ${clock(w, crossed)} (battery until ${clock(w, plan.lastResort?.safeUntil ?? '')}), then gets warmer.`);
+      }
+      expect(checked).toBeGreaterThan(0);
+    });
+
     it('in the unit the sandbox chose: a °F sandbox alerts the family in °F (#306)', async () => {
       const w = stormAt(20, { units: 'F' });
       const plan = await lastResort(w);

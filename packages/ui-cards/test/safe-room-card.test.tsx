@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { celsius } from '@cold-reserve/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SafeRoomCard, clockOf, roomLabel } from '../src/SafeRoomCard.js';
-import { safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
+import { safeRoomBatteryFirst, safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
 import { setTempUnit } from '../src/temp-unit.js';
 
 afterEach(() => {
@@ -142,5 +142,40 @@ describe('SafeRoomCard', () => {
   it('says when nobody is in the room', () => {
     render(<SafeRoomCard status={{ ...safeRoomCalm(), occupantRoles: [] }} />);
     expect(screen.getByRole('list', { name: 'In the safe room', hidden: true }).textContent).toContain('Who: nobody right now');
+  });
+});
+
+describe('SafeRoomCard when the battery runs out first (#364)', () => {
+  it('the room time big, with its limit; the battery time below; the cubes still under the big time', () => {
+    render(<SafeRoomCard status={safeRoomBatteryFirst()} />);
+    const eyebrow = screen.getByText('Under 24 °C until about');
+    const big = screen.getByTestId('safe-until');
+    const battery = screen.getByTestId('battery-until');
+    expect(big.textContent).toBe('06:00');
+    expect(battery.textContent).toBe('The battery lasts until 03:05.');
+    expect(eyebrow.compareDocumentPosition(big) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(big.compareDocumentPosition(battery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('Comfortable at least until')).toBeNull();
+    // The cubes stay in the first view, right under the big time.
+    expect(big.closest('.hero-row')?.querySelector('.cubes')).toBeTruthy();
+    cleanup();
+    setTempUnit('F');
+    render(<SafeRoomCard status={safeRoomBatteryFirst()} />);
+    expect(screen.getByText('Under 75.2 °F until about')).toBeTruthy();
+  });
+
+  it('inside its limits to the end of the projection: "at least until", no limit named', () => {
+    const status = safeRoomBatteryFirst();
+    render(<SafeRoomCard status={{ ...status, withinLimits: { until: '2026-07-18T20:00:00+02:00' } }} />);
+    expect(screen.getByText('Within its limits at least until')).toBeTruthy();
+    expect(screen.getByTestId('safe-until').textContent).toBe('20:00');
+    expect(screen.getByTestId('battery-until').textContent).toBe('The battery lasts until 03:05.');
+  });
+
+  it('the 06:40 storm of the demo script is unchanged: no room time, the battery time big', () => {
+    render(<SafeRoomCard status={safeRoomInStorm()} />);
+    expect(screen.getByText('Comfortable at least until')).toBeTruthy();
+    expect(screen.getByTestId('safe-until').textContent).toBe('06:40');
+    expect(screen.queryByTestId('battery-until')).toBeNull();
   });
 });

@@ -332,7 +332,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   );
   return (
     <EchoFrame sky={sky} aside={phonePanel} top={settingsControl}>
-      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', onCardAction }}>
+      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', place: demoSettings?.locationId, onCardAction }}>
         <QueryClientProvider client={queryClient}>
           <Conversation
             agent={agent}

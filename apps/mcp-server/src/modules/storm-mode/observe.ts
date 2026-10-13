@@ -21,7 +21,7 @@ import {
   type StormSession,
 } from '@cold-reserve/contracts';
 import { epsBaseLoadW, planNotifications, prepareDevices, stormReduce, type DeviceFailure, type NotificationPlan, type StateStore, type StormContext, type StormEvent } from '@cold-reserve/core';
-import { holdSafeRoom, safeRoomLimitKindAt, type SafeRoomLimitKind } from '@cold-reserve/guard';
+import { holdSafeRoom, safeRoomLimitKindAt, withinLimitsAfterBattery, type SafeRoomLimitKind } from '@cold-reserve/guard';
 import { stormMessage, type Locale, type StormMessageFields } from '@cold-reserve/i18n';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
@@ -49,6 +49,8 @@ export interface Observed {
   readonly safeUntilMs: number;
   /** #271: the safe room's limit in force at the reading and what sets it, from the same guard frame as the hours. */
   readonly limitNow: { limitC: number; kind: SafeRoomLimitKind };
+  /** #364: the battery ends the safe hours and the room then stays within its limits until `ms` (the limit crossed there, when it is). */
+  readonly withinLimits?: { readonly ms: number; readonly limitC?: number };
   readonly session: StormSession | undefined;
   /** #114: the store could not be read (preferences or the storm session): the live reading, the default safe room, no session. */
   readonly storeUnavailable?: true;
@@ -77,7 +79,7 @@ function holdHours(
   forecast: Forecast,
   preferences: Preferences,
   strictest = false,
-): Result<{ hours: number; untilMs: number; season: Season; limitNow: { limitC: number; kind: SafeRoomLimitKind } }, ErrorEnvelope> {
+): Result<{ hours: number; untilMs: number; season: Season; limitNow: { limitC: number; kind: SafeRoomLimitKind }; withinLimits?: { readonly ms: number; readonly limitC?: number } }, ErrorEnvelope> {
   // Never assume an EPS load (#107): the projection would quietly count none.
   const eps = epsBaseLoadW(profile);
   if (!eps.ok) return eps;
@@ -96,7 +98,9 @@ function holdHours(
   const untilMs = held.value.safeUntil?.ms ?? toMs;
   // #271: the limit in force now, on the same frame (at the stricter night limit when the store is down, #114).
   const limitNow = safeRoomLimitKindAt({ preferences, profile, config: deps.guard, ...frame })(nowMs);
-  return ok({ hours: Math.round(((untilMs - nowMs) / HOUR_MS) * 100) / 100, untilMs, season: frame.season, limitNow });
+  // #364: the battery runs out first and the room then holds its limits a while, on the same hold and the same cap.
+  const within = withinLimitsAfterBattery(held.value, { preferences, profile, config: deps.guard, ...frame }, toMs);
+  return ok({ hours: Math.round(((untilMs - nowMs) / HOUR_MS) * 100) / 100, untilMs, season: frame.season, limitNow, ...(within === undefined ? {} : { withinLimits: within }) });
 }
 
 export function messageFields(o: Observed, session: StormSession | undefined): StormMessageFields {
@@ -108,6 +112,8 @@ export function messageFields(o: Observed, session: StormSession | undefined): S
     unit: o.home.units ?? 'C',
     atMs: o.nowMs,
     safeUntilMs: o.safeUntilMs,
+    // #364: the room's time leads the message only with a real crossing (never "then gets warmer" past the projection).
+    ...(o.withinLimits?.limitC === undefined ? {} : { withinLimitsUntilMs: o.withinLimits.ms }),
     ...(session?.gridBackAt === undefined ? {} : { powerBackAtMs: Date.parse(session.gridBackAt) }),
     timeZone: o.home.profile.location.tz,
   };
@@ -214,6 +220,7 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext, degrade = 
     safeHours: hours.value.hours,
     safeUntilMs: hours.value.untilMs,
     limitNow: hours.value.limitNow,
+    ...(hours.value.withinLimits === undefined ? {} : { withinLimits: hours.value.withinLimits }),
     session: latest.value,
     ...(degraded ? { storeUnavailable: true as const } : {}),
     // In the heating season the hold keeps the heating minimum: the older-person night limit changes nothing.

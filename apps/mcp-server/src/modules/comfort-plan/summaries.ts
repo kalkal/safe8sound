@@ -1,5 +1,7 @@
 import { DATA_GROUPS, epochMs, formatTemp, isFullyLive, tempGap, type ApplyPlanOutput, type TempUnit, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
 import { localIso, localTimeText } from '@cold-reserve/core';
+import { lastResortAdvice } from '@cold-reserve/i18n';
+import { roomTimeLeads } from './family-alert.js';
 
 // The text content of each tool result. The agent (Strands) reads only this text, not structuredContent
 // (F7 finding): every number and fact the model may say is here. The JSON is for the cards and clients.
@@ -118,7 +120,7 @@ function windowText(lr: NonNullable<Plan['lastResort']>, opts: PlanSummaryOption
   // The battery runs out but the room stays inside its limit to the end of the plan: said, not left out (#272). Its
   // temperature limit: humidity may end a last resort, never this window.
   if (lr.limitedBy === 'battery' && lr.worstAt === undefined) {
-    return `The battery lasts until ${localTimeText(lr.safeUntil)}; the safe room still stays inside its temperature limit until ${localTimeText(horizonAt)}, the next recharge.`;
+    return `The safe room stays inside its temperature limit until ${localTimeText(horizonAt)}, the next recharge (the battery lasts until ${localTimeText(lr.safeUntil)}).`;
   }
   if (lr.comfortLimitC === undefined || lr.worstC === undefined || lr.worstAt === undefined) return undefined;
   // The room has gone past the limit (contract): below it is the heating season.
@@ -140,12 +142,45 @@ function windowText(lr: NonNullable<Plan['lastResort']>, opts: PlanSummaryOption
   if (lr.limitedBy === 'battery' && lr.limitCrossedAt !== undefined && !heating) {
     const crossedC = lr.limitCrossedC ?? lr.comfortLimitC;
     const crossedLimit = `${deg(crossedC, unit)}${inNight(wallHour(lr.limitCrossedAt), opts) ? ' night' : ''} limit`;
-    return `The battery lasts until ${until}; the safe room stays at or below its ${crossedLimit} until about ${localTimeText(lr.limitCrossedAt)}, then warms up to ${temp} by ${by}.`;
+    // #364: the room's time leads, the battery's follows, as on the card and in the family alert.
+    return `The safe room stays at or below its ${crossedLimit} until about ${localTimeText(lr.limitCrossedAt)} (the battery lasts until ${until}), then warms up to ${temp} by ${by}.`;
   }
   const then = atEnd
     ? `at ${until} the safe room is at ${temp}, past its ${limit}.`
     : `the safe room then goes ${heating ? 'down' : 'up'} to ${temp} by ${by}, past its ${limit}.`;
   return lr.limitedBy === 'battery' ? `The battery lasts until ${until}; ${then}` : `Safe until ${until}; ${then}`;
+}
+
+/**
+ * #364: until when the room stays within its limits, the big time on the card: when the battery runs out first, the
+ * crossing after it, or the next recharge when the room holds its limits that long; otherwise the end of the safe hours.
+ */
+function roomUntil(lr: NonNullable<Plan['lastResort']>, horizonAt: string): string {
+  if (lr.limitedBy !== 'battery') return lr.safeUntil;
+  // The crossing leads only when the room then gets warmer (#364 review): heating keeps the battery time.
+  if (lr.limitCrossedAt !== undefined) return roomTimeLeads(lr) ? lr.limitCrossedAt : lr.safeUntil;
+  return lr.worstAt === undefined ? horizonAt : lr.safeUntil;
+}
+
+/** The first words of a last resort (#364): the room's time first, then the battery's when it runs out earlier. */
+function lastResortHead(lr: NonNullable<Plan['lastResort']>, horizonAt: string): string {
+  const room = roomUntil(lr, horizonAt);
+  if (lr.limitedBy !== 'battery') return `within its limits until ${localTimeText(lr.safeUntil)}`;
+  if (room === lr.safeUntil) return `until the battery runs out at ${localTimeText(lr.safeUntil)}`;
+  const about = lr.limitCrossedAt === undefined ? `${localTimeText(room)}, the next recharge` : `about ${localTimeText(room)}`;
+  return `within its limits until ${about}, the battery until ${localTimeText(lr.safeUntil)}`;
+}
+
+/**
+ * #376: what the card's last page says, so the voice can say it too: the zero-energy actions, the heat-stroke signs and
+ * the number to call at the home's place (911 in Houston, 112 in Italy). General tips, never medical protection.
+ */
+function adviceText(lr: NonNullable<Plan['lastResort']>, unit: TempUnit): string | undefined {
+  // The card's own words (the catalog), so voice and card say the same; a plan without its place names no number.
+  if (lr.place === undefined) return undefined;
+  const advice = lastResortAdvice('en-US', lr.actions ?? [], unit, lr.place);
+  const todo = advice.actions.length === 0 ? '' : `${advice.title}: ${advice.actions.join(' ')} `;
+  return `The card says: ${todo}${advice.signsTitle}: ${advice.signs.join('; ')}. ${advice.call} ${advice.notMedical}`;
 }
 
 export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
@@ -156,9 +191,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   const head =
     lr === undefined
       ? `Proposed plan ${p.id}: ${level} level until ${localTimeText(p.horizonAt)}`
-      : lr.limitedBy === 'battery'
-        ? `Proposed last-resort plan ${p.id}: the safe room alone, until the battery runs out at ${localTimeText(lr.safeUntil)}`
-        : `Proposed last-resort plan ${p.id}: the safe room alone, within its limits until ${localTimeText(lr.safeUntil)}`;
+      : `Proposed last-resort plan ${p.id}: the safe room alone, ${lastResortHead(lr, p.horizonAt)}`;
   // A refused proposal (#202): the first words say so and that this plan holds, so the model offers it at once.
   const refused =
     p.refusedProposal === undefined ? [] : [`The safety check refused the plan you proposed: ${p.refusedProposal.message} This plan holds instead and is ready to apply.`];
@@ -191,6 +224,9 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   }
   const window = p.lastResort === undefined ? undefined : windowText(p.lastResort, opts, p.horizonAt);
   if (window !== undefined) parts.push(window);
+  // #376: the card's page of what to do without power; the number to call is the home's, said only from here.
+  const advice = p.lastResort === undefined ? undefined : adviceText(p.lastResort, opts.unit ?? 'C');
+  if (advice !== undefined) parts.push(advice);
   // What the room does once the battery is empty, said not hidden (#160 acceptance test: up to ~100 % RH on a
   // humid night). The plan's own steps say the season: a heated room gets colder, never warmer.
   if (p.lastResort?.limitedBy === 'battery') {
@@ -203,7 +239,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
       ? // The pending plan, named, so a plain "yes" in the next turn applies it instead of planning again (#274).
         `Say it to the person and ask to confirm. Plan ${p.id} is waiting for the person's yes: when they say yes, call apply_plan with planId ${p.id}.`
       : `Last resort: the safest plan there is, but not every guarantee holds. It can be applied only with two explicit yeses: ` +
-          `read the person the risk and until when the safe room is safe (${localTimeText(p.lastResort.safeUntil)}), ask; ` +
+          `read the person the risk and until when the safe room stays within its limits (${localTimeText(roomUntil(p.lastResort, p.horizonAt))}), ask; ` +
           `if they say yes, call apply_plan with planId ${p.id} and ask again with what it returns.`,
   );
   return parts.join(' ');

@@ -1,4 +1,4 @@
-import { DEMO_CONTEXT_KEY, UNITS_CONTEXT_KEY } from '@cold-reserve/ui-cards';
+import { DEMO_CONTEXT_KEY, PLACE_CONTEXT_KEY, UNITS_CONTEXT_KEY } from '@cold-reserve/ui-cards';
 import { describe, expect, it } from 'vitest';
 import { hostContextFor } from '../../src/host/CardFrame.js';
 
@@ -29,5 +29,15 @@ describe('the hostContext a card frame receives', () => {
     const base = { theme: 'dark' as const, timeZone: 'Europe/Rome', fullscreen: false, locale: 'en-US' as const, demo: false };
     expect(hostContextFor({ ...base, units: 'F' })).toMatchObject({ [UNITS_CONTEXT_KEY]: 'F' });
     expect(hostContextFor({ ...base, units: 'C' })).toMatchObject({ [UNITS_CONTEXT_KEY]: 'C' });
+  });
+});
+
+describe('#376: the place of the home, for the number to call on a last resort', () => {
+  const base = { theme: 'dark' as const, timeZone: 'Europe/Rome', fullscreen: false, locale: 'en-US' as const, demo: false };
+
+  it('names the place the judge chose, and nothing when the page knows none (never a default number)', () => {
+    expect(hostContextFor({ ...base, place: 'houston' })).toMatchObject({ [PLACE_CONTEXT_KEY]: 'houston' });
+    expect(hostContextFor({ ...base, place: 'turin' })).toMatchObject({ [PLACE_CONTEXT_KEY]: 'turin' });
+    expect(hostContextFor(base)).not.toHaveProperty(PLACE_CONTEXT_KEY);
   });
 });

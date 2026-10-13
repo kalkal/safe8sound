@@ -37,6 +37,8 @@ export async function alertFamily(
     unit: input.unit ?? 'C',
     atMs: input.nowMs,
     safeUntilMs: epochMs(plan.lastResort.safeUntil),
+    // #364: the battery runs out first and the room crosses its limit later: the room's time leads, the battery's follows.
+    ...(roomTimeLeads(plan.lastResort) && plan.lastResort.limitCrossedAt !== undefined ? { withinLimitsUntilMs: epochMs(plan.lastResort.limitCrossedAt) } : {}),
     timeZone: profile.location.tz,
   };
   const at = new Date(input.nowMs).toISOString();
@@ -58,4 +60,12 @@ export async function alertFamily(
     }
   }
   return { sent, failed, ...(failure === undefined ? {} : { failure }) };
+}
+
+/**
+ * #364 review: the room's time leads only when the room then gets warmer, that is cooling: the worst point is above
+ * its limit. When heating it gets colder and the battery time stays the one said.
+ */
+export function roomTimeLeads(lr: NonNullable<Plan['lastResort']>): boolean {
+  return lr.limitCrossedAt !== undefined && lr.worstC !== undefined && lr.comfortLimitC !== undefined && lr.worstC > lr.comfortLimitC;
 }

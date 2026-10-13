@@ -166,6 +166,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
       entry: { source: sim, profile, readOnly: false, levelSince: since, clock: homeClock.value },
       forecast: () => sim.forecast(),
       units: choices.units,
+      place: choices.locationId,
       scenario: sandboxScenario,
       startMs: Date.parse(sandboxScenario.startAt) + startHMs,
       ...(choices.version === undefined ? {} : { version: choices.version }),
@@ -202,7 +203,9 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     const homeClock = opts.scenarioClock !== undefined && entry?.clock !== undefined ? { clock: entry.clock } : {};
     // The unit a visitor chose (#306), read with the settings on every request; the real home and demo say °C.
     const units = sandboxFor(homeId)?.units ?? 'C';
-    return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly, units, ...homeClock } : undefined;
+    // #376: the place of the emergency number: the visitor's choice; the demo and the real home are in Italy, the reference place.
+    const place = sandboxFor(homeId)?.place ?? 'reference';
+    return entry && forecast ? { source: entry.source, forecast, profile: entry.profile, readOnly: entry.readOnly, units, place, ...homeClock } : undefined;
   };
 
   const stormDeps: StormModeDeps | undefined = opts.stormMode === undefined ? undefined : { ...opts.stormMode, model: params, homes: planningHome, logger: opts.logger };

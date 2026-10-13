@@ -150,6 +150,17 @@ export const enUS = {
   // Sent by the server when a last-resort plan is applied (#160): the fixed "battery low, check on them" alert.
   'storm.lastResort':
     '{product} alert for {name}: the home battery is low. {room} is at {temp} and stays within its limits until {safeUntil}, then gets warmer. Please check on them.',
+  // #364: the battery runs out first and the room then holds its limits a while: the room's time leads, the battery follows.
+  'storm.startedWithin':
+    '{product} alert for {name}: a storm cut the power at home. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. No action is needed now. Next message: when the level changes or power returns.',
+  'storm.essentialWithin':
+    '{product} update for {name}: the battery switched to essential mode. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. No action is needed now. Next message: when the level changes or power returns.',
+  'storm.lastResortWithin':
+    '{product} alert for {name}: the home battery is low. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. Please check on them.',
+  // #364: the big time on the plan and safe-room cards when the battery runs out first.
+  'hold.underUntil': 'Under {limit} until about',
+  'hold.withinAtLeast': 'Within its limits at least until',
+  'hold.batteryLine': 'The battery lasts until {time}.',
   // The last-resort card (#160): zero-energy actions and heat-illness signs, from docs/heat-advice.md.
   'lastResort.title': 'Keep cool without power',
   'lastResort.action.close_curtains': 'Close the curtains on the sunny side.',

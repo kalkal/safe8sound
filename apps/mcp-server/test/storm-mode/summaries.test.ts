@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { celsius } from '@cold-reserve/contracts';
+import { SafeRoomStatusSchema, celsius } from '@cold-reserve/contracts';
 import { notifySummary, safeRoomSummary, startSummary } from '../../src/modules/storm-mode/summaries.js';
 import { stormModeModule } from '../../src/modules/storm-mode/index.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
@@ -128,5 +128,35 @@ describe('localIso', () => {
     expect(localIso(Date.parse('2026-07-17T19:30:00Z'), 'Europe/Rome')).toBe('2026-07-17T21:30:00+02:00');
     expect(localIso(Date.parse('2026-01-10T23:15:00Z'), 'Europe/Rome')).toBe('2026-01-11T00:15:00+01:00');
     expect(localIso(Date.parse('2026-01-10T23:15:00Z'), 'UTC')).toBe('2026-01-10T23:15:00+00:00');
+  });
+});
+
+describe('#364: the room time leads, the battery time follows', () => {
+  const base = {
+    safeRoomId: 'bedroom-1',
+    tempC: celsius(23.8),
+    occupantRoles: ['grandpa'],
+    level: 'essential',
+    levelReason: 'storm',
+    safeHours: 7.2,
+    safeUntil: '2026-07-18T03:05:00+02:00',
+    stormPhase: 'active',
+    gridAvailable: false,
+    origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' },
+    homeLink: 'ok',
+  };
+  const status = (withinLimits: object) => SafeRoomStatusSchema.parse({ ...base, withinLimits });
+
+  it('with the limit crossed: both times, the room first, and every number on the card', () => {
+    const text = safeRoomSummary(status({ until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) }));
+    expect(text).toContain('The safe room stays at or below its 24 °C limit until about 6:00 AM; the battery lasts until 3:05 AM (about 7.2 hours), then the room warms up.');
+    expect(text).not.toContain('Safe for about');
+    const f = safeRoomSummary(status({ until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) }), 'F');
+    expect(f).toContain('at or below its 75.2 °F limit until about 6:00 AM');
+  });
+
+  it('inside its limits to the end of the projection: "at least until"', () => {
+    const text = safeRoomSummary(status({ until: '2026-07-18T20:00:00+02:00' }));
+    expect(text).toContain('The safe room stays within its limits at least until 8:00 PM; the battery lasts until 3:05 AM (about 7.2 hours).');
   });
 });

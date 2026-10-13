@@ -154,6 +154,16 @@ describe('seasonFor', () => {
     expect(seasonFor('auto', temps(19, 30), preferences)).toBe('cooling');
   });
 
+  it("the season comes from the place's own forecast, never the calendar: the same dates differ by place (owner, 13 Oct)", () => {
+    // Illustrative hourly outdoor temperatures for one day, not measured data: a mid-October day in Houston is still
+    // a cooling day, the same day in Turin a heating one; mid-January heats in both.
+    const day = (low: number, high: number) => temps(...Array.from({ length: 24 }, (_, h) => low + ((high - low) * (1 - Math.cos((Math.PI * Math.min(10, Math.max(0, h - 5))) / 10))) / 2));
+    expect(seasonFor('auto', day(20, 29), preferences)).toBe('cooling'); // Houston, 15 October
+    expect(seasonFor('auto', day(9, 18), preferences)).toBe('heating'); // Turin, 15 October
+    expect(seasonFor('auto', day(7, 17), preferences)).toBe('heating'); // Houston, 15 January
+    expect(seasonFor('auto', day(-1, 7), preferences)).toBe('heating'); // Turin, 15 January
+  });
+
   it('with auto and no forecast, stays neutral', () => {
     expect(seasonFor('auto', [], preferences)).toBe('neutral');
   });

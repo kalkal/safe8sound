@@ -277,7 +277,8 @@ describe('last resort (approved in #19: proposal only)', () => {
     expect(p.lastResort?.safeHours).toBeGreaterThan(0);
     // The time as the person says it, in the home's zone (the guard's reasons use local time too).
     expect(p.warnings?.find((x) => x.code === 'last_resort_plan')?.message).toMatch(
-      /^No plan keeps the Bedroom within its limits until the next recharge: safe for about [\d.]+ hours, until \d{1,2}:\d\d (AM|PM); then /,
+      // #364: the room holds its limit after the battery runs out: its time first, then the battery's.
+      /^No plan keeps the Bedroom within its limits until the next recharge: (safe for about [\d.]+ hours, until \d{1,2}:\d\d (AM|PM); then |within them until about \d{1,2}:\d\d (AM|PM), the battery until \d{1,2}:\d\d (AM|PM); then it warms up\.$)/,
     );
     expect(p.lastResort?.safeUntil).toMatch(/\+02:00$/);
     // A last resort names a real limit inside the horizon, never a battery that does not run out.

@@ -109,6 +109,11 @@ describe('PlanSchema', () => {
       expect(PlanSchema.safeParse(plan({ lastResort: { ...battery, limitCrossedC: 27 } })).success).toBe(false);
     });
 
+    it('#376 (additive): carries the home place, so the card names its emergency number', () => {
+      for (const place of ['reference', 'turin', 'houston']) expect(PlanSchema.parse(plan({ lastResort: { ...lastResort, place } })).lastResort?.place).toBe(place);
+      expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, place: 'paris' } })).success).toBe(false);
+    });
+
     it('carries until when the safe room is safe, and what limits it', () => {
       expect(PlanSchema.parse(plan({})).lastResort).toEqual(lastResort);
       expect(PlanSchema.safeParse(plan({ lastResort: { ...lastResort, limitedBy: 'luck' } })).success).toBe(false);

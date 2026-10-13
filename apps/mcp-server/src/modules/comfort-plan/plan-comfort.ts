@@ -11,6 +11,7 @@ import {
   type Forecast,
   type HomeProfile,
   type LevelStep,
+  type LocationId,
   type TempUnit,
   type NightRecovery,
   type Plan,
@@ -103,6 +104,8 @@ export function roomsText(rooms: readonly { id: string; name: string }[], budget
 
 /** The unit of the texts for this call (#306): the sandbox's choice, °C otherwise. */
 const unitOf = (deps: ComfortPlanDeps, ctx: ToolContext): TempUnit => deps.homes(ctx.homeId)?.units ?? 'C';
+/** The home's place (#376): the last-resort card names the number to call there. */
+const placeOf = (deps: ComfortPlanDeps, ctx: ToolContext): LocationId | undefined => deps.homes(ctx.homeId)?.place;
 
 export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput, ctx: ToolContext): Promise<Result<Plan, ErrorEnvelope>> {
   const loaded = await loadInputs(deps, ctx);
@@ -269,7 +272,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     advisoryOnly: loaded.value.home.readOnly,
     ...(chosen.verdict.nightRecovery === undefined ? {} : { nightRecovery: chosen.verdict.nightRecovery }),
     ...(warningsOf(chosen, safest, roomName, unitOf(deps, ctx)).length === 0 ? {} : { warnings: warningsOf(chosen, safest, roomName, unitOf(deps, ctx)) }),
-    ...(safest === undefined ? {} : { lastResort: safest.lastResort }),
+    ...(safest === undefined ? {} : { lastResort: withPlace(safest.lastResort, placeOf(deps, ctx)) }),
     ...(refusedProposal === undefined ? {} : { refusedProposal }),
     ...(ctx.turnId === undefined ? {} : { proposedInTurn: ctx.turnId }),
     ...(counterfactual === undefined ? {} : { counterfactual }),
@@ -403,7 +406,11 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
     },
     warning: {
       code: 'last_resort_plan',
-      message: `No plan keeps the ${room} within its limits until the next recharge: safe for about ${String(safeHours)} hours, until ${localTimeText(safeUntilIso)}; then ${then}.`.slice(0, 300),
+      // #364: when the room holds its limit after the battery runs out, its time first, then the battery's, as on the card.
+      message: (crossed === undefined || season === 'heating'
+        ? `No plan keeps the ${room} within its limits until the next recharge: safe for about ${String(safeHours)} hours, until ${localTimeText(safeUntilIso)}; then ${then}.`
+        : `No plan keeps the ${room} within its limits until the next recharge: within them until about ${localTimeText(localIso(crossed.atMs, profile.location.tz))}, the battery until ${localTimeText(safeUntilIso)}; then it warms up.`
+      ).slice(0, 300),
     },
   };
 }
@@ -774,4 +781,9 @@ function withHumidityControl(steps: readonly PlanStep[], deps: ComfortPlanDeps, 
     return [{ ...setting, ts: new Date(c.ms).toISOString(), hvacMode: c.mode }];
   });
   return [...rewritten, ...added];
+}
+
+/** The last resort with the home's place, when the home has one (#376). */
+function withPlace(lr: NonNullable<Plan['lastResort']>, place: LocationId | undefined): NonNullable<Plan['lastResort']> {
+  return place === undefined ? lr : { ...lr, place };
 }

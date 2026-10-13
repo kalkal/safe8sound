@@ -1,6 +1,6 @@
 import { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge';
-import type { TempUnit } from '@cold-reserve/contracts';
-import { CARD_KINDS, CARD_WAITING_MIN_PX, DEMO_CONTEXT_KEY, UNITS_CONTEXT_KEY, type CardKind } from '@cold-reserve/ui-cards';
+import type { LocationId, TempUnit } from '@cold-reserve/contracts';
+import { CARD_KINDS, CARD_WAITING_MIN_PX, DEMO_CONTEXT_KEY, PLACE_CONTEXT_KEY, UNITS_CONTEXT_KEY, type CardKind } from '@cold-reserve/ui-cards';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { getLocale, subscribeLocale, type Locale } from '@cold-reserve/i18n';
 import type { ToolCard } from '../agent/wire.js';
@@ -25,7 +25,25 @@ const ECHO_LANDSCAPE = '(width >= 56rem)';
 const DISPLAY_MODES: ('inline' | 'fullscreen')[] = ['inline', 'fullscreen'];
 
 /** The hostContext of a frame: the MCP Apps fields, plus the simulator's own demo key only in demo mode. */
-export function hostContextFor({ theme, timeZone, fullscreen, demo, locale, units = 'C', maxHeight }: { theme: 'dark' | 'light'; timeZone: string; fullscreen: boolean; demo: boolean; locale: Locale; units?: TempUnit; maxHeight?: number }) {
+export function hostContextFor({
+  theme,
+  timeZone,
+  fullscreen,
+  demo,
+  locale,
+  units = 'C',
+  place,
+  maxHeight,
+}: {
+  theme: 'dark' | 'light';
+  timeZone: string;
+  fullscreen: boolean;
+  demo: boolean;
+  locale: Locale;
+  units?: TempUnit;
+  place?: LocationId | undefined;
+  maxHeight?: number;
+}) {
   return {
     // No scrolling on the Echo screen (owner, 10 Oct): inline, the height the card has; the card fits itself in it.
     ...(maxHeight === undefined ? {} : { containerDimensions: { maxHeight } }),
@@ -39,6 +57,8 @@ export function hostContextFor({ theme, timeZone, fullscreen, demo, locale, unit
     // °F everywhere (owner decision, 9 Oct): always said, so a switch back to °C reaches a card already shown;
     // a host that never names it (a real Alexa+ device) gets the cards' default, °C.
     [UNITS_CONTEXT_KEY]: units,
+    // #376: the place the judge chose, for the number to call on a last resort; nothing when the page knows none.
+    ...(place === undefined ? {} : { [PLACE_CONTEXT_KEY]: place }),
   };
 }
 
@@ -56,15 +76,15 @@ export function CardFrame({ card, turnId }: { card: ToolCard; turnId: string }) 
 }
 
 function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind; turnId: string }) {
-  const { agent, documentFor, theme, timeZone, demo = false, units = 'C', onCardAction } = useCardHost();
+  const { agent, documentFor, theme, timeZone, demo = false, units = 'C', place, onCardAction } = useCardHost();
   const onCardActionRef = useRef(onCardAction);
   onCardActionRef.current = onCardAction;
   const document = useMemo(() => documentFor(kind), [documentFor, kind]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
   const locale = useSyncExternalStore(subscribeLocale, getLocale);
-  const contextRef = useRef<{ theme: 'dark' | 'light'; timeZone: string; demo: boolean; locale: Locale; units: TempUnit; maxHeight?: number }>({ theme, timeZone, demo, locale, units });
-  contextRef.current = { theme, timeZone, demo, locale, units };
+  const contextRef = useRef<{ theme: 'dark' | 'light'; timeZone: string; demo: boolean; locale: Locale; units: TempUnit; place: LocationId | undefined; maxHeight?: number }>({ theme, timeZone, demo, locale, units, place });
+  contextRef.current = { theme, timeZone, demo, locale, units, place };
   const [height, setHeight] = useState(INITIAL_HEIGHT_PX);
   const [failed, setFailed] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -191,8 +211,8 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
   // Also in the first hostContext: a frame measured before its bridge connected (a card behind its tab) still fits.
   if (maxHeight !== undefined) contextRef.current.maxHeight = maxHeight;
   useEffect(() => {
-    bridgeRef.current?.setHostContext(hostContextFor({ theme, timeZone, fullscreen, demo, locale, units, ...(maxHeight === undefined ? {} : { maxHeight }) }));
-  }, [theme, timeZone, fullscreen, demo, locale, units, maxHeight]);
+    bridgeRef.current?.setHostContext(hostContextFor({ theme, timeZone, fullscreen, demo, locale, units, place, ...(maxHeight === undefined ? {} : { maxHeight }) }));
+  }, [theme, timeZone, fullscreen, demo, locale, units, place, maxHeight]);
 
   if (!document.ok || failed) return <p role="alert">{t('surface.failed')}</p>;
   // The wrapper is always there, so the frame is never remounted (that would reload the card).

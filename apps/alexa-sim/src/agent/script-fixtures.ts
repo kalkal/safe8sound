@@ -1,6 +1,6 @@
 import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
-import { homeInStorm, hotDayPlan, lastResortPlan, planThatHolds, safeRoomCalm, safeRoomInStorm, stormPlan, surplusPlan } from '@cold-reserve/ui-cards';
+import { homeInStorm, hotDayPlan, lastResortBatteryPlan, lastResortPlan, planThatHolds, safeRoomBatteryFirst, safeRoomCalm, safeRoomInStorm, stormPlan, surplusPlan } from '@cold-reserve/ui-cards';
 import { ToolCardSchema, type ToolCard } from './wire.js';
 
 // The tool results the script can show, by name: built from the contract fixtures, the same data the
@@ -55,6 +55,9 @@ export const SCRIPT_FIXTURES = {
     }),
   'safe-room-storm': () => card({ tool: 'get_safe_room_status', result: safeRoomInStorm() }),
   'safe-room-calm': () => card({ tool: 'get_safe_room_status', result: { ...safeRoomCalm(), stormPhase: 'ended' } }),
+  /** #364, #376: the battery runs out first (03:05), the room holds 24 °C until about 06:00; the plan from a Houston home. Not in the script: the e2e of the server's place. */
+  'last-resort-battery-houston': () => card({ tool: 'plan_comfort', result: lastResortBatteryPlan('houston') }),
+  'safe-room-battery-first': () => card({ tool: 'get_safe_room_status', result: safeRoomBatteryFirst() }),
   /** The night in the storm: the pacing line with the reserve as the budget (plan §11.3, Q4 of #24). */
   'storm-plan': () => card({ tool: 'plan_comfort', result: stormPlan() }),
   /** The thermal floor plan in the storm: the safe room served, the others waiting for the level (G8). */

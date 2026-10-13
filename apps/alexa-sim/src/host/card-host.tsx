@@ -1,4 +1,4 @@
-import type { Result, TempUnit } from '@cold-reserve/contracts';
+import type { LocationId, Result, TempUnit } from '@cold-reserve/contracts';
 import type { CardKind } from '@cold-reserve/ui-cards';
 import { createContext, useContext, type ReactNode } from 'react';
 import type { Agent } from '../agent/agent.js';
@@ -15,6 +15,8 @@ export interface CardHost {
   demo?: boolean;
   /** The temperature unit the person chose (demo settings); °C when absent. */
   units?: TempUnit;
+  /** #376: the place the person chose (demo settings), for the number to call on a last resort; unknown when absent. */
+  place?: LocationId | undefined;
   /** A card action that succeeded (its tool name, the turn of its card and its structured result): the page may update what it shows, e.g. the home panel, the steps. */
   onCardAction?: (name: string, turnId: string, result: unknown) => void;
 }

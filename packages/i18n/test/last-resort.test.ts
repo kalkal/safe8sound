@@ -7,23 +7,23 @@ import { emergencyNumberOf, lastResortAdvice } from '../src/index.js';
 
 describe('last-resort advice', () => {
   it('has a line for every action the plan can list, in the order given', () => {
-    const advice = lastResortAdvice('en-US', LAST_RESORT_ACTIONS);
+    const advice = lastResortAdvice('en-US', LAST_RESORT_ACTIONS, 'C', 'turin');
     expect(advice.actions).toHaveLength(LAST_RESORT_ACTIONS.length);
     expect(advice.actions[0]).toBe('Close the curtains on the sunny side.');
-    expect(lastResortAdvice('en-US', ['drink_water']).actions).toEqual(['Drink water often, even without thirst.']);
+    expect(lastResortAdvice('en-US', ['drink_water'], 'C', 'turin').actions).toEqual(['Drink water often, even without thirst.']);
   });
 
   it('the fan line keeps the 35 °C rule', () => {
-    expect(lastResortAdvice('en-US', ['fan_below_35c']).actions[0]).toContain('35 °C');
+    expect(lastResortAdvice('en-US', ['fan_below_35c'], 'C', 'turin').actions[0]).toContain('35 °C');
   });
 
   it('the fan line in the unit the sandbox chose: 35 °C is 95 °F (#306)', () => {
-    expect(lastResortAdvice('en-US', ['fan_below_35c'], 'F').actions[0]).toBe('Use a fan only while the room is below 95 °F.');
-    expect(lastResortAdvice('it-IT', ['fan_below_35c'], 'F').actions[0]).toBe('Usa un ventilatore solo finché la stanza è sotto i 95 °F.');
+    expect(lastResortAdvice('en-US', ['fan_below_35c'], 'F', 'houston').actions[0]).toBe('Use a fan only while the room is below 95 °F.');
+    expect(lastResortAdvice('it-IT', ['fan_below_35c'], 'F', 'houston').actions[0]).toBe('Usa un ventilatore solo finché la stanza è sotto i 95 °F.');
   });
 
   it('always gives the heat-stroke signs and says to call 112 when worried', () => {
-    const advice = lastResortAdvice('en-US', []);
+    const advice = lastResortAdvice('en-US', [], 'C', 'reference');
     expect(advice.signs.length).toBeGreaterThanOrEqual(4);
     expect(advice.signs).toContain('Confusion or lack of coordination');
     expect(advice.call).toBe('If you are worried, call 112.');
@@ -37,11 +37,11 @@ describe('last-resort advice', () => {
     expect(lastResortAdvice('it-IT', [], 'F', 'houston').call).toBe('Se sei preoccupato, chiama il 911.');
     expect(lastResortAdvice('en-US', [], 'C', 'turin').call).toBe('If you are worried, call 112.');
     expect(lastResortAdvice('it-IT', [], 'C', 'turin').call).toBe('Se sei preoccupato, chiama il 112.');
-    expect(lastResortAdvice('it-IT', []).call).toBe('Se sei preoccupato, chiama il 112.');
+    expect(lastResortAdvice('it-IT', [], 'C', 'reference').call).toBe('Se sei preoccupato, chiama il 112.');
   });
 
   it('never claims to protect, prevent or treat', () => {
-    const advice = lastResortAdvice('en-US', LAST_RESORT_ACTIONS);
+    const advice = lastResortAdvice('en-US', LAST_RESORT_ACTIONS, 'C', 'turin');
     for (const line of [advice.title, ...advice.actions, advice.signsTitle, ...advice.signs, advice.call, advice.notMedical]) {
       expect(line).not.toMatch(/\b(protect|prevent|treat|cure|guarantee)/i);
     }

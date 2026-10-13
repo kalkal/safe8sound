@@ -1,4 +1,4 @@
-import { ErrorEnvelopeSchema, PlanSchema, SafeRoomStatusSchema, type ErrorEnvelope, type Plan, type SafeRoomStatus } from '@cold-reserve/contracts';
+import { ErrorEnvelopeSchema, PlanSchema, SafeRoomStatusSchema, type ErrorEnvelope, type LocationId, type Plan, type SafeRoomStatus } from '@cold-reserve/contracts';
 import { examplePlan } from '@cold-reserve/contracts/fixtures';
 
 // Card fixtures, built only from the contract fixtures and parsed by the contract schemas.
@@ -90,10 +90,33 @@ export function lastResortPlan(): Plan {
     comfortLimitC: 24,
     worstC: 26.1,
     worstAt: '2026-07-16T03:00:00+02:00',
-    actions: ['close_curtains', 'drink_water'],
+    actions: ['close_curtains', 'drink_water', 'fan_below_35c'],
   };
   plan.warnings = [{ code: 'last_resort_plan', message: 'Last resort: within its limits until 22:00, then up to 26.1 °C by 03:00.' }];
   return PlanSchema.parse(plan);
+}
+
+/**
+ * A last resort where the battery runs out first (#364): at 03:05, and the room then holds the 24 °C night limit
+ * until about 06:00 before it warms up to 26.1 °C by 07:00. With the home's place when given (#376).
+ */
+export function lastResortBatteryPlan(place?: LocationId): Plan {
+  return PlanSchema.parse({
+    ...lastResortPlan(),
+    lastResort: {
+      safeUntil: '2026-07-16T03:05:00+02:00',
+      safeHours: 13.08,
+      limitedBy: 'battery',
+      comfortLimitC: 24,
+      worstC: 26.1,
+      worstAt: '2026-07-16T07:00:00+02:00',
+      limitCrossedAt: '2026-07-16T06:00:00+02:00',
+      limitCrossedC: 24,
+      actions: ['close_curtains', 'drink_water', 'fan_below_35c'],
+      ...(place === undefined ? {} : { place }),
+    },
+    warnings: [{ code: 'last_resort_plan', message: 'No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up.' }],
+  });
 }
 
 /**
@@ -189,5 +212,19 @@ export function safeRoomAboveNightLimit(): SafeRoomStatus {
     tempC: 27,
     people: [{ role: 'grandpa', name: 'Leo' }],
     limitNow: { limitC: 24, kind: 'night' },
+  });
+}
+
+/**
+ * #364: the storm at 20:00 with a low battery: it runs out at 03:05 and the room then holds the 24 °C night limit until
+ * about 06:00 (the storm-blackout sandbox at hour 4 with 22 %, pinned in the mcp-server agreement test).
+ */
+export function safeRoomBatteryFirst(): SafeRoomStatus {
+  return SafeRoomStatusSchema.parse({
+    ...safeRoomInStorm(),
+    tempC: 23.8,
+    safeHours: 7.08,
+    safeUntil: '2026-07-18T03:05:00+02:00',
+    withinLimits: { until: '2026-07-18T06:00:00+02:00', limitC: 24 },
   });
 }

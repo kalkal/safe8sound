@@ -104,6 +104,28 @@ describe('storm tool contracts', () => {
     expect(SafeRoomStatusSchema.safeParse({ ...status, occupantRoles: ['Grandpa Joe'] }).success).toBe(false);
   });
 
+  it('#364 (additive): until when the room stays within its limits after the battery runs out, always after it', () => {
+    const status = {
+      safeRoomId: 'bedroom-1',
+      tempC: 23.8,
+      occupantRoles: ['grandpa'],
+      level: 'essential',
+      levelReason: 'storm',
+      safeHours: 7.2,
+      safeUntil: '2026-07-18T03:05:00+02:00',
+      origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated', scenario: 'storm-blackout' },
+      homeLink: 'ok',
+    };
+    expect(SafeRoomStatusSchema.parse({ ...status, withinLimits: { until: '2026-07-18T06:00:00+02:00', limitC: 24 } }).withinLimits).toEqual({ until: '2026-07-18T06:00:00+02:00', limitC: 24 });
+    // Without a crossing inside the projection: "at least until", with no limit named.
+    expect(SafeRoomStatusSchema.safeParse({ ...status, withinLimits: { until: '2026-07-18T20:00:00+02:00' } }).success).toBe(true);
+    // Never at or before the battery time: then the battery time is the room's time too.
+    for (const until of ['2026-07-18T03:05:00+02:00', '2026-07-18T02:00:00+02:00']) {
+      const r = SafeRoomStatusSchema.safeParse({ ...status, withinLimits: { until, limitC: 24 } });
+      expect(!r.success && r.error.issues[0]?.path).toEqual(['withinLimits', 'until']);
+    }
+  });
+
   it('notify_family accepts no free text, recipient or handle (anti-exfiltration)', () => {
     expect(NotifyFamilyInputSchema.safeParse({ transition: 'storm_started' }).success).toBe(true);
     expect(NotifyFamilyInputSchema.safeParse({ transition: 'power_back', roles: ['daughter'] }).success).toBe(true);

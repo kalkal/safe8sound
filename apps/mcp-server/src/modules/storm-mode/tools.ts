@@ -80,6 +80,7 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext, degr
   // Once the storm has ended, an old "on my way" is not news any more.
   const people = namedPeople(o.value);
   const limit = o.value.limitNow;
+  const within = o.value.withinLimits;
   const reply = session?.phase === 'ended' ? undefined : session?.familyReplies?.at(-1);
   return ok({
     safeRoomId: safeRoom.id,
@@ -97,6 +98,10 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext, degr
     ...(o.value.storeUnavailable === true ? { storeUnavailable: true as const } : {}),
     ...(o.value.stricterNightLimit === true ? { stricterNightLimit: true as const } : {}),
     limitNow: { limitC: celsius(limit.limitC), kind: limit.kind },
+    // #364: the battery runs out first: until when the room then stays within its limits, the big time on the card.
+    ...(within === undefined
+      ? {}
+      : { withinLimits: { until: localIso(within.ms, o.value.home.profile.location.tz), ...(within.limitC === undefined ? {} : { limitC: celsius(within.limitC) }) } }),
     ...(people.length === 0 ? {} : { people }),
   });
 }

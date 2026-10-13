@@ -1,7 +1,9 @@
-import { epochMs, formatTemp, tempGap, type Plan } from '@cold-reserve/contracts';
+import { epochMs, formatTemp, tempGap, type LastResortAction, type LocationId, type Plan } from '@cold-reserve/contracts';
 import { Fragment, useId, useState, type ReactElement } from 'react';
+import { getLocale, lastResortAdvice } from '@cold-reserve/i18n';
 import { CardShell } from './CardShell.js';
-import { homeClock, isSimulated, levelSpans, pacingGeometry } from './plan-model.js';
+import { homeClock, isSimulated, lastResortHeadline, levelSpans, pacingGeometry } from './plan-model.js';
+import { getPlace } from './place-context.js';
 import { roomLabel } from './SafeRoomCard.js';
 import { getTempUnit } from './temp-unit.js';
 import { formatMeasure, t } from './text.js';
@@ -50,7 +52,7 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss, 
           <p className="muted">{plan.confidenceReason}</p>
         </div>
       ) : (
-        <LastResortHero lastResort={lastResort} timeZone={timeZone} />
+        <LastResortHero lastResort={lastResort} horizonAt={plan.horizonAt} timeZone={timeZone} />
       )}
       {applicable && (
         <div className="plan-actions">
@@ -93,8 +95,11 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss, 
     </Fragment>
   );
   const notes = (plan.warnings ?? []).length > 0 || plan.advisoryOnly || lastResort === undefined || plan.householdTip !== undefined;
+  // #376: right after the headline, what to do without power and whom to call, with the number of the home's place.
+  const place = lastResort?.place ?? getPlace();
   const pages = [
     first,
+    ...(lastResort === undefined || place === undefined ? [] : [<LastResortAdvicePage key="advice" actions={lastResort.actions ?? []} place={place} />]),
     ...(notes
       ? [
           <Fragment key="levels">
@@ -198,17 +203,78 @@ type LastResort = NonNullable<Plan['lastResort']>;
  * The headline of a last resort (#160): until when the safe room stays within its limits, then how far past
  * them it goes and by when. Every number from the plan; never a claim about the time after `safeUntil`.
  */
-function LastResortHero({ lastResort: lr, timeZone }: { lastResort: LastResort; timeZone: string }) {
+function LastResortHero({ lastResort: lr, horizonAt, timeZone }: { lastResort: LastResort; horizonAt: string; timeZone: string }) {
+  // #364 (owner, 12 Oct): the big time is until when the room stays within its limits; the battery time goes below it.
+  const head = lastResortHeadline(lr, horizonAt);
+  const roomFirst = head.kind === 'under' || head.kind === 'within';
   return (
     <div className="plan-hero">
-      <p className="eyebrow">{t(lr.limitedBy === 'battery' ? 'plan.lastResortBatteryUntil' : 'plan.lastResortUntil')}</p>
+      <p className="eyebrow">{eyebrowOf(head)}</p>
       <p className="hero-value" data-testid="plan-horizon">
-        {homeClock(lr.safeUntil, timeZone)}
+        {homeClock(head.at, timeZone)}
       </p>
-      <p className="warning" data-testid="last-resort-window">
-        {lastResortWindow(lr, timeZone)}
-      </p>
+      {roomFirst && (
+        <p className="muted" data-testid="battery-until">
+          {t('hold.batteryLine', { time: homeClock(lr.safeUntil, timeZone) })}
+        </p>
+      )}
+      {/* Inside its limits to the next recharge: nothing past them to say. */}
+      {head.kind !== 'within' && (
+        <p className="warning" data-testid="last-resort-window">
+          {lastResortWindow(lr, timeZone)}
+        </p>
+      )}
     </div>
+  );
+}
+
+function eyebrowOf(head: ReturnType<typeof lastResortHeadline>): string {
+  switch (head.kind) {
+    case 'under':
+      return t('hold.underUntil', { limit: formatMeasure(head.limitC, 'C') });
+    case 'within':
+      return t('hold.withinAtLeast');
+    case 'battery':
+      return t('plan.lastResortBatteryUntil');
+    case 'limits':
+      return t('plan.lastResortUntil');
+  }
+}
+
+/**
+ * The last resort's own page (#376, owner decision of 1 Oct): what to do without power, the signs of heat stroke and
+ * "if you are worried, call" the number of the home's place. General tips, never presented as medical protection.
+ */
+function LastResortAdvicePage({ actions, place }: { actions: readonly LastResortAction[]; place: LocationId }) {
+  const titleId = useId();
+  const signsId = useId();
+  const advice = lastResortAdvice(getLocale(), actions, getTempUnit(), place);
+  return (
+    <section className="last-resort-advice" aria-labelledby={titleId}>
+      <h3 id={titleId} className="eyebrow">
+        {advice.title}
+      </h3>
+      {/* Whom to call first (review of #376): on a short screen the page is cut at the bottom, never this line. */}
+      <p className="call" data-testid="emergency-call">
+        {advice.call}
+      </p>
+      {advice.actions.length > 0 && (
+        <ul className="advice-list" aria-labelledby={titleId}>
+          {advice.actions.map((a) => (
+            <li key={a}>{a}</li>
+          ))}
+        </ul>
+      )}
+      <h3 id={signsId} className="eyebrow">
+        {advice.signsTitle}
+      </h3>
+      <ul className="advice-list signs" aria-labelledby={signsId}>
+        {advice.signs.map((s) => (
+          <li key={s}>{s}</li>
+        ))}
+      </ul>
+      <p className="muted">{advice.notMedical}</p>
+    </section>
   );
 }
 

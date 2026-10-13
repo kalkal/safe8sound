@@ -45,6 +45,8 @@ describe('the storm card and the last-resort plan on one physics', () => {
     expect(status.safeUntil).toBe(plan.lastResort?.safeUntil);
     expect(status.safeUntil).toBe('2026-07-18T03:05:00+02:00');
     expect(plan.lastResort?.limitCrossedAt).toBe('2026-07-18T06:00:00+02:00');
+    // #364: the storm card's big time is the same room time, the battery time below it.
+    expect(status.withinLimits).toEqual({ until: '2026-07-18T06:00:00+02:00', limitC: plan.lastResort?.limitCrossedC });
   });
 
   it('hour 4, 50 %: a plan keeps him safe (no last resort), and the storm card does not stop at 22:00', async () => {
@@ -71,6 +73,7 @@ describe('the storm card and the last-resort plan on one physics', () => {
 
   it('hour 6, 20 %: both run out of battery before 22:00, at the same time (the energy side)', async () => {
     const { status, plan } = await at(6, 20);
+    expect(status.withinLimits?.until).toBe(plan.lastResort?.limitCrossedAt);
     expect(plan.lastResort?.limitedBy).toBe('battery');
     expect(status.safeUntil).toBe('2026-07-17T20:05:00+02:00');
     // Cooled to the comfort setpoint while there is energy, the room then holds its limit until 22:15.
@@ -95,16 +98,23 @@ describe('the storm card and the last-resort plan on one physics', () => {
     expect(checked).toBeGreaterThanOrEqual(Math.ceil(runs(20) / 2));
   }, 300_000);
 
-  it('property: at the same hour, more battery never brings the room out of its limits earlier (#332 review)', async () => {
-    /** When the plan says the room leaves its limits: the end of the safe hours on the room, or the crossing after the battery. */
+  it('property: at the same hour, more battery never brings the big time on either card earlier (#332 review, #364)', async () => {
+    /**
+     * The big time on the plan card (#364, ui-cards lastResortHeadline): the crossing after the battery, the next
+     * recharge when the room holds its limits that long, else the end of the safe hours; a plan that holds, its horizon.
+     */
     const outOfLimits = (plan: Plan): number => {
       const lr = plan.lastResort;
-      if (lr === undefined) return Number.POSITIVE_INFINITY;
+      if (lr === undefined) return Date.parse(plan.horizonAt);
       if (lr.limitedBy !== 'battery') return Date.parse(lr.safeUntil);
-      return lr.limitCrossedAt === undefined ? Number.POSITIVE_INFINITY : Date.parse(lr.limitCrossedAt);
+      if (lr.limitCrossedAt !== undefined) return Date.parse(lr.limitCrossedAt);
+      return Date.parse(lr.worstAt === undefined ? plan.horizonAt : lr.safeUntil);
     };
+    /** The big time on the storm card (#364): the room's when the battery runs out first, else the end of the safe hours. */
+    const storm = (status: SafeRoomStatus): number => Date.parse(status.withinLimits?.until ?? status.safeUntil);
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 3, max: 8 }), async (h) => {
+        let previousStorm = Number.NEGATIVE_INFINITY;
         let previous = Number.NEGATIVE_INFINITY;
         for (let soc = 12; soc <= 30; soc += 3) {
           const { status, plan } = await at(h, soc);
@@ -112,6 +122,9 @@ describe('the storm card and the last-resort plan on one physics', () => {
           const out = outOfLimits(plan);
           expect(out, `hour ${String(h)}, ${String(soc)} %`).toBeGreaterThanOrEqual(previous);
           previous = out;
+          const card = storm(status);
+          expect(card, `storm card, hour ${String(h)}, ${String(soc)} %`).toBeGreaterThanOrEqual(previousStorm);
+          previousStorm = card;
         }
       }),
       // Seven local servers per case (about a second each).

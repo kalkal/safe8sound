@@ -1,4 +1,4 @@
-import type { ErrorEnvelope, Forecast, HomeId, HomeProfile, Preferences, Result, TempUnit } from '@cold-reserve/contracts';
+import type { ErrorEnvelope, Forecast, HomeId, HomeProfile, LocationId, Preferences, Result, TempUnit } from '@cold-reserve/contracts';
 import type { Clock, HomeDataSource, Logger, Notifier, SimParams, StateStoreFactory, StoreScope } from '@cold-reserve/core';
 import type { GuardConfig } from '@cold-reserve/guard';
 import type { ComfortPlanConfig } from './config.js';
@@ -18,6 +18,8 @@ export interface ComfortHome {
   readonly clock?: Clock;
   /** The temperature unit of the tool texts (#306): the sandbox's choice; °C when unset. */
   readonly units?: TempUnit;
+  /** The home's place (#376): the last-resort card and its summary name the number to call there. */
+  readonly place?: LocationId;
 }
 
 /** The deps a tool call on `homeId` runs with: the home's own clock when it has one, else the module's. */

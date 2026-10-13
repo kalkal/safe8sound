@@ -140,6 +140,15 @@ export const itIT = {
   'storm.powerBack': 'Aggiornamento di {product} per {name}: la corrente è tornata in casa alle {powerBackAt}. {room} è a {temp}. La modalità temporale è finita. Non serve fare nulla.',
   'storm.lastResort':
     'Avviso di {product} per {name}: la batteria di casa è quasi scarica. {room} è a {temp} e resta nei suoi limiti fino alle {safeUntil}, poi si scalda. Per favore, vai a controllare.',
+  'storm.startedWithin':
+    'Avviso di {product} per {name}: un temporale ha tolto la corrente in casa. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
+  'storm.essentialWithin':
+    'Aggiornamento di {product} per {name}: la batteria è passata al livello essenziale. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
+  'storm.lastResortWithin':
+    'Avviso di {product} per {name}: la batteria di casa è quasi scarica. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. Per favore, vai a controllare.',
+  'hold.underUntil': 'Sotto i {limit} fino a circa le',
+  'hold.withinAtLeast': 'Nei suoi limiti almeno fino alle',
+  'hold.batteryLine': 'La batteria dura fino alle {time}.',
   'lastResort.title': 'Stare freschi senza corrente',
   'lastResort.action.close_curtains': 'Chiudi le tende dal lato al sole.',
   'lastResort.action.drink_water': 'Bevi acqua spesso, anche senza sete.',

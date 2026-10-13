@@ -62,3 +62,27 @@ export function pacingGeometry(plan: Plan, batteryUsableWh?: number): PacingGeom
 
 /** True when any group of the plan's inputs is simulated: the plan is then never shown as live. */
 export const isSimulated = (plan: Plan): boolean => Object.values(plan.sourceOrigin).includes('simulated');
+
+type LastResort = NonNullable<Plan['lastResort']>;
+
+/**
+ * The big time of a last resort (#364): until when the safe room stays within its limits. When the battery runs out
+ * first and the room then crosses its limit, that crossing with the limit crossed ("Under 24 °C until about"); when it
+ * stays inside its limits to the next recharge, the recharge ("at least until"); otherwise the end of the safe hours,
+ * said as the battery or as the limits. Never earlier than the battery time.
+ */
+export type LastResortHeadline =
+  | { readonly kind: 'under'; readonly at: string; readonly limitC: number }
+  | { readonly kind: 'within'; readonly at: string }
+  | { readonly kind: 'battery' | 'limits'; readonly at: string };
+
+export function lastResortHeadline(lr: LastResort, horizonAt: string): LastResortHeadline {
+  if (lr.limitedBy !== 'battery') return { kind: 'limits', at: lr.safeUntil };
+  const limitC = lr.limitCrossedC ?? lr.comfortLimitC;
+  // Only when the room then gets warmer (cooling, the worst point above its limit): when heating it gets colder (#364 review).
+  const warmer = lr.worstC !== undefined && lr.comfortLimitC !== undefined && lr.worstC > lr.comfortLimitC;
+  if (lr.limitCrossedAt !== undefined && limitC !== undefined && warmer) return { kind: 'under', at: lr.limitCrossedAt, limitC };
+  // No window with the battery (contract): the room stays inside its limit to the end of the plan, the next recharge.
+  if (lr.worstAt === undefined) return { kind: 'within', at: horizonAt };
+  return { kind: 'battery', at: lr.safeUntil };
+}

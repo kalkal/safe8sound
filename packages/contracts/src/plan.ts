@@ -8,6 +8,7 @@ import { CorrelationIdSchema } from './correlation.js';
 import { CounterfactualSchema } from './counterfactual.js';
 import { NightRecoverySchema, PlanWarningSchema } from './night-recovery.js';
 import { LevelSchema, levelRank } from './pacing.js';
+import { LocationIdSchema } from './sandbox-settings.js';
 import { ForecastConfidenceSchema } from './snapshot.js';
 import { CelsiusSchema, PctSchema, WattHourSchema } from './units.js';
 
@@ -182,6 +183,8 @@ export const PlanSchema = z
         limitCrossedC: CelsiusSchema.optional(),
         /** Zero-energy actions for the card, from public-health guidance (optional, added 2026-10-02, approved in #160). */
         actions: z.array(LastResortActionSchema).max(LAST_RESORT_ACTIONS.length).optional(),
+        /** The home's place, so the card names the number to call there: 911 in Houston, 112 in Italy (optional, additive, #376). */
+        place: LocationIdSchema.optional(),
       })
       .superRefine((lr, ctx) => {
         const window = [lr.comfortLimitC, lr.worstC, lr.worstAt];
