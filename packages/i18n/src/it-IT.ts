@@ -134,18 +134,27 @@ export const itIT = {
   'surface.failed': 'Questa parte dello schermo ha smesso di funzionare. Ricarica la pagina per riprovare.',
   'config.invalid': 'Il simulatore non è configurato correttamente. Controlla le impostazioni e ricarica la pagina.',
   'storm.started':
-    'Avviso di {product} per {name}: un temporale ha tolto la corrente in casa. {room} è a {temp} e la batteria la tiene al sicuro fino alle {safeUntil}. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
+    'Avviso di {product} per {name}: un temporale ha tolto la corrente in casa. {room} è a {temp} e la batteria la tiene al sicuro {untilSafe}. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
   'storm.essential':
-    'Aggiornamento di {product} per {name}: per tenere {room} al sicuro fino alle {safeUntil}, la batteria è passata al livello essenziale. {room} è a {temp}. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
-  'storm.powerBack': 'Aggiornamento di {product} per {name}: la corrente è tornata in casa alle {powerBackAt}. {room} è a {temp}. La modalità temporale è finita. Non serve fare nulla.',
+    'Aggiornamento di {product} per {name}: la batteria è arrivata al livello essenziale, per tenere {room} al sicuro {untilSafe}. {room} è a {temp}. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
+  'storm.powerBack': 'Aggiornamento di {product} per {name}: la corrente è tornata in casa alle {powerBackAt}. {room} è a {temp}. La modalità temporale è finita. {action}',
   'storm.lastResort':
     'Avviso di {product} per {name}: la batteria di casa è quasi scarica. {room} è a {temp} e resta nei suoi limiti fino alle {safeUntil}, poi si scalda. Per favore, vai a controllare.',
   'storm.startedWithin':
-    'Avviso di {product} per {name}: un temporale ha tolto la corrente in casa. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
+    'Avviso di {product} per {name}: un temporale ha tolto la corrente in casa. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
   'storm.essentialWithin':
-    'Aggiornamento di {product} per {name}: la batteria è passata al livello essenziale. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente.',
+    'Aggiornamento di {product} per {name}: la batteria è arrivata al livello essenziale. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
   'storm.lastResortWithin':
     'Avviso di {product} per {name}: la batteria di casa è quasi scarica. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. Per favore, vai a controllare.',
+  'storm.prepared':
+    'Avviso di {product} per {name}: è previsto un temporale e la casa è pronta a un blackout. {room} è a {temp}; se va via la corrente, la batteria la tiene al sicuro {untilSafe}. {action} Prossimo messaggio: se va via la corrente.',
+  'storm.preparedWithin':
+    'Avviso di {product} per {name}: è previsto un temporale e la casa è pronta a un blackout. {room} è a {temp}; se va via la corrente, resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. {action} Prossimo messaggio: se va via la corrente.',
+  'storm.action.none': 'Per ora non serve fare nulla.',
+  'storm.action.check': '{room} è sopra il suo limite di {limit}: per favore, vai a controllare.',
+  'storm.tomorrow': '{time} di domani',
+  'storm.until': 'fino alle {time}',
+  'storm.atLeastUntil': 'almeno fino alle {time}',
   'hold.underUntil': 'Sotto i {limit} fino a circa le',
   'hold.withinAtLeast': 'Nei suoi limiti almeno fino alle',
   'hold.batteryLine': 'La batteria dura fino alle {time}.',
@@ -345,12 +354,13 @@ export const itIT = {
   'phone.title': 'Il telefono di tua figlia (simulato)',
   'phone.onlyInbox': 'Solo il telefono di Ana: i messaggi che {product} manda alla famiglia. Chiedi a {product} nella pagina principale.',
   'phone.empty': 'Ancora nessun messaggio da {product}.',
-  'phone.whenTold': 'Ana riceve un messaggio quando inizia il temporale, quando la batteria arriva al livello essenziale, quando viene applicato il piano di emergenza e quando torna la corrente.',
+  'phone.whenTold': 'Ana riceve un messaggio quando è previsto un temporale, quando inizia, quando la batteria arriva al livello essenziale, quando viene applicato il piano di emergenza e quando torna la corrente.',
   'phone.list': 'Notifiche',
   'phone.storm_started': 'Blackout (temporale) a casa',
   'phone.essential_level': 'Passato a Essenziale',
   'phone.power_back': 'La corrente è tornata a casa',
   'phone.last_resort_applied': 'Batteria di casa quasi scarica: passa a controllare',
+  'phone.storm_prepared': 'Temporale previsto: la casa è pronta',
   'phone.replies': 'Rispondi',
   'phone.onMyWay': 'Sto arrivando',
   'phone.checkStatus': 'Controlla lo stato',

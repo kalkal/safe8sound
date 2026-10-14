@@ -55,6 +55,11 @@ export const ScenarioSchema = z
     sun: z.strictObject({ sunrise: z.array(IsoDateTimeSchema), sunset: z.array(IsoDateTimeSchema) }),
     gridOutages: z.array(z.strictObject(WindowShape)),
     occupancy: z.array(z.strictObject({ roomId: EntityIdSchema, roles: z.array(RoleSchema), ...WindowShape })),
+    /**
+     * #390: the hour the scripted home steps down to its essential settings (its own level, as a plan step would): the
+     * judges' clock stops there, so the family hears the essential level during the storm night.
+     */
+    essentialAtH: z.number().nonnegative().optional(),
     hvac: z.array(
       z.strictObject({ roomId: EntityIdSchema, mode: HvacModeSchema, setpointC: CelsiusSchema, fanOn: z.boolean(), ...WindowShape }),
     ),
@@ -62,6 +67,9 @@ export const ScenarioSchema = z
   .superRefine((s, ctx) => {
     if (s.hourly.length !== s.durationH) {
       ctx.addIssue({ code: 'custom', path: ['hourly'], message: `Expected ${s.durationH} hourly values, got ${s.hourly.length}` });
+    }
+    if (s.essentialAtH !== undefined && s.essentialAtH >= s.durationH) {
+      ctx.addIssue({ code: 'custom', path: ['essentialAtH'], message: `Must be before the end, ${s.durationH} hours` });
     }
     const windows: [string, readonly { fromH: number; toH: number }[]][] = [
       ['gridOutages', s.gridOutages],

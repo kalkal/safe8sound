@@ -6,8 +6,9 @@ import { AWS_SITE_URL, DEMO_CODE } from './chain.js';
 // still up made the assistant answer "the grid is still up" and Ana's phone stayed empty. Now the page makes the
 // simulated grid go down first (set_scenario, then advance_clock to the storm start), so storm mode starts and Ana is
 // told; the clock then skips to each next moment until the day has none, and Ana hears that the power is back.
-// Ana's messages are exactly what this sandbox sends: the storm and power back (at this battery the night never
-// reaches the essential level, and the emergency plan is never offered in the storm).
+// Ana's messages are exactly what this sandbox sends: the storm, the essential level at 21:00 (the night's stop, #390:
+// the storm day starts on a low battery and the scripted home steps down to essential then) and power back; the
+// emergency plan is never offered in the storm.
 
 test.use({ baseURL: AWS_SITE_URL });
 
@@ -46,8 +47,9 @@ test('Power cut → the simulated grid goes down and Ana is told; Skip ahead to 
     await expect(status).toHaveText(/^Now: .+\.$/,{ timeout: 20_000 });
     reached.push((await status.textContent()) ?? '');
   }
-  expect(reached).toContain('Now: the power is back.');
+  // #390: one Skip ahead no longer jumps from the storm to the morning: the night stops at the essential level first.
+  expect(reached.slice(0, 2)).toEqual(['Now: the battery reaches the essential level.', 'Now: the power is back.']);
   await expect(skip).toBeDisabled();
   const notes = phone.getByRole('list', { name: 'Notifications' }).getByRole('heading');
-  await expect(notes).toHaveText(['Power is back at home', 'Power outage (storm) at home'], { timeout: 20_000 });
+  await expect(notes).toHaveText(['Power is back at home', 'Switched to Essential', 'Power outage (storm) at home'], { timeout: 20_000 });
 });

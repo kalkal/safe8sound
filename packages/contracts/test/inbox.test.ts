@@ -16,7 +16,9 @@ describe('InboxMessageSchema (the family phone, approved in #24)', () => {
 
   it('refuses an empty text, a transition that is never sent, a free-form role and extra fields', () => {
     expect(InboxMessageSchema.safeParse({ ...message, text: '' }).success).toBe(false);
-    expect(InboxMessageSchema.safeParse({ ...message, transition: 'storm_prepared' }).success).toBe(false);
+    expect(InboxMessageSchema.safeParse({ ...message, transition: 'storm_done' }).success).toBe(false);
+    // #390: the forecast message is sent too (owner decision).
+    expect(InboxMessageSchema.safeParse({ ...message, transition: 'storm_prepared' }).success).toBe(true);
     expect(InboxMessageSchema.safeParse({ ...message, role: 'Giulia' }).success).toBe(false);
     expect(InboxMessageSchema.safeParse({ ...message, handle: 'phone-1' }).success).toBe(false);
   });

@@ -18,12 +18,14 @@ describe('what the model reads', () => {
     if (!out.ok) throw new Error(out.error.message);
     const text = startSummary(out.value);
     expect(text).toContain('Storm mode is prepared: the grid is still up, so the storm reserve stays locked.');
-    expect(text).toContain(`about ${one(out.value.safeHours)} hours, until ${localTimeText(out.value.safeUntil)}`);
+    // #390: at the 24-hour cap the same clock time is tomorrow's, and the text says so.
+    expect(text).toContain(`about ${one(out.value.safeHours)} hours, until ${localTimeText(out.value.safeUntil)} tomorrow`);
     expect(text).toMatch(/until \d{1,2}:\d\d [AP]M/);
     // The person hears the clock time only, never an ISO stamp (#160 acceptance test).
     expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
     expect(text).not.toMatch(/Giulia|phone-/);
-    expect(text).toContain('No family message was sent.');
+    // #390: preparing a storm tells the family once (the forecast message), by role and channel only.
+    expect(text).toContain('Family told that a storm is expected: daughter (in_app).');
   });
 
   it('start_storm_mode with the grid down: active, reserve unlocked, and who was told', async () => {
@@ -45,7 +47,7 @@ describe('what the model reads', () => {
     const text = safeRoomSummary(s);
     expect(text).toContain(`Safe room ${s.safeRoomId}: ${one(s.tempC)} °C, ${String(s.humidityPct)} % humidity, occupants: Leo (grandpa).`);
     expect(text).toContain('Level essential (reason: storm).');
-    expect(text).toContain(`Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`);
+    expect(text).toContain(`Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}${s.safeHours >= 24 ? ' tomorrow' : ''}.`);
     expect(text).not.toMatch(/Giulia|phone-/);
     expect(text).toContain('Storm mode: active.');
     expect(text).toContain('simulated data (');
@@ -149,14 +151,28 @@ describe('#364: the room time leads, the battery time follows', () => {
 
   it('with the limit crossed: both times, the room first, and every number on the card', () => {
     const text = safeRoomSummary(status({ until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) }));
-    expect(text).toContain('The safe room stays at or below its 24 °C limit until about 6:00 AM; the battery lasts until 3:05 AM (about 7.2 hours), then the room warms up.');
+    expect(text).toContain('The safe room stays at or below its 24 °C limit until about 6:00 AM tomorrow; the battery lasts until 3:05 AM tomorrow (about 7.2 hours), then the room warms up.');
     expect(text).not.toContain('Safe for about');
     const f = safeRoomSummary(status({ until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) }), 'F');
-    expect(f).toContain('at or below its 75.2 °F limit until about 6:00 AM');
+    expect(f).toContain('at or below its 75.2 °F limit until about 6:00 AM tomorrow');
   });
 
   it('inside its limits to the end of the projection: "at least until"', () => {
     const text = safeRoomSummary(status({ until: '2026-07-18T20:00:00+02:00' }));
-    expect(text).toContain('The safe room stays within its limits at least until 8:00 PM; the battery lasts until 3:05 AM (about 7.2 hours).');
+    expect(text).toContain('The safe room stays within its limits at least until 8:00 PM tomorrow; the battery lasts until 3:05 AM tomorrow (about 7.2 hours).');
+    // #390: read at 7:53 PM, both times are on the next day, and the text says so.
+    expect(text).not.toMatch(/until 3:05 AM;/);
+  });
+});
+
+describe('#390 review: at the cap of the projection the hours are a horizon', () => {
+  it('says "at least" for the hours and the time, never "about … until" as an end', async () => {
+    const w = world(4);
+    const out = await safeRoomStatus(w.deps, w.ctx);
+    if (!out.ok) throw new Error(out.error.message);
+    expect(out.value.safeHours).toBe(24);
+    const text = safeRoomSummary(out.value, 'C', undefined, 24);
+    expect(text).toContain(`Safe for at least 24.0 hours, at least until ${localTimeText(out.value.safeUntil)} tomorrow.`);
+    expect(safeRoomSummary(out.value)).toContain('Safe for about 24.0 hours');
   });
 });

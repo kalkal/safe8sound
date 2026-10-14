@@ -19,7 +19,7 @@ describe('local entry: log lines on the wall clock', () => {
   it('a last-resort plan made in July scenario time is logged at the October wall time, with the scenario time beside it', async () => {
     const wall = settableClock(WALL);
     const logger = memoryLogger();
-    const env = { MCP_CLIENTS: `agent@demo=${TOKEN}`, MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '8', MCP_SCENARIO_START_SOC_PCT: '30' };
+    const env = { MCP_CLIENTS: `agent@demo=${TOKEN}`, MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '8', MCP_SCENARIO_START_SOC_PCT: '10' };
     const local = createLocalApp(env, { wallClock: wall, logger });
     if (!local.ok) throw new Error(local.error.message);
     const server = await startNodeServer(local.value.app.handler, { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: local.value.app.config.maxBodyBytes });

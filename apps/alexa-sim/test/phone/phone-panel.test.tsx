@@ -16,7 +16,7 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
   });
 
   it('the empty phone says, in one fixed line, when Ana will hear from it; the line goes with the first message', () => {
-    const line = 'Ana gets a message when the storm starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.';
+    const line = 'Ana gets a message when a storm is expected, when it starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.';
     const feed = createScriptedPhone();
     render(<PhonePanel feed={feed} timeZone="Europe/Rome" />);
     expect(screen.getByText(line)).toBeTruthy();

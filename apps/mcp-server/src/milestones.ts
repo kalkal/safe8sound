@@ -34,6 +34,9 @@ export function firstEssentialMs(plan: Plan): number | undefined {
   return times.length === 0 ? undefined : Math.min(...times);
 }
 
+/** The earlier of two moments, either of which may be unknown. */
+export const earliest = (a: number | undefined, b: number | undefined): number | undefined => (a === undefined ? b : b === undefined ? a : Math.min(a, b));
+
 export function milestonesOf(o: {
   readonly nowMs: number;
   /** Only moments before this instant are listed (the clock looks a day ahead). */
@@ -47,6 +50,8 @@ export function milestonesOf(o: {
    */
   readonly stableGridMs?: number;
   readonly plan?: Plan;
+  /** #390: when the scripted home steps down to its essential settings (the scenario's own essential level), when it does. */
+  readonly essentialAtMs?: number;
   /** When the battery recharges next (the guard's dark window end), when known. */
   readonly rechargeAtMs?: number;
 }): Milestone[] {
@@ -59,10 +64,15 @@ export function milestonesOf(o: {
     add('power_back', outage.toMs + (o.stableGridMs ?? 0));
   }
   const p = o.plan;
+  // The plan's first essential step or the scripted home's (#390), whichever comes first ahead: a plan made in the storm
+  // is essential from its first step, now, and the night's step down is still a moment to stop at.
+  const ahead = (ms: number | undefined) => (ms !== undefined && ms > o.nowMs ? ms : undefined);
+  const essentialAhead = earliest(ahead(p === undefined ? undefined : firstEssentialMs(p)), ahead(o.essentialAtMs));
+  if (p === undefined) add('essential_level', essentialAhead);
   if (p !== undefined) {
     const pre = preCoolingStart(p.steps);
     add('pre_cooling_start', pre === undefined ? undefined : epochMs(pre));
-    add('essential_level', firstEssentialMs(p));
+    add('essential_level', essentialAhead);
     if (p.surplus !== undefined) {
       add('surplus_start', epochMs(p.surplus.from));
       add('surplus_end', epochMs(p.surplus.to));
@@ -81,6 +91,11 @@ export function milestonesOf(o: {
     .sort((a, b) => a.ms - b.ms || a.i - b.i)
     .slice(0, MAX_MILESTONES)
     .map((m) => ({ kind: m.kind, at: localIso(m.ms, o.timeZone), label: LABEL[m.kind] }));
+}
+
+/** #390: when the scripted home steps down to its essential settings, as an instant (undefined: it never does). */
+export function essentialAtOf(scenario: Scenario): number | undefined {
+  return scenario.essentialAtH === undefined ? undefined : Date.parse(scenario.startAt) + scenario.essentialAtH * 3_600_000;
 }
 
 /**

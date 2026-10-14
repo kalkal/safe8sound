@@ -119,26 +119,30 @@ describe('SimulatorSource', () => {
     }
   });
 
-  it('storm-blackout: off grid only the EPS circuits draw, so the default dry setting lasts until the grid returns but over-dries the room', () => {
-    // Off grid only the EPS circuits are powered (#19): the profile's 150 W besides the HVAC, plus the safe
-    // room's split. Until 2026-10-01 the whole-house base load (450-800 W in the evening) was drawn from the
-    // battery as well, and the default dry setting ran it to the floor at about 04:00. Now it lasts until the
-    // grid returns at 06:30; what goes wrong instead is the humidity: dry all night takes the room under 40 %.
+  it('storm-blackout (#390): off grid only the EPS circuits draw; the safe room is held under its limits on a low battery until the grid returns, then the house is cooled again', () => {
+    // Off grid only the EPS circuits are powered (#19): the profile's 150 W besides the HVAC, plus the safe room's split.
+    // Until #390 the script dried the safe room at 27 °C with the fan all storm long: above the older person's 24 °C night
+    // limit, and a dry mode that draws a fixed share of the input, so a low battery ran out before midnight. Now the
+    // script holds the room as storm mode would: 25 °C in the evening, 24 °C (the night limit) from 21:00, the essential
+    // step, on a 30 % battery that lasts until the grid returns at 06:30; then the living room is cooled again too.
     const { sim, start, scenario } = source('storm-blackout');
     const outage = scenario.gridOutages[0];
     if (!outage) throw new Error('storm-blackout has an outage');
     expect(outage.toH).toBe(18.5);
+    expect(scenario.initial.batterySocPct).toBe(30);
+    expect(scenario.essentialAtH).toBe(9);
     const dark = sim.snapshotAt(start + (outage.toH - 0.1) * HOUR);
     expect(dark.gridAvailable).toBe(false);
     expect(dark.batterySocPct).toBeGreaterThan(profile.battery.minSocHwPct);
-    // The EPS load and the safe room's split only: far below the whole house of the evening.
     expect(dark.loadW).toBeLessThan(800);
-    // At 20:00 the whole house would draw 800 W of base load alone; off grid it is the EPS 150 W plus the
-    // safe room's split and fan at most.
     const safe = profile.rooms.find((r) => r.isSafeRoom);
     const most = 150 + (safe?.hvacUnits[0]?.inputKw.max ?? 0) * 1000 + (safe?.fans.reduce((w, f) => w + f.powerW, 0) ?? 0);
     expect(sim.snapshotAt(start + 8 * HOUR).loadW).toBeLessThanOrEqual(most * 1.05);
-    expect(dark.rooms.find((r) => r.id === 'bedroom-1')?.humidityPct).toBeLessThan(40);
+    // Within the night limit through the night, never the 27 °C of the old script.
+    for (let h = 10; h < outage.toH; h += 0.5) expect(sim.snapshotAt(start + h * HOUR).rooms.find((r) => r.id === 'bedroom-1')?.tempC).toBeLessThanOrEqual(24);
+    // Power back: the living room is served again, not only the safe room.
+    const back = sim.snapshotAt(start + (outage.toH + 0.5) * HOUR);
+    expect(back.rooms.filter((r) => r.hvac !== undefined && r.hvac.mode !== 'off').map((r) => r.id).sort()).toEqual(['bedroom-1', 'living']);
   });
 
   it('forecast: hourly scenario weather from now to the end, valid against the contract', () => {

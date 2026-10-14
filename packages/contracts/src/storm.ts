@@ -27,10 +27,11 @@ export const StormTransitionSchema = z.enum(['storm_prepared', 'storm_started', 
 export type StormTransition = z.infer<typeof StormTransitionSchema>;
 
 /**
- * The transitions a family message is sent for; `storm_prepared` is only spoken (plan §11.2 p.8).
- * `last_resort_applied` is sent by the server when a last-resort plan is applied (approved in #160).
+ * The transitions a family message is sent for. `last_resort_applied` is sent by the server when a last-resort plan is
+ * applied (approved in #160). `storm_prepared` is sent once per storm when it is prepared for a forecast storm (owner
+ * decision, #390; it was only spoken before, plan §11.2 p.8). Added last: the order of the others is unchanged.
  */
-export const SENDABLE_TRANSITIONS = ['storm_started', 'essential_level', 'power_back', 'last_resort_applied'] as const satisfies readonly StormTransition[];
+export const SENDABLE_TRANSITIONS = ['storm_started', 'essential_level', 'power_back', 'last_resort_applied', 'storm_prepared'] as const satisfies readonly StormTransition[];
 export const SendableTransitionSchema = z.enum(SENDABLE_TRANSITIONS);
 export type SendableTransition = z.infer<typeof SendableTransitionSchema>;
 

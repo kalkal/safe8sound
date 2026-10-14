@@ -135,7 +135,8 @@ describe('storm tool contracts', () => {
   });
 
   it('notify_family sends only on the transitions that are worth a message', () => {
-    expect(SENDABLE_TRANSITIONS).toEqual(['storm_started', 'essential_level', 'power_back', 'last_resort_applied']);
+    // #390: the forecast message (storm_prepared) is sent by the server once per storm; the model still cannot ask for it.
+    expect(SENDABLE_TRANSITIONS).toEqual(['storm_started', 'essential_level', 'power_back', 'last_resort_applied', 'storm_prepared']);
     expect(NotifyFamilyInputSchema.safeParse({ transition: 'storm_prepared' }).success).toBe(false);
   });
 

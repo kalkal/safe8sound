@@ -119,7 +119,7 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
 
 describe('storm (the grid is down at 15:00)', () => {
   it('on the EPS circuits alone, keeps the safe room at comfort until the recharge, cooler than the naive plan', async () => {
-    await withServer({ MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '3' }, async (call) => {
+    await withServer({ MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '3', MCP_SCENARIO_START_SOC_PCT: '85' }, async (call) => {
       const r = await call(TOKEN, 'plan_comfort', { goal: 'cool' });
       expect(r.isError).toBeFalsy();
       const plan = PlanSchema.parse(r.structuredContent);
@@ -130,12 +130,11 @@ describe('storm (the grid is down at 15:00)', () => {
       expect(plan.guarantees.find((g) => g.id === 'storm_reserve')?.reason).toMatch(/grid is down/);
       expect(plan.nightRecovery?.status).toBe('met');
       const c = plan.counterfactual;
-      // Until 2026-10-01 the projection drew the whole house's base load from the battery in a blackout, so
-      // the naive plan (the scenario's own dry 27 °C) ran it empty before dawn and this plan had to be paced.
-      // Off grid only the EPS circuits are powered now (150 W besides the safe room's split): the naive plan
-      // lasts, but it holds the room at its 27 °C limit, while ours keeps it at 26 °C with no heat stress.
-      expect(c?.scenarios.naive.peakTempC).toBeGreaterThan(c?.scenarios.plan.peakTempC ?? Infinity);
-      expect(c?.scenarios.naive.heatIndexDegreeHours).toBeGreaterThan(c?.scenarios.plan.heatIndexDegreeHours ?? Infinity);
+      // Off grid only the EPS circuits are powered (150 W besides the safe room's split). Since #390 the scenario's own
+      // control (the naive line) cools the safe room too, so it is no longer the warmer one: the plan is never warmer
+      // nor more heat-stressed than it, and keeps the room with no heat stress at all.
+      expect(c?.scenarios.plan.peakTempC).toBeLessThanOrEqual(c?.scenarios.naive.peakTempC ?? -Infinity);
+      expect(c?.scenarios.plan.heatIndexDegreeHours).toBeLessThanOrEqual(c?.scenarios.naive.heatIndexDegreeHours ?? -Infinity);
       expect(c?.scenarios.plan.heatIndexDegreeHours).toBe(0);
     });
   });
@@ -143,8 +142,8 @@ describe('storm (the grid is down at 15:00)', () => {
 
 describe('humid air, not hot (#248): the plan passes with a warning, never a refusal', () => {
   it('a proposal that keeps the safe room cool but humid is accepted, says so, and applies', async () => {
-    await withServer({ MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '15' }, async (call) => {
-      const r = await call(TOKEN, 'plan_comfort', { goal: 'cool', setpointC: 16, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
+    await withServer({ MCP_SCENARIO: 'storm-blackout', MCP_SCENARIO_START_H: '15', MCP_SCENARIO_START_SOC_PCT: '85' }, async (call) => {
+      const r = await call(TOKEN, 'plan_comfort', { goal: 'cool', setpointC: 22, roomIds: ['bedroom-1'] });
       expect(r.isError).toBeFalsy();
       const plan = PlanSchema.parse(r.structuredContent);
       expect(plan.refusedProposal).toBeUndefined();

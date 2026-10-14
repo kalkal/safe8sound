@@ -8,7 +8,7 @@ import { notifySummary, safeRoomSummary, startSummary, type RoomLabel } from './
 import { notifyFamily, safeRoomStatus, startStormMode } from './tools.js';
 
 export { parseStormModeConfig, type StormModeConfig } from './config.js';
-export type { StormHome, StormModeDeps } from './deps.js';
+export type { ClaimedTransition, StormHome, StormModeDeps } from './deps.js';
 
 // `storm-mode` capability module (plan §14.1, issue #23): prepare or start the storm, read the safe
 // room in hours, and tell the registered family. On only for the homes the server knows.
@@ -28,7 +28,7 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         input: StartStormModeInputSchema,
         output: StartStormModeOutputSchema,
-        summarize: (o, ctx) => startSummary(o, roomLabel(deps, ctx.homeId)),
+        summarize: (o, ctx) => startSummary(o, roomLabel(deps, ctx.homeId), deps.config.capHours),
         handler: (args, ctx) => startStormMode(atHome(deps, ctx.homeId), args, ctx),
       }),
       defineTool({
@@ -39,7 +39,7 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         input: z.strictObject({}),
         output: SafeRoomStatusSchema,
-        summarize: (o, ctx) => safeRoomSummary(o, deps.homes(ctx.homeId)?.units ?? 'C', roomLabel(deps, ctx.homeId)),
+        summarize: (o, ctx) => safeRoomSummary(o, deps.homes(ctx.homeId)?.units ?? 'C', roomLabel(deps, ctx.homeId), deps.config.capHours),
         handler: (_args, ctx) => safeRoomStatus(atHome(deps, ctx.homeId), ctx),
       }),
       defineTool({

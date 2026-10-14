@@ -4,7 +4,8 @@ import { fixedClock, memoryLogger, type Clock, type Notifier, type StateStoreFac
 import { createInAppNotifier } from '@cold-reserve/notifier-inapp';
 import { parseGuardConfig } from '@cold-reserve/guard';
 import rawGuardConfig from '@cold-reserve/guard/config/guard.json' with { type: 'json' };
-import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
+import { ScenarioSchema, SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type Scenario, type ScenarioId } from '@cold-reserve/source-simulator';
+import guidedStormDay from '../fixtures/storm-blackout-guided.json' with { type: 'json' };
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import rawComfortConfig from '../../config/comfort-plan.json' with { type: 'json' };
 import { parseComfortPlanConfig } from '../../src/modules/comfort-plan/config.js';
@@ -39,9 +40,16 @@ export function comfortConfig() {
 }
 
 /** A simulator scenario at hour `atH`, with every dependency of the module. */
+/**
+ * The storm day these tests pin the guard's numbers on (the guided storm of #272): the storm script as it was before #390,
+ * dry at 27 °C with the fan all storm long, from 85 %. Frozen here so the physics of the planner and the guard stay pinned
+ * on one home state; the shipped storm story (#390) is tested in source-simulator and end to end.
+ */
+const GUIDED_STORM: Scenario = ScenarioSchema.parse(guidedStormDay);
+
 export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean; notifier?: Notifier; storeWallMs?: number; units?: 'C' | 'F' } = {}) {
   const profile = demoProfile();
-  const scenario = builtInScenario(id);
+  const scenario = id === 'storm-blackout' ? GUIDED_STORM : builtInScenario(id);
   const startMs = Date.parse(scenario.startAt);
   const scenarioMs = startMs + atH * H;
   const clock = settableClock(Date.parse('2026-09-30T10:00:00Z'));

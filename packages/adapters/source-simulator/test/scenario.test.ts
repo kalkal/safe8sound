@@ -66,6 +66,12 @@ describe('parseScenario errors (invalid_config)', () => {
     expectInvalid(raw, 'initial.rooms');
   });
 
+  it('#390: rejects an essential hour at or past the end of the scenario', () => {
+    const raw = clone(rawScenario('storm-blackout')) as { essentialAtH?: number; durationH: number };
+    expect(parseScenario({ ...raw, essentialAtH: raw.durationH }, profile).ok).toBe(false);
+    expect(parseScenario({ ...raw, essentialAtH: raw.durationH - 1 }, profile).ok).toBe(true);
+  });
+
   it('rejects an initial SOC below the hardware floor', () => {
     const raw = clone(rawScenario('clear-day')) as { initial: { batterySocPct: number } };
     raw.initial.batterySocPct = 5;

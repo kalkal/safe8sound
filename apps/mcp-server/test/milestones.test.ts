@@ -2,7 +2,7 @@ import { examplePlan } from '@cold-reserve/contracts/fixtures';
 import { celsius, pct, type Plan } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { builtInScenario } from '@cold-reserve/source-simulator';
-import { milestonesOf, outagesOf } from '../src/milestones.js';
+import { essentialAtOf, milestonesOf, outagesOf } from '../src/milestones.js';
 
 // #311: the next interesting moments of a sandbox's day, from the scenario and the plan's own fields (one source):
 // never recomputed apart from what the plan and the scenario already say.
@@ -85,6 +85,27 @@ describe('milestonesOf (#311)', () => {
   it('a moment exactly now is not ahead; two at the same time keep a stable order', () => {
     const m = milestonesOf({ ...base, outages: [{ fromMs: NOW, toMs: NOW + 3_600_000 }], rechargeAtMs: NOW + 3_600_000 });
     expect(m.map((x) => x.kind)).toEqual(['power_back', 'next_recharge']);
+  });
+});
+
+describe("#390: the scripted home's own essential level", () => {
+  const ninePm = at('2026-07-17T21:00:00+02:00');
+  const from = at('2026-07-17T15:00:00+02:00');
+
+  it('is a moment of the day with no plan, and the earlier of the two with one; a plan essential from now leaves it ahead', () => {
+    expect(milestonesOf({ ...base, nowMs: from, essentialAtMs: ninePm }).map((m) => [m.kind, m.at])).toEqual([['essential_level', '2026-07-17T21:00:00+02:00']]);
+    const later = plan({ steps: [step('2026-07-17T23:00:00+02:00', 24, 'essential')] });
+    expect(milestonesOf({ ...base, nowMs: from, essentialAtMs: ninePm, plan: later }).filter((m) => m.kind === 'essential_level').map((m) => m.at)).toEqual(['2026-07-17T21:00:00+02:00']);
+    const fromNow = plan({ steps: [step('2026-07-17T15:00:00+02:00', 25, 'essential')] });
+    expect(milestonesOf({ ...base, nowMs: from, essentialAtMs: ninePm, plan: fromNow }).filter((m) => m.kind === 'essential_level').map((m) => m.at)).toEqual(['2026-07-17T21:00:00+02:00']);
+    // Behind now: not listed.
+    expect(milestonesOf({ ...base, nowMs: ninePm, essentialAtMs: ninePm })).toEqual([]);
+  });
+
+  it('the storm day steps down at 21:00, six hours into the storm; the calm days never do', () => {
+    const storm = builtInScenario('storm-blackout');
+    expect(essentialAtOf(storm)).toBe(Date.parse(storm.startAt) + 9 * 3_600_000);
+    expect(essentialAtOf(builtInScenario('clear-day'))).toBeUndefined();
   });
 });
 

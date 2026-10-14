@@ -61,7 +61,10 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       const injected = await call('start_storm_mode', { mode: 'active' });
       expect(StartStormModeOutputSchema.parse(injected.structuredContent)).toMatchObject({ effectiveMode: 'prepare', reserveUnlocked: false, reason: 'grid_still_up' });
       expect(textOf(injected)).toContain('the storm reserve stays locked');
-      expect(await inbox()).toEqual([]);
+      // #390: the family hears once that a storm is expected and the home is ready (the forecast message).
+      expect((await inbox()).map((m) => `${m.transition}:${m.role}`)).toEqual(['storm_prepared:daughter']);
+      expect((await inbox())[0]?.text).toContain('a storm is expected and the home is ready for a power cut.');
+      expect(textOf(injected)).toContain('Family told that a storm is expected: daughter (in_app).');
 
       expect(JSON.stringify(injected)).not.toMatch(/Giulia|phone-/);
 
@@ -70,7 +73,7 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       atHour(3.5);
       const quiet = await call('get_safe_room_status');
       expect(SafeRoomStatusSchema.parse(quiet.structuredContent)).toMatchObject({ stormPhase: 'prepare', level: 'comfort' });
-      expect(await inbox()).toEqual([]);
+      expect((await inbox()).map((m) => m.transition)).toEqual(['storm_prepared']);
       const started = await call('start_storm_mode', { mode: 'prepare' });
       const start = StartStormModeOutputSchema.parse(started.structuredContent);
       expect(start).toMatchObject({ effectiveMode: 'active', reserveUnlocked: true, reason: 'grid_lost' });
@@ -78,7 +81,7 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       expect(start.session.devicesSecured?.map((d) => `${d.entityId}:${d.action}:${d.outcome}`)).toEqual(['lawn_mower.garden:dock:done', 'cover.living_room:close:done']);
       expect(textOf(started)).toContain('Made safe before the storm: the robot mower is docked, the shutters are closed.');
       expect(JSON.stringify(started)).not.toMatch(/Giulia|phone-/);
-      expect((await inbox())[0]?.text).toContain(`keeps it safe until ${clock(Date.parse(start.safeUntil))}.`);
+      expect((await inbox())[0]?.text).toContain(`keeps it safe ${start.safeHours >= 24 ? 'at least ' : ''}until ${clock(Date.parse(start.safeUntil))}${start.safeHours >= 24 ? ' tomorrow' : ''}.`);
       const status = await call('get_safe_room_status');
       expect(JSON.stringify(status)).not.toMatch(/Giulia|phone-/);
       const s = SafeRoomStatusSchema.parse(status.structuredContent);
@@ -88,8 +91,8 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       // before 22:00, and the battery holds it through the 24-hour cap.
       expect(s.safeHours).toBe(24);
       expect(s.safeUntil).toMatch(/T15:30:00\+02:00$/);
-      expect(textOf(status)).toContain(`Safe for about ${s.safeHours.toFixed(1)} hours`);
-      expect((await inbox()).map((m) => `${m.transition}:${m.role}`)).toEqual(['storm_started:daughter']);
+      expect(textOf(status)).toContain(`Safe for at least ${s.safeHours.toFixed(1)} hours, at least until`);
+      expect((await inbox()).map((m) => `${m.transition}:${m.role}`)).toEqual(['storm_started:daughter', 'storm_prepared:daughter']);
       expect((await inbox())[0]?.text).toContain('Bedroom is at');
 
       // 3. The model tells the family the house went to Essential: roles only in what it reads.
@@ -108,8 +111,9 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       expect(StartStormModeOutputSchema.parse(back.structuredContent).effectiveMode).toBe('active'); // not yet stable
       atHour(18.6 + 11 / 60);
       await call('start_storm_mode', { mode: 'prepare' });
-      expect((await inbox()).map((m) => m.transition)).toEqual(['power_back', 'essential_level', 'storm_started']);
-      expect((await inbox())[0]?.text).toContain(`power came back at home at ${clock(gridBackMs)}.`);
+      // The last request, after power back, prepares a new storm as asked: its own forecast message (#390), newest first.
+      expect((await inbox()).map((m) => m.transition)).toEqual(['storm_prepared', 'power_back', 'essential_level', 'storm_started', 'storm_prepared']);
+      expect((await inbox())[1]?.text).toContain(`power came back at home at ${clock(gridBackMs)}.`);
     } finally {
       await client.close();
       await server.close();

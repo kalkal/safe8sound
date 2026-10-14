@@ -66,6 +66,7 @@ export const ScriptSchema = z.strictObject({
   initial: z.unknown(),
   hourly: z.array(z.strictObject({ stormProb: RatioSchema, baseLoadW: WattSchema })).min(1),
   gridOutages: z.array(z.strictObject(WindowShape)),
+  essentialAtH: z.number().nonnegative().optional(),
   occupancy: z.array(z.unknown()),
   hvac: z.array(z.unknown()),
 });
@@ -101,6 +102,7 @@ export function mergeScenario(rawScript: unknown, place: Place, profile: HomePro
     }),
     sun: day.sun,
     gridOutages: [...s.gridOutages, ...(day.outage === undefined ? [] : [{ fromH: day.outage.fromH, toH: day.outage.toH }])],
+    ...(s.essentialAtH === undefined ? {} : { essentialAtH: s.essentialAtH }),
     occupancy: s.occupancy,
     hvac: s.hvac,
   };

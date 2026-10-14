@@ -35,7 +35,8 @@ export async function alertFamily(
     tempC,
     // The family reads the unit the sandbox chose (#306).
     unit: input.unit ?? 'C',
-    atMs: input.nowMs,
+    // #390: the reading's time, the one the plan counts from: a time on a later day than it says so.
+    atMs: Date.parse(snapshot.ts),
     safeUntilMs: epochMs(plan.lastResort.safeUntil),
     // #364: the battery runs out first and the room crosses its limit later: the room's time leads, the battery's follows.
     ...(roomTimeLeads(plan.lastResort) && plan.lastResort.limitCrossedAt !== undefined ? { withinLimitsUntilMs: epochMs(plan.lastResort.limitCrossedAt) } : {}),

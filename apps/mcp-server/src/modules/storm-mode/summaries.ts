@@ -10,6 +10,18 @@ import { localTimeText } from '@cold-reserve/core';
 
 const one = (x: number) => x.toFixed(1);
 
+/**
+ * #390: a time on a later day than the reading says so ("3:00 PM tomorrow"): at the 24-hour cap of the safe hours the
+ * clock alone reads as the time it is now. The reading is the safe-hours end minus the hours (both from the same hold);
+ * both are local ISO times with the home's offset, so the day is the home's.
+ */
+function untilText(iso: string, safeUntil: string, safeHours: number): string {
+  const offset = /([+-])(\d{2}):(\d{2})$/.exec(safeUntil);
+  const offsetMs = offset === null ? 0 : (offset[1] === '-' ? -1 : 1) * (Number(offset[2]) * 60 + Number(offset[3])) * 60_000;
+  const readingDay = new Date(Date.parse(safeUntil) - safeHours * 3_600_000 + offsetMs).toISOString().slice(0, 10);
+  return `${localTimeText(iso)}${iso.slice(0, 10) > readingDay ? ' tomorrow' : ''}`;
+}
+
 
 /** The fixed label of a device domain from the catalog ("the robot mower"): never a name from the home. */
 function deviceLabel(domain: 'lawn_mower' | 'cover'): string {
@@ -42,18 +54,28 @@ function dataText(o: DataOrigin): string {
 export type RoomLabel = (roomId: string) => string;
 const idOnly: RoomLabel = (roomId) => roomId;
 
-export function startSummary(o: StartOutput, room: RoomLabel = idOnly): string {
+/**
+ * #390 review: the safe hours at the projection's cap (`capHours`) are a horizon, never an end: "at least 24.0 hours,
+ * at least until 3:00 PM tomorrow", as withinText says "at least until" for the room. Without the cap, never said.
+ */
+const hoursText = (hours: number, capHours: number | undefined) => `${capHours !== undefined && hours >= capHours ? 'at least' : 'about'} ${one(hours)} hours`;
+const untilWords = (hours: number, capHours: number | undefined) => (capHours !== undefined && hours >= capHours ? 'at least until' : 'until');
+
+export function startSummary(o: StartOutput, room: RoomLabel = idOnly, capHours?: number): string {
   const state =
     o.effectiveMode === 'active'
       ? 'Storm mode is active: the grid is down, so the storm reserve is now the budget.'
       : `Storm mode is prepared: ${o.reason === 'grid_still_up' ? 'the grid is still up, so the storm reserve stays locked.' : 'the storm reserve stays locked until the grid goes down.'}`;
-  const told = o.session.notifications.filter((n) => n.transition === 'storm_started' && n.delivered);
-  const family = told.length > 0 ? `Family told that the storm started: ${told.map((n) => `${n.contactRole} (${n.channel})`).join(', ')}.` : 'No family message was sent.';
-  return `${state} The safe room, ${room(o.session.safeRoomId)}, is covered for about ${one(o.safeHours)} hours, until ${localTimeText(o.safeUntil)}. ${family}${devicesText(o)}`;
+  // #390: preparing a storm tells the family too (once per storm), as the storm start does.
+  const transition = o.effectiveMode === 'active' ? 'storm_started' : 'storm_prepared';
+  const told = o.session.notifications.filter((n) => n.transition === transition && n.delivered);
+  const what = o.effectiveMode === 'active' ? 'the storm started' : 'a storm is expected';
+  const family = told.length > 0 ? `Family told that ${what}: ${told.map((n) => `${n.contactRole} (${n.channel})`).join(', ')}.` : 'No family message was sent.';
+  return `${state} The safe room, ${room(o.session.safeRoomId)}, is covered for ${hoursText(o.safeHours, capHours)}, ${untilWords(o.safeHours, capHours)} ${untilText(o.safeUntil, o.safeUntil, o.safeHours)}. ${family}${devicesText(o)}`;
 }
 
 /** The safe room now, in the unit the sandbox chose (#306); the structured status stays in °C. */
-export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: RoomLabel = idOnly): string {
+export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: RoomLabel = idOnly, capHours?: number): string {
   const humidity = s.humidityPct === undefined ? '' : `, ${String(s.humidityPct)} % humidity`;
   // #271: a fictional name with its role, "Leo (grandpa)", so a name and a role are one person.
   const named = new Map((s.people ?? []).map((p) => [p.role, p.name]));
@@ -72,10 +94,10 @@ export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: R
   const within = withinText(s, unit);
   const hours =
     s.gridAvailable === true
-      ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone${strict ? ', at the stricter night limit for an older person,' : ''} it would hold about ${one(s.safeHours)} hours.${within === undefined ? '' : ` On the battery alone: ${within}`}`
+      ? `${s.stormPhase === 'active' ? 'Power is back. ' : ''}The grid powers the safe room; on the battery alone${strict ? ', at the stricter night limit for an older person,' : ''} it would hold ${hoursText(s.safeHours, capHours)}.${within === undefined ? '' : ` On the battery alone: ${within}`}`
       : degraded
-        ? `${strict ? 'At the stricter night limit for an older person' : 'From the live reading'}, it holds for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.${within === undefined ? '' : ` ${within}`}`
-        : within ?? `Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}.`;
+        ? `${strict ? 'At the stricter night limit for an older person' : 'From the live reading'}, it holds for ${hoursText(s.safeHours, capHours)}, ${untilWords(s.safeHours, capHours)} ${untilText(s.safeUntil, s.safeUntil, s.safeHours)}.${within === undefined ? '' : ` ${within}`}`
+        : within ?? `Safe for ${hoursText(s.safeHours, capHours)}, ${untilWords(s.safeHours, capHours)} ${untilText(s.safeUntil, s.safeUntil, s.safeHours)}.`;
   const head = degraded ? 'The saved settings and the storm state are not reachable right now: this is the live reading only. ' : '';
   return (
     head +
@@ -116,8 +138,8 @@ function pastLimit(s: SafeRoomStatus, unit: TempUnit): string {
 function withinText(s: SafeRoomStatus, unit: TempUnit): string | undefined {
   const w = s.withinLimits;
   if (w === undefined) return undefined;
-  const battery = `the battery lasts until ${localTimeText(s.safeUntil)} (about ${one(s.safeHours)} hours)`;
+  const battery = `the battery lasts until ${untilText(s.safeUntil, s.safeUntil, s.safeHours)} (about ${one(s.safeHours)} hours)`;
   return w.limitC === undefined
-    ? `The safe room stays within its limits at least until ${localTimeText(w.until)}; ${battery}.`
-    : `The safe room stays at or below its ${formatTemp(w.limitC, unit)} limit until about ${localTimeText(w.until)}; ${battery}, then the room warms up.`;
+    ? `The safe room stays within its limits at least until ${untilText(w.until, s.safeUntil, s.safeHours)}; ${battery}.`
+    : `The safe room stays at or below its ${formatTemp(w.limitC, unit)} limit until about ${untilText(w.until, s.safeUntil, s.safeHours)}; ${battery}, then the room warms up.`;
 }

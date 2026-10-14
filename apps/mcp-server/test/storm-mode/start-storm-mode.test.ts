@@ -7,16 +7,19 @@ import { preferences, stormConfig, world } from './support.js';
 // start_storm_mode (plan §4, §9.4): "active" unlocks the reserve only with the grid measured down.
 
 describe('start_storm_mode', () => {
-  it('with the grid up, "active" is only a preparation: the reserve stays locked and nobody is messaged', async () => {
+  it('with the grid up, "active" is only a preparation: the reserve stays locked and the family hears only that a storm is expected (#390)', async () => {
     const w = world(1);
     const out = await startStormMode(w.deps, { mode: 'active' }, w.ctx);
     expect(out.ok && StartStormModeOutputSchema.parse(out.value)).toMatchObject({
       effectiveMode: 'prepare',
       reserveUnlocked: false,
       reason: 'grid_still_up',
-      session: { phase: 'prepare', trigger: 'user', safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], notifications: [] },
+      session: { phase: 'prepare', trigger: 'user', safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], notifications: [{ transition: 'storm_prepared', contactRole: 'daughter', delivered: true }] },
     });
-    expect((await w.inbox())).toEqual([]);
+    expect((await w.inbox()).map((m) => m.transition)).toEqual(['storm_prepared']);
+    // Once per storm: asking again tells no one more.
+    await startStormMode(w.deps, { mode: 'prepare' }, w.ctx);
+    expect((await w.inbox()).map((m) => m.transition)).toEqual(['storm_prepared']);
   });
 
   it('"prepare" with the grid up says it was requested', async () => {
@@ -57,6 +60,16 @@ describe('start_storm_mode', () => {
       expect(await w.inbox()).toHaveLength(1);
     });
 
+    it('#390: two prepare requests at once before the storm: one opens the session and tells the family that a storm is expected, once', async () => {
+      const w = world(1);
+      const deps = claimed(w);
+      const both = await Promise.all([startStormMode(deps, { mode: 'prepare' }, w.ctx), startStormMode(deps, { mode: 'prepare' }, w.ctx)]);
+      const ids = both.map((r) => (r.ok ? r.value.session.id : r.error.code));
+      expect(ids[0]).toMatch(/^storm_/);
+      expect(ids[1]).toBe(ids[0]);
+      expect((await w.inbox()).map((m) => m.transition)).toEqual(['storm_prepared']);
+    });
+
     it('a save that fails after the claim still leaves the session open: the next request finds it and tells nobody again', async () => {
       const w = world(4);
       const down = toolError('store_unavailable', 'Down.');
@@ -93,9 +106,9 @@ describe('start_storm_mode', () => {
     await startStormMode(w.deps, { mode: 'prepare' }, w.ctx); // the grid is back: the window starts
     w.advanceTo(19 + (stormConfig().stableGridMinutes + 1) / 60);
     const out = await startStormMode(w.deps, { mode: 'prepare' }, w.ctx);
-    expect((await w.inbox()).map((m) => m.transition)).toEqual(['power_back', 'storm_started']);
-    // The request itself then opens a new preparation, as asked.
-    expect(out.ok && out.value).toMatchObject({ effectiveMode: 'prepare', reason: 'requested', session: { phase: 'prepare', notifications: [] } });
+    // The request itself then opens a new preparation, as asked: a new storm, so its own forecast message (#390).
+    expect((await w.inbox()).map((m) => m.transition)).toEqual(['storm_prepared', 'power_back', 'storm_started']);
+    expect(out.ok && out.value).toMatchObject({ effectiveMode: 'prepare', reason: 'requested', session: { phase: 'prepare', notifications: [{ transition: 'storm_prepared' }] } });
   });
 
   it('saves the session in the store', async () => {

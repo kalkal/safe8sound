@@ -26,7 +26,7 @@ import { stormMessage, type Locale, type StormMessageFields } from '@cold-reserv
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import type { ToolContext } from '../../tool.js';
 import { guardFrame } from '../comfort-plan/plan-comfort.js';
-import type { StormHome, StormModeDeps } from './deps.js';
+import type { ClaimedTransition, StormHome, StormModeDeps } from './deps.js';
 
 // What the storm tools share (plan §9.2): reading the home and counting the safe hours (no side
 // effects), and the storm detector, which runs an event through the session, sends the family message
@@ -48,6 +48,8 @@ export interface Observed {
   readonly safeHours: number;
   /** When the hold ends (or the cap): the projection's own time, from the home's reading. */
   readonly safeUntilMs: number;
+  /** #390 review: the hold never ends inside the projection: `safeUntilMs` is its cap, a horizon, never an end. */
+  readonly capped: boolean;
   /** #271: the safe room's limit in force at the reading and what sets it, from the same guard frame as the hours. */
   readonly limitNow: { limitC: number; kind: SafeRoomLimitKind };
   /** #364: the battery ends the safe hours and the room then stays within its limits until `ms` (the limit crossed there, when it is). */
@@ -80,7 +82,7 @@ function holdHours(
   forecast: Forecast,
   preferences: Preferences,
   strictest = false,
-): Result<{ hours: number; untilMs: number; season: Season; limitNow: { limitC: number; kind: SafeRoomLimitKind }; withinLimits?: { readonly ms: number; readonly limitC?: number } }, ErrorEnvelope> {
+): Result<{ hours: number; untilMs: number; capped: boolean; season: Season; limitNow: { limitC: number; kind: SafeRoomLimitKind }; withinLimits?: { readonly ms: number; readonly limitC?: number } }, ErrorEnvelope> {
   // Never assume an EPS load (#107): the projection would quietly count none.
   const eps = epsBaseLoadW(profile);
   if (!eps.ok) return eps;
@@ -101,7 +103,7 @@ function holdHours(
   const limitNow = safeRoomLimitKindAt({ preferences, profile, config: deps.guard, ...frame })(nowMs);
   // #364: the battery runs out first and the room then holds its limits a while, on the same hold and the same cap.
   const within = withinLimitsAfterBattery(held.value, { preferences, profile, config: deps.guard, ...frame }, toMs);
-  return ok({ hours: Math.round(((untilMs - nowMs) / HOUR_MS) * 100) / 100, untilMs, season: frame.season, limitNow, ...(within === undefined ? {} : { withinLimits: within }) });
+  return ok({ hours: Math.round(((untilMs - nowMs) / HOUR_MS) * 100) / 100, untilMs, capped: held.value.safeUntil === undefined, season: frame.season, limitNow, ...(within === undefined ? {} : { withinLimits: within }) });
 }
 
 export function messageFields(o: Observed, session: StormSession | undefined): StormMessageFields {
@@ -111,11 +113,16 @@ export function messageFields(o: Observed, session: StormSession | undefined): S
     tempC: o.safeRoom.tempC,
     // The family reads the unit the sandbox chose (#306).
     unit: o.home.units ?? 'C',
-    atMs: o.nowMs,
+    // #390: the reading's time, the one the safe hours count from: a time on a later day than it says so.
+    atMs: Date.parse(o.snapshot.ts),
     safeUntilMs: o.safeUntilMs,
+    // #390 review: at the cap the time is a horizon: "at least until".
+    safeUntilCapped: o.capped,
     // #364: the room's time leads the message only with a real crossing (never "then gets warmer" past the projection).
     ...(o.withinLimits?.limitC === undefined ? {} : { withinLimitsUntilMs: o.withinLimits.ms }),
     ...(session?.gridBackAt === undefined ? {} : { powerBackAtMs: Date.parse(session.gridBackAt) }),
+    // #390: the limit in force at the reading: above it the family is asked to check, never told "no action".
+    limitC: o.limitNow.limitC,
     timeZone: o.home.profile.location.tz,
   };
 }
@@ -220,6 +227,7 @@ export async function readHome(deps: StormModeDeps, ctx: ToolContext, degrade = 
     nowMs,
     safeHours: hours.value.hours,
     safeUntilMs: hours.value.untilMs,
+    capped: hours.value.capped,
     limitNow: hours.value.limitNow,
     ...(hours.value.withinLimits === undefined ? {} : { withinLimits: hours.value.withinLimits }),
     session: latest.value,
@@ -255,11 +263,11 @@ export async function detect(deps: StormModeDeps, o: Observed, event: StormEvent
   // The essential level keeps the same session object but has a message to send (#311): only a step with neither is a no-op.
   if (step.session === undefined || (step.session === o.session && step.transitions.length === 0)) return ok(o);
 
-  // #379, #387: a sandbox's storm start and power back are claimed before they are sent, and the claim is the session
+  // #379, #387, #390: a sandbox's storm prepared, start and power back are claimed before they are sent; the claim is the session
   // itself: the claim and the session it opens or ends are written together, so a request that stops after it (a failed
   // save, a timeout) still leaves the session saved. Of two requests at once (two containers) only the one that claims
   // it tells the family; the other reads the session the winner saved, so start_storm_mode finds it open.
-  const claimable = step.transitions.find((t): t is 'storm_started' | 'power_back' => t === 'storm_started' || t === 'power_back');
+  const claimable = step.transitions.find((t): t is ClaimedTransition => t === 'storm_prepared' || t === 'storm_started' || t === 'power_back');
   const key = claimable === undefined ? undefined : deps.alertKey?.(o.ctx.homeId, claimable, o.nowMs);
   if (key !== undefined) {
     const claimed = await o.store.claimStormSession(step.session, key);
@@ -274,7 +282,7 @@ export async function detect(deps: StormModeDeps, o: Observed, event: StormEvent
   let session = step.session;
   for (const transition of step.transitions) {
     const sendable = SendableTransitionSchema.safeParse(transition);
-    if (!sendable.success) continue; // storm_prepared is only spoken
+    if (!sendable.success) continue;
     const sent = await deliver(deps, o, session, sendable.data);
     if (!sent.ok) return sent;
     session = sent.value.session;

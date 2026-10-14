@@ -49,6 +49,7 @@ const STORM_KEYS = {
   essential_level: 'storm.essential',
   power_back: 'storm.powerBack',
   last_resort_applied: 'storm.lastResort',
+  storm_prepared: 'storm.prepared',
 } as const satisfies Record<
   SendableTransition,
   MessageKey
@@ -61,10 +62,12 @@ export interface StormMessageFields {
   readonly tempC: number;
   /** The temperature unit the family reads (the sandbox's choice, #306); °C when unset. */
   readonly unit?: TempUnit;
-  /** When the message is sent (epoch ms). */
+  /** The reading the message is about (epoch ms), on the home's clock: a time ahead on a later day says so (#390). */
   readonly atMs: number;
   /** Until when the safe room is covered (epoch ms); needed by the messages that quote it. */
   readonly safeUntilMs?: number;
+  /** #390 review: the safe hours reach the projection's cap: safeUntilMs is a horizon, said "at least until". */
+  readonly safeUntilCapped?: boolean;
   /**
    * #364: when the battery runs out at `safeUntilMs` and the room then stays within its limits a while, until when
    * (epoch ms). Only with a real crossing: the room's time leads the message, the battery time follows.
@@ -72,6 +75,11 @@ export interface StormMessageFields {
   readonly withinLimitsUntilMs?: number;
   /** When the grid came back (the session's gridBackAt, epoch ms); needed by power_back. */
   readonly powerBackAtMs?: number;
+  /**
+   * #390: the safe room's limit in force at the reading (°C). With the room above it, as the temperature is said, the
+   * message never says "no action": it asks the family to check on them.
+   */
+  readonly limitC?: number;
   /** The home's time zone, for the times in the message. */
   readonly timeZone: string;
 }
@@ -87,20 +95,49 @@ const STORM_WITHIN_KEYS = {
   storm_started: 'storm.startedWithin',
   essential_level: 'storm.essentialWithin',
   last_resort_applied: 'storm.lastResortWithin',
+  storm_prepared: 'storm.preparedWithin',
 } as const satisfies Partial<Record<SendableTransition, MessageKey>>;
 
 const keyOf = (transition: SendableTransition, within: boolean): MessageKey =>
   within && transition !== 'power_back' ? STORM_WITHIN_KEYS[transition] : STORM_KEYS[transition];
 
+/** The local calendar day of an instant in a zone. */
+const dayOf = (ms: number, timeZone: string) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
+
+/**
+ * #390: a time ahead on a later day than the message says so ("3:00 PM tomorrow"): at the 24-hour cap of the safe hours
+ * the clock alone would read as the time the message is sent. The times are at most a day ahead (the projection's cap).
+ */
+function untilTime(locale: Locale, ms: number, fields: StormMessageFields): string {
+  const time = clockTime(locale, ms, fields.timeZone);
+  if (ms <= fields.atMs || dayOf(ms, fields.timeZone) === dayOf(fields.atMs, fields.timeZone)) return time;
+  return CATALOGS[locale]['storm.tomorrow'].replace('{time}', time);
+}
+
+/** #390: a room above its limit (to the tenth of a degree, as the readings are said) is never told "no action". */
+function actionOf(locale: Locale, fields: StormMessageFields): Result<string, FormatError> {
+  const limitC = fields.limitC;
+  if (limitC === undefined || Math.round(fields.tempC * 10) / 10 <= limitC) return format(locale, 'storm.action.none');
+  return format(locale, 'storm.action.check', { room: fields.roomName, limit: formatTemp(limitC, fields.unit ?? 'C') });
+}
+
 function renderStorm(locale: Locale, transition: SendableTransition, addressee: string, fields: StormMessageFields): Result<string, FormatError> {
   const within = fields.withinLimitsUntilMs;
+  const action = actionOf(locale, fields);
+  if (!action.ok) return action;
   return format(locale, keyOf(transition, within !== undefined), {
-    ...(within === undefined ? {} : { withinUntil: clockTime(locale, within, fields.timeZone) }),
+    ...(within === undefined ? {} : { withinUntil: untilTime(locale, within, fields) }),
+    action: action.value,
     name: addressee,
     room: fields.roomName,
     temp: formatTempFixed(fields.tempC, fields.unit ?? 'C'),
     at: clockTime(locale, fields.atMs, fields.timeZone),
-    ...(fields.safeUntilMs === undefined ? {} : { safeUntil: clockTime(locale, fields.safeUntilMs, fields.timeZone) }),
+    ...(fields.safeUntilMs === undefined
+      ? {}
+      : {
+          safeUntil: untilTime(locale, fields.safeUntilMs, fields),
+          untilSafe: CATALOGS[locale][fields.safeUntilCapped === true ? 'storm.atLeastUntil' : 'storm.until'].replace('{time}', untilTime(locale, fields.safeUntilMs, fields)),
+        }),
     ...(fields.powerBackAtMs === undefined ? {} : { powerBackAt: clockTime(locale, fields.powerBackAtMs, fields.timeZone) }),
   });
 }

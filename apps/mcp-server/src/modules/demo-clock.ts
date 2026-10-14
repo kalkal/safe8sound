@@ -17,7 +17,7 @@ import {
   type SandboxSettings,
 } from '@cold-reserve/contracts';
 import { localIso, utcDayStart, type Clock, type Logger } from '@cold-reserve/core';
-import { firstEssentialMs, milestonesOf } from '../milestones.js';
+import { earliest, firstEssentialMs, milestonesOf } from '../milestones.js';
 import { homeDetail, isSandbox } from '../sandbox-log.js';
 import { defineTool, type ToolContext, type ToolDefinition } from '../tool.js';
 
@@ -46,6 +46,8 @@ export interface SandboxDay {
   readonly outages: readonly { readonly fromMs: number; readonly toMs: number }[];
   /** When the battery recharges next (the dark window's end), when the forecast shows it. */
   readonly rechargeAtMs?: number;
+  /** #390: when the scripted home steps down to its essential settings (the scenario's own essential level), when it does. */
+  readonly essentialAtMs?: number;
 }
 
 export interface DemoClockDeps {
@@ -85,18 +87,19 @@ const listOf = (day: SandboxDay, plan: Plan | undefined, stableGridMs: number) =
     stableGridMs,
     ...(plan === undefined ? {} : { plan }),
     ...(day.rechargeAtMs === undefined ? {} : { rechargeAtMs: day.rechargeAtMs }),
+    ...(day.essentialAtMs === undefined ? {} : { essentialAtMs: day.essentialAtMs }),
   });
 
 /**
  * Where the detector runs on the way to `toMs` (after now, up to it): each storm start, power back and stable grid,
- * the plan's first essential step, the target. From that step on every stop is an essential reading: the planner keeps
+ * the first essential step (the plan's or the scripted home's, #390), the target. From that step on every stop is an essential reading: the planner keeps
  * one level for a whole plan, so a plan made in the storm is essential from its first step (often now), and the family
  * hears it at the first stop of the storm. The detector tells it once, during an active storm only.
  */
 function stopsOf(day: SandboxDay, plan: Plan | undefined, toMs: number, stableGridMs: number): { atMs: number; kind: 'reading' | 'essential' }[] {
   const times: number[] = [];
   for (const o of day.outages) times.push(o.fromMs, o.toMs, o.toMs + stableGridMs);
-  const essential = plan === undefined ? undefined : firstEssentialMs(plan);
+  const essential = earliest(plan === undefined ? undefined : firstEssentialMs(plan), day.essentialAtMs);
   if (essential !== undefined) times.push(essential);
   const ahead = [...new Set(times.filter((t) => t > day.nowMs && t < toMs))].sort((a, b) => a - b);
   return [...ahead, toMs].map((atMs) => ({ atMs, kind: essential !== undefined && atMs >= essential ? 'essential' : 'reading' }));

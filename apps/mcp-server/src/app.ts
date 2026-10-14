@@ -11,12 +11,12 @@ import { comfortPlanModule } from './modules/comfort-plan/index.js';
 import type { DemoClockDeps } from './modules/demo-clock.js';
 import { demoSettingsModule, type SandboxChoices } from './modules/demo-settings.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
-import { stormModeModule, type StormModeDeps } from './modules/storm-mode/index.js';
+import { stormModeModule, type ClaimedTransition, type StormModeDeps } from './modules/storm-mode/index.js';
 import { catchUpStorm, runStormDetector } from './modules/storm-mode/observe.js';
 import { familyReply } from './modules/storm-mode/tools.js';
 import type { PhoneReplyHandler } from './phone-inbox.js';
 import type { StormModeWiring } from './storm-mode-config.js';
-import { outagesOf } from './milestones.js';
+import { essentialAtOf, outagesOf } from './milestones.js';
 import { createSandboxes, type Sandboxes } from './sandboxes.js';
 import { sandboxStorm } from './sandbox-storm.js';
 import { refreshFrom, shippedPlace, withHousehold, type SandboxPlay } from './sandbox-play.js';
@@ -210,12 +210,18 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   };
 
   // #379: a sandbox's storm start and power back belong to a scripted outage: its start names the alert, so every
-  // container claims the same key and the family hears each once. The real home and demo claim nothing.
-  const alertKey = (homeId: HomeId, transition: 'storm_started' | 'power_back', nowMs: number): string | undefined => {
+  // container claims the same key and the family hears each once. The real home and demo claim nothing. #390: a storm
+  // prepared belongs to the next outage not over yet (none ahead: nothing to claim, the session still opens once).
+  const alertKey = (homeId: HomeId, transition: ClaimedTransition, nowMs: number): string | undefined => {
     const play = sandboxFor(homeId);
     if (play === undefined) return undefined;
-    const outages = outagesOf(play.scenario).filter((o) => (transition === 'storm_started' ? o.fromMs <= nowMs : o.toMs <= nowMs));
-    const outage = outages.reduce<(typeof outages)[number] | undefined>((latest, o) => (latest === undefined || o.fromMs > latest.fromMs ? o : latest), undefined);
+    const all = outagesOf(play.scenario);
+    const outage =
+      transition === 'storm_prepared'
+        ? all.filter((o) => o.toMs > nowMs).reduce<(typeof all)[number] | undefined>((first, o) => (first === undefined || o.fromMs < first.fromMs ? o : first), undefined)
+        : all
+            .filter((o) => (transition === 'storm_started' ? o.fromMs <= nowMs : o.toMs <= nowMs))
+            .reduce<(typeof all)[number] | undefined>((latest, o) => (latest === undefined || o.fromMs > latest.fromMs ? o : latest), undefined);
     return outage === undefined ? undefined : `${transition}#${new Date(outage.fromMs).toISOString()}`;
   };
   const stormDeps: StormModeDeps | undefined = opts.stormMode === undefined ? undefined : { ...opts.stormMode, model: params, homes: planningHome, logger: opts.logger, alertKey };
@@ -252,6 +258,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
       const { clock: homeClock, profile } = play.entry;
       if (homeClock === undefined) return undefined;
       const nowMs = homeClock.now();
+      const essentialAt = essentialAtOf(play.scenario);
       const recharge =
         comfortPlan === undefined
           ? undefined
@@ -265,6 +272,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
         timeZone: profile.location.tz,
         outages: outagesOf(play.scenario),
         ...(recharge === undefined ? {} : { rechargeAtMs: recharge.toMs }),
+        ...(essentialAt === undefined ? {} : { essentialAtMs: essentialAt }),
       };
     },
     getPlan: (homeId, planId, correlationId) =>

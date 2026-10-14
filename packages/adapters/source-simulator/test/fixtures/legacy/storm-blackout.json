@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "id": "storm-blackout",
-  "version": "1.0.0",
-  "description": "A summer storm: overcast afternoon, the grid goes down at 15:00 and comes back at 06:30. Grandpa stays in the safe room on the battery; the daughter is away from home.",
+  "version": "1.1.0",
+  "description": "A summer storm: overcast afternoon, the grid goes down at 15:00 and comes back at 06:30. Grandpa stays in the safe room on a low battery, essential from 21:00; the daughter is away from home.",
   "startAt": "2026-07-17T12:00:00+02:00",
   "durationH": 24,
   "stepSeconds": 60,
   "seed": 20260717,
   "simulatedGroups": ["energy", "rooms", "weather"],
   "initial": {
-    "batterySocPct": 85,
+    "batterySocPct": 30,
     "rooms": [
       { "id": "bedroom-1", "tempC": 26, "humidityPct": 58 },
       { "id": "bedroom-2", "tempC": 26.5, "humidityPct": 58 },
@@ -47,6 +47,7 @@
     "sunrise": ["2026-07-18T05:47:00+02:00"],
     "sunset": ["2026-07-17T20:38:00+02:00"]
   },
+  "essentialAtH": 9,
   "gridOutages": [{ "fromH": 3, "toH": 18.5 }],
   "occupancy": [
     { "roomId": "bedroom-1", "roles": ["grandpa"], "fromH": 0, "toH": 24 },
@@ -55,6 +56,9 @@
   "hvac": [
     { "roomId": "bedroom-1", "mode": "cool", "setpointC": 26, "fanOn": false, "fromH": 0, "toH": 3 },
     { "roomId": "living", "mode": "cool", "setpointC": 26, "fanOn": false, "fromH": 0, "toH": 3 },
-    { "roomId": "bedroom-1", "mode": "dry", "setpointC": 27, "fanOn": true, "fromH": 3, "toH": 24 }
+    { "roomId": "bedroom-1", "mode": "cool", "setpointC": 25, "fanOn": false, "fromH": 3, "toH": 9 },
+    { "roomId": "bedroom-1", "mode": "cool", "setpointC": 24, "fanOn": true, "fromH": 9, "toH": 18.5 },
+    { "roomId": "bedroom-1", "mode": "cool", "setpointC": 24, "fanOn": false, "fromH": 18.5, "toH": 24 },
+    { "roomId": "living", "mode": "cool", "setpointC": 26, "fanOn": false, "fromH": 18.5, "toH": 24 }
   ]
 }

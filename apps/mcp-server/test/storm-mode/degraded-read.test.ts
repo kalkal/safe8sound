@@ -48,7 +48,7 @@ describe('get_safe_room_status with the store down (#114)', () => {
     if (!degraded.ok) throw new Error(degraded.error.message);
     expect(degraded.value.gridAvailable).toBe(false);
     const text = safeRoomSummary(degraded.value);
-    expect(text).toMatch(/ At the stricter night limit for an older person, it holds for about [\d.]+ hours, until \d{1,2}:\d\d(?: [AP]M)?\. /);
+    expect(text).toMatch(/ At the stricter night limit for an older person, it holds for about [\d.]+ hours, until \d{1,2}:\d\d(?: [AP]M)?(?: tomorrow)?\. /);
     expect(text).not.toContain('Safe for about');
     expect(text).not.toContain('The grid powers the safe room');
   });
@@ -69,7 +69,7 @@ describe('get_safe_room_status with the store down (#114)', () => {
     expect(degraded.value.stricterNightLimit).toBeUndefined();
     const text = safeRoomSummary(degraded.value);
     expect(text).not.toMatch(/stricter|older person/);
-    expect(text).toMatch(/ From the live reading, it holds for about [\d.]+ hours, until \d{1,2}:\d\d(?: [AP]M)?\. /);
+    expect(text).toMatch(/ From the live reading, it holds for about [\d.]+ hours, until \d{1,2}:\d\d(?: [AP]M)?(?: tomorrow)?\. /);
     const gridUp = safeRoomSummary({ ...degraded.value, gridAvailable: true });
     expect(gridUp).toContain('The grid powers the safe room; on the battery alone it would hold about');
     expect(gridUp).not.toMatch(/stricter|older person/);

@@ -145,20 +145,32 @@ export const enUS = {
   'config.invalid': 'The simulator is not configured correctly. Check its settings and reload the page.',
   // Family messages in storm mode, Mileti style: source, hazard, place, status, time, what to do.
   'storm.started':
-    '{product} alert for {name}: a storm cut the power at home. {room} is at {temp} and the battery keeps it safe until {safeUntil}. No action is needed now. Next message: when the level changes or power returns.',
+    '{product} alert for {name}: a storm cut the power at home. {room} is at {temp} and the battery keeps it safe {untilSafe}. {action} Next message: when the level changes or power returns.',
   'storm.essential':
-    '{product} update for {name}: to keep {room} safe until {safeUntil}, the battery switched to essential mode. {room} is at {temp}. No action is needed now. Next message: when the level changes or power returns.',
-  'storm.powerBack': '{product} update for {name}: power came back at home at {powerBackAt}. {room} is at {temp}. Storm mode has ended. No action is needed.',
+    '{product} update for {name}: the battery reached the essential level, to keep {room} safe {untilSafe}. {room} is at {temp}. {action} Next message: when the level changes or power returns.',
+  'storm.powerBack': '{product} update for {name}: power came back at home at {powerBackAt}. {room} is at {temp}. Storm mode has ended. {action}',
   // Sent by the server when a last-resort plan is applied (#160): the fixed "battery low, check on them" alert.
   'storm.lastResort':
     '{product} alert for {name}: the home battery is low. {room} is at {temp} and stays within its limits until {safeUntil}, then gets warmer. Please check on them.',
   // #364: the battery runs out first and the room then holds its limits a while: the room's time leads, the battery follows.
   'storm.startedWithin':
-    '{product} alert for {name}: a storm cut the power at home. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. No action is needed now. Next message: when the level changes or power returns.',
+    '{product} alert for {name}: a storm cut the power at home. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. {action} Next message: when the level changes or power returns.',
   'storm.essentialWithin':
-    '{product} update for {name}: the battery switched to essential mode. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. No action is needed now. Next message: when the level changes or power returns.',
+    '{product} update for {name}: the battery reached the essential level. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. {action} Next message: when the level changes or power returns.',
   'storm.lastResortWithin':
     '{product} alert for {name}: the home battery is low. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. Please check on them.',
+  // #390: a storm is expected and the home is prepared (sent once per storm). The times are what the battery would do if the power goes out.
+  'storm.prepared':
+    '{product} notice for {name}: a storm is expected and the home is ready for a power cut. {room} is at {temp}; if the power goes out, the battery keeps it safe {untilSafe}. {action} Next message: if the power goes out.',
+  'storm.preparedWithin':
+    '{product} notice for {name}: a storm is expected and the home is ready for a power cut. {room} is at {temp}; if the power goes out, it stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. {action} Next message: if the power goes out.',
+  // #390: what the family is asked to do, never "no action" with the safe room above its limit; a time on a later day says so.
+  'storm.action.none': 'No action is needed now.',
+  'storm.action.check': '{room} is above its {limit} limit: please check on them.',
+  'storm.tomorrow': '{time} tomorrow',
+  // #390 review: the safe hours reach the projection's cap: the time is a horizon, never an end.
+  'storm.until': 'until {time}',
+  'storm.atLeastUntil': 'at least until {time}',
   // #364: the big time on the plan and safe-room cards when the battery runs out first.
   'hold.underUntil': 'Under {limit} until about',
   'hold.withinAtLeast': 'Within its limits at least until',
@@ -386,12 +398,13 @@ export const enUS = {
   'phone.onlyInbox': "Only Ana's phone: the messages {product} sends to the family. Ask {product} on the main page.",
   'phone.empty': 'No messages from {product} yet.',
   // The empty phone says when the family will hear from it (owner decision, 10 Oct).
-  'phone.whenTold': 'Ana gets a message when the storm starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.',
+  'phone.whenTold': 'Ana gets a message when a storm is expected, when it starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.',
   'phone.list': 'Notifications',
   'phone.storm_started': 'Power outage (storm) at home',
   'phone.essential_level': 'Switched to Essential',
   'phone.power_back': 'Power is back at home',
   'phone.last_resort_applied': 'Home battery low: please check in',
+  'phone.storm_prepared': 'Storm expected: the home is ready',
   // The family's replies (queue item 3, #24): a closed set, by touch.
   'phone.replies': 'Reply',
   'phone.onMyWay': "I'm on my way",

@@ -33,11 +33,11 @@ function verdictAt(id: ScenarioId, atH: number, s: { mode: HvacMode; setpointC: 
 const byId = (v: GuardVerdict, id: string) => v.guarantees.find((g) => g.id === id);
 
 describe('storm-blackout: the grid goes down at 15:00 and returns at 06:30', () => {
-  // The scenario's own HVAC (dry 27 °C + fan). Off grid only the EPS circuits draw (150 W besides the safe
-  // room's split, #19): from the scenario's 87.5 % it lasts until the grid is back at 06:30, but dry all night
-  // takes the room under its 40 % humidity minimum. Until 2026-10-01 the whole house drew from the battery in a
-  // blackout and this plan ran it out at about 04:00 instead.
-  const naive = verdictAt('storm-blackout', 3, { mode: 'dry', setpointC: 27, fanOn: true, targetPct: 10 });
+  // Dry 27 °C + fan all night, the scenario's own HVAC until #390 (the script now cools the safe room). Off grid only
+  // the EPS circuits draw (150 W besides the safe room's split, #19): from 87.5 % at the storm start (the battery the
+  // scenario had until #390) it lasts until the grid is back at 06:30, but dry all night takes the room under its 40 %
+  // humidity minimum. Until 2026-10-01 the whole house drew from the battery in a blackout and it ran out at about 04:00.
+  const naive = verdictAt('storm-blackout', 3, { mode: 'dry', setpointC: 27, fanOn: true, targetPct: 10 }, 87.5);
 
   it('refuses the naive plan: dry all night takes the safe room under its humidity minimum', () => {
     expect(byId(naive, 'pacing_on_track')).toMatchObject({ ok: true, reason: 'The energy lasts until the next recharge at 08:00.' });

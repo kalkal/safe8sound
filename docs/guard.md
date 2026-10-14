@@ -49,7 +49,7 @@ Defaults are in `packages/guard/config/guard.json`, validated by `GuardConfigSch
 
 ## Tests
 - Unit tests for each constraint and for the night statuses.
-- The seeded `storm-blackout` scenario: the scenario's own HVAC empties the battery before the 08:00 recharge, so `pacing_on_track` refuses it.
+- The seeded `storm-blackout` scenario: dry at 27 °C with the fan all night (its own HVAC until #390) lasts on 87.5 % but dries the safe room under its humidity minimum, and on 20 % empties the battery before the 08:00 recharge, so `pacing_on_track` refuses it.
 - Property tests with fast-check, 10 000 cases each:
   - no accepted plan breaks the reserve, the inverter or the battery limits;
   - the guard never changes its inputs;

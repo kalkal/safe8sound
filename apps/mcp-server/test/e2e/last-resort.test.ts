@@ -26,6 +26,8 @@ const H = 3_600_000;
 const DEMO = HomeIdSchema.parse('demo');
 const textOf = (r: Record<string, unknown>): string => (r['content'] as { type: string; text: string }[] | undefined)?.[0]?.text ?? '';
 const clock = (iso: string) => new Intl.DateTimeFormat('en-US', { timeZone: demoProfile().location.tz, hour: 'numeric', minute: '2-digit' }).format(Date.parse(iso));
+/** #390: the family reads a time on the day after the storm afternoon (17 July) as tomorrow's. */
+const said = (iso: string) => clock(iso) + (iso.slice(0, 10) > '2026-07-17' ? ' tomorrow' : '');
 
 describe('storm, battery 20 %: the last resort, confirmed twice, tells the family', () => {
   it('runs through MCP: window, actions, two yeses, the alert, and a model plan past the physical limits still refused', async () => {
@@ -107,8 +109,8 @@ describe('storm, battery 20 %: the last resort, confirmed twice, tells the famil
       // #364: the room's time first, the battery's after it, as on the card.
       expect(messages[0]?.text).toContain(
         lr.limitCrossedAt === undefined
-          ? `until ${clock(lr.safeUntil)}, then gets warmer. Please check on them.`
-          : `stays within its limits until about ${clock(lr.limitCrossedAt)} (battery until ${clock(lr.safeUntil)}), then gets warmer. Please check on them.`,
+          ? `until ${said(lr.safeUntil)}, then gets warmer. Please check on them.`
+          : `stays within its limits until about ${said(lr.limitCrossedAt)} (battery until ${said(lr.safeUntil)}), then gets warmer. Please check on them.`,
       );
       expect(JSON.stringify(second)).not.toMatch(/Giulia|phone-/);
 

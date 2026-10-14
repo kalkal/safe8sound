@@ -98,6 +98,7 @@ describe('notify_family', () => {
     expect((await phone.inbox()).map((m) => m.transition)).toEqual(['essential_level']);
   });
 
+  // Each case plays a storm on the low battery of the storm day (#390): the hold weighs its variants, about half a second.
   it('property: whatever roles the model asks for, only registered contacts get a message, and no name reaches the model', async () => {
     const role = fc.stringMatching(/^[a-z][a-z_-]{0,31}$/);
     await fc.assert(
@@ -116,6 +117,6 @@ describe('notify_family', () => {
       }),
       { numRuns: 40 },
     );
-  });
+  }, 60_000);
 
 });

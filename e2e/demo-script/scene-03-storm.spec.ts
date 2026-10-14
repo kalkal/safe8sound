@@ -17,7 +17,7 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await page.goto('/');
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
   await expect(phone.getByText('No messages from Safe-8-Sound yet.')).toBeVisible();
-  const whenTold = phone.getByText('Ana gets a message when the storm starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.');
+  const whenTold = phone.getByText('Ana gets a message when a storm is expected, when it starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.');
   await expect(whenTold).toBeVisible();
 
   await ask(page, "The power's out");

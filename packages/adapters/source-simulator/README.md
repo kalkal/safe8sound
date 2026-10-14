@@ -35,6 +35,9 @@ The 1R1C constants are in K/kW and kWh/K as in the contract.
   afternoon sees the whole night), half-open `[fromH, toH)` windows for grid outages, occupancy (roles only)
   and HVAC settings, and `simulatedGroups`: the field groups the scenario replaces even over a live home.
   `storm-blackout` lists all three groups, so it is always fully simulated.
+  It starts on a 30 % battery and its HVAC holds the safe room as storm mode would (cool at 25 °C, then the 24 °C
+  night limit from 21:00, its optional `essentialAtH`: the judges' clock stops there), and cools the house again
+  when the grid is back (#390). The simulator plays this script, never an applied plan.
 - `locations/<id>.json`, the places: a label, the coordinates rounded to one decimal (a city, never a home),
   the IANA zone, the data `source` (name, URL, licence, retrieval date), a `pvYieldFactor` that scales the sun,
   and for every scenario its real day: the `date`, the hourly outdoor temperature, humidity and irradiance,

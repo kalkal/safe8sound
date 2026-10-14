@@ -36,9 +36,12 @@ export interface StormModeDeps {
   /** Where the module's warn lines go (a device that did not answer); the server's logger. */
   readonly logger: Logger;
   /**
-   * #379: the key that tells the family of this storm start or power back once across containers (the scripted
+   * #379, #390: the key that tells the family of this storm prepared, storm start or power back once across containers (the scripted
    * outage it belongs to), or undefined (the real home and the demo: one detector, nothing to claim). With a key, the
    * alert is claimed in the store together with its session before it is sent (#387), and only the request that claims it sends it.
    */
-  readonly alertKey?: (homeId: HomeId, transition: 'storm_started' | 'power_back', nowMs: number) => string | undefined;
+  readonly alertKey?: (homeId: HomeId, transition: ClaimedTransition, nowMs: number) => string | undefined;
 }
+
+/** The transitions a sandbox claims before it tells the family (#379, #387; the prepared storm since #390). */
+export type ClaimedTransition = 'storm_prepared' | 'storm_started' | 'power_back';
