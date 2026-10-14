@@ -13,23 +13,28 @@ export interface EchoFrameProps {
   aside?: ReactNode;
   /** Above the device, outside its screen: the scenario badge (B1). */
   top?: ReactNode;
+  /** Under the device, outside its screen: the simulated clock (#391). */
+  dock?: ReactNode;
 }
 
-export function EchoFrame({ sky, children, aside, top }: EchoFrameProps) {
+export function EchoFrame({ sky, children, aside, top, dock }: EchoFrameProps) {
   return (
     <div className="echo-stage">
       {top !== undefined && <div className="echo-top">{top}</div>}
-      <div className="echo-device">
-        <div className="echo-screen" data-testid="echo-screen" data-sky={sky}>
-          <div className="sky" aria-hidden="true">
-            {SKIES.map((s) => (
-              <div key={s} className="sky-layer" data-layer={s} data-shown={s === sky} />
-            ))}
-          </div>
-          <div className="echo-scroll">
-            <main className="surface">{children}</main>
+      <div className="echo-column">
+        <div className="echo-device">
+          <div className="echo-screen" data-testid="echo-screen" data-sky={sky}>
+            <div className="sky" aria-hidden="true">
+              {SKIES.map((s) => (
+                <div key={s} className="sky-layer" data-layer={s} data-shown={s === sky} />
+              ))}
+            </div>
+            <div className="echo-scroll">
+              <main className="surface">{children}</main>
+            </div>
           </div>
         </div>
+        {dock}
       </div>
       {aside}
     </div>

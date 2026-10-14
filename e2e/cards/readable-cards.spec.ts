@@ -1,7 +1,7 @@
 import type { FrameLocator, Page } from '@playwright/test';
 import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
-import { openRemote } from '../remote-session.js';
+import { openRemote, routeSandboxTools } from '../remote-session.js';
 import { expectScreenSettled } from '../screen-settled.js';
 
 // Owner, 12 Oct (dev site, 1920 × 1080): under "I can keep Grandpa's room under 27 degrees…", with the battery and the
@@ -25,6 +25,7 @@ async function askAsTheOwnerDid(page: Page, italian = false): Promise<void> {
     cards,
   };
   await page.route('**/sim-api/v1/turns', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) }));
+  await routeSandboxTools(page);
   await openRemote(page, italian);
   await page.getByLabel(italian ? 'Fai una domanda' : 'Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
   await page.getByRole('button', { name: italian ? 'Chiedi' : 'Ask' }).click();
@@ -94,6 +95,8 @@ for (const [width, height, large] of [
   [960, 480, false],
 ] as const) {
   test(`at ${String(width)} × ${String(height)} the owner's answer keeps the plan and the preferences readable on every page`, async ({ page }) => {
+    // Walks every page of two cards: slow on an old PC, and now with the clock's tool calls on top.
+    test.setTimeout(60_000);
     await page.setViewportSize({ width, height });
     await askAsTheOwnerDid(page);
     for (const [tab, title] of [

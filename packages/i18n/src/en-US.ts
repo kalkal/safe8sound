@@ -113,10 +113,11 @@ export const enUS = {
   // The simulated clock (owner decision, 10 Oct; time pack, 12 Oct): any visitor skips to the next moment of the day.
   'clock.label': 'Simulated time',
   'clock.badge': 'SIMULATED',
-  'clock.badgeShort': 'SIM',
   'clock.next': 'Next: {moment} at {time}',
   'clock.nothingNext': 'Nothing more to skip to today.',
   'clock.skip': 'Skip ahead',
+  'clock.skipTo': 'Go to {time} · {moment}',
+  'clock.skipToShort': 'Go to {time}',
   'clock.skipUtterance': 'Jump to the next moment',
   'clock.moving': 'Moving the clock…',
   'clock.failed': "The clock didn't move. Try again.",

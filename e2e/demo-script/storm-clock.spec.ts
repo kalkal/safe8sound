@@ -29,7 +29,7 @@ test('Power cut → the grid goes down and Ana is told; Skip ahead → Essential
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toBeVisible();
   await expect(page.getByTestId('echo-screen')).toHaveAttribute('data-sky', 'storm');
 
-  await clock.getByRole('button', { name: /Skip ahead/ }).click();
+  await clock.getByRole('button', { name: /^Go to [0-9][0-9]:[0-9][0-9] · the battery reaches the essential level/ }).click();
   await expect(clock.getByRole('status')).toHaveText('Now: the battery reaches the essential level.');
   await expect(phone.getByRole('article', { name: 'Switched to Essential' })).toBeVisible();
 
@@ -42,7 +42,7 @@ test('Power cut → the grid goes down and Ana is told; Skip ahead → Essential
   await expect(clock.getByRole('button', { name: /Skip ahead/ })).toBeDisabled();
 });
 
-test('the clock sits beside the badge above the screen, on every Echo size and on a phone; nothing scrolls', async ({ page }) => {
+test('the clock is a big dock under the Echo frame, on every Echo size and on a phone; nothing scrolls sideways', async ({ page }) => {
   for (const size of [
     { width: 960, height: 480 },
     { width: 1280, height: 800 },
@@ -53,17 +53,21 @@ test('the clock sits beside the badge above the screen, on every Echo size and o
     await page.setViewportSize(size);
     await page.goto('/');
     const clock = clockOf(page);
-    await expect(clock.getByRole('button', { name: /Skip ahead/ })).toBeVisible();
-    const badge = await page.getByRole('button', { name: /SCENARIO/ }).boundingBox();
+    const skip = clock.getByRole('button', { name: /Skip ahead|^Go to / });
+    await expect(skip).toBeVisible();
+    await expect(skip).toBeInViewport();
     const box = await clock.boundingBox();
-    const middle = (b: typeof box) => (b?.y ?? 0) + (b?.height ?? 0) / 2;
-    expect(Math.abs(middle(badge) - middle(box)), `${label} one row`).toBeLessThan(4);
+    const button = await skip.boundingBox();
+    expect(button?.height ?? 0, `${label} big target`).toBeGreaterThanOrEqual(48);
     expect((box?.x ?? 0) + (box?.width ?? 0), `${label} inside`).toBeLessThanOrEqual(size.width);
     // String expressions: the e2e tsconfig has no DOM types.
     expect(await page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), `${label} no side scroll`).toBe(true);
-    // The screen starts under the top row, whole, with the question field in the first view.
+    // Under the screen (on a phone it rests on the screen's empty bottom padding, up to 24 px); the question field stays in view.
     const screen = await page.getByTestId('echo-screen').boundingBox();
-    expect(screen?.y ?? 0, `${label} under the clock`).toBeGreaterThanOrEqual((box?.y ?? 0) + (box?.height ?? 0));
+    expect(box?.y ?? 0, `${label} under the screen`).toBeGreaterThanOrEqual((screen?.y ?? 0) + (screen?.height ?? 0) - 24);
+    // The time is large and marked SIMULATED.
+    expect((await clock.locator('time').boundingBox())?.height ?? 0, `${label} large time`).toBeGreaterThanOrEqual(28);
+    await expect(clock).toContainText('SIMULATED');
     await expect(page.getByLabel('Ask a question')).toBeInViewport();
   }
 });

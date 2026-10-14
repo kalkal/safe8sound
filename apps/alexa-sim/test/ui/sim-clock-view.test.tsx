@@ -11,20 +11,20 @@ afterEach(() => {
 });
 
 // The simulated clock above the device (time pack, 12 Oct): the time marked SIMULATED, one line on what happened or
-// what comes next, and one quiet "Skip ahead" button, disabled while it moves or with nothing ahead.
+// what comes next, and one big button that says where it goes ("Skip ahead" when it cannot), disabled while it moves or with nothing ahead.
 
 const AHEAD: ClockState = { now: '2026-07-18T12:00:00+02:00', next: { kind: 'storm_start', at: '2026-07-18T15:00:00+02:00', label: 'The storm starts: the grid goes down' } };
 
 describe('SimClock', () => {
-  it('says the simulated time and the next moment; Skip ahead is a quiet button that skips', () => {
+  it('says the simulated time and the next moment; the big button names its target and skips', () => {
     const onSkip = vi.fn();
     render(<SimClock state={AHEAD} busy={false} onSkip={onSkip} />);
     const clock = screen.getByRole('group', { name: 'Simulated time' });
     expect(clock.textContent).toContain('SIMULATED');
     expect(clock.querySelector('time')?.textContent).toBe('12:00');
     expect(within(clock).getByRole('status').textContent).toBe('Next: the grid goes down at 15:00');
-    const skip = within(clock).getByRole('button', { name: /Skip ahead/ });
-    // Quiet: a chip, never the bright `.button` (one bright action per screen).
+    const skip = within(clock).getByRole('button', { name: 'Go to 15:00 · the grid goes down' });
+    // A chip, never the bright `.button` (one bright action per screen).
     expect(skip.classList.contains('button')).toBe(false);
     fireEvent.click(skip);
     expect(onSkip).toHaveBeenCalledOnce();
@@ -43,7 +43,7 @@ describe('SimClock', () => {
 
   it('disabled while moving and with nothing ahead, and says why', () => {
     const { rerender } = render(<SimClock state={AHEAD} busy onSkip={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /Skip ahead/ })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: /Go to 15:00/ })).toHaveProperty('disabled', true);
     expect(screen.getByRole('status').textContent).toBe('Moving the clock…');
     rerender(<SimClock state={{ now: AHEAD.now }} busy={false} onSkip={vi.fn()} />);
     expect(screen.getByRole('button', { name: /Skip ahead/ })).toHaveProperty('disabled', true);
@@ -52,9 +52,11 @@ describe('SimClock', () => {
 
   it('in Italian', () => {
     setLocale('it-IT');
-    render(<SimClock state={AHEAD} busy={false} onSkip={vi.fn()} />);
+    const { rerender } = render(<SimClock state={AHEAD} busy={false} onSkip={vi.fn()} />);
     expect(screen.getByRole('group', { name: 'Ora simulata' }).textContent).toContain('SIMULATO');
-    expect(screen.getByRole('button', { name: /Vai avanti/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Vai alle 15:00 · la rete si spegne/ })).toBeTruthy();
     expect(screen.getByRole('status').textContent).toBe('Prossimo: la rete si spegne alle 15:00');
+    rerender(<SimClock state={{ now: AHEAD.now }} busy={false} onSkip={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Vai avanti/ })).toHaveProperty('disabled', true);
   });
 });

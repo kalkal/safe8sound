@@ -36,7 +36,7 @@ test('Power cut → the simulated grid goes down and Ana is told; Skip ahead to 
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toBeVisible({ timeout: 20_000 });
 
   // Skip ahead until the day has no moment left; each skip says where it went.
-  const skip = clock.getByRole('button', { name: /Skip ahead/ });
+  const skip = clock.getByRole('button');
   const reached: string[] = [];
   for (let i = 0; i < 6 && (await skip.isEnabled()); i++) {
     const status = clock.getByRole('status');

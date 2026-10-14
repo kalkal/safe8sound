@@ -25,7 +25,7 @@ import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { useHomePanel } from './ui/HomePanel.js';
 import { ReserveClock } from './ui/ReserveClock.js';
 import { SimClock, type ClockNote } from './ui/SimClock.js';
-import { cutThePower, isPowerCut, planIdOf, readClock, skipAhead, type ClockState } from './ui/sim-clock.js';
+import { clockTime, cutThePower, isPowerCut, planIdOf, readClock, skipAhead, type ClockState } from './ui/sim-clock.js';
 import { isAppliedPlan } from './ui/steps.js';
 import { fetchReserve } from './ui/reserve.js';
 import { SHIPPED_PLACES, applyChange, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario, type DemoSettingsView } from './ui/demo-settings.js';
@@ -316,10 +316,11 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [onSettingsChange],
   );
+  // The simulated clock sits under the Echo frame, big (#391): the top bar's pill was not noticed.
+  const clockDock = hasSandbox && clock !== undefined ? <SimClock state={clock} busy={clockBusy} onSkip={onSkip} {...(clockNote === undefined ? {} : { note: clockNote })} /> : undefined;
   const settingsControl = (
     <>
       <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} locale={locale} onLocale={onLocale} />
-      {hasSandbox && clock !== undefined && <SimClock state={clock} busy={clockBusy} onSkip={onSkip} {...(clockNote === undefined ? {} : { note: clockNote })} />}
       {/* The language icon at the top (owner, 10 Oct), at the end of the row, quiet beside the badge. */}
       <LanguageToggle locale={locale} onLocale={onLocale} />
     </>
@@ -331,7 +332,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     </ErrorBoundary>
   );
   return (
-    <EchoFrame sky={sky} aside={phonePanel} top={settingsControl}>
+    <EchoFrame sky={sky} aside={phonePanel} top={settingsControl} {...(clockDock === undefined ? {} : { dock: clockDock })}>
       <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', place: demoSettings?.locationId, onCardAction }}>
         <QueryClientProvider client={queryClient}>
           <Conversation
@@ -343,8 +344,10 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
             onAnswer={onAnswer}
             examples={examples}
             commands={[
-              // The clock's button, said or typed (idea 4), while it has a moment to skip to.
-              ...(hasSandbox && clock?.next !== undefined && !clockBusy ? [{ id: 'clock_skip', phrases: [t('clock.skip'), t('clock.skipUtterance')], run: onSkip }] : []),
+              // The clock's button, said or typed (idea 4), while it has a moment to skip to: what is written on it can be said ("Go to 21:10").
+              ...(hasSandbox && clock?.next !== undefined && !clockBusy
+                ? [{ id: 'clock_skip', phrases: [t('clock.skip'), t('clock.skipUtterance'), t('clock.skipToShort', { time: clockTime(clock.next.at) }), t('clock.skipTo', { time: clockTime(clock.next.at), moment: t(`clock.kind.${clock.next.kind}`) })], run: onSkip }]
+                : []),
               { id: 'home_show', phrases: [t('home.show')], run: homePanel.open },
               { id: 'home_hide', phrases: [t('home.hide')], run: homePanel.close },
               { id: 'theme_light', phrases: [t('theme.toggle')], run: () => {

@@ -463,7 +463,7 @@
   }
 
   .echo-stage:has(> .echo-top) .echo-screen {
-    block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-6));
+    block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-6) - var(--dock-h, 0px));
   }
 
   .echo-scroll {
@@ -569,7 +569,7 @@
       /* A containing block for fixed children: a card at full screen covers the screen, not the window. */
       transform: translateZ(0);
       /* 16:10 like the Echo Show 15, as large as the window allows. */
-      inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5) * 1.6), 80rem);
+      inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px)) * 1.6), 80rem);
       block-size: auto;
       aspect-ratio: 16 / 10;
       /* Keeps the 16:10 box whatever the content: the content scrolls inside it. */
@@ -579,7 +579,7 @@
 
     /* With the scenario badge above the device, its row comes out of the screen's height (B1). */
     .echo-stage:has(> .echo-top) .echo-screen {
-      inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5 - var(--target-min) - var(--space-3)) * 1.6), 80rem);
+      inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px) - var(--target-min) - var(--space-3)) * 1.6), 80rem);
       block-size: auto;
     }
 
@@ -596,11 +596,11 @@
     }
 
     .echo-screen {
-      inline-size: min(calc(100vw - 24rem - var(--space-6) * 8), calc((100dvh - var(--space-6) * 5) * 1.6), 80rem);
+      inline-size: min(calc(100vw - 24rem - var(--space-6) * 8), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px)) * 1.6), 80rem);
     }
 
     .echo-stage:has(> .echo-top) .echo-screen {
-      inline-size: min(calc(100vw - 24rem - var(--space-6) * 8), calc((100dvh - var(--space-6) * 5 - var(--target-min) - var(--space-3)) * 1.6), 80rem);
+      inline-size: min(calc(100vw - 24rem - var(--space-6) * 8), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px) - var(--target-min) - var(--space-3)) * 1.6), 80rem);
     }
   }
 }
@@ -648,7 +648,7 @@
     }
 
     .echo-stage:has(> .echo-top) .echo-screen {
-      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-2));
+      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-2) - var(--dock-h, 0px));
     }
 
     .echo-screen .surface {
@@ -978,7 +978,7 @@
 
   /* Where the note or the simulated clock shares the row with a long badge, the badge shows the scenario alone so they fit. */
   @media (width < 80rem) {
-    .echo-top:has(> .language-top-note, > .sim-clock) .badge-long {
+    .echo-top:has(> .language-top-note) .badge-long {
       position: absolute;
       overflow: hidden;
       inline-size: 1px;
@@ -987,7 +987,7 @@
       white-space: nowrap;
     }
 
-    .echo-top:has(> .language-top-note, > .sim-clock) .badge-short {
+    .echo-top:has(> .language-top-note) .badge-short {
       display: inline;
     }
   }
@@ -1045,7 +1045,7 @@
     }
 
     .echo-stage:has(> .echo-top > .language-top-note) .echo-screen {
-      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-1) - var(--space-4) - var(--space-1));
+      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-1) - var(--space-4) - var(--space-1) - var(--dock-h, 0px) - var(--space-4));
     }
   }
 
@@ -1070,89 +1070,193 @@
     white-space: nowrap;
   }
 
-  /* The clock's line gives way first: the language note beside it is read in full. */
-  .sim-clock {
-    display: flex;
-    flex: 0 1000 auto;
-    align-items: center;
-    gap: var(--space-2);
-    box-sizing: border-box;
-    min-inline-size: 0;
-    min-block-size: var(--target-min);
-    padding-inline-start: var(--space-3);
-    /* An outline drawn inside, not a border: the pill stays one target high around its 48 px button. */
-    outline: var(--border-thin) solid var(--surface-card-line);
-    outline-offset: calc(var(--border-thin) * -1);
-    border-radius: var(--radius-pill);
-    background: var(--surface-card-raised);
-    color: var(--text-primary);
-    font-size: var(--font-size-min);
+  /* The simulated clock under the Echo frame (#391; the pill in the top bar went unseen): the time large with its
+     SIMULATED mark, one big button that says where it goes, and the line on what happened or why it cannot move.
+     The dock is paid for with the frame's chrome (padding, bezel), never with the Echo screen, which keeps its size:
+     on a laptop-sized window --dock-h is 0; on a small Echo and a phone it is the little the chrome cannot give. */
+  .echo-stage:has(.sim-dock) {
+    --dock-btn: 4rem;
+    /* The button and its gap, less the top row's padding it takes back (below). */
+    --dock-h: calc(var(--dock-btn) + var(--space-2) - var(--space-3));
   }
 
-  .sim-clock-time {
+  .echo-stage:has(.sim-dock) > .echo-top {
+    padding-block-start: 0;
+  }
+
+  .echo-column {
+    display: grid;
+    justify-items: stretch;
+    gap: var(--space-2);
+    min-inline-size: 0;
+  }
+
+  .sim-dock {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "time button";
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 80rem;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-card);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+  }
+
+  .sim-dock-time {
+    grid-area: time;
+    display: grid;
+    justify-items: start;
     font-family: var(--font-data);
+    line-height: 1.1;
     white-space: nowrap;
 
     & time {
+      font-size: calc(var(--font-size-lead) * 1.4);
       font-weight: var(--font-weight-bold);
     }
   }
 
-  .sim-clock-badge {
+  .sim-dock-badge {
     color: var(--text-secondary);
+    font-size: var(--font-size-min);
+    letter-spacing: 0.08em;
   }
 
-  /* The short mark is the phone's (below). */
-  .sim-clock-short {
-    display: none;
+  .sim-dock-skip {
+    grid-area: button;
+    box-sizing: border-box;
+    min-inline-size: 0;
+    block-size: calc(var(--dock-btn) - var(--space-2));
+    padding-inline: var(--space-4);
+    border: calc(var(--border-thin) * 2) solid var(--accent);
+    background: var(--surface-card);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-bold);
+    text-align: start;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+
+    &:hover:not(:disabled) {
+      background: var(--surface-card-raised);
+    }
   }
 
-  .sim-clock-note {
+  /* The words give way (two lines, then an ellipsis); the full target stays in the button's name. */
+  .sim-dock-words {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     min-inline-size: 0;
     overflow: hidden;
-    color: var(--text-secondary);
-    text-overflow: ellipsis;
+    line-height: 1.25;
+  }
+
+  /* A phone: the line stays for screen readers (and is said); the button's words are what the eye needs. */
+  .sim-dock-note {
+    position: absolute;
+    overflow: hidden;
+    inline-size: 1px;
+    block-size: 1px;
+    clip-path: inset(50%);
     white-space: nowrap;
   }
 
-  .sim-clock-skip {
-    flex: none;
-    font-size: var(--font-size-min);
+  /* A small Echo and a phone: one compact 48 px row (the time and the button, whose words shorten with an ellipsis).
+     It takes back the top row's padding and rests on 20 px of the screen's bottom padding (empty), so the screen keeps
+     its height and the cubes and the big time stay in the first view. */
+  @media (width < 64rem) {
+    .echo-stage:has(.sim-dock) {
+      --dock-btn: 3rem;
+      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-4) - var(--space-1));
+    }
+
+    .echo-column {
+      gap: 0;
+    }
+
+    .sim-dock {
+      position: relative;
+      margin-block-start: calc((var(--space-4) + var(--space-1)) * -1);
+      padding-block: 0;
+    }
+
+    .sim-dock-skip {
+      block-size: var(--target-min);
+    }
   }
 
-  /* A phone: the clock stays on the badge's row (the screen and its ice cubes keep their place): "SIM", the time and
-     the button's arrows; SIMULATED, the line and the button's words stay for screen readers (and can be said). */
+  /* A short landscape Echo (960 × 480) has no gap above the screen, and its dock rests on 24 px of the screen's bottom padding. */
+  @media (width >= 56rem) and (width < 64rem) and (height < 40rem) {
+    .echo-stage:has(.sim-dock) {
+      row-gap: 0;
+      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-6) - var(--space-2));
+    }
+
+    .sim-dock {
+      margin-block-start: calc(var(--space-6) * -1);
+    }
+  }
+
+  /* A phone gives back 16 px of the gap above the screen. */
   @media (width < 48rem) {
-    .sim-clock {
-      flex: none;
-      gap: var(--space-1);
+    .echo-stage:has(.sim-dock) {
+      row-gap: var(--space-2);
+      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-4) - var(--space-1) - var(--space-4));
+    }
+  }
+
+  /* From a small Echo up there is room for the line beside the button. */
+  @media (width >= 48rem) {
+    .sim-dock {
+      grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr);
+      grid-template-areas: "time button note";
     }
 
-    /* The badge takes what the clock and the icon leave (cut with an ellipsis): the row never wraps for it. */
-    .echo-top:has(> .sim-clock) > .scenario-badge {
-      flex: 1 1 0;
-      max-inline-size: max-content;
+    .sim-dock-skip {
+      font-size: var(--font-size-lead);
     }
 
-    .sim-clock-long,
-    .sim-clock-note,
-    .sim-clock-words {
-      position: absolute;
+    .sim-dock-note {
+      grid-area: note;
+      position: static;
+      inline-size: auto;
+      block-size: auto;
+      min-inline-size: 0;
+      clip-path: none;
       overflow: hidden;
-      inline-size: 1px;
-      block-size: 1px;
-      clip-path: inset(50%);
-      white-space: nowrap;
+      color: var(--text-secondary);
+      font-size: var(--font-size-min);
+      line-height: 1.25;
+      white-space: normal;
+    }
+  }
+
+  @media (width >= 48rem) and (height < 40rem) {
+    .sim-dock-skip {
+      font-size: var(--font-size-body);
+    }
+  }
+
+  /* A laptop-sized window and up: the chrome gives the dock its room, the screen keeps its size. */
+  @media (width >= 64rem) {
+    .echo-column {
+      justify-items: center;
     }
 
-    /* "SIM" stays in sight: the time never looks like the real hour (review of #378). */
-    .sim-clock-short {
-      display: inline;
+    .echo-stage:has(.sim-dock) {
+      --dock-h: 0px;
+      padding: var(--space-1) var(--space-6);
     }
 
-    .sim-clock-skip {
-      min-inline-size: var(--target-min);
-      padding-inline: var(--space-2);
+    .echo-stage:has(.sim-dock) .echo-device {
+      padding: var(--space-3);
     }
   }
 

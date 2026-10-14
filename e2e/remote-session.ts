@@ -16,3 +16,29 @@ export async function openRemote(page: Page, italian = false): Promise<void> {
   await page.getByRole('button', { name: italian ? 'Inizia' : 'Start' }).click();
   await expect(page.getByLabel(italian ? 'Fai una domanda' : 'Ask a question')).toBeVisible();
 }
+
+/**
+ * Makes the remote home a visitor sandbox for the page: its settings and one moment ahead, so the simulated clock's dock
+ * is on screen (as on the deployed site). Any other tool call is refused, as on a plain home.
+ */
+export async function routeSandboxTools(page: Page): Promise<void> {
+  await page.route('**/sim-api/v1/tools/call', (route) => {
+    const { name } = route.request().postDataJSON() as { name: string };
+    const answer = (structuredContent: unknown) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: 'ok' }], structuredContent }) });
+    if (name === 'get_demo_settings') {
+      return answer({
+        settings: { version: 1, updatedAt: '2026-07-15T14:00:00+02:00', scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' },
+        place: { id: 'reference', label: 'Reference home (central Italy)', tz: 'Europe/Rome' },
+      });
+    }
+    if (name === 'get_milestones') {
+      return answer({
+        now: '2026-07-15T14:00:00+02:00',
+        day: { from: '2026-07-15T14:00:00+02:00', to: '2026-07-16T14:00:00+02:00' },
+        milestones: [{ kind: 'storm_start', at: '2026-07-15T19:00:00+02:00', label: 'The storm starts: the grid goes down' }],
+      });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isError: true, content: [{ type: 'text', text: 'No settings.' }] }) });
+  });
+}
