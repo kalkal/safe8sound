@@ -7,12 +7,12 @@ export const DEMO_CODE = 'e2e-demo-code-0001';
 export const DEMO_TOKEN = 'e2e.demo.token';
 
 /** Opens the simulator in remote mode and enters the demo code, so the question field is ready. */
-export async function openRemote(page: Page): Promise<void> {
+export async function openRemote(page: Page, italian = false): Promise<void> {
   await page.route('**/sim-api/v1/session', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: DEMO_TOKEN, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }) }),
   );
   await page.goto('/?agent=remote');
-  await page.getByLabel('Demo code').fill(DEMO_CODE);
-  await page.getByRole('button', { name: 'Start' }).click();
-  await expect(page.getByLabel('Ask a question')).toBeVisible();
+  await page.getByLabel(italian ? 'Codice demo' : 'Demo code').fill(DEMO_CODE);
+  await page.getByRole('button', { name: italian ? 'Inizia' : 'Start' }).click();
+  await expect(page.getByLabel(italian ? 'Fai una domanda' : 'Ask a question')).toBeVisible();
 }

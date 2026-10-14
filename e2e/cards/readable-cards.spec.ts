@@ -12,7 +12,7 @@ import { expectScreenSettled } from '../screen-settled.js';
 const OWNER_TEXT = "I can keep Grandpa's room under 27 degrees and still hold 6 kWh for a storm. Shall I start?";
 
 /** The owner's answer: the words, the battery and two cards (Preferences, Plan), as the remote agent sends it. */
-async function askAsTheOwnerDid(page: Page): Promise<void> {
+async function askAsTheOwnerDid(page: Page, italian = false): Promise<void> {
   await page.goto('/');
   // The same tool results the script shows, from the dev server (the card fixtures, parsed by the contract schemas).
   const cards = await page.evaluate(async (path) => {
@@ -25,9 +25,9 @@ async function askAsTheOwnerDid(page: Page): Promise<void> {
     cards,
   };
   await page.route('**/sim-api/v1/turns', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) }));
-  await openRemote(page);
-  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
-  await page.getByRole('button', { name: 'Ask' }).click();
+  await openRemote(page, italian);
+  await page.getByLabel(italian ? 'Fai una domanda' : 'Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await page.getByRole('button', { name: italian ? 'Chiedi' : 'Ask' }).click();
   await expect(page.getByTestId('battery-soc')).toHaveText('100%');
 }
 
@@ -117,5 +117,29 @@ for (const [width, height, large] of [
     const card = page.frameLocator('iframe[title="Plan card"]');
     await expect(card.getByTestId('plan-horizon')).toBeVisible();
     await expectEveryPageReadable(page, card, large);
+  });
+}
+
+// #385: in Italian at 960 × 480 the "Prova a dire" row wrapped, the card got shorter and its sticky button row covered
+// the big time. The big time is whole and not under the row of "valid until" and the buttons, in both languages.
+for (const italian of [false, true]) {
+  test(`at 960 × 480${italian ? ' in Italian' : ''} the plan's big time is not covered by the sticky button row (#385)`, async ({ page }) => {
+    await page.setViewportSize({ width: 960, height: 480 });
+    if (italian) {
+      await page.addInitScript(() => {
+        globalThis.localStorage.setItem('cold-reserve.locale', 'it-IT');
+      });
+    }
+    await askAsTheOwnerDid(page, italian);
+    await page.getByRole('tab', { name: italian ? 'Piano' : 'Plan' }).click();
+    const card = page.frameLocator(`iframe[title="${italian ? 'Scheda del piano' : 'Plan card'}"]`);
+    const time = card.getByTestId('plan-horizon');
+    await expect(time).toBeVisible();
+    await expectScreenSettled(page);
+    const frame = await card.locator('.fit').boundingBox();
+    const timeBox = await time.boundingBox();
+    const rowBox = await card.locator('.plan-actions').boundingBox();
+    expect(inside(timeBox, frame), 'the big time whole inside the frame').toBe(true);
+    expect(timeBox !== null && rowBox !== null && timeBox.y + timeBox.height <= rowBox.y + 0.5, 'the big time ends above the sticky row').toBe(true);
   });
 }

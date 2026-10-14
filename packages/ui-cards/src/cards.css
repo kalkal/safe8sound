@@ -140,6 +140,32 @@
       }
     }
 
+    /* The ordinary plan's first page (#385): the label, the confidence and its reason all beside the time, so the hero is
+       as high as the time alone and the page fits whole beside its button row. A taller hero cut the page, and the
+       sticky button row then covered the big time. */
+    & .plan-hero:has(> .chip) {
+      grid-template-columns: auto auto minmax(0, 1fr);
+
+      & > .eyebrow {
+        grid-row: 1;
+        grid-column: 2 / -1;
+      }
+
+      & > .hero-value {
+        grid-row: 1 / span 2;
+      }
+
+      & > .chip {
+        grid-row: 2;
+        grid-column: 2;
+      }
+
+      & > .muted {
+        grid-row: 2;
+        grid-column: 3;
+      }
+    }
+
     & .plan-actions p {
       flex-basis: auto;
     }

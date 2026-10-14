@@ -715,13 +715,34 @@
   /* A landscape Echo screen: what to say and the question side by side, so the content band keeps the height. */
   @media (width >= 56rem) {
     .echo-screen .band-actions {
-      /* The examples take what they need; the question row (field, Ask, Speak) keeps room to type: long examples wrap. */
+      /* The examples take what they need; the question row (field, Ask, Speak) keeps room to type: long examples end with an ellipsis. */
       grid-template-columns: minmax(0, max-content) minmax(28rem, 1fr);
       align-items: center;
       column-gap: var(--space-4);
 
       & > :not(.try-row, .ask-row) {
         grid-column: 1 / -1;
+      }
+
+      /* One line, in every language (#385): a wrapped "Try saying" row made the actions band taller, so the card above
+         was cut shorter and its sticky button row covered the big time. A long example gives way with an ellipsis. */
+      & .try-row,
+      & .examples {
+        flex-wrap: nowrap;
+        min-inline-size: 0;
+      }
+
+      & .try-saying {
+        flex: none;
+        white-space: nowrap;
+      }
+
+      & .examples .chip-button {
+        min-inline-size: 0;
+        padding-inline: var(--space-3);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
 
