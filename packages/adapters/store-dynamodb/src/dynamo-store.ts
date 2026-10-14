@@ -289,11 +289,27 @@ class DynamoStateStore implements StateStore {
     });
   }
 
-  claimStormAlert(key: string) {
-    return this.#run('claimStormAlert', async () => {
+  claimStormSession(session: StormSession, key: string) {
+    return this.#run('claimStormSession', async () => {
       if (key.length === 0) fail(toolError('invalid_input', 'A storm alert claim needs a key.', { details: { field: 'key' } }));
-      // SK = ALERT#<key>, one conditional put: of two containers at once, only one writes it.
-      const outcome = await this.#table.put(this.#item(`${this.#play}ALERT#${key}`, { key }, this.#retainedFor(this.#ttl.stormSessionDays)), [{ attr: 'PK', op: 'not_exists' }]);
+      if (session.homeId !== this.homeId) {
+        fail(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } }));
+      }
+      // SK = ALERT#<key> and the session, in one transaction conditional on the claim: of two containers at once, only
+      // one writes them, and a claim never stands without its session (#387).
+      const retained = this.#retainedFor(this.#ttl.stormSessionDays);
+      const claim = this.#item(`${this.#play}ALERT#${key}`, { key }, retained);
+      const write = () => this.#table.transactPut([claim, this.#item(`${this.#play}${stormKey(session)}`, session, retained)], [[{ attr: 'PK', op: 'not_exists' }], []]);
+      let outcome = await write();
+      if (outcome === 'conflict') {
+        // Two claims in flight at once: DynamoDB may cancel this one for the other (TransactionConflict) instead of
+        // failing its condition. Let the other land, then read the claim (a consistent read): written with its session,
+        // this claim is lost; not there (the other failed too), one more try.
+        await new Promise((resolve) => setTimeout(resolve, CLAIM_CONFLICT_PAUSE_MS));
+        if ((await this.#table.get(this.#pk, claim.SK)) !== undefined) return false;
+        outcome = await write();
+        if (outcome === 'conflict') throw claimConflict();
+      }
       return outcome === 'ok';
     });
   }
@@ -385,6 +401,13 @@ class DynamoStateStore implements StateStore {
     }
   }
 }
+
+/** How long a storm claim cancelled by a concurrent one waits before it reads who won (review of #387). */
+const CLAIM_CONFLICT_PAUSE_MS = 150;
+
+/** A storm claim cancelled twice by concurrent writes: transient, so store_unavailable (the next request claims again). */
+const claimConflict = () =>
+  Object.assign(new Error('A storm claim was cancelled twice by concurrent writes.'), { name: 'TransactionCanceledException', CancellationReasons: [{ Code: 'TransactionConflict' }] });
 
 /** Throttling and capacity errors: DynamoDB asks the caller to slow down and retry. */
 const TRANSIENT_NAMES = new Set(['ThrottlingException', 'ProvisionedThroughputExceededException', 'RequestLimitExceeded', 'TimeoutError', 'NetworkingError']);

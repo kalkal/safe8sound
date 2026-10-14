@@ -225,6 +225,67 @@ describe('sandbox settings on the Lambda entry: two containers, one table', () =
     expect(await started()).toBe(1);
   });
 
+  // #387: two containers on one table, each store wrapped (a late session read, a failing save).
+  const stormContainers = async (wrap: (seed: number, name: string, call: () => Promise<unknown>) => Promise<unknown>) => {
+    const table = createFakeTable();
+    const container = (seed: number) => {
+      const wall = settableClock(WALL);
+      const real = dynamoStateStoreFactory({ table, clock: wall, rng: seededRng(seed) });
+      const wrapped: typeof real = (home, scope) =>
+        new Proxy(real(home, scope), {
+          get: (target, key) => {
+            const value: unknown = Reflect.get(target, key);
+            if (typeof value !== 'function') return value;
+            const bound = (value as (...args: unknown[]) => unknown).bind(target);
+            return (...args: unknown[]) => wrap(seed, String(key), () => Promise.resolve(bound(...args)));
+          },
+        });
+      const app = createLambdaApp({ ...ENV, MCP_SCENARIO_ANCHOR: 'daily' }, { wallClock: wall, logger: memoryLogger(), storeFor: wrapped });
+      if (!app.ok) throw new Error(app.error.message);
+      return app.value;
+    };
+    const one = await (await serve(container(1)))(A);
+    const two = await (await serve(container(2)))(A);
+    // The storm day at 10:00: the grid has been down since 03:00. The daughter is registered in the app.
+    expect((await one.call('set_scenario', { scenarioId: 'storm-blackout' })).isError).not.toBe(true);
+    await dynamoStateStoreFactory({ table, clock: settableClock(WALL), rng: seededRng(9) })(HomeIdSchema.parse(A)).putPreferences(preferences, []);
+    const items = async (kind: string) => (await table.query(`HOME#${A}`, '')).filter((i) => i.SK.includes(kind));
+    const started = async () => (await items('INBOX#')).filter((i) => JSON.stringify(i).includes('storm_started')).length;
+    const sessionOf = (r: Record<string, unknown>) => (r['structuredContent'] as { session?: { id: string; phase: string } } | undefined)?.session;
+    return { one, two, items, started, sessionOf };
+  };
+
+  it('a container that stops after claiming the storm start leaves the session open: the next request finds it (#387)', async () => {
+    const down = toolError('store_unavailable', 'Down.');
+    // Container 1 claims the alert and tells the family, then its session save fails (a DynamoDB error, a timeout).
+    const t = await stormContainers((seed, name, call) => (seed === 1 && name === 'saveStormSession' ? Promise.resolve({ ok: false, error: down }) : call()));
+    expect((await t.one.call('get_home_status')).isError).not.toBe(true);
+    expect(await t.started()).toBe(1);
+    expect(await t.items('STORM#')).toHaveLength(1);
+    // The other container's storm request finds the storm open: no "left no open session", no second alert.
+    const asked = await t.two.call('start_storm_mode', { mode: 'active' });
+    expect(asked.isError).not.toBe(true);
+    expect(t.sessionOf(asked)?.phase).toBe('active');
+    expect(await t.started()).toBe(1);
+    expect(await t.items('STORM#')).toHaveLength(1);
+  });
+
+  it('two containers asking for the storm at once both get the one session, and the family is told once (#387)', async () => {
+    // Both read "no storm yet" before either writes: both detect the storm start at once.
+    const t = await stormContainers(async (_seed, name, call) => {
+      const out = await call();
+      if (name === 'getLatestStormSession') await new Promise((r) => setTimeout(r, 150));
+      return out;
+    });
+    const both = await Promise.all([t.one.call('start_storm_mode', { mode: 'active' }), t.two.call('start_storm_mode', { mode: 'active' })]);
+    expect(both.map((r) => r.isError === true)).toEqual([false, false]);
+    const ids = both.map((r) => t.sessionOf(r)?.id);
+    expect(ids[0]).toBeDefined();
+    expect(ids[1]).toBe(ids[0]);
+    expect(await t.items('STORM#')).toHaveLength(1);
+    expect(await t.started()).toBe(1);
+  });
+
   it('°F chosen through one container is said by the other: the plan, the preferences and an unconverted number (#306, #324)', async () => {
     const table = createFakeTable();
     const container = (seed: number) => {

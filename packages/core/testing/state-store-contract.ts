@@ -178,15 +178,27 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
         expect(await store.getLatestStormSession()).toEqual({ ok: true, value: second });
       });
 
-      it('claims a storm alert once (#379): of two store clients at once only one wins; another key or home is free', async () => {
+      it('claims a storm alert once with its session (#379, #387): of two store clients at once only one writes; another key or home is free', async () => {
         const t = setup();
         const key = 'storm_started#2026-07-17T01:00:00.000Z';
-        const both = await Promise.all([t.harness.factory(t.homeA).claimStormAlert(key), t.harness.factory(t.homeA).claimStormAlert(key)]);
+        const mine = t.storm(t.homeA, 'storm_claimmine01', 0);
+        const theirs = t.storm(t.homeA, 'storm_claimtheirs', 1);
+        const both = await Promise.all([t.harness.factory(t.homeA).claimStormSession(mine, key), t.harness.factory(t.homeA).claimStormSession(theirs, key)]);
         expect(both.map((r) => (r.ok ? r.value : r.error.code)).sort()).toEqual([false, true]);
-        expect(await t.harness.factory(t.homeA).claimStormAlert(key)).toEqual({ ok: true, value: false });
-        expect(await t.harness.factory(t.homeA).claimStormAlert('power_back#2026-07-17T01:00:00.000Z')).toEqual({ ok: true, value: true });
-        expect(await t.harness.factory(t.homeB).claimStormAlert(key)).toEqual({ ok: true, value: true });
-        expect(await t.harness.factory(t.homeA).claimStormAlert('')).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+        // The winner's session is saved with its claim; the loser wrote nothing.
+        const [first] = both;
+        const winner = first.ok && first.value ? mine : theirs;
+        expect(await t.harness.factory(t.homeA).getLatestStormSession()).toEqual({ ok: true, value: winner });
+        const late = t.storm(t.homeA, 'storm_claimlate01', 2);
+        expect(await t.harness.factory(t.homeA).claimStormSession(late, key)).toEqual({ ok: true, value: false });
+        expect(await t.harness.factory(t.homeA).getLatestStormSession()).toEqual({ ok: true, value: winner });
+        // The same session, ended, under the power-back claim: replaced in place.
+        const ended = StormSessionSchema.parse({ ...winner, phase: 'ended', endedAt: t.at(5 * MINUTE_MS) });
+        expect(await t.harness.factory(t.homeA).claimStormSession(ended, 'power_back#2026-07-17T01:00:00.000Z')).toEqual({ ok: true, value: true });
+        expect(await t.harness.factory(t.homeA).getLatestStormSession()).toEqual({ ok: true, value: ended });
+        expect(await t.harness.factory(t.homeB).claimStormSession(t.storm(t.homeB, 'storm_claimhomeb1', 0), key)).toEqual({ ok: true, value: true });
+        expect(await t.harness.factory(t.homeA).claimStormSession(late, '')).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+        expect(await t.harness.factory(t.homeA).claimStormSession(t.storm(t.homeB, 'storm_claimwrong1', 0), 'other')).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
       });
 
       it('updates a session in place (same id) and survives a new store instance', async () => {

@@ -124,10 +124,11 @@ export interface StateStore {
   /** The most recently started storm session still retained, if any. */
   getLatestStormSession(): Promise<Result<StormSession | undefined, ErrorEnvelope>>;
   /**
-   * Claims a family alert once (#379): writes `key` in this playthrough only if no one has (a conditional write, kept as
-   * long as a storm session). True for the one writer that claimed it, false when another request already had.
+   * Saves a storm session together with the claim of its family alert (#379, #387), only if no one has claimed `key` in
+   * this playthrough: one conditional write of both (kept as long as a storm session), so a claim never exists without
+   * its session. True for the one writer that claimed it; false, with nothing written, when another request already had.
    */
-  claimStormAlert(key: string): Promise<Result<boolean, ErrorEnvelope>>;
+  claimStormSession(session: StormSession, key: string): Promise<Result<boolean, ErrorEnvelope>>;
   /** Keeps a delivered family message for the phone (#24); validated against InboxMessageSchema. */
   saveInboxMessage(message: NewInboxMessage): Promise<Result<void, ErrorEnvelope>>;
   /** The family messages still retained, newest first, at most `limit`. */

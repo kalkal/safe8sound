@@ -44,6 +44,38 @@ describe('start_storm_mode', () => {
     expect((await w.inbox())).toHaveLength(1);
   });
 
+  describe('a claimed storm start (#379, #387)', () => {
+    const claimed = (w: ReturnType<typeof world>) => ({ ...w.deps, alertKey: (_h: unknown, t: string) => `${t}#2026-07-17T03:00:00.000Z` });
+
+    it('two requests at once: one opens the session and tells the family, the other answers with that session', async () => {
+      const w = world(4);
+      const deps = claimed(w);
+      const both = await Promise.all([startStormMode(deps, { mode: 'active' }, w.ctx), startStormMode(deps, { mode: 'active' }, w.ctx)]);
+      const ids = both.map((r) => (r.ok ? r.value.session.id : r.error.code));
+      expect(ids[0]).toMatch(/^storm_/);
+      expect(ids[1]).toBe(ids[0]);
+      expect(await w.inbox()).toHaveLength(1);
+    });
+
+    it('a save that fails after the claim still leaves the session open: the next request finds it and tells nobody again', async () => {
+      const w = world(4);
+      const down = toolError('store_unavailable', 'Down.');
+      const storeFor: typeof w.deps.storeFor = (h, s) =>
+        new Proxy(w.deps.storeFor(h, s), {
+          get: (target, key) => {
+            if (key === 'saveStormSession') return () => Promise.resolve(err(down));
+            const value: unknown = Reflect.get(target, key);
+            return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+          },
+        });
+      expect(await startStormMode({ ...claimed(w), storeFor }, { mode: 'active' }, w.ctx)).toMatchObject({ ok: false, error: { code: 'store_unavailable' } });
+      expect(await w.inbox()).toHaveLength(1);
+      const next = await startStormMode(claimed(w), { mode: 'active' }, w.ctx);
+      expect(next.ok && next.value.session.phase).toBe('active');
+      expect(await w.inbox()).toHaveLength(1);
+    });
+  });
+
   it('quotes the safe hours of the guard\'s hold (#23 on one physics), until when, and keeps them as hoursAtEssential', async () => {
     const w = world(4);
     const out = await startStormMode(w.deps, { mode: 'active' }, w.ctx);

@@ -15,7 +15,16 @@ function holds(item: TableItem | undefined, condition: Condition): boolean {
   }
 }
 
-export function createFakeTable(): TableClient {
+export interface FakeTableOptions {
+  /**
+   * The next conditional transactions that DynamoDB cancels for a concurrent write on one of their items
+   * (TransactionConflict): each is `conflict`, with nothing written (review of #387).
+   */
+  readonly transactionConflicts?: number;
+}
+
+export function createFakeTable(options: FakeTableOptions = {}): TableClient {
+  let conflicts = options.transactionConflicts ?? 0;
   const partitions = new Map<string, Map<string, TableItem>>();
   const partition = (pk: string) => {
     let p = partitions.get(pk);
@@ -51,10 +60,16 @@ export function createFakeTable(): TableClient {
       return Promise.resolve(sorted.slice(0, options.limit ?? sorted.length).map(([, item]) => clone(item)));
     },
 
-    transactPut(items) {
-      // No conditions are used in transactions yet, so every item is written, in one step.
+    transactPut(items, conditions = []) {
+      if (conflicts > 0 && conditions.some((c) => c.length > 0)) {
+        conflicts -= 1;
+        return Promise.resolve('conflict');
+      }
+      // Every condition is checked first, then every item is written, in one step: all or none.
+      const held = items.every((item, i) => (conditions[i] ?? []).every((c) => holds(partition(item.PK).get(item.SK), c)));
+      if (!held) return Promise.resolve('condition_failed');
       for (const item of items) partition(item.PK).set(item.SK, clone(item));
-      return Promise.resolve();
+      return Promise.resolve('ok');
     },
   };
 }

@@ -86,6 +86,26 @@ describe('createDocumentTableClient', () => {
     });
   });
 
+  it('puts a condition on one item of a transaction and reports a cancelled condition or a concurrent write as a value (#387); other cancellations throw', async () => {
+    const cancelled = (code: string) => Object.assign(new Error('Transaction cancelled'), { name: 'TransactionCanceledException', CancellationReasons: [{ Code: code }, { Code: 'None' }] });
+    const { sent, table } = stub(cancelled('ConditionalCheckFailed'), cancelled('TransactionConflict'), cancelled('TransactionConflict'), cancelled('ValidationError'));
+    const items = [
+      { PK: 'HOME#demo', SK: 'ALERT#k' },
+      { PK: 'HOME#demo', SK: 'STORM#1' },
+    ];
+    expect(await table.transactPut(items, [[{ attr: 'PK', op: 'not_exists' }], []])).toBe('condition_failed');
+    expect(sent[0]?.input).toEqual({
+      TransactItems: [
+        { Put: { TableName: 'ColdReserve-dev', Item: items[0], ConditionExpression: 'attribute_not_exists(#c0)', ExpressionAttributeNames: { '#c0': 'PK' } } },
+        { Put: { TableName: 'ColdReserve-dev', Item: items[1] } },
+      ],
+    });
+    expect(await table.transactPut(items, [[{ attr: 'PK', op: 'not_exists' }]])).toBe('conflict');
+    // Without a condition, a concurrent write still throws (transient for the store); any other reason throws too.
+    await expect(table.transactPut(items)).rejects.toThrow('Transaction cancelled');
+    await expect(table.transactPut(items, [[{ attr: 'PK', op: 'not_exists' }]])).rejects.toThrow('Transaction cancelled');
+  });
+
   it('queries newest first with a limit, and stops paginating once it has enough', async () => {
     const { sent, table } = stub({ Items: [{ PK: 'HOME#demo', SK: 'STORM#2' }], LastEvaluatedKey: { PK: 'HOME#demo', SK: 'STORM#2' } });
     expect((await table.query('HOME#demo', 'STORM#', { newestFirst: true, limit: 1 })).map((i) => i.SK)).toEqual(['STORM#2']);

@@ -14,6 +14,12 @@ export type Condition =
 
 export type WriteOutcome = 'ok' | 'condition_failed';
 
+/**
+ * A conditional transaction may also be cancelled because another transaction was writing the same item at that
+ * moment (DynamoDB TransactionConflict): `conflict`, nothing written. Unconditional transactions still throw it.
+ */
+export type TransactOutcome = WriteOutcome | 'conflict';
+
 export interface QueryOptions {
   /** Highest sort key first (DynamoDB ScanIndexForward = false). */
   readonly newestFirst?: boolean;
@@ -28,6 +34,9 @@ export interface TableClient {
   update(pk: string, sk: string, set: Readonly<Record<string, unknown>>, conditions: readonly Condition[]): Promise<WriteOutcome>;
   /** Items of the partition whose sort key starts with the prefix, in sort-key order (or reversed). */
   query(pk: string, skPrefix: string, options?: QueryOptions): Promise<TableItem[]>;
-  /** Writes all the items or none (DynamoDB TransactWriteItems, at most 100 items). */
-  transactPut(items: readonly TableItem[]): Promise<void>;
+  /**
+   * Writes all the items or none (DynamoDB TransactWriteItems, at most 100 items). `conditions[i]`, when given, must hold
+   * on the stored `items[i]`: if any fails nothing is written and the outcome is `condition_failed`.
+   */
+  transactPut(items: readonly TableItem[], conditions?: readonly (readonly Condition[])[]): Promise<TransactOutcome>;
 }

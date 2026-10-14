@@ -192,19 +192,27 @@ class MemoryStateStore implements StateStore {
     if (session.homeId !== this.homeId) {
       return Promise.resolve(err(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } })));
     }
-    // Same key as store-dynamodb: the start time in UTC, then the id.
-    const sk = `${this.#play}STORM#${new Date(session.startedAt).toISOString()}#${session.id}`;
-    this.#put(sk, { value: session, expiresAtMs: this.#retainedFor(this.#ttl.stormSessionDays) });
+    this.#putStormSession(session);
     return Promise.resolve(ok(undefined));
   }
 
-  claimStormAlert(key: string): Promise<Result<boolean, ErrorEnvelope>> {
+  claimStormSession(session: StormSession, key: string): Promise<Result<boolean, ErrorEnvelope>> {
     if (key.length === 0) return Promise.resolve(err(toolError('invalid_input', 'A storm alert claim needs a key.', { details: { field: 'key' } })));
-    // Same key and condition as store-dynamodb: written only if no one has.
+    if (session.homeId !== this.homeId) {
+      return Promise.resolve(err(toolError('invalid_input', 'A storm session belongs to the home of the store.', { details: { field: 'homeId' } })));
+    }
+    // Same keys and condition as store-dynamodb: the claim and its session are written together, only if no one claimed it.
     const sk = `${this.#play}ALERT#${key}`;
     if (this.#partition().has(sk)) return Promise.resolve(ok(false));
     this.#put(sk, { value: { key }, expiresAtMs: this.#retainedFor(this.#ttl.stormSessionDays) });
+    this.#putStormSession(session);
     return Promise.resolve(ok(true));
+  }
+
+  #putStormSession(session: StormSession): void {
+    // Same key as store-dynamodb: the start time in UTC, then the id.
+    const sk = `${this.#play}STORM#${new Date(session.startedAt).toISOString()}#${session.id}`;
+    this.#put(sk, { value: session, expiresAtMs: this.#retainedFor(this.#ttl.stormSessionDays) });
   }
 
   getLatestStormSession(): Promise<Result<StormSession | undefined, ErrorEnvelope>> {

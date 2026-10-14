@@ -42,6 +42,19 @@ function conditionExpression(conditions: readonly Condition[]): Expression {
 
 const isConditionFailure = (error: unknown) => error instanceof Error && error.name === 'ConditionalCheckFailedException';
 
+/** A cancelled transaction whose reasons include a failed condition: the outcome, not an outage (#387). */
+const isTransactionConditionFailure = (error: unknown) =>
+  error instanceof Error &&
+  error.name === 'TransactionCanceledException' &&
+  ((error as { CancellationReasons?: { Code?: unknown }[] }).CancellationReasons ?? []).some((r) => r.Code === 'ConditionalCheckFailed');
+
+/** A cancelled transaction whose reasons are only concurrent writes on its items (review of #387). */
+const isTransactionConflict = (error: unknown) => {
+  if (!(error instanceof Error) || error.name !== 'TransactionCanceledException') return false;
+  const codes = ((error as { CancellationReasons?: { Code?: unknown }[] }).CancellationReasons ?? []).map((r) => r.Code).filter((code) => code !== 'None');
+  return codes.length > 0 && codes.every((code) => code === 'TransactionConflict');
+};
+
 async function conditional(write: () => Promise<unknown>): Promise<WriteOutcome> {
   try {
     await write();
@@ -120,8 +133,29 @@ export function createDocumentTableClient(options: { tableName: string; sender: 
       return items;
     },
 
-    async transactPut(items) {
-      await sender.send(new TransactWriteCommand({ TransactItems: items.map((Item) => ({ Put: { TableName, Item } })) }));
+    async transactPut(items, conditions = []) {
+      const TransactItems = items.map((Item, i) => {
+        const own = conditions[i] ?? [];
+        if (own.length === 0) return { Put: { TableName, Item } };
+        const c = conditionExpression(own);
+        return {
+          Put: {
+            TableName,
+            Item,
+            ConditionExpression: c.expression,
+            ExpressionAttributeNames: c.names,
+            ...(Object.keys(c.values).length > 0 && { ExpressionAttributeValues: c.values }),
+          },
+        };
+      });
+      try {
+        await sender.send(new TransactWriteCommand({ TransactItems }));
+        return 'ok';
+      } catch (error) {
+        if (isTransactionConditionFailure(error)) return 'condition_failed';
+        if (conditions.some((c) => c.length > 0) && isTransactionConflict(error)) return 'conflict';
+        throw error;
+      }
     },
   };
 }

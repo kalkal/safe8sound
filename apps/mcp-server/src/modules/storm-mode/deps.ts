@@ -38,7 +38,7 @@ export interface StormModeDeps {
   /**
    * #379: the key that tells the family of this storm start or power back once across containers (the scripted
    * outage it belongs to), or undefined (the real home and the demo: one detector, nothing to claim). With a key, the
-   * alert is claimed in the store before it is sent, and only the request that claims it sends it.
+   * alert is claimed in the store together with its session before it is sent (#387), and only the request that claims it sends it.
    */
   readonly alertKey?: (homeId: HomeId, transition: 'storm_started' | 'power_back', nowMs: number) => string | undefined;
 }

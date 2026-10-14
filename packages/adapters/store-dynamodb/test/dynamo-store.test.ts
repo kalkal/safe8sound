@@ -86,6 +86,41 @@ describe('store-dynamodb item layout (plan §3.2)', () => {
   });
 });
 
+describe('store-dynamodb storm claim cancelled by a concurrent one (TransactionConflict, review of #387)', () => {
+  const KEY = 'storm_started#2026-07-17T01:00:00.000Z';
+  const storm = (id: string) =>
+    StormSessionSchema.parse({
+      schemaVersion: 1, id, homeId: HOME, phase: 'active', trigger: 'grid_loss', startedAt: '2026-07-17T03:00:00Z', activeAt: '2026-07-17T03:00:00Z',
+      safeRoomId: 'bedroom-1', occupantRoles: [], hoursAtEssential: 10, notifications: [],
+    });
+  const sessions = async (table: TableClient) => (await table.query(`HOME#${HOME}`, 'STORM#')).map((i) => (i['data'] as { id: string }).id);
+
+  it('the other claim landed: this one lost, wrote nothing, and the winner\'s session is there to read', async () => {
+    const { table, store } = setup(createFakeTable({ transactionConflicts: 1 }));
+    // The concurrent winner's transaction: its claim and its session.
+    await table.transactPut([
+      { PK: `HOME#${HOME}`, SK: `ALERT#${KEY}`, data: { key: KEY } },
+      { PK: `HOME#${HOME}`, SK: 'STORM#2026-07-17T03:00:00.000Z#storm_theirs0001', schemaVersion: 1, data: storm('storm_theirs0001') },
+    ]);
+    expect(await store.claimStormSession(storm('storm_mine00001'), KEY)).toEqual({ ok: true, value: false });
+    expect(await sessions(table)).toEqual(['storm_theirs0001']);
+    expect(await store.getLatestStormSession()).toMatchObject({ ok: true, value: { id: 'storm_theirs0001' } });
+  });
+
+  it('the other claim failed too: one more try claims it with its session', async () => {
+    const { table, store } = setup(createFakeTable({ transactionConflicts: 1 }));
+    expect(await store.claimStormSession(storm('storm_mine00001'), KEY)).toEqual({ ok: true, value: true });
+    expect(await sessions(table)).toEqual(['storm_mine00001']);
+  });
+
+  it('cancelled twice: store_unavailable (retryable), reported with its operation, nothing written', async () => {
+    const { table, store, errors } = setup(createFakeTable({ transactionConflicts: 2 }));
+    expect(await store.claimStormSession(storm('storm_mine00001'), KEY)).toMatchObject({ ok: false, error: { code: 'store_unavailable', retryable: true } });
+    expect(errors).toMatchObject([{ code: 'store_unavailable', operation: 'claimStormSession' }]);
+    expect(await table.query(`HOME#${HOME}`, '')).toEqual([]);
+  });
+});
+
 describe('store-dynamodb writes preferences and their log atomically', () => {
   it('sends PREFS and every EVENT# item in one transaction', async () => {
     const fake = createFakeTable();

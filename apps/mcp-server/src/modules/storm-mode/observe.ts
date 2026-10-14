@@ -255,15 +255,20 @@ export async function detect(deps: StormModeDeps, o: Observed, event: StormEvent
   // The essential level keeps the same session object but has a message to send (#311): only a step with neither is a no-op.
   if (step.session === undefined || (step.session === o.session && step.transitions.length === 0)) return ok(o);
 
-  // #379: a sandbox's storm start and power back are claimed before they are sent: of two requests at once (two
-  // containers), only the one that claims it tells the family and saves the session; the other leaves it as it was.
-  for (const transition of step.transitions) {
-    if (transition !== 'storm_started' && transition !== 'power_back') continue;
-    const key = deps.alertKey?.(o.ctx.homeId, transition, o.nowMs);
-    if (key === undefined) continue;
-    const claimed = await o.store.claimStormAlert(key);
+  // #379, #387: a sandbox's storm start and power back are claimed before they are sent, and the claim is the session
+  // itself: the claim and the session it opens or ends are written together, so a request that stops after it (a failed
+  // save, a timeout) still leaves the session saved. Of two requests at once (two containers) only the one that claims
+  // it tells the family; the other reads the session the winner saved, so start_storm_mode finds it open.
+  const claimable = step.transitions.find((t): t is 'storm_started' | 'power_back' => t === 'storm_started' || t === 'power_back');
+  const key = claimable === undefined ? undefined : deps.alertKey?.(o.ctx.homeId, claimable, o.nowMs);
+  if (key !== undefined) {
+    const claimed = await o.store.claimStormSession(step.session, key);
     if (!claimed.ok) return claimed;
-    if (!claimed.value) return ok(o);
+    if (!claimed.value) {
+      const latest = await o.store.getLatestStormSession();
+      if (!latest.ok) return latest;
+      return ok({ ...o, session: latest.value });
+    }
   }
 
   let session = step.session;
