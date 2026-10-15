@@ -1,4 +1,5 @@
 import { homeClock } from '@cold-reserve/ui-cards';
+import { useState } from 'react';
 import type { AgentAnswer } from '../agent/index.js';
 import { OriginBadge } from './OriginBadge.js';
 import { t } from './text.js';
@@ -13,14 +14,33 @@ export interface AnswerCardProps {
 
 export function AnswerCard({ answer, timeZone, turnId }: AnswerCardProps) {
   const { status } = answer;
+  // #398: on a phone, under a card, the words keep two lines; a touch opens them (CSS shows the button only there).
+  const [open, setOpen] = useState(false);
   return (
-    <article className="answer" data-testid="answer">
+    <article className="answer" data-testid="answer" data-words-open={open}>
       {answer.degradedBy !== undefined && (
         <p className="notice" role="note">
           {t('chat.degraded')}
         </p>
       )}
-      <p className="answer-text">{answer.text}</p>
+      <div className="answer-words">
+        <p className="answer-text" id="answer-words-text">
+          {answer.text}
+        </p>
+        {answer.cards !== undefined && (
+          <button
+            type="button"
+            className="answer-more"
+            aria-expanded={open}
+            aria-controls="answer-words-text"
+            onClick={() => {
+              setOpen(!open);
+            }}
+          >
+            {t(open ? 'answers.readLess' : 'answers.readAll')}
+          </button>
+        )}
+      </div>
       {status !== undefined && (
         <dl className="facts">
           <div className="fact">

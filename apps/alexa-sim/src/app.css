@@ -686,7 +686,7 @@
     /* The question and the answer's words are spoken: on a short screen they stay for screen readers only, and the
        card owns the content band. */
     .echo-screen .bubble,
-    .echo-screen .answer-text {
+    .echo-screen .answer-words {
       position: absolute;
       overflow: hidden;
       inline-size: 1px;
@@ -710,6 +710,146 @@
 
   .privacy-notice {
     font-size: var(--font-size-min);
+  }
+
+  /* A short landscape Echo (960 × 480): the simulated clock's dock rests on the screen's bottom padding, right under this
+     line; one tight line keeps its last pixels clear of the dock (#398). */
+  @media (width >= 56rem) and (height < 40rem) {
+    .echo-screen .privacy-notice {
+      line-height: 1.2;
+    }
+  }
+
+  .answer-words {
+    position: relative;
+  }
+
+  /* Only a phone under a card shows it (below). */
+  .answer-more {
+    display: none;
+  }
+
+  /* A phone (#398; owner rule: the ice cubes always in the first screen, under the big number): when the answer brings a
+     card, the card owns the content band, as on a small Echo: the answer's frame is only its card, the question stays for screen
+     readers, and Alexa's words keep two lines (below). */
+  @media (width < 48rem) {
+    .echo-screen .answer:has(> .tool-cards) {
+      padding: 0;
+      border: 0;
+      background: none;
+    }
+
+    .echo-screen .band-content:has(.answer > .tool-cards) .bubble {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* Alexa's answer stays in view in two lines (an ellipsis ends them); a touch anywhere on it opens the whole text, which is
+       always in the page for screen readers. The button covers the words; its name is its own text (set in the app, shown
+       to no one: the font is 0). */
+    .echo-screen .answer:has(> .tool-cards) .answer-text {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+      font-size: var(--font-size-body);
+      line-height: 1.25;
+    }
+
+    .echo-screen .answer[data-words-open="true"]:has(> .tool-cards) .answer-text {
+      display: block;
+      overflow: visible;
+    }
+
+    /* A touch target of 48 px at least. */
+    .echo-screen .answer:has(> .tool-cards) .answer-words {
+      display: grid;
+      align-content: center;
+      min-block-size: var(--target-min);
+    }
+
+    .echo-screen .answer:has(> .tool-cards) .answer-more {
+      display: block;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: transparent;
+      font-size: 0;
+      cursor: pointer;
+
+      /* Drawn inside: the scrolling band would cut an outside ring. */
+      &:focus-visible {
+        outline: calc(var(--border-thin) * 3) solid var(--focus-ring);
+        outline-offset: calc(var(--border-thin) * -3);
+      }
+    }
+
+    /* The examples on one row that slides sideways inside its own box (the page never scrolls): two show, the third
+       peeks out, and each keeps its words. "Try saying:" is dropped (the examples say it, and it is aria-hidden) and the title is a line smaller, so the
+       card keeps their height. */
+    .echo-screen .bands:has(.answer > .tool-cards) .band-actions .examples {
+      flex-wrap: nowrap;
+      min-inline-size: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+
+      & .chip-button {
+        flex: none;
+        white-space: nowrap;
+      }
+    }
+
+    /* The question's field, Ask and Stop on one row (the field keeps what they leave): a Stop row of its own took the card's height. */
+    .echo-screen .bands:has(.answer > .tool-cards) .ask input {
+      flex-basis: 5rem;
+    }
+
+    .echo-screen .bands:has(.answer > .tool-cards) .voice-button {
+      min-inline-size: 0;
+      padding-inline: var(--space-3);
+    }
+
+    .echo-screen .answer:has(> .tool-cards) {
+      gap: var(--space-1);
+    }
+
+    .echo-screen .answer:has(> .tool-cards) > .tool-cards {
+      gap: var(--space-1);
+    }
+
+    .echo-screen .bands:has(.answer > .tool-cards) {
+      gap: var(--space-1);
+    }
+
+    .echo-screen .bands:has(.answer > .tool-cards) .band-head {
+      gap: var(--space-1) var(--space-3);
+    }
+
+    .echo-screen .bands:has(.answer > .tool-cards) .band-head h1 {
+      font-size: var(--font-size-body);
+      line-height: 1.2;
+    }
+
+    .echo-screen .bands:has(.answer > .tool-cards) .privacy-notice {
+      line-height: 1.2;
+    }
+
+    .echo-screen .bands:has(.answer > .tool-cards) .try-saying {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   }
 
   /* A landscape Echo screen: what to say and the question side by side, so the content band keeps the height. */

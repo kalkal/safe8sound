@@ -108,7 +108,7 @@
 
     & .card {
       gap: var(--space-2);
-      padding: var(--space-3);
+      padding: var(--space-2) var(--space-3);
     }
 
     & .card-page {
@@ -117,6 +117,14 @@
 
     & .card-page .card {
       padding: 0;
+    }
+
+    /* The storm banner and the limit strip are one line of words: 4 px above and below, not 12 (#398). Together with the
+       tighter card they bring the safe room's first page (banner, label, big time, cubes) under a small Echo's height
+       at the readable scale, so the cubes are whole in the first view and not under the cut's fade. */
+    & .storm-banner,
+    & .limit-strip {
+      padding-block: var(--space-1);
     }
 
     /* The plan's first page in a short frame (owner, 12 Oct: cut at 960 × 480): the confidence beside the time, and
@@ -168,6 +176,45 @@
 
     & .plan-actions p {
       flex-basis: auto;
+    }
+  }
+
+  /* A phone's narrow frame (#398; owner rule: the ice cubes always in the first screen, under the big number): the card's
+     chrome takes as little height as it can, so the label, the big time and the cubes reach the first view; the cubes
+     are smaller in proportion (owner, 14 Oct), still whole and recognisable. */
+  @media (width < 26rem) {
+    .card {
+      padding: var(--space-2) var(--space-3);
+    }
+
+    .hero-row {
+      gap: var(--space-1);
+    }
+
+    .card-head {
+      gap: var(--space-1) var(--space-2);
+
+      & h2 {
+        font-size: var(--font-size-body);
+      }
+    }
+
+    .card-page {
+      gap: var(--space-1);
+    }
+
+    .storm-banner,
+    .limit-strip {
+      padding-block: var(--space-1);
+    }
+
+    /* Only inline, where the cubes must reach the first view; in full screen the big number keeps its size. */
+    :root:not([data-fullscreen]) .hero-row > .hero-value {
+      font-size: calc(var(--font-size-hero-min) * 0.8);
+    }
+
+    .cubes {
+      --cube-size: 24px;
     }
   }
 

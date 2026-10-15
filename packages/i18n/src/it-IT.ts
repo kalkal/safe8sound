@@ -32,6 +32,8 @@ export const itIT = {
   'chat.errorOther': 'Qualcosa è andato storto con questa risposta. Prova a chiedere in un altro modo.',
   'chat.retry': 'Riprova',
   'answers.nav': 'Risposte',
+  'answers.readAll': 'Leggi tutta la risposta',
+  'answers.readLess': 'Mostra la risposta in due righe',
   'answers.previous': 'Risposta precedente',
   'answers.next': 'Risposta successiva',
   'answers.previousShort': 'Precedente',

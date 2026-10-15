@@ -33,6 +33,8 @@ export const enUS = {
   'chat.retry': 'Try again',
   // One answer at a time (owner's choice, 10 Oct): the labels are what a person would say.
   'answers.nav': 'Answers',
+  'answers.readAll': 'Read the whole answer',
+  'answers.readLess': 'Show the answer in two lines',
   'answers.previous': 'Previous answer',
   'answers.next': 'Next answer',
   'answers.previousShort': 'Previous',

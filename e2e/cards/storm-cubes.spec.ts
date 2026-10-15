@@ -81,3 +81,64 @@ test('a 15 h reserve card at 1280 × 800: the cubes stay 56 px, on two even rows
   expect(rows).toHaveLength(2);
   expect(boxes.filter((b) => b.top === rows[0])).toHaveLength(8);
 });
+
+// #398 (owner rule, 11 Oct: the cubes always sit in the first screen under the big number): in the scripted storm, after
+// "Power cut" and one skip, the whole row of cubes is inside what can be seen, on a small Echo and on a phone.
+for (const size of [
+  { width: 960, height: 480 },
+  { width: 375, height: 812 },
+]) {
+  test(`at ${String(size.width)} × ${String(size.height)} the storm's safe room shows its whole row of cubes in the first screen`, async ({ page }) => {
+    await page.setViewportSize(size);
+    const card = await powerOut(page);
+    await page.getByRole('button', { name: /^Go to [0-9][0-9]:[0-9][0-9] · / }).click();
+    const cubes = card.locator('.cubes');
+    await expect(cubes).toBeVisible();
+    await expect(card.locator('.cube').first()).toBeVisible();
+    // Fully inside the viewport and not clipped by the card frame or the answer's box (ratio 1 counts clipping).
+    await expect(cubes).toBeInViewport({ ratio: 1 });
+    // Under the big number, in the same first view.
+    await expect(card.getByTestId('safe-until')).toBeInViewport({ ratio: 1 });
+    // The page fits whole at the readable scale: no cut, no fade over the cubes.
+    if (size.width === 960) await expect(card.locator('.fit')).toHaveAttribute('data-cramped', 'false');
+    const row = await cubes.boundingBox();
+    expect((row?.y ?? 0) + (row?.height ?? 0), 'cubes end in the window').toBeLessThanOrEqual(size.height);
+    expect(row?.height ?? 0, 'the cubes are still recognisable').toBeGreaterThanOrEqual(36);
+  });
+}
+
+test('at 960 × 480 on a hot day the simulated clock dock leaves the voice line whole', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 480 });
+  await page.goto('/');
+  await page.getByRole('group', { name: 'Example questions' }).getByRole('button', { name: 'A hot day' }).click();
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
+  await expect(page.frameLocator('iframe[title="Plan card"]').locator('.hero-value')).toBeVisible();
+  const line = await page.getByText(/^Your voice and the answers read aloud/).boundingBox();
+  const dock = await page.getByRole('group', { name: 'Simulated time' }).boundingBox();
+  expect((line?.y ?? 0) + (line?.height ?? 0), 'the voice line ends above the dock').toBeLessThanOrEqual(dock?.y ?? 0);
+});
+
+// #398 (owner, 15 Oct): on a phone under a card the answer's first two lines stay visible; a touch opens the whole text.
+for (const italian of [false, true]) {
+  test(`at 375 × 812 the answer shows two lines under its card and a touch opens it all (${italian ? 'it' : 'en'})`, async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/');
+    if (italian) await page.getByRole('button', { name: 'Language: Italiano' }).click();
+    await page.getByLabel(italian ? 'Fai una domanda' : 'Ask a question').fill(italian ? 'Blackout' : "The power's out");
+    await page.getByRole('button', { name: italian ? 'Chiedi' : 'Ask', exact: true }).click();
+    const words = page.locator('.answer-text');
+    await expect(words).toBeInViewport({ ratio: 1 });
+    const button = page.getByRole('button', { name: italian ? 'Leggi tutta la risposta' : 'Read the whole answer' });
+    await expect(button).toHaveAttribute('aria-expanded', 'false');
+    const closed = (await words.boundingBox())?.height ?? 0;
+    const full = (await words.textContent()) ?? '';
+    expect(full.length).toBeGreaterThan(40);
+    await button.click();
+    const closeName = italian ? 'Mostra la risposta in due righe' : 'Show the answer in two lines';
+    await expect(page.getByRole('button', { name: closeName })).toHaveAttribute('aria-expanded', 'true');
+    await expect.poll(async () => (await words.boundingBox())?.height ?? 0).toBeGreaterThan(closed);
+    expect(await words.textContent()).toBe(full);
+    await page.getByRole('button', { name: closeName }).click();
+    await expect(button).toHaveAttribute('aria-expanded', 'false');
+  });
+}

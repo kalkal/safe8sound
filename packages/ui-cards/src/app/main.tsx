@@ -112,6 +112,10 @@ function Card({ kind }: { kind: CardKind }) {
 
   // Full screen for the whole frame, only through the host and only when it offers it (#200).
   const fullscreen = context.displayMode === 'fullscreen';
+  // The styles keep the big numbers at full size in full screen (#398).
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-fullscreen', fullscreen);
+  }, [fullscreen]);
   const toggleDisplay = useCallback(() => {
     void app
       ?.requestDisplayMode({ mode: fullscreen ? 'inline' : 'fullscreen' })
