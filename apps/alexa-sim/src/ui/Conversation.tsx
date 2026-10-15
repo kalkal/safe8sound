@@ -164,6 +164,8 @@ export function Conversation({
   const focusQuestion = useCallback(() => {
     inputRef.current?.focus();
   }, []);
+  // Listen reads the answer again, outside the machine: the mic waits until it is over.
+  const [replaying, setReplaying] = useState(false);
   const micRef = useRef<HTMLButtonElement>(null);
   const stopSpeakingRef = useRef<HTMLButtonElement>(null);
   // A valid demo code brings the question field back: the focus goes there (review of #140).
@@ -186,6 +188,8 @@ export function Conversation({
 
   const onSubmit = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // Inside the tap: the answer arrives later, and the browser only reads it aloud if the page was unlocked here.
+    voice.unlock();
     const turnId = crypto.randomUUID();
     if (!runCommand(draft, turnId)) send({ type: 'TEXT_SUBMITTED', text: draft, turnId });
     setDraft('');
@@ -271,6 +275,22 @@ export function Conversation({
           <p className="notice" role="status">
             {t(notice)}
           </p>
+        )}
+        {notice === 'voice.silent' && !listening && !busy && shown.data?.ok === true && (
+          <button
+            type="button"
+            className="button button-quiet listen-button"
+            aria-label={t('voice.listenLabel')}
+            onClick={() => {
+              if (shown.data?.ok !== true) return;
+              setReplaying(true);
+              voice.replay(shown.data.value.text, () => {
+                setReplaying(false);
+              });
+            }}
+          >
+            <span aria-hidden="true">🔊</span> {t('voice.listen')}
+          </button>
         )}
         {slowTurn && (
           <p className="notice" role="status">
@@ -387,8 +407,9 @@ export function Conversation({
               type="button"
               className="button button-quiet voice-button"
               aria-pressed={listening}
-              disabled={thinking || speaking}
+              disabled={thinking || speaking || replaying}
               onClick={() => {
+                voice.unlock();
                 send(listening ? { type: 'CANCEL' } : { type: 'MIC_PRESSED' });
               }}
             >

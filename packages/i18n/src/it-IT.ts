@@ -58,6 +58,8 @@ export const itIT = {
   'voice.typeInstead': 'La voce ora non funziona. Scrivi la domanda.',
   'voice.micBlocked': 'Il microfono è bloccato o non disponibile. Scrivi la domanda.',
   'voice.silent': 'Non sono riuscito a leggere la risposta ad alta voce. È sullo schermo.',
+  'voice.listen': 'Ascolta',
+  'voice.listenLabel': 'Ascolta la risposta',
   'voice.browserVoice': 'Quando la voce di studio non è disponibile, legge la risposta la voce del browser.',
   'voice.privacyStudio': 'Voce: servizio vocale del browser; lettura ad alta voce con Amazon Polly o il browser.',
   'voice.privacyStudioReplies': 'Risposte lette ad alta voce da Amazon Polly o dal servizio vocale del browser.',

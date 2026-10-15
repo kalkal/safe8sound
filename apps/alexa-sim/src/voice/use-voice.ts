@@ -23,6 +23,10 @@ export interface Voice {
   studioVoice: boolean;
   /** The studio voice failed once on this page: the browser voice reads the replies now (one honest notice). */
   browserVoiceNotice: boolean;
+  /** Call inside a tap: lets the browser speak the answer that arrives seconds later (Chrome on Android). */
+  unlock: () => void;
+  /** Reads a text at once, from a tap on Listen (the person's own gesture); `done` runs when it is over. */
+  replay: (text: string, done: () => void) => void;
 }
 
 /** The studio voice of remote mode (F8d, #25): how to fetch a reply's audio from the sim-api. */
@@ -35,7 +39,7 @@ const newTurnId = () => crypto.randomUUID();
 function browserAdapters(config: VoiceConfig, send: (event: ConversationEvent) => void, studio: StudioVoice | undefined, onFallback: () => void) {
   const ctor = recognitionCtor(window);
   const recognizer = ctor === null ? null : createBrowserRecognizer(ctor, { lang: config.lang, send, newTurnId });
-  if (!('speechSynthesis' in window)) return { recognizer, speaker: null };
+  if (!('speechSynthesis' in window)) return { recognizer, speaker: null, replay: null, unlock: () => undefined };
   const speaker = createBrowserSpeaker({
     synth: window.speechSynthesis as unknown as SynthesisLike,
     utterance: (text) => new SpeechSynthesisUtterance(text) as unknown as UtteranceLike,
@@ -45,7 +49,8 @@ function browserAdapters(config: VoiceConfig, send: (event: ConversationEvent) =
     send,
   });
   speaker.warmUp();
-  if (studio === undefined || typeof Audio === 'undefined') return { recognizer, speaker };
+  const unlock = () => { speaker.unlock(); };
+  if (studio === undefined || typeof Audio === 'undefined') return { recognizer, speaker, replay: (text: string, done: () => void) => { speaker.replay(text, done); }, unlock };
   // The studio voice first; the browser voice reads any reply it cannot (F8d, #25).
   const studioSpeaker = createPollySpeaker({
     synthesize: studio.synthesize,
@@ -56,7 +61,7 @@ function browserAdapters(config: VoiceConfig, send: (event: ConversationEvent) =
     onFallback,
     send,
   });
-  return { recognizer, speaker: studioSpeaker };
+  return { recognizer, speaker: studioSpeaker, replay: (text: string, done: () => void) => { speaker.replay(text, done); }, unlock };
 }
 
 /** `send` may change between renders; the adapters always reach the current one. */
@@ -68,7 +73,10 @@ export function useVoice(config: VoiceConfig, send: (event: ConversationEvent) =
     const relay = (event: ConversationEvent) => {
       sendRef.current(event);
     };
-    if (config.speech === 'fake') return createFakeVoice(relay, newTurnId);
+    if (config.speech === 'fake') {
+      const fake = createFakeVoice(relay, newTurnId);
+      return { ...fake, replay: (text: string, done: () => void) => { fake.speaker.speak(text); done(); }, unlock: () => undefined };
+    }
     return {
       ...browserAdapters(config, relay, studio, () => {
         setBrowserVoiceNotice(true);
@@ -90,6 +98,11 @@ export function useVoice(config: VoiceConfig, send: (event: ConversationEvent) =
     speaker: adapters.speaker,
     studioVoice: studio !== undefined && config.speech === 'browser' && adapters.speaker !== null,
     browserVoiceNotice,
+    unlock: adapters.unlock,
+    replay: (text, done) => {
+      if (adapters.replay === null) done();
+      else adapters.replay(text, done);
+    },
     settings: {
       micAvailable: adapters.recognizer !== null,
       speakReplies: config.speakReplies && adapters.speaker !== null,

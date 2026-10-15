@@ -62,6 +62,8 @@ export const enUS = {
   'voice.typeInstead': "Voice isn't working right now. Type your question instead.",
   'voice.micBlocked': 'The microphone is blocked or unavailable. Type your question instead.',
   'voice.silent': "I couldn't read the answer aloud. It's on the screen.",
+  'voice.listen': 'Listen',
+  'voice.listenLabel': 'Listen to the answer',
   'voice.browserVoice': "When the studio voice isn't available, your browser's voice reads the answer instead.",
   // One line under the input row (owner, 13 Oct): a longer note pushed the plan's button row out of a small Echo's card.
   'voice.privacyStudio': "Voice: your browser's speech service; read aloud by Amazon Polly or your browser.",

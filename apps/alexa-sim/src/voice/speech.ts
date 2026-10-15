@@ -145,12 +145,31 @@ export interface SynthesisLike {
   speak(utterance: UtteranceLike): void;
   cancel(): void;
   getVoices(): readonly VoiceInfo[];
+  /** Chrome fills the voice list late (Android: empty at first); `voiceschanged` says it is ready. */
+  addEventListener?(type: 'voiceschanged', listener: () => void): void;
+  removeEventListener?(type: 'voiceschanged', listener: () => void): void;
+  speaking?: boolean;
+  pending?: boolean;
 }
 
 export interface BrowserSpeaker extends Speaker {
   /** A silent utterance at page load: the first speak of a page is the slowest (spike S5, ≈ 840 ms). */
   warmUp(): void;
+  /**
+   * Call synchronously inside a tap (Speak, Ask): a silent utterance there gives the page the browser's permission
+   * to speak later, when the answer arrives seconds after the tap (Chrome on Android drops a speak() otherwise).
+   */
+  unlock(): void;
+  /**
+   * Reads a text at once, inside the tap on Listen (no waiting for voices: waiting loses the permission).
+   * `done` runs when it ends, fails, or is cancelled.
+   */
+  replay(text: string, done: () => void): void;
 }
+
+/** How long to wait for the voice list, and for the first sound, before saying the browser blocked the voice. */
+const VOICES_WAIT_MS = 1000;
+const START_WAIT_MS = 1500;
 
 export function createBrowserSpeaker(opts: {
   synth: SynthesisLike;
@@ -160,37 +179,117 @@ export function createBrowserSpeaker(opts: {
   online: () => boolean;
   voiceName?: string;
   send: Send;
+  log?: Log;
+  /** setTimeout / clearTimeout, injected for the tests. */
+  timers?: { set: (run: () => void, ms: number) => unknown; clear: (handle: unknown) => void };
 }): BrowserSpeaker {
+  const log = opts.log ?? defaultLog;
+  const timers = opts.timers ?? { set: (run, ms) => setTimeout(run, ms), clear: (h) => { clearTimeout(h as ReturnType<typeof setTimeout>); } };
   let current: UtteranceLike | null = null;
+  let cancelWait: (() => void) | null = null;
   const prepare = (text: string) => {
     const u = opts.utterance(text);
     u.lang = opts.lang;
     u.voice = pickVoice(opts.synth.getVoices(), opts.lang, { online: opts.online(), ...(opts.voiceName !== undefined && { preferredName: opts.voiceName }) });
     return u;
   };
+  const blocked = (reason: string, turnId: string | undefined) => {
+    log({ level: 'warn', code: 'speech_blocked', ...(turnId !== undefined && { correlationId: turnId }), details: { reason } });
+  };
+  /** Runs `go` now, or once the voice list is ready (at most VOICES_WAIT_MS). */
+  const whenVoicesReady = (go: () => void): void => {
+    const { synth } = opts;
+    if (synth.getVoices().length > 0 || synth.addEventListener === undefined) {
+      go();
+      return;
+    }
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      cancelWait = null;
+      synth.removeEventListener?.('voiceschanged', finish);
+      timers.clear(handle);
+      go();
+    };
+    synth.addEventListener('voiceschanged', finish);
+    const handle = timers.set(finish, VOICES_WAIT_MS);
+    cancelWait = () => {
+      done = true;
+      cancelWait = null;
+      synth.removeEventListener?.('voiceschanged', finish);
+      timers.clear(handle);
+    };
+  };
   return {
-    speak(text) {
-      const u = prepare(text);
-      current = u;
-      u.onstart = () => {
-        if (current === u) opts.send({ type: 'SPEAKING_STARTED' });
+    speak(text, turnId) {
+      cancelWait?.();
+      const run = () => {
+        const u = prepare(text);
+        // Only one of our own real phrases playing is cancelled; the silent unlock phrase is queued behind, not cut
+        // (cancel + speak is the pattern Chrome for Android drops).
+        const cutting = current !== null;
+        current = u;
+        let started = false;
+        const startTimer = timers.set(() => {
+          if (current === u && !started) blocked('no_start', turnId);
+        }, START_WAIT_MS);
+        u.onstart = () => {
+          started = true;
+          timers.clear(startTimer);
+          if (current === u) opts.send({ type: 'SPEAKING_STARTED' });
+        };
+        u.onend = () => {
+          timers.clear(startTimer);
+          if (current === u) {
+            current = null;
+            opts.send({ type: 'SPEAKING_ENDED' });
+          }
+        };
+        u.onerror = (event) => {
+          timers.clear(startTimer);
+          // 'interrupted' and 'canceled' are our own cancel().
+          if (current !== u || event.error === 'interrupted' || event.error === 'canceled') return;
+          current = null;
+          if (event.error === 'not-allowed') blocked('not-allowed', turnId);
+          opts.send({ type: 'SPEAKING_FAILED' });
+        };
+        // Cancelling right before speaking drops the new utterance on Chrome for Android: only when something is queued.
+        if (cutting) opts.synth.cancel();
+        opts.synth.speak(u);
       };
-      u.onend = () => {
-        if (current === u) opts.send({ type: 'SPEAKING_ENDED' });
-      };
-      u.onerror = (event) => {
-        // 'interrupted' and 'canceled' are our own cancel().
-        if (current !== u || event.error === 'interrupted' || event.error === 'canceled') return;
-        opts.send({ type: 'SPEAKING_FAILED' });
-      };
-      opts.synth.cancel();
-      opts.synth.speak(u);
+      whenVoicesReady(run);
     },
     cancel() {
+      cancelWait?.();
       current = null;
       opts.synth.cancel();
     },
     warmUp() {
+      const u = prepare(' ');
+      u.volume = 0;
+      opts.synth.speak(u);
+    },
+    replay(text, done) {
+      cancelWait?.();
+      const u = prepare(text);
+      const cutting = current !== null;
+      current = u;
+      let over = false;
+      const finish = () => {
+        if (over) return;
+        over = true;
+        timers.clear(guard);
+        if (current === u) current = null;
+        done();
+      };
+      const guard = timers.set(finish, 15_000 + 100 * text.length);
+      u.onend = finish;
+      u.onerror = finish;
+      if (cutting) opts.synth.cancel();
+      opts.synth.speak(u);
+    },
+    unlock() {
       const u = prepare(' ');
       u.volume = 0;
       opts.synth.speak(u);

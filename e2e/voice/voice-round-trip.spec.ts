@@ -164,3 +164,46 @@ test('the form does not move when the answer starts or stops being read (no misp
   await expect(page.getByRole('button', { name: 'Stop speaking' })).toHaveCount(0);
   expect((await ask.boundingBox())?.y).toBe(before?.y);
 });
+
+test.describe('a phone whose browser blocks the voice', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test('the answer shows a Listen button that reads it on tap', async ({ page }) => {
+    await page.goto('/?voice=fake');
+    await page.getByLabel('Ask a question').fill("What's my battery level?");
+    await page.getByRole('button', { name: 'Ask' }).tap();
+    // The browser never starts the voice: after the wait the answer stays, silent, and Listen appears.
+    const listen = page.getByRole('button', { name: 'Listen to the answer' });
+    await expect(listen).toBeVisible({ timeout: 5_000 });
+    await expect(listen).toContainText('Listen');
+    await expect(page.getByTestId('battery-soc')).toHaveText('78%');
+    expect(await voice(page, (d) => d.spoken())).toHaveLength(1);
+    await listen.tap();
+    const spoken = await voice(page, (d) => d.spoken());
+    expect(spoken).toHaveLength(2);
+    expect(spoken[1]).toBe(spoken[0]);
+  });
+});
+
+for (const [width, height] of [
+  [960, 480],
+  [375, 812],
+] as const) {
+  test(`the silent notice and Listen fit at ${width} x ${height}: no scroll, target of at least 44 px`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/?voice=fake');
+    await page.getByLabel('Ask a question').fill("What's my battery level?");
+    await page.getByRole('button', { name: 'Ask' }).click();
+    const listen = page.getByRole('button', { name: 'Listen to the answer' });
+    await expect(listen).toBeVisible({ timeout: 5_000 });
+    await expect(listen).toBeInViewport({ ratio: 1 });
+    const box = await listen.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    const phone = width < 896;
+    for (const selector of phone ? ['.echo-scroll'] : ['.echo-scroll', '.band-content']) {
+      const s = await page.locator(selector).evaluate((el: { scrollHeight: number; clientHeight: number }) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
+      expect(s.scroll, selector).toBeLessThanOrEqual(s.client + 1);
+    }
+  });
+}

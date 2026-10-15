@@ -178,3 +178,115 @@ describe('createBrowserSpeaker', () => {
     expect(events).toEqual([]);
   });
 });
+
+describe('createBrowserSpeaker on a phone (Chrome for Android)', () => {
+  function phone(opts: { voices?: VoiceInfo[]; speaking?: boolean } = {}) {
+    const events: ConversationEvent[] = [];
+    const spoken: UtteranceLike[] = [];
+    const listeners: (() => void)[] = [];
+    const timers: { run: () => void; ms: number; live: boolean }[] = [];
+    let voices = opts.voices ?? [];
+    const speakSpy = vi.fn((u: UtteranceLike) => spoken.push(u));
+    const cancelSpy = vi.fn();
+    const synth: SynthesisLike = {
+      speak: speakSpy,
+      cancel: cancelSpy,
+      getVoices: () => voices,
+      addEventListener: (_t, l) => listeners.push(l),
+      removeEventListener: (_t, l) => listeners.splice(listeners.indexOf(l), 1),
+      speaking: opts.speaking ?? false,
+      pending: false,
+    };
+    const log = vi.fn();
+    const sp = createBrowserSpeaker({
+      synth,
+      utterance: (text) => ({ text, lang: '', voice: null, volume: 1, onstart: null, onend: null, onerror: null }),
+      lang: 'it-IT',
+      online: () => true,
+      send: (e) => events.push(e),
+      log,
+      timers: {
+        set: (run, ms) => {
+          const t = { run, ms, live: true };
+          timers.push(t);
+          return t;
+        },
+        clear: (h) => {
+          (h as { live: boolean }).live = false;
+        },
+      },
+    });
+    return { sp, synth, speakSpy, cancelSpy, spoken, events, log, listeners, timers, setVoices: (v: VoiceInfo[]) => (voices = v) };
+  }
+  const italian: VoiceInfo = { name: 'it', lang: 'it-IT', localService: true };
+
+  it('unlock() speaks one silent utterance synchronously, inside the tap', () => {
+    const { sp, spoken, events } = phone({ voices: [italian] });
+    sp.unlock();
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0]).toMatchObject({ volume: 0 });
+    expect(events).toEqual([]);
+  });
+
+  it('waits for the voice list (empty at first) and then speaks with the right voice', () => {
+    const { sp, spoken, listeners, setVoices, speakSpy } = phone();
+    sp.speak('Ciao.');
+    expect(speakSpy).not.toHaveBeenCalled();
+    setVoices([italian]);
+    listeners[0]?.();
+    expect(spoken[0]).toMatchObject({ text: 'Ciao.', voice: { name: 'it' } });
+  });
+
+  it('speaks anyway when the voice list never arrives', () => {
+    const { sp, spoken, timers } = phone();
+    sp.speak('Ciao.');
+    timers.find((t) => t.ms === 1000)?.run();
+    expect(spoken).toHaveLength(1);
+  });
+
+  it('does not cancel an idle synthesis before speaking (it drops the new utterance on Android)', () => {
+    const idle = phone({ voices: [italian], speaking: false });
+    idle.sp.speak('Ciao.');
+    expect(idle.cancelSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs a structured warning with the turn id when the browser refuses (not-allowed)', () => {
+    const { sp, spoken, events, log } = phone({ voices: [italian] });
+    sp.speak('Ciao.', 'turn-1');
+    spoken[0]?.onerror?.({ error: 'not-allowed' });
+    expect(events).toEqual([{ type: 'SPEAKING_FAILED' }]);
+    expect(log).toHaveBeenCalledExactlyOnceWith({ level: 'warn', code: 'speech_blocked', correlationId: 'turn-1', details: { reason: 'not-allowed' } });
+  });
+
+  it('logs when nothing starts within 1.5 s, and not when it did start', () => {
+    const silent = phone({ voices: [italian] });
+    silent.sp.speak('Ciao.', 'turn-2');
+    silent.timers.find((t) => t.ms === 1500)?.run();
+    expect(silent.log).toHaveBeenCalledExactlyOnceWith({ level: 'warn', code: 'speech_blocked', correlationId: 'turn-2', details: { reason: 'no_start' } });
+    const fine = phone({ voices: [italian] });
+    fine.sp.speak('Ciao.', 'turn-3');
+    fine.spoken[0]?.onstart?.();
+    expect(fine.timers.find((t) => t.ms === 1500)?.live).toBe(false);
+    expect(fine.log).not.toHaveBeenCalled();
+  });
+
+  it('queues behind the silent unlock phrase and cancels only one of its own real phrases', () => {
+    const t = phone({ voices: [italian], speaking: true });
+    t.sp.unlock();
+    t.sp.speak('Uno.');
+    expect(t.cancelSpy).not.toHaveBeenCalled();
+    t.sp.speak('Due.');
+    expect(t.cancelSpy).toHaveBeenCalledOnce();
+  });
+
+  it('replay speaks inside the tap even when the voice list is empty, and calls done once when over', () => {
+    const t = phone();
+    const done = vi.fn();
+    t.sp.replay('Ciao.', done);
+    expect(t.spoken).toHaveLength(1);
+    expect(t.cancelSpy).not.toHaveBeenCalled();
+    t.spoken[0]?.onend?.();
+    t.spoken[0]?.onerror?.({ error: 'interrupted' });
+    expect(done).toHaveBeenCalledOnce();
+  });
+});
