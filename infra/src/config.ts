@@ -206,6 +206,11 @@ export const InfraConfigSchema = z.strictObject({
     if (!(c.turnTiming.turnBudgetMs <= c.simApi.timeoutSeconds * 1000)) {
       ctx.addIssue({ code: 'custom', path: ['turnTiming', 'turnBudgetMs'], message: 'The turn budget must fit in the sim-api function timeout.' });
     }
+    // A card call (the simulated clock's moves, 15 Oct) must end inside the browser's wait, or the page gives up first.
+    // Like the turn chain below, it leaves out the DynamoDB quota reads (accepted trade-off, docs/agentcore.md).
+    if (!(c.simApi.ssmTimeoutMs + c.simApi.mcpTimeoutMs + 1000 < c.turnTiming.browserTimeoutMs)) {
+      ctx.addIssue({ code: 'custom', path: ['simApi', 'mcpTimeoutMs'], message: 'The MCP wait of a card call must end before the browser stops waiting.' });
+    }
     const turnMs = c.simApi.ssmTimeoutMs + 2 * dynamoCallMs + Math.max(agentMs, c.simApi.mcpTimeoutMs) + 1000;
     const speechMs = c.simApi.ssmTimeoutMs + 2 * c.simApi.speech.cacheTimeoutMs + 4 * dynamoCallMs + c.simApi.speech.pollyTimeoutMs + 1000;
     const worstMs = Math.max(turnMs, speechMs);

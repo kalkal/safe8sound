@@ -38,6 +38,7 @@ const BackendsSchema = z.strictObject({
   mcpUrl: z.url(),
   mcpToken: z.string().min(32),
   mcpTimeoutMs: z.coerce.number().int().min(100).max(30_000),
+  phoneTimeoutMs: z.coerce.number().int().min(100).max(30_000),
   /** sim-api's sandbox phone token (#267), the MCP server's phone:<role>@demo#* entry; optional locally. */
   phoneToken: z.string().min(32).optional(),
 });
@@ -47,7 +48,8 @@ const backends = BackendsSchema.safeParse({
   agentTimeoutMs: process.env['SIM_AGENT_TIMEOUT_MS'] ?? String(DEFAULT_AGENT_TIMEOUT_MS),
   mcpUrl: process.env['SIM_MCP_URL'] ?? 'http://127.0.0.1:3316/mcp',
   mcpToken: process.env['SIM_MCP_TOKEN'],
-  mcpTimeoutMs: process.env['SIM_MCP_TIMEOUT_MS'] ?? '3000',
+  mcpTimeoutMs: process.env['SIM_MCP_TIMEOUT_MS'] ?? '10000',
+  phoneTimeoutMs: process.env['SIM_PHONE_TIMEOUT_MS'] ?? '3000',
   // Empty, as .env.example ships it, means no phone route.
   phoneToken: process.env['SIM_PHONE_TOKEN'] === '' ? undefined : process.env['SIM_PHONE_TOKEN'],
 });
@@ -62,7 +64,7 @@ const handler = createSimApiHandler(config.value, {
   clock: { now: Date.now },
   randomHex: () => randomBytes(8).toString('hex'),
   logger: { log },
-  ...(b.phoneToken === undefined ? {} : { phone: httpPhoneInbox({ mcpUrl: b.mcpUrl, token: b.phoneToken, timeoutMs: b.mcpTimeoutMs }) }),
+  ...(b.phoneToken === undefined ? {} : { phone: httpPhoneInbox({ mcpUrl: b.mcpUrl, token: b.phoneToken, timeoutMs: b.phoneTimeoutMs }) }),
 });
 
 // Client IP from the socket only; body capped while read; a throw becomes a 500 Problem Details.

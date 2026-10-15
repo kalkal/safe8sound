@@ -68,7 +68,7 @@ describe('sim-api stack (#17)', () => {
       SIM_MCP_URL: 'https://mcp.lambda-url.us-east-1.on.aws/mcp',
       // From the one timing table (#270): the agent's deadline plus its margin.
       SIM_AGENT_TIMEOUT_MS: '14000',
-      SIM_MCP_TIMEOUT_MS: '3000',
+      SIM_MCP_TIMEOUT_MS: '10000',
       SSM_TIMEOUT_MS: '2000',
       SIM_ALLOWED_ORIGINS: 'https://sim.example',
       SIM_DEMO_ENABLED: 'true',
@@ -206,6 +206,8 @@ describe('the sim-api time budget (Copilot on #156): the caller never gets a raw
     expect(JSON.stringify(result.error?.issues)).toContain('timeoutSeconds');
     expect(parse({}, { maxAttempts: 5 }).success).toBe(false);
     expect(parse({ mcpTimeoutMs: 20_000 }).success).toBe(false);
+    expect(parse({ mcpTimeoutMs: 14_000 }).success).toBe(false);
+    expect(parse({ mcpTimeoutMs: 10_000 }).success).toBe(true);
   });
 });
 

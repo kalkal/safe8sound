@@ -41,7 +41,7 @@ export const exampleConfig = (): InfraConfig => ({
     logRetentionDays: 14,
     p95AlarmMs: 9000,
     ssmTimeoutMs: 2000,
-    mcpTimeoutMs: 3000,
+    mcpTimeoutMs: 10_000,
     allowedOrigins: [],
     demoEnabled: { dev: true, demo: true },
     tokenTtlS: 3600,

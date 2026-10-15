@@ -21,6 +21,7 @@ import { AnswerPager } from './AnswerPager.js';
 import { DemoCodeGate } from './DemoCodeGate.js';
 import { DemoOverlay } from './DemoOverlay.js';
 import { ExampleQuestions, type ExampleQuestion } from './ExampleQuestions.js';
+import { Spinner } from './Spinner.js';
 import { t } from './text.js';
 
 type TurnResult = Result<AgentAnswer, ErrorEnvelope>;
@@ -299,7 +300,7 @@ export function Conversation({
         )}
         {thinking && (
           <p className="thinking" role="status">
-            {t('chat.thinking')}{' '}
+            <Spinner /> {t('chat.thinking')}{' '}
             <button
               type="button"
               className="link-button"
@@ -383,7 +384,7 @@ export function Conversation({
               setDraft(e.target.value);
             }}
           />
-          <button type="submit" className="button button-quiet" disabled={thinking}>
+          <button type="submit" className="button button-quiet" aria-busy={thinking} disabled={thinking}>
             {t('chat.send')}
           </button>
           {/* Three bands: stopping the voice is an action in this row, in the place of Speak (disabled while the answer
@@ -407,6 +408,7 @@ export function Conversation({
               type="button"
               className="button button-quiet voice-button"
               aria-pressed={listening}
+              aria-busy={thinking}
               disabled={thinking || speaking || replaying}
               onClick={() => {
                 voice.unlock();

@@ -60,3 +60,15 @@ describe('SimClock', () => {
     expect(screen.getByRole('button', { name: /Vai avanti/ })).toHaveProperty('disabled', true);
   });
 });
+
+describe('SimClock while it moves', () => {
+  it('says it is busy: aria-busy and a turning mark on the button, only while it moves', () => {
+    const { rerender } = render(<SimClock state={AHEAD} busy onSkip={vi.fn()} />);
+    const skip = screen.getByRole('button', { name: /Go to 15:00/ });
+    expect(skip.getAttribute('aria-busy')).toBe('true');
+    expect(within(skip).getByTestId('spinner').getAttribute('aria-hidden')).toBe('true');
+    rerender(<SimClock state={AHEAD} busy={false} onSkip={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Go to 15:00/ }).getAttribute('aria-busy')).toBe('false');
+    expect(screen.queryByTestId('spinner')).toBeNull();
+  });
+});

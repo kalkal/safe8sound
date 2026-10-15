@@ -1,6 +1,7 @@
 import type { MilestoneKind } from '@cold-reserve/contracts';
 import { useId } from 'react';
 import { clockTime, type ClockState } from './sim-clock.js';
+import { Spinner } from './Spinner.js';
 import { t } from './text.js';
 
 // The simulated clock (owner decision, 10 Oct; made big under the Echo frame in #391, the top bar pill went unseen): it
@@ -32,9 +33,9 @@ export function SimClock({ state, note, busy, onSkip }: { state: ClockState; not
         <span className="sim-dock-badge">{t('clock.badge')}</span>
         <time dateTime={state.now}>{clockTime(state.now)}</time>
       </span>
-      <button type="button" className="chip-button sim-dock-skip" aria-describedby={noteId} disabled={busy || state.next === undefined} onClick={onSkip}>
+      <button type="button" className="chip-button sim-dock-skip" aria-describedby={noteId} aria-busy={busy} disabled={busy || state.next === undefined} onClick={onSkip}>
         <span className="sim-dock-words">{target ?? t('clock.skip')}</span>
-        <span aria-hidden="true"> ››</span>
+        {busy ? <Spinner /> : <span aria-hidden="true"> ››</span>}
       </button>
       <span id={noteId} className="sim-dock-note" role="status">
         {noteText(state, note, busy)}

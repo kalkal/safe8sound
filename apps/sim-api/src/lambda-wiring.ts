@@ -23,7 +23,9 @@ const SettingsSchema = z.object({
   SIM_MCP_URL: z.url(),
   /** sim-api's sandbox phone token (#267): without it the visitor's phone panel has no route. */
   SIM_PHONE_TOKEN_PARAMETER: z.string().regex(/^\/[\w./-]+$/).optional(),
-  SIM_MCP_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(3000),
+  SIM_MCP_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(10_000),
+  // The family phone inbox: the browser gives up on a poll after 4 s, so its read waits less than that.
+  SIM_PHONE_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(3000),
   /** The studio voice (F8d part 3, #25): the cache bucket, and timeouts for Polly and for each cache call. */
   SIM_SPEECH_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/).optional(),
   SIM_POLLY_TIMEOUT_MS: z.coerce.number().int().min(100).max(10_000).default(2500),
@@ -111,7 +113,7 @@ export async function loadSimApiLambda(env: Readonly<Record<string, string | und
       clock: deps.clock,
       randomHex: () => randomBytes(8).toString('hex'),
       logger: { log: deps.log },
-      ...(phoneToken === undefined ? {} : { phone: httpPhoneInbox({ mcpUrl: s.SIM_MCP_URL, token: phoneToken, timeoutMs: s.SIM_MCP_TIMEOUT_MS }) }),
+      ...(phoneToken === undefined ? {} : { phone: httpPhoneInbox({ mcpUrl: s.SIM_MCP_URL, token: phoneToken, timeoutMs: s.SIM_PHONE_TIMEOUT_MS }) }),
       ...(plain.value.speech.enabled && s.SIM_SPEECH_BUCKET !== undefined && deps.speech !== undefined
         ? { speech: deps.speech({ bucket: s.SIM_SPEECH_BUCKET, pollyTimeoutMs: s.SIM_POLLY_TIMEOUT_MS, cacheTimeoutMs: s.SIM_SPEECH_CACHE_TIMEOUT_MS }) }
         : {}),

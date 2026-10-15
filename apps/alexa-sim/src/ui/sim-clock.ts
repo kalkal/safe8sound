@@ -152,7 +152,16 @@ export async function skipAhead(
     context,
     logEvent,
   );
-  if (!moved.ok) return moved;
+  if (!moved.ok) {
+    // The page may give up before the home answers (cold start, slow link) though the move went through: read the clock
+    // again, and show the real state instead of nothing (15 Oct, found on a phone).
+    // If the read comes before the home has finished, the time is unchanged and the failure stays: the next tap reads the real state.
+    if (moved.error.code !== 'agent_timeout' && moved.error.code !== 'agent_unavailable') return moved;
+    const real = await readClock(agent, list.value.planId, context, logEvent);
+    if (!real.ok || real.value.now === list.value.now) return moved;
+    logEvent({ level: 'info', code: 'clock_skipped', correlationId: context.correlationId, details: { kind: target.kind, recovered: true } });
+    return ok({ state: real.value, reached: target });
+  }
   logEvent({ level: 'info', code: 'clock_skipped', correlationId: context.correlationId, details: { kind: target.kind } });
   const after = await readClock(agent, list.value.planId, context, logEvent);
   return ok({ state: after.ok ? after.value : { now: moved.value.now }, reached: target });

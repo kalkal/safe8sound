@@ -155,6 +155,28 @@ describe('readClock and skipAhead', () => {
     expect(await skipAhead(answering(limited), undefined, ctx, () => undefined)).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', retryAfterMs: 3_600_000 } });
   });
 
+  it('a timeout on the jump that went through: the clock is read again and shows the real time', async () => {
+    const { agent } = sandbox('storm-blackout');
+    // The home moves, but the answer never reaches the page.
+    const slow: Agent = {
+      ...agent,
+      callTool: async (name, args) => {
+        const reply = await agent.callTool(name, args);
+        return name === 'advance_clock' ? refused('agent_timeout') : reply;
+      },
+    };
+    const lines: LogEvent[] = [];
+    const moved = await skipAhead(slow, undefined, ctx, (e) => lines.push(e));
+    expect(moved).toMatchObject({ ok: true, value: { reached: { kind: 'storm_start' }, state: { now: '2026-07-18T19:42:00+02:00' } } });
+    expect(lines.map((e) => e.code)).toEqual(['agent_timeout', 'clock_skipped']);
+  });
+
+  it('a timeout on a jump that did not happen stays a failure, the clock unchanged', async () => {
+    const { agent } = sandbox('storm-blackout');
+    const dead: Agent = { ...agent, callTool: (name, args) => (name === 'advance_clock' ? Promise.resolve(refused('agent_timeout')) : agent.callTool(name, args)) };
+    expect(await skipAhead(dead, undefined, ctx, () => undefined)).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
+  });
+
   it('nothing ahead, a refused jump, a broken reply or a call that throws: a failure as a value, logged with the turn id', async () => {
     const quiet = sandbox('heatwave');
     expect(await skipAhead(quiet.agent, undefined, ctx, () => undefined)).toMatchObject({ ok: false, error: { code: 'invalid_input' } });

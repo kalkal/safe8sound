@@ -1266,6 +1266,32 @@
     letter-spacing: 0.08em;
   }
 
+  /* A small ring that turns while a button waits (clock, Ask, Speak). Still with reduced motion (overrides layer). */
+  .spinner {
+    display: inline-block;
+    box-sizing: border-box;
+    flex: none;
+    inline-size: 1.1em;
+    block-size: 1.1em;
+    margin-inline-start: var(--space-2);
+    vertical-align: -0.15em;
+    border: 0.18em solid currentcolor;
+    border-block-start-color: transparent;
+    border-radius: var(--radius-pill);
+    animation: spinner-turn 0.9s linear infinite;
+  }
+
+  /* Before a status line's words the ring has its own gap after it, not before. */
+  .thinking .spinner {
+    margin-inline: 0 var(--space-2);
+  }
+
+  @keyframes spinner-turn {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   .sim-dock-skip {
     grid-area: button;
     box-sizing: border-box;
