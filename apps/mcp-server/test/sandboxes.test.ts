@@ -83,6 +83,25 @@ describe('sandbox refresh (C2, #222): a sandbox follows its stored settings', ()
     expect(sandboxes.get(home(1))).toEqual({ home: home(1), version: 2 });
   });
 
+  it('hands the settings a request has just saved to refresh, so it need not read them again (#406)', async () => {
+    const seen: (number | undefined)[] = [];
+    const sandboxes = createSandboxes<{ home: string; version: number }, { version: number }>({
+      clock: { now: () => Date.UTC(2026, 9, 4, 9) },
+      ttlMs: 24 * HOUR,
+      maxNewPerDay: 5,
+      create: (h) => ({ home: h, version: 0 }),
+      refresh: (_h, current, _c, saved) => {
+        seen.push(saved?.version);
+        return Promise.resolve(saved === undefined ? current : { ...current, version: saved.version });
+      },
+    });
+    sandboxes.admit(home(1));
+    await sandboxes.refresh(home(1), 'c-1', { version: 3 });
+    await sandboxes.refresh(home(1), 'c-2');
+    expect(seen).toEqual([3, undefined]);
+    expect(sandboxes.get(home(1))).toEqual({ home: home(1), version: 3 });
+  });
+
   it('does nothing for a sandbox that is not live, and nothing without a refresh', async () => {
     const { sandboxes } = setup();
     await expect(sandboxes.refresh(home(9), 'c-1')).resolves.toBeUndefined();

@@ -1,6 +1,6 @@
 import { AdvanceClockOutputSchema, CARD_TOOL_ACCESS, GetMilestonesOutputSchema, HomeIdSchema, celsius, ok, pct, toolError, type HomeId, type Plan, type SandboxSettings } from '@cold-reserve/contracts';
 import { examplePlan } from '@cold-reserve/contracts/fixtures';
-import { localIso, memoryLogger } from '@cold-reserve/core';
+import { localIso, memoryLogger, type StateStoreFactory } from '@cold-reserve/core';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { describe, expect, it } from 'vitest';
 import type { DemoClockDeps } from '../src/modules/demo-clock.js';
@@ -42,6 +42,21 @@ const planOf = (homeId: HomeId, over: Partial<Plan> = {}): Plan => {
 function setup(over: Partial<DemoClockDeps> = {}) {
   const logger = memoryLogger();
   const storeFor = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: { now: () => WALL } });
+  // #406: the settings reads the module makes, counted on the store it is given.
+  const reads = { settings: 0 };
+  const counted: StateStoreFactory = (homeId, scope) =>
+    new Proxy(storeFor(homeId, scope), {
+      get(target, key) {
+        if (key === 'getSandboxSettings') {
+          return () => {
+            reads.settings++;
+            return target.getSandboxSettings();
+          };
+        }
+        const value: unknown = Reflect.get(target, key, target);
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+      },
+    });
   // The sandbox as played here: its scenario time moves with the stored jump, as the real refresh plays it.
   const played = new Map<HomeId, number>();
   const versions = new Map<HomeId, number>();
@@ -66,7 +81,7 @@ function setup(over: Partial<DemoClockDeps> = {}) {
     ...over,
   };
   const module = demoSettingsModule({
-    storeFor,
+    storeFor: counted,
     wallClock: { now: () => WALL },
     defaults: { scenarioId: 'storm-blackout', locationId: 'reference', units: 'C', household: 'older-man' },
     place: (id) => (id === 'reference' ? { id, label: 'Reference home', tz: TZ } : undefined),
@@ -83,7 +98,7 @@ function setup(over: Partial<DemoClockDeps> = {}) {
     const r = await storeFor(A).getSandboxSettings();
     return r.ok ? r.value : undefined;
   };
-  return { logger, stops, settings, storeFor, list: tool('get_milestones'), advance: tool('advance_clock'), set: tool('set_scenario'), nowOf };
+  return { logger, stops, settings, storeFor, reads, list: tool('get_milestones'), advance: tool('advance_clock'), set: tool('set_scenario'), nowOf };
 }
 
 const summary = (t: ToolDefinition, value: unknown, homeId: HomeId = A) => t.summarize?.(t.output.parse(value), ctx(homeId)) ?? '';
@@ -279,6 +294,36 @@ describe('advance_clock (#311)', () => {
     expect(await advance.handler({ hours: 1 }, ctx(A))).toMatchObject({ ok: true });
     expect(await advance.handler({ hours: 1 }, ctx(A))).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded' } });
     expect(await advance.handler({ hours: 1 }, ctx(B))).toMatchObject({ ok: true });
+  });
+
+  it('reads the settings once per jump, however many stops it makes on the way (#406)', async () => {
+    const { advance, reads, stops } = setup();
+    expect(await advance.handler({ hours: 20 }, ctx(A))).toMatchObject({ ok: true });
+    expect(stops).toHaveLength(4);
+    expect(reads.settings).toBe(1);
+    expect(await advance.handler({ hours: 1 }, ctx(A))).toMatchObject({ ok: true });
+    expect(reads.settings).toBe(2);
+  });
+
+  it('settings another container moves in the middle of a jump: the next stop is a conflict, the jump stays where it stopped (#406)', async () => {
+    let otherContainer: (() => Promise<void>) | undefined;
+    const { advance, storeFor, logger, nowOf } = setup({
+      detect: async () => {
+        await otherContainer?.();
+        otherContainer = undefined;
+        return ok(undefined);
+      },
+    });
+    otherContainer = async () => {
+      const stored = await storeFor(A).getSandboxSettings();
+      if (!stored.ok) throw new Error(stored.error.message);
+      const saved = await storeFor(A).putSandboxSettings({ ...stored.value, version: stored.value.version + 1, advancedMs: 5 * H }, stored.value.version);
+      if (!saved.ok) throw new Error(saved.error.message);
+    };
+    const r = await advance.handler({ hours: 20 }, ctx(A));
+    expect(r).toMatchObject({ ok: false, error: { code: 'settings_version_conflict', message: 'The day moved on meanwhile: ask get_milestones again.' } });
+    expect(nowOf(A)).toBe(OUTAGE.fromMs);
+    expect(logger.lines.find((l) => l.details?.['event'] === 'clock_advance_failed')).toMatchObject({ level: 'warn', code: 'settings_version_conflict', correlationId: 'corr-clock' });
   });
 
   it('a detector failure stops the jump where it is, comes back as a value and is logged', async () => {

@@ -1,4 +1,4 @@
-import { categoryOf, type ErrorEnvelope, type Forecast, type HomeId, type Household, type LocationId, type Result, type SandboxSettings, type TempUnit } from '@cold-reserve/contracts';
+import { categoryOf, ok, type ErrorEnvelope, type Forecast, type HomeId, type Household, type LocationId, type Result, type SandboxSettings, type TempUnit } from '@cold-reserve/contracts';
 import type { Logger, StateStoreFactory } from '@cold-reserve/core';
 import { builtInPlace, type Place, type Scenario } from '@cold-reserve/source-simulator';
 import type { HomeEntry } from './modules/energy-status/index.js';
@@ -47,8 +47,13 @@ type Play = (homeId: HomeId, settings: SandboxSettings) => Result<SandboxPlay, E
 /**
  * Brings a sandbox up to date with its stored settings, one read per request (C2b Q3), so every container plays a
  * change at its next request. A failure is logged and the sandbox keeps playing what it played (its degraded mode).
+ * The settings a request has just saved here (`saved`, #406) are played as they are, with no read: the store holds them.
  */
-export function refreshFrom(storeFor: StateStoreFactory, play: Play, logger: Logger): (homeId: HomeId, current: SandboxPlay, correlationId: string) => Promise<SandboxPlay> {
+export function refreshFrom(
+  storeFor: StateStoreFactory,
+  play: Play,
+  logger: Logger,
+): (homeId: HomeId, current: SandboxPlay, correlationId: string, saved?: SandboxSettings) => Promise<SandboxPlay> {
   const warn = (homeId: HomeId, correlationId: string, error: ErrorEnvelope, event: string, message: string, level: 'warn' | 'error' = 'warn') => {
     logger.log({
       ts: new Date().toISOString(),
@@ -61,8 +66,8 @@ export function refreshFrom(storeFor: StateStoreFactory, play: Play, logger: Log
       details: { event, ...homeDetail(homeId) },
     });
   };
-  return async (homeId, current, correlationId) => {
-    const read = await storeFor(homeId, { correlationId }).getSandboxSettings();
+  return async (homeId, current, correlationId, saved) => {
+    const read = saved === undefined ? await storeFor(homeId, { correlationId }).getSandboxSettings() : ok(saved);
     if (!read.ok) {
       if (read.error.code !== 'settings_not_found') {
         warn(homeId, correlationId, read.error, 'settings_read_failed', 'The sandbox settings could not be read: the sandbox keeps what it plays.');

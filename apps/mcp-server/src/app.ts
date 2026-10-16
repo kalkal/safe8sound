@@ -1,4 +1,4 @@
-import { HomeIdSchema, HomeProfileSchema, SandboxHomeIdSchema, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type Result, type TempUnit } from '@cold-reserve/contracts';
+import { HomeIdSchema, HomeProfileSchema, SandboxHomeIdSchema, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type Result, type SandboxSettings, type TempUnit } from '@cold-reserve/contracts';
 import { darkWindow, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
 import { FallbackSource } from '@cold-reserve/source-fallback';
 import { SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, demoStoryProfile, profileAtPlace } from '@cold-reserve/source-simulator';
@@ -175,7 +175,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     });
   };
   const settingsStoreFor = opts.settingsStoreFor;
-  const sandboxes = createSandboxes<SandboxPlay>({
+  const sandboxes = createSandboxes<SandboxPlay, SandboxSettings>({
     clock: opts.wallClock,
     ttlMs: sandboxTtlH.value * HOUR_MS,
     maxNewPerDay: sandboxMaxNew.value,
@@ -303,8 +303,8 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
               return { id, label, tz };
             },
             logger: opts.logger,
-            // This container plays the change at once; the others at their next request.
-            onChange: (homeId, _settings, correlationId) => sandboxes.refresh(homeId, correlationId),
+            // This container plays the change at once, as saved (no read, #406); the others at their next request.
+            onChange: (homeId, settings, correlationId) => sandboxes.refresh(homeId, correlationId, settings),
             clock: demoClock,
           }),
         ]),

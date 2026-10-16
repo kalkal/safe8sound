@@ -67,7 +67,11 @@ export interface SettingsAccess {
   readonly save: (homeId: HomeId, next: SandboxSettings, expected: number | undefined, correlationId: string) => Promise<Result<void, ErrorEnvelope>>;
 }
 
+/** The settings a jump builds on, and the version they were stored with (undefined: the defaults, nothing saved). */
+type StoredSettings = { readonly settings: SandboxSettings; readonly version: number | undefined };
+
 const notHere = (): ErrorEnvelope => toolError('home_not_allowed', 'Only a visitor sandbox has a demo clock.');
+const movedOn = (): ErrorEnvelope => toolError('settings_version_conflict', 'The day moved on meanwhile: ask get_milestones again.');
 
 /** The sandbox's own plan, or plan_not_found: another home's plan is never told apart from a missing one. */
 async function ownPlan(deps: DemoClockDeps, homeId: HomeId, planId: PlanId | undefined, correlationId: string): Promise<Result<Plan | undefined, ErrorEnvelope>> {
@@ -170,18 +174,30 @@ export function demoClockTools(deps: DemoClockDeps, settings: SettingsAccess, o:
 
       used.set(ctx.homeId, { dayMs: today, count: count + 1 });
       const fromMs = day.nowMs;
-      // Each stop is saved on the version the jump was planned on, then on its own: a concurrent jump (a double tap,
-      // another container) makes one of them a conflict, never a clock moved twice or backwards.
-      let version = day.version;
+      // #406: the settings are read once, before the first stop; each stop then builds on the settings the previous one
+      // saved. Each stop is saved on the version the jump was planned on, then on its own: a concurrent jump (a double
+      // tap, another container) makes one of them a conflict, never a clock moved twice or backwards.
+      const stored = await settings.read(ctx.homeId, ctx.correlationId);
+      if (!stored.ok) {
+        logFailure(ctx, stored.error);
+        return stored;
+      }
+      if (stored.value.version !== day.version) {
+        const conflict = movedOn();
+        logFailure(ctx, conflict);
+        return err(conflict);
+      }
+      let saved = stored.value;
       for (const stop of stopsOf(day, plan.value, toMs, deps.stableGridMs)) {
-        const moved = await moveTo(ctx, stop.atMs, version);
+        const moved = await moveTo(ctx, stop.atMs, saved);
         const detected = moved.ok ? await deps.detect(ctx, stop.kind) : moved;
         if (!detected.ok) {
           logFailure(ctx, detected.error);
           return detected;
         }
-        if (moved.ok) version = moved.value;
+        if (moved.ok) saved = { settings: moved.value, version: moved.value.version };
       }
+      const version = saved.version;
       o.logger.log({
         ts: new Date(wallMs).toISOString(),
         level: 'info',
@@ -196,27 +212,26 @@ export function demoClockTools(deps: DemoClockDeps, settings: SettingsAccess, o:
 
   /**
    * Saves the jump that puts the sandbox's now at `atMs` (a new settings version) and plays it here, only on the
-   * version `expected`: settings moved since, or a now already past `atMs`, are a conflict, never a clock moved back.
+   * settings `current` (read before the first stop, or saved by the previous one): settings moved since, here or in
+   * another container (the conditional save), or a now already past `atMs`, are a conflict, never a clock moved back.
    */
-  async function moveTo(ctx: ToolContext, atMs: number, expected: number | undefined): Promise<Result<number, ErrorEnvelope>> {
+  async function moveTo(ctx: ToolContext, atMs: number, current: StoredSettings): Promise<Result<SandboxSettings, ErrorEnvelope>> {
     const day = deps.day(ctx.homeId);
     if (day === undefined) return err(toolError('home_not_found', 'This sandbox is not playing.'));
-    const current = await settings.read(ctx.homeId, ctx.correlationId);
-    if (!current.ok) return current;
-    if (current.value.version !== expected || day.version !== expected || atMs < day.nowMs) {
-      return err(toolError('settings_version_conflict', 'The day moved on meanwhile: ask get_milestones again.'));
-    }
-    const before = current.value.settings;
+    if (day.version !== current.version || atMs < day.nowMs) return err(movedOn());
+    const before = current.settings;
     const next: SandboxSettings = {
       ...before,
-      version: (current.value.version ?? 0) + 1,
+      version: (current.version ?? 0) + 1,
       updatedAt: new Date(o.wallClock.now()).toISOString(),
       // The playthrough is pinned: the same anchor, so a daily anchor never rolls the day over under a jump.
       scenarioStartedAt: before.scenarioStartedAt ?? new Date(day.anchorMs).toISOString(),
       advancedMs: Math.round((before.advancedMs ?? 0) + atMs - day.nowMs),
     };
-    const saved = await settings.save(ctx.homeId, next, expected, ctx.correlationId);
-    return saved.ok ? ok(next.version) : saved;
+    const saved = await settings.save(ctx.homeId, next, current.version, ctx.correlationId);
+    if (saved.ok) return ok(next);
+    // The store says the same conflict in its own words: the visitor hears the clock's.
+    return saved.error.code === 'settings_version_conflict' ? err(movedOn()) : saved;
   }
 
   function logFailure(ctx: ToolContext, error: ErrorEnvelope): void {

@@ -53,6 +53,25 @@ describe('refreshFrom: one settings read per request (C2b)', () => {
     expect(await refresh(A, play(1), 'c')).toBe(rebuilt);
   });
 
+  it('plays the settings this request has just saved without reading them again (#406)', async () => {
+    const logger = memoryLogger();
+    let reads = 0;
+    const counting: StateStoreFactory = () =>
+      ({
+        getSandboxSettings: () => {
+          reads++;
+          return Promise.resolve(ok(settings));
+        },
+      }) as unknown as StateStore;
+    const rebuilt = play(2);
+    const refresh = refreshFrom(counting, () => ok(rebuilt), logger);
+    expect(await refresh(A, play(1), 'c', settings)).toBe(rebuilt);
+    const same = play(2);
+    expect(await refresh(A, same, 'c', settings)).toBe(same);
+    expect(reads).toBe(0);
+    expect(logger.lines).toEqual([]);
+  });
+
   it('warns once per build when no settings are saved, and keeps the defaults', async () => {
     const logger = memoryLogger();
     const refresh = refreshFrom(storeWith(err(toolError('settings_not_found', 'None.'))), () => ok(play(9)), logger);

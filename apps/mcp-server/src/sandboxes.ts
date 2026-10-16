@@ -3,7 +3,7 @@ import type { Clock } from '@cold-reserve/core';
 
 const DAY_MS = 86_400_000;
 
-export interface Sandboxes<T> {
+export interface Sandboxes<T, S = unknown> {
   /** The sandbox of `home`, created on first use within the daily cap; using it restarts its TTL. */
   admit(home: HomeId): Result<T, ErrorEnvelope>;
   /** The live sandbox of `home`, if any (no creation, no TTL refresh). */
@@ -11,8 +11,9 @@ export interface Sandboxes<T> {
   /**
    * Brings a live sandbox up to date with its stored settings (C2, #222): the handler awaits it right after
    * `admit`, so every container sees a change at its next request. It never throws: a failure keeps the sandbox.
+   * `saved`: the settings this request has just stored, played with no read (#406).
    */
-  refresh(home: HomeId, correlationId: string): Promise<void>;
+  refresh(home: HomeId, correlationId: string, saved?: S): Promise<void>;
 }
 
 /**
@@ -23,14 +24,14 @@ export interface Sandboxes<T> {
  * so the real daily ceiling is `maxNewPerDay` × concurrent instances (10 on a new account). A store-backed
  * counter replaces it if the demo goes public.
  */
-export function createSandboxes<T>(opts: {
+export function createSandboxes<T, S = unknown>(opts: {
   clock: Clock;
   ttlMs: number;
   maxNewPerDay: number;
   create: (home: HomeId) => T;
   /** Returns the sandbox to keep: the same one, or one rebuilt from new settings. It handles its own failures. */
-  refresh?: (home: HomeId, current: T, correlationId: string) => Promise<T>;
-}): Sandboxes<T> {
+  refresh?: (home: HomeId, current: T, correlationId: string, saved?: S) => Promise<T>;
+}): Sandboxes<T, S> {
   const live = new Map<HomeId, { value: T; lastUsedMs: number }>();
   let day = -1;
   let createdToday = 0;
@@ -65,10 +66,10 @@ export function createSandboxes<T>(opts: {
       sweep(opts.clock.now());
       return live.get(home)?.value;
     },
-    async refresh(home, correlationId) {
+    async refresh(home, correlationId, saved) {
       const entry = live.get(home);
       if (entry === undefined || opts.refresh === undefined) return;
-      const next = await opts.refresh(home, entry.value, correlationId);
+      const next = await opts.refresh(home, entry.value, correlationId, saved);
       // Another request may have replaced or forgotten it meanwhile: only the entry we read is updated.
       if (live.get(home) === entry) entry.value = next;
     },
