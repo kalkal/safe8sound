@@ -1,7 +1,5 @@
 import { HOME_HEADER, ToolCallReplySchema, err, ok, toolError, type ErrorEnvelope, type HomeId, type Result, type ToolCallReply } from '@cold-reserve/contracts';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import type { CardToolPort } from '../handler.js';
 
 /** One MCP tools/call for a home: the real client below, a fake one in tests. */
@@ -42,19 +40,31 @@ function pick(raw: unknown): unknown {
   return { ...(r.isError === undefined ? {} : { isError: r.isError }), content, ...(r.structuredContent === undefined ? {} : { structuredContent: r.structuredContent }) };
 }
 
-/** The real MCP caller: one stateless Streamable HTTP request per call, with the sandbox header. */
-export function streamableMcpCaller(opts: { url: string; token: string }): McpCaller {
+/**
+ * The real MCP caller (#406): ONE stateless Streamable HTTP POST per call, the JSON-RPC `tools/call` itself, with the
+ * sandbox header and the negotiated protocol version. The server keeps no session (and a sandbox refresh runs on
+ * tools/call only), so the initialize + initialized handshake of an SDK client would be two wasted round trips.
+ * Any failure (transport, HTTP status, JSON-RPC error) throws: `mcpCardTools` turns it into a value.
+ */
+export function streamableMcpCaller(opts: { url: string; token: string; fetch?: typeof fetch }): McpCaller {
+  const send = opts.fetch ?? fetch;
   return async (home, name, args, signal, correlationId) => {
-    const client = new Client({ name: 'cold-reserve-sim-api', version: '0.0.0' });
-    const transport = new StreamableHTTPClientTransport(new URL(opts.url), {
-      requestInit: { headers: { authorization: `Bearer ${opts.token}`, [HOME_HEADER]: home, 'x-correlation-id': correlationId } },
+    const res = await send(opts.url, {
+      method: 'POST',
+      signal,
+      headers: {
+        authorization: `Bearer ${opts.token}`,
+        [HOME_HEADER]: home,
+        'x-correlation-id': correlationId,
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        'mcp-protocol-version': LATEST_PROTOCOL_VERSION,
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
     });
-    // SDK v1 types do not satisfy exactOptionalPropertyTypes (sessionId?: string vs undefined).
-    await client.connect(transport as unknown as Transport, { signal });
-    try {
-      return await client.callTool({ name, arguments: args }, undefined, { signal });
-    } finally {
-      await client.close();
-    }
+    if (!res.ok) throw new Error(`MCP server answered ${res.status}`);
+    const message = (await res.json()) as { result?: unknown; error?: { message?: unknown } };
+    if (message.error !== undefined) throw new Error(`MCP error: ${typeof message.error.message === 'string' ? message.error.message : 'unknown'}`);
+    return message.result;
   };
 }

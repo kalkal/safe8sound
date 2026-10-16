@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createMcpHandler, type LogEntry } from '../src/handler.js';
 import { createRegistry } from '../src/registry.js';
 import { createSandboxes } from '../src/sandboxes.js';
-import { HOME_TOKEN, TOKEN, callTool, homeId, post, probeModule, testConfig, toolResult } from './helpers.js';
+import { HOME_TOKEN, TOKEN, callTool, homeId, initializeRequest, post, probeModule, testConfig, toolResult, toolsList } from './helpers.js';
 
 // The sandbox header (#101): only a demo#* grant may send it, only for demo#<16 hex>, and never for `home`.
 const SANDBOX_TOKEN = 's'.repeat(32);
@@ -100,5 +100,40 @@ describe('x-cold-reserve-home: sandbox homes for the demo#* grant only', () => {
     expect(metrics).toHaveLength(1);
     expect(JSON.stringify(logs)).not.toContain('demo#');
     expect(JSON.stringify(metrics)).not.toContain('demo#');
+  });
+});
+
+describe('the sandbox refresh runs for tools/call only (#406)', () => {
+  function counted() {
+    const refreshed: string[] = [];
+    const registry = createRegistry([probeModule]);
+    if (!registry.ok) throw new Error(registry.error.message);
+    const inner = createSandboxes({ clock: { now: () => Date.UTC(2026, 9, 1, 12) }, ttlMs: 86_400_000, maxNewPerDay: 10, create: (h) => h });
+    const sandboxes = {
+      ...inner,
+      refresh: (home: Parameters<typeof inner.refresh>[0], correlationId: string) => {
+        refreshed.push(home);
+        return inner.refresh(home, correlationId);
+      },
+    };
+    const config = testConfig({ clients: new Map([[SANDBOX_TOKEN, { clientId: 'agent-sandbox', homeId: homeId('demo'), sandboxes: true }]]) });
+    const handler = createMcpHandler(config, { registry: registry.value, logger: { log: () => undefined }, sandboxes });
+    const send = (body: unknown) => post(handler, body, { authorization: `Bearer ${SANDBOX_TOKEN}`, 'x-cold-reserve-home': SANDBOX });
+    return { refreshed, send };
+  }
+
+  it('does not refresh for initialize, notifications or tools/list', async () => {
+    const { refreshed, send } = counted();
+    await send(initializeRequest);
+    await send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+    await send(toolsList);
+    expect(refreshed).toEqual([]);
+  });
+
+  it('refreshes once per tools/call, so every container sees a change on its next request', async () => {
+    const { refreshed, send } = counted();
+    await send(callTool('whoami', {}));
+    await send(callTool('whoami', {}));
+    expect(refreshed).toEqual([SANDBOX, SANDBOX]);
   });
 });

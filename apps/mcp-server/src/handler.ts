@@ -304,7 +304,8 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
         return problem(admitted.error, correlationId);
       }
       // The visitor's saved settings (C2b): one read per request, so every container plays a change at once.
-      await deps.sandboxes.refresh(sandbox.data, correlationId);
+      // Only a tools/call acts: initialize, notifications and tools/list skip it, and with it the storm catch-up (#406).
+      if (isToolCall(body)) await deps.sandboxes.refresh(sandbox.data, correlationId);
       homeId = sandbox.data;
     }
 

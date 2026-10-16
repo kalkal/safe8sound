@@ -1,7 +1,7 @@
 import { HomeIdSchema, ToolCallRequestSchema, toolError, toProblemDetails } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { httpTurnAgent } from '../src/adapters/agent-http.js';
-import { mcpCardTools, type McpCaller } from '../src/adapters/mcp-cards.js';
+import { mcpCardTools, streamableMcpCaller, type McpCaller } from '../src/adapters/mcp-cards.js';
 
 const HOME = HomeIdSchema.parse('demo#0123456789abcdef');
 const CID = '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60';
@@ -111,5 +111,44 @@ describe('mcpCardTools: card actions to the MCP server, with the sandbox home of
     expect(await down.call({ home: HOME, request: APPLY, correlationId: CID })).toMatchObject({ ok: false, error: { code: 'agent_unavailable' } });
     const slow = mcpCardTools({ caller: () => new Promise(() => undefined), timeoutMs: 20 });
     expect(await slow.call({ home: HOME, request: APPLY, correlationId: CID })).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
+  });
+});
+
+describe('streamableMcpCaller: one POST per card action (#406)', () => {
+  const reply = { jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: 'ok' }], structuredContent: { n: 1 } } };
+  function recorder(answer: () => Promise<Response>) {
+    const calls: { url: string; headers: Record<string, string>; body: { method: string; params: unknown }; signal: AbortSignal | null | undefined }[] = [];
+    const fetcher = ((url: string, init: RequestInit) => {
+      calls.push({ url, headers: init.headers as Record<string, string>, body: JSON.parse(init.body as string) as never, signal: init.signal });
+      return answer();
+    }) as typeof fetch;
+    return { calls, caller: streamableMcpCaller({ url: 'http://mcp.test/mcp', token: 't'.repeat(32), fetch: fetcher }) };
+  }
+
+  it('sends only tools/call, with token, sandbox home, correlation id and protocol version, and returns the result', async () => {
+    const { calls, caller } = recorder(() => Promise.resolve(Response.json(reply)));
+    const signal = AbortSignal.timeout(1000);
+    expect(await caller(HOME, 'apply_plan', { planId: 'p' }, signal, CID)).toEqual(reply.result);
+    expect(await caller(HOME, 'apply_plan', { planId: 'p' }, signal, CID)).toEqual(reply.result);
+    // Two actions in a row: two requests in all, no initialize and no initialized notification.
+    expect(calls.map((c) => c.body.method)).toEqual(['tools/call', 'tools/call']);
+    expect(calls[0]).toMatchObject({
+      url: 'http://mcp.test/mcp',
+      body: { params: { name: 'apply_plan', arguments: { planId: 'p' } } },
+      headers: { authorization: `Bearer ${'t'.repeat(32)}`, 'x-cold-reserve-home': HOME, 'x-correlation-id': CID, 'mcp-protocol-version': expect.any(String) as string },
+      signal,
+    });
+  });
+
+  it('throws on a failed status, a JSON-RPC error and a transport error, so the card sees a value', async () => {
+    await expect(recorder(() => Promise.resolve(new Response('no', { status: 502 }))).caller(HOME, 'x', {}, AbortSignal.timeout(1000), CID)).rejects.toThrow('502');
+    await expect(recorder(() => Promise.resolve(Response.json({ jsonrpc: '2.0', id: 1, error: { code: -32602, message: 'bad' } }))).caller(HOME, 'x', {}, AbortSignal.timeout(1000), CID)).rejects.toThrow('bad');
+    await expect(recorder(() => Promise.reject(new TypeError('fetch failed'))).caller(HOME, 'x', {}, AbortSignal.timeout(1000), CID)).rejects.toThrow('fetch failed');
+  });
+
+  it('keeps the timeout of the card: a slow server ends as agent_timeout', async () => {
+    const { caller } = recorder(() => new Promise(() => undefined));
+    const tools = mcpCardTools({ caller, timeoutMs: 20 });
+    expect(await tools.call({ home: HOME, request: APPLY, correlationId: CID })).toMatchObject({ ok: false, error: { code: 'agent_timeout' } });
   });
 });
