@@ -79,11 +79,13 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext, degr
   // The family's latest reply in this storm, by role only; its time on the home's clock (queue item 3).
   // Once the storm has ended, an old "on my way" is not news any more.
   const people = namedPeople(o.value);
+  const roomName = o.value.home.profile.rooms.find((r) => r.id === safeRoom.id)?.name;
   const limit = o.value.limitNow;
   const within = o.value.withinLimits;
   const reply = session?.phase === 'ended' ? undefined : session?.familyReplies?.at(-1);
   return ok({
     safeRoomId: safeRoom.id,
+    ...(roomName === undefined ? {} : { safeRoomName: roomName }),
     tempC: safeRoom.tempC,
     ...(safeRoom.humidityPct === undefined ? {} : { humidityPct: safeRoom.humidityPct }),
     occupantRoles: safeRoom.occupants,

@@ -67,7 +67,7 @@ describe('heat safety settings over MCP (#266)', () => {
     expect(stricter).toMatchObject({ structuredContent: { preferences: { safety: { stricterNightLimit: true, heatIndexCapC: 30 } } } });
     // The model only sees the text: it carries every value it must say.
     const text = (stricter.content as { text: string }[])[0]?.text;
-    expect(text).toBe('Saved: safety.stricterNightLimit from false to true, safety.heatIndexCapC from 32.2 to 30.');
+    expect(text).toBe('Saved: safety stricter night limit from false to true, safety heat index cap from 32.2 to 30.');
 
     // The text names the maximum, the toggle and both caps as played (#266 review).
     const after = await session(backing, (client) => client.callTool({ name: 'get_preferences', arguments: {} }));
@@ -97,7 +97,7 @@ describe('preferences in a °F sandbox (#306): said in °F, with the °C value t
     const saved = text(
       await session(backing, (client) => client.callTool({ name: 'set_preferences', arguments: { safety: { stricterNightLimit: true, heatIndexCapC: 30 }, confirmed: true } }), () => 'F'),
     );
-    expect(saved).toBe('Saved: safety.stricterNightLimit from false to true, safety.heatIndexCapC from 90 °F (32.2 C) to 86 °F (30 C).');
+    expect(saved).toBe('Saved: safety stricter night limit from false to true, safety heat index cap from 90 °F (32.2 C) to 86 °F (30 C).');
   });
 
   it('set_preferences refuses in °F with the °C to send in brackets (#306 review)', async () => {
@@ -113,6 +113,6 @@ describe('preferences in a °F sandbox (#306): said in °F, with the °C value t
     const read = text(await session(backing, (client) => client.callTool({ name: 'get_preferences', arguments: {} }), () => 'F'));
     expect(read).not.toContain('154.4');
     const saved = text(await session(backing, (client) => client.callTool({ name: 'set_preferences', arguments: { comfortC: { heating: 19 }, confirmed: true } }), () => 'F'));
-    expect(saved).toBe('Saved: comfortC.heating from 68 °F (20 C) to 66.2 °F (19 C).');
+    expect(saved).toBe('Saved: comfort heating from 68 °F (20 C) to 66.2 °F (19 C).');
   });
 });

@@ -24,8 +24,8 @@ export interface EnergyStatusDeps {
 }
 
 /** The text of get_home_status; the last live reading as the home's clock time, never an ISO stamp (#177). */
-/** Rooms as "Name (id)": people hear the name, the model reads the id it must pass (#274). */
-export const roomLabel = (id: string, names: Readonly<Record<string, string>>): string => (names[id] === undefined ? id : `${names[id]} (${id})`);
+/** Rooms by their display name, never their id (#192). */
+export const roomLabel = (id: string, names: Readonly<Record<string, string>>): string => (names[id] ?? 'a room');
 
 export function homeStatusSummary(
   s: HomeStatus,
@@ -47,7 +47,9 @@ export function homeStatusSummary(
   // Who is in each room (#271): a fictional name with its role, "Leo (grandpa)", so the model never thinks they are two people.
   const who = (roles: readonly string[]) => (roles.length === 0 ? '' : ` with ${roles.map((r) => (people[r] === undefined ? r : `${people[r]} (${r})`)).join(' and ')}`);
   const rooms = s.rooms.length === 0 ? '' : ` Rooms: ${s.rooms.map((r) => `${roomLabel(r.roomId, roomNames)} ${r.state}${who(r.occupants)}`).join(', ')}.`;
-  return `Battery at ${s.batterySocPct}%, ${s.level} level; ${served} of ${s.rooms.length} rooms served (${data}). ${grid}${rooms}${link}`;
+  // For tool calls only, never said aloud: the ids plan_comfort and set_preferences take (#192).
+  const ids = s.rooms.length === 0 ? '' : ` Room ids for tools (do not say them): ${s.rooms.map((r) => `${roomLabel(r.roomId, roomNames)} = ${r.roomId}`).join('; ')}.`;
+  return `Battery at ${s.batterySocPct}%, ${s.level} level; ${served} of ${s.rooms.length} rooms served (${data}). ${grid}${rooms}${link}${ids}`;
 }
 
 export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {

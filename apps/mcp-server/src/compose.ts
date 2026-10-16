@@ -2,7 +2,7 @@ import type { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { HomeIdSchema, SandboxHomeIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Result, type TempUnit } from '@cold-reserve/contracts';
 import { seededRng, type Clock, type StateStoreFactory } from '@cold-reserve/core';
-import { demoProfile } from '@cold-reserve/source-simulator';
+import { demoProfile, demoStoryProfile } from '@cold-reserve/source-simulator';
 import {
   createDocumentTableClient,
   defaultDynamoClient,
@@ -26,7 +26,7 @@ import type { CapabilityModule } from './registry.js';
 const SANDBOX_PROBE = HomeIdSchema.parse('demo#0000000000000000');
 
 export function profileFor(homeId: HomeId): HomeProfile | undefined {
-  return homeId === 'demo' || SandboxHomeIdSchema.safeParse(homeId).success ? demoProfile() : undefined;
+  return homeId === 'demo' || SandboxHomeIdSchema.safeParse(homeId).success ? demoStoryProfile() : undefined;
 }
 
 export interface ComposeOptions {

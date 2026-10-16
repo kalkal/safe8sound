@@ -308,6 +308,11 @@ describe('updatePreferences', () => {
     });
   });
 
+  it('an unknown room is refused with the rooms there are, as "Name (id)" (#192)', () => {
+    const r = updatePreferences(current(), { safeRoomId: 'attic' }, { ...ctx, roomNames: { 'bedroom-1': 'Bedroom' } });
+    expect(!r.ok && r.error.message).toContain('The rooms are: Bedroom (bedroom-1),');
+  });
+
   it('refuses rooms the home does not have', () => {
     expect(updatePreferences(current(), { safeRoomId: 'attic' }, ctx)).toMatchObject({
       ok: false,

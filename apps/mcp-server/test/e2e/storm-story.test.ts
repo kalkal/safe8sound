@@ -81,12 +81,12 @@ describe('the storm story of a sandbox (#390)', () => {
     const messages = await phone();
     expect(messages.map((m) => `${m.transition}@${m.at}`)).toEqual(['storm_prepared@12:00', 'storm_started@15:00', 'essential_level@21:00', 'power_back@06:40']);
     const [forecast, started, essential, back] = messages.map((m) => m.text);
-    expect(forecast).toContain('a storm is expected and the home is ready for a power cut. Bedroom is at 26.0 °C; if the power goes out, the battery keeps it safe at least until 12:00 PM tomorrow.');
+    expect(forecast).toContain("a storm is expected and the home is ready for a power cut. Leo's room is at 26.0 °C; if the power goes out, the battery keeps it safe at least until 12:00 PM tomorrow.");
     // The storm-start time is never the time it is sent ("until 3:00 PM" at 3:00 PM): at the 24-hour cap it is a horizon.
-    expect(started).toMatch(/Bedroom is at 26\.0 °C and the battery keeps it safe at least until 3:00 PM tomorrow\. No action is needed now\./);
-    expect(essential).toMatch(/the battery reached the essential level, to keep Bedroom safe at least until 9:00 PM tomorrow\. Bedroom is at 25\.0 °C\. No action is needed now\./);
+    expect(started).toMatch(/Leo's room is at 26\.0 °C and the battery keeps it safe at least until 3:00 PM tomorrow\. No action is needed now\./);
+    expect(essential).toMatch(/the battery reached the essential level, to keep Leo's room safe at least until 9:00 PM tomorrow\. Leo's room is at 25\.0 °C\. No action is needed now\./);
     // Power back: grandpa's room within his 24 °C night limit, so no action is needed (above it, the family would be asked to check).
-    expect(back).toContain('power came back at home at 6:30 AM. Bedroom is at 24.0 °C. Storm mode has ended. No action is needed now.');
+    expect(back).toContain("power came back at home at 6:30 AM. Leo's room is at 24.0 °C. Storm mode has ended. No action is needed now.");
     for (const text of [started, essential, back]) expect(tempOf(text ?? '')).toBeLessThanOrEqual(26);
 
     // After power back the house is no longer in a storm: storm mode ended, the comfort level, the living room cooled again.

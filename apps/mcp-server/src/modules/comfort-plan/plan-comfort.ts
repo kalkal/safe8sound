@@ -27,7 +27,7 @@ import { acLimitW, buildLadder, chooseHouseholdTip, epsBaseLoadW, candidateSteps
 import { buildContext, counterfactualOf, currentControls, holdSafeRoom, projectFrom, rejectionOf, reserveOf, runGuard, safeRoomLimitAt, safeRoomLimitKindAt, safeUntil, type CandidatePlan, type GuardContext, type GuardInput, type GuardVerdict, type SafeLimit } from '@cold-reserve/guard';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import { withModelHint, type ToolContext } from '../../tool.js';
-import { localIso, localTimeText } from '@cold-reserve/core';
+import { localIso, theRoom, localTimeText } from '@cold-reserve/core';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
 import { lastResortActions, lastResortThen, lastResortWindow, limitCrossedAt, loweredLimit } from './last-resort.js';
 import { recordRejection } from './rejections.js';
@@ -408,8 +408,8 @@ function lastResortOf(tried: readonly Attempt[], deps: ComfortPlanDeps, guardInp
       code: 'last_resort_plan',
       // #364: when the room holds its limit after the battery runs out, its time first, then the battery's, as on the card.
       message: (crossed === undefined || season === 'heating'
-        ? `No plan keeps the ${room} within its limits until the next recharge: safe for about ${String(safeHours)} hours, until ${localTimeText(safeUntilIso)}; then ${then}.`
-        : `No plan keeps the ${room} within its limits until the next recharge: within them until about ${localTimeText(localIso(crossed.atMs, profile.location.tz))}, the battery until ${localTimeText(safeUntilIso)}; then it warms up.`
+        ? `No plan keeps ${theRoom(room)} within its limits until the next recharge: safe for about ${String(safeHours)} hours, until ${localTimeText(safeUntilIso)}; then ${then}.`
+        : `No plan keeps ${theRoom(room)} within its limits until the next recharge: within them until about ${localTimeText(localIso(crossed.atMs, profile.location.tz))}, the battery until ${localTimeText(safeUntilIso)}; then it warms up.`
       ).slice(0, 300),
     },
   };
@@ -428,7 +428,7 @@ export function alignedNightWarning(w: PlanWarning, lr: Plan['lastResort'], nigh
   if (lr.limitCrossedAt !== undefined && lr.limitCrossedC === night.thresholdC) until = `about ${localTimeText(lr.limitCrossedAt)}`;
   else if (lr.limitCrossedAt === undefined && lr.worstAt === undefined) until = 'the next recharge';
   else return w;
-  return { code: w.code, message: `Tonight the ${roomName} stays at or below ${formatTemp(night.thresholdC, unit)} until ${until}, then it warms up.`.slice(0, 300) };
+  return { code: w.code, message: `Tonight ${theRoom(roomName)} stays at or below ${formatTemp(night.thresholdC, unit)} until ${until}, then it warms up.`.slice(0, 300) };
 }
 
 /** The plan's warnings: the night warning aligned with a last resort, and "no heat danger" never next to it (#285 review). */

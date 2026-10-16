@@ -1,6 +1,6 @@
 import { celsius, type HomeProfile, type NightRecovery, type PlanWarning } from '@cold-reserve/contracts';
 import { degreeHours, heatAmount, temp } from './display.js';
-import { nightMetrics, type NightMetrics, type ProjectionPoint, type RoomControl } from '@cold-reserve/core';
+import { nightMetrics, theRoom, type NightMetrics, type ProjectionPoint, type RoomControl } from '@cold-reserve/core';
 import { UNSERVED_TOLERANCE_W, projectFrom, type GuardContext } from './context.js';
 
 // Night recovery (feature queue item 1; definitions and sources in packages/contracts/src/night-recovery.ts
@@ -74,8 +74,8 @@ export function evaluateNight(ctx: GuardContext): { nightRecovery?: NightRecover
         // With the grid up the limit is the air conditioner (or the room's humidity), not the battery. When the
         // hours are reached, what cannot be kept is the heat budget: say that, not "x hours, not the 0".
         message: (plan.achievedHours >= requiredHours - EPS
-          ? `Tonight ${limit} cannot keep the heat in the ${room} within the night budget: about ${heatAmount(base.heatIndexDegreeHoursAbove26_7, unit)}, over the ${degreeHours(cfg.budgetDegreeHours, unit)} allowed.`
-          : `Tonight ${limit} can keep the ${room} at or below ${temp(thresholdC, unit)} for about ${best.toString()} hours, not the ${base.requiredHours.toString()} hours of the night-recovery target.`
+          ? `Tonight ${limit} cannot keep the heat in ${theRoom(room)} within the night budget: about ${heatAmount(base.heatIndexDegreeHoursAbove26_7, unit)}, over the ${degreeHours(cfg.budgetDegreeHours, unit)} allowed.`
+          : `Tonight ${limit} can keep ${theRoom(room)} at or below ${temp(thresholdC, unit)} for about ${best.toString()} hours, not the ${base.requiredHours.toString()} hours of the night-recovery target.`
         ).slice(0, 300),
       },
     ],

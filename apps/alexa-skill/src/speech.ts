@@ -24,8 +24,6 @@ function hoursText(h: number): string {
 const UNIT_WORD: Readonly<Record<TempUnit, string>> = { C: 'Celsius', F: 'Fahrenheit' };
 const temp = (c: number, unit: TempUnit) => `${String(toDisplayTemp(c, unit))} degrees ${UNIT_WORD[unit]}`;
 
-/** A room id as said aloud: "living_room" becomes "living room". */
-const roomWords = (id: string) => id.replace(/[_-]+/g, ' ');
 
 export function homeStatusSpeech(s: HomeStatus): string {
   const served = s.rooms.filter((r) => r.state === 'served').length;
@@ -67,7 +65,7 @@ export function safeRoomSpeech(s: SafeRoomStatus, unit: TempUnit): string {
     pastLimit(s, unit) ??
     (s.gridAvailable === true ? `The grid powers it; on the battery alone it would stay safe for ${hoursText(s.safeHours)}.` : `It stays safe for ${hoursText(s.safeHours)}.`);
   const degraded = s.storeUnavailable === true ? ' The saved settings could not be read, so this is the live reading only.' : '';
-  return `The safe room, the ${roomWords(s.safeRoomId)}, is at ${temp(s.tempC, unit)}. ${people} ${hours}${degraded}`;
+  return `The safe room${s.safeRoomName === undefined ? '' : `, ${s.safeRoomName},`} is at ${temp(s.tempC, unit)}. ${people} ${hours}${degraded}`;
 }
 
 /** What the person hears when a step fails: short, honest, never the technical detail (that stays in the log). */

@@ -40,7 +40,7 @@ describe('handle: the requests that read the home', () => {
     const fake = fakeCaller();
     const r = await handle(intent('SafeRoomIntent'), makeDeps({ caller: fake.caller }).deps);
     expect(fake.calls.map((c) => c.name)).toEqual(['get_safe_room_status']);
-    expect(spoken(r)).toBe('The safe room, the living room, is at 26.1 degrees Celsius. 1 person is in it. It stays safe for about 12 hours.');
+    expect(spoken(r)).toBe('The safe room, Living room, is at 26.1 degrees Celsius. 1 person is in it. It stays safe for about 12 hours.');
     const f = await handle(intent('SafeRoomIntent'), makeDeps({ tempUnit: 'F' }).deps);
     expect(spoken(f)).toContain('79 degrees Fahrenheit');
   });
@@ -48,7 +48,7 @@ describe('handle: the requests that read the home', () => {
   it('a safe room already past its limit is said so, without the reassuring safe hours', async () => {
     const above = { ...safeRoomStatus(), tempC: 27.4, limitNow: { limitC: 26, kind: 'night' } };
     const r = await handle(intent('SafeRoomIntent'), makeDeps({ caller: fakeCaller(() => Promise.resolve(toolResult(above))).caller }).deps);
-    expect(spoken(r)).toBe('The safe room, the living room, is at 27.4 degrees Celsius. 1 person is in it. It is above the night limit of 26 degrees Celsius now.');
+    expect(spoken(r)).toBe('The safe room, Living room, is at 27.4 degrees Celsius. 1 person is in it. It is above the night limit of 26 degrees Celsius now.');
     const below = { ...safeRoomStatus(), tempC: 15.2, limitNow: { limitC: 16, kind: 'minimum' } };
     const cold = await handle(intent('SafeRoomIntent'), makeDeps({ caller: fakeCaller(() => Promise.resolve(toolResult(below))).caller }).deps);
     expect(spoken(cold)).toContain('It is below the safety minimum of 16 degrees Celsius now.');
@@ -71,7 +71,7 @@ describe('handle: the requests that read the home', () => {
     const said = await Promise.all([handle(fixture('launch'), deps), handle(fixture('reserve-outlook'), deps), handle(intent('SafeRoomIntent'), deps)]).then((rs) => rs.map(spoken));
     expect(said[0]).toContain('The battery is at 17 percent, at the balanced level. 1 of 1 room is served.');
     expect(said[1]).toBe('At the saver level, the battery alone lasts about 3 hours. At the essential level, about 6 hours. The storm reserve on its own covers less than an hour at the essential level.');
-    expect(said[2]).toBe('The safe room, the living room, is at 31.4 degrees Celsius. Nobody is in it. The grid powers it; on the battery alone it would stay safe for about 2 hours.');
+    expect(said[2]).toBe('The safe room, Living room, is at 31.4 degrees Celsius. Nobody is in it. The grid powers it; on the battery alone it would stay safe for about 2 hours.');
   });
 });
 
@@ -247,5 +247,15 @@ describe('SSML', () => {
     const r = await handle(intent('NopeIntent'), makeDeps().deps);
     expect(r.response.outputSpeech?.type).toBe('SSML');
     expect(r.response.outputSpeech?.ssml).toMatch(/^<speak>Sorry, I can&apos;t help with that\. [^<>]+<\/speak>$/);
+  });
+});
+
+describe('handle: no raw room id is ever said (#192)', () => {
+  it('a status without a room name says "The safe room" and no id', async () => {
+    const bare: Record<string, unknown> = { ...safeRoomStatus() };
+    delete bare['safeRoomName'];
+    const r = await handle(intent('SafeRoomIntent'), makeDeps({ caller: fakeCaller(() => Promise.resolve(toolResult(bare))).caller }).deps);
+    expect(spoken(r)).toMatch(/^The safe room is at 26\.1 degrees Celsius\./);
+    expect(spoken(r)).not.toMatch(/living|_|bedroom/i);
   });
 });

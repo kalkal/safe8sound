@@ -1,4 +1,5 @@
 import type { PlanWarning } from '@cold-reserve/contracts';
+import { theRoom } from '@cold-reserve/core';
 import { driedInto, type GuardContext } from './context.js';
 
 // Dry air the plan did not cause (#107): cooling and fans cannot raise the humidity, so a safe room below the
@@ -19,6 +20,6 @@ export function dryAirWarning(ctx: GuardContext): PlanWarning | undefined {
   const room = profile.rooms.find((r) => r.id === preferences.safeRoomId)?.name ?? preferences.safeRoomId;
   return {
     code: 'dry_air',
-    message: `The air in the ${room} is dry (down to ${Math.round(Math.min(...dry)).toString()} %, under ${minPct.toString()} %) and cooling cannot raise it: drink water; a damp cloth or a bowl of water in the room helps.`.slice(0, 300),
+    message: `The air in ${theRoom(room)} is dry (down to ${Math.round(Math.min(...dry)).toString()} %, under ${minPct.toString()} %) and cooling cannot raise it: drink water; a damp cloth or a bowl of water in the room helps.`.slice(0, 300),
   };
 }

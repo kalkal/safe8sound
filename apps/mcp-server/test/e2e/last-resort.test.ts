@@ -83,7 +83,7 @@ describe('storm, battery 20 %: the last resort, confirmed twice, tells the famil
         lr.limitCrossedAt === undefined
           ? `(within its limits until|until the battery runs out at) ${localTimeText(lr.safeUntil)} `
           : `within its limits until about ${localTimeText(lr.limitCrossedAt)}, the battery until ${localTimeText(lr.safeUntil)} `;
-      expect(textOf(planned)).toMatch(new RegExp(`^Proposed last-resort plan ${plan.id}: the safe room alone, ${head}`));
+      expect(textOf(planned)).toMatch(new RegExp(`^Proposed last-resort plan: the safe room alone, ${head}`));
       // #376: the card's advice, with the number to call at the home's place (the local entry is the reference home).
       expect(lr.place).toBe('reference');
       expect(textOf(planned)).toContain('If you are worried, call 112.');

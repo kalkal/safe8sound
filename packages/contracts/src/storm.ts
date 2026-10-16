@@ -155,6 +155,8 @@ export const SafeRoomStatusSchema = z.strictObject({
   stricterNightLimit: z.literal(true).optional(),
   /** #271 (additive, approved in #271): the safe room's limit in force now and what sets it, so a room above it is said so. */
   limitNow: z.strictObject({ limitC: CelsiusSchema, kind: SafeRoomLimitKindSchema }).optional(),
+  /** #192 (additive): the safe room by its display name from the home profile, so a voice never says the id. */
+  safeRoomName: z.string().min(1).max(80).optional(),
   /** #271 (additive, approved in #271): the fictional names of the occupants that have one in a demo or sandbox home. */
   people: z.array(z.strictObject({ role: RoleSchema, name: z.string().min(1).max(30) })).max(10).optional(),
   /**

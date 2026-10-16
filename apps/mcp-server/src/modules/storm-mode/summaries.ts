@@ -50,9 +50,9 @@ function dataText(o: DataOrigin): string {
   return `simulated data (${simulated}${o.scenario === undefined ? '' : `, scenario ${o.scenario}`})`;
 }
 
-/** A room as it is said: its name with its id, "Bedroom 1 (bedroom-1)", so the model says the name and still knows the id. */
-export type RoomLabel = (roomId: string) => string;
-const idOnly: RoomLabel = (roomId) => roomId;
+/** A room as it is said: its display name from the home profile, never its id (#192); undefined when unknown. */
+export type RoomLabel = (roomId: string) => string | undefined;
+const noName: RoomLabel = () => undefined;
 
 /**
  * #390 review: the safe hours at the projection's cap (`capHours`) are a horizon, never an end: "at least 24.0 hours,
@@ -61,7 +61,7 @@ const idOnly: RoomLabel = (roomId) => roomId;
 const hoursText = (hours: number, capHours: number | undefined) => `${capHours !== undefined && hours >= capHours ? 'at least' : 'about'} ${one(hours)} hours`;
 const untilWords = (hours: number, capHours: number | undefined) => (capHours !== undefined && hours >= capHours ? 'at least until' : 'until');
 
-export function startSummary(o: StartOutput, room: RoomLabel = idOnly, capHours?: number): string {
+export function startSummary(o: StartOutput, room: RoomLabel = noName, capHours?: number): string {
   const state =
     o.effectiveMode === 'active'
       ? 'Storm mode is active: the grid is down, so the storm reserve is now the budget.'
@@ -71,11 +71,11 @@ export function startSummary(o: StartOutput, room: RoomLabel = idOnly, capHours?
   const told = o.session.notifications.filter((n) => n.transition === transition && n.delivered);
   const what = o.effectiveMode === 'active' ? 'the storm started' : 'a storm is expected';
   const family = told.length > 0 ? `Family told that ${what}: ${told.map((n) => `${n.contactRole} (${n.channel})`).join(', ')}.` : 'No family message was sent.';
-  return `${state} The safe room, ${room(o.session.safeRoomId)}, is covered for ${hoursText(o.safeHours, capHours)}, ${untilWords(o.safeHours, capHours)} ${untilText(o.safeUntil, o.safeUntil, o.safeHours)}. ${family}${devicesText(o)}`;
+  return `${state} The safe room${nameOf(room, o.session.safeRoomId)} is covered for ${hoursText(o.safeHours, capHours)}, ${untilWords(o.safeHours, capHours)} ${untilText(o.safeUntil, o.safeUntil, o.safeHours)}. ${family}${devicesText(o)}`;
 }
 
 /** The safe room now, in the unit the sandbox chose (#306); the structured status stays in °C. */
-export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: RoomLabel = idOnly, capHours?: number): string {
+export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: RoomLabel = noName, capHours?: number): string {
   const humidity = s.humidityPct === undefined ? '' : `, ${String(s.humidityPct)} % humidity`;
   // #271: a fictional name with its role, "Leo (grandpa)", so a name and a role are one person.
   const named = new Map((s.people ?? []).map((p) => [p.role, p.name]));
@@ -101,7 +101,7 @@ export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: R
   const head = degraded ? 'The saved settings and the storm state are not reachable right now: this is the live reading only. ' : '';
   return (
     head +
-    `Safe room ${room(s.safeRoomId)}: ${formatTempFixed(s.tempC, unit)}${humidity}, occupants: ${occupants}.${pastLimit(s, unit)} Level ${s.level} (reason: ${s.levelReason}). ` +
+    `Safe room${nameOf(room, s.safeRoomId, true)}: ${formatTempFixed(s.tempC, unit)}${humidity}, occupants: ${occupants}.${pastLimit(s, unit)} Level ${s.level} (reason: ${s.levelReason}). ` +
     `${hours} ${storm}${checkIn} Home link ${s.homeLink}, ${dataText(s.origin)}.`
   );
 }
@@ -142,4 +142,10 @@ function withinText(s: SafeRoomStatus, unit: TempUnit): string | undefined {
   return w.limitC === undefined
     ? `The safe room stays within its limits at least until ${untilText(w.until, s.safeUntil, s.safeHours)}; ${battery}.`
     : `The safe room stays at or below its ${formatTemp(w.limitC, unit)} limit until about ${untilText(w.until, s.safeUntil, s.safeHours)}; ${battery}, then the room warms up.`;
+}
+
+/** ", Leo's bedroom," inside a sentence (or " Leo's bedroom" with `bare`), and nothing when the profile has no name. */
+function nameOf(room: RoomLabel, roomId: string, bare = false): string {
+  const name = room(roomId);
+  return name === undefined ? '' : bare ? ` ${name}` : `, ${name},`;
 }

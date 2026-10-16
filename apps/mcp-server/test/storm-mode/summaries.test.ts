@@ -45,7 +45,7 @@ describe('what the model reads', () => {
     if (!out.ok) throw new Error(out.error.message);
     const s = out.value;
     const text = safeRoomSummary(s);
-    expect(text).toContain(`Safe room ${s.safeRoomId}: ${one(s.tempC)} °C, ${String(s.humidityPct)} % humidity, occupants: Leo (grandpa).`);
+    expect(text).toContain(`Safe room: ${one(s.tempC)} °C, ${String(s.humidityPct)} % humidity, occupants: Leo (grandpa).`);
     expect(text).toContain('Level essential (reason: storm).');
     expect(text).toContain(`Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}${s.safeHours >= 24 ? ' tomorrow' : ''}.`);
     expect(text).not.toMatch(/Giulia|phone-/);
@@ -53,7 +53,7 @@ describe('what the model reads', () => {
     expect(text).toContain('simulated data (');
   });
 
-  it('the storm tools say the safe room by its name, with its id: "Bedroom 1 (bedroom-1)"', async () => {
+  it('the storm tools say the safe room by its name, never its id (#192)', async () => {
     const w = world(4);
     const tools = stormModeModule(w.deps).tools;
     const said = (name: string, output: unknown) => tools.find((t) => t.name === name)?.summarize?.(output, w.ctx) ?? '';
@@ -63,8 +63,9 @@ describe('what the model reads', () => {
     if (!status.ok) throw new Error(status.error.message);
     const room = w.deps.homes(w.ctx.homeId)?.profile.rooms.find((r) => r.id === status.value.safeRoomId);
     if (room === undefined) throw new Error('no safe room in the profile');
-    expect(said('start_storm_mode', started.value)).toContain(`The safe room, ${room.name} (${room.id}), is covered`);
-    expect(said('get_safe_room_status', status.value)).toContain(`Safe room ${room.name} (${room.id}): `);
+    expect(status.value.safeRoomName).toBe(room.name);
+    expect(said('start_storm_mode', started.value)).toContain(`The safe room, ${room.name}, is covered`);
+    expect(said('get_safe_room_status', status.value)).toContain(`Safe room ${room.name}: `);
   });
 
   it('#271: at 22:00 with an older person, 27 °C is said above the night limit of 24 °C, and the grandpa by his fictional name', async () => {
@@ -91,7 +92,7 @@ describe('what the model reads', () => {
     if (!out.ok) throw new Error(out.error.message);
     // The structured status stays in °C; the text the model reads is in °F.
     const f = Math.round((out.value.tempC * 1.8 + 32) * 10) / 10;
-    expect(safeRoomSummary(out.value, 'F')).toContain(`Safe room ${out.value.safeRoomId}: ${f.toFixed(1)} °F`);
+    expect(safeRoomSummary(out.value, 'F')).toContain(`Safe room: ${f.toFixed(1)} °F`);
     expect(safeRoomSummary(out.value, 'F')).not.toContain('°C');
     const told = await w.inbox();
     expect(told.map((m) => m.text).join(' ')).toMatch(/is at \d+\.\d °F/);

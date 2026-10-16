@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { allocateRooms } from '../src/index.js';
+import { allocateRooms, theRoom } from '../src/index.js';
 
 // Mutation testing runs the properties with fewer cases (FC_RUNS); CI and local runs use the full count.
 const runs = (n: number): number => Number(process.env['FC_RUNS'] ?? n);
@@ -51,5 +51,14 @@ describe('allocateRooms: room priority under the inverter limit (plan §4ter, §
       }),
       { numRuns: runs(10_000) },
     );
+  });
+});
+
+describe('theRoom (#192)', () => {
+  it('puts "the" before a common name and not before a possessive', () => {
+    expect(theRoom('Bedroom')).toBe('the Bedroom');
+    expect(theRoom('Living room')).toBe('the Living room');
+    expect(theRoom("Leo's room")).toBe("Leo's room");
+    expect(theRoom('Leo’s room')).toBe('Leo’s room');
   });
 });

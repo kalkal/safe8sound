@@ -25,3 +25,9 @@ export function allocateRooms(input: {
     return { roomId: d.roomId, state: 'waiting', waitingReason: 'inverter_limit' };
   });
 }
+
+/**
+ * A room as a noun phrase in a sentence (#192): "the Bedroom" for a common name, but no article before a possessive
+ * ("Leo's room"), which would read "the Leo's room".
+ */
+export const theRoom = (name: string): string => (/['’]s\b/.test(name) ? name : `the ${name}`);

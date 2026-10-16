@@ -44,6 +44,8 @@ export interface PreferencesUpdateContext {
   readonly limits: SafetyHardLimits;
   /** Rooms of the home profile. */
   readonly roomIds: readonly string[];
+  /** Display names by room id, to list the rooms there are when one is unknown (#192). */
+  readonly roomNames?: Readonly<Record<string, string>> | undefined;
   /** ISO 8601 time of the confirmation. */
   readonly at: string;
   readonly by: ConfigChange['by'];
@@ -68,7 +70,8 @@ export function updatePreferences(
   const safeRoomId = update.safeRoomId ?? current.safeRoomId;
   const unknown = [safeRoomId, ...(update.roomPriority ?? [])].find((id) => !ctx.roomIds.includes(id));
   if (unknown !== undefined) {
-    return err(toolError('unknown_room', `This home has no room "${unknown}".`, { details: { roomId: unknown } }));
+    const rooms = ctx.roomIds.map((id) => (ctx.roomNames?.[id] === undefined ? id : `${ctx.roomNames[id]} (${id})`)).join(', ');
+    return err(toolError('unknown_room', `This home has no room "${unknown}". The rooms are: ${rooms}.`, { details: { roomId: unknown } }));
   }
 
   let roomPriority: string[];

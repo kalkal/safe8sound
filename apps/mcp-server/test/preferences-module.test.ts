@@ -36,11 +36,12 @@ describe('preferences module (MCP tools)', () => {
     expect(byName['set_preferences']).toMatchObject({ readOnlyHint: CARD_TOOL_ACCESS.set_preferences === 'read', destructiveHint: true, idempotentHint: true });
   });
 
-  it('names the safe room in the text, its id only in parentheses for the model (#274)', async () => {
+  it('names the safe room in the text, never its id (#192)', async () => {
     const named = deps({ roomNameFor: (_home, id) => ({ 'bedroom-1': 'Bedroom' })[id] });
     const result = await call(named, 'get_preferences', {});
     const text = (result.content as { text: string }[])[0]?.text;
-    expect(text).toContain('safe room Bedroom (bedroom-1)');
+    expect(text).toContain('safe room Bedroom.');
+    expect((text ?? '').slice(0, (text ?? '').indexOf(' Room ids for tools'))).not.toContain('bedroom-1');
   });
 
   it('returns the defaults for a home with nothing saved, with the hard limits', async () => {
@@ -57,6 +58,21 @@ describe('preferences module (MCP tools)', () => {
     const result = await call(deps(), 'get_preferences', {});
     expect(result.structuredContent).toMatchObject({ preferences: { contacts: [{ role: 'daughter', channel: 'in_app' }] } });
     expect(JSON.stringify(result)).not.toMatch(/Example Contact|phone-1/);
+  });
+
+  it('get_preferences gives the room ids in a separate "do not say" line; set_preferences says rooms by name (#192)', async () => {
+    const names: Record<string, string> = { 'bedroom-1': 'Bedroom', living: 'Living room', study: 'Study' };
+    const d = deps({ roomNameFor: (_home, id) => names[id] });
+    const text = ((await call(d, 'get_preferences', {})).content as { text: string }[])[0]?.text ?? '';
+    expect(text).toContain(' Room ids for tools (do not say them): Bedroom = bedroom-1; Living room = living; Study = study.');
+    expect(text.slice(0, text.indexOf(' Room ids for tools'))).not.toMatch(/bedroom-1|living\b|study\b/);
+    const set = await call(d, 'set_preferences', { safeRoomId: 'living', roomPriority: ['living', 'bedroom-1'], confirmed: true });
+    const said = (set.content as { text: string }[])[0]?.text ?? '';
+    expect(said).toContain('safe room from Bedroom to Living room');
+    expect(said).toContain('room priority from');
+    expect(said).not.toMatch(/bedroom-1|\bliving\b(?!\s+room)/);
+    const refused = await call(d, 'set_preferences', { safeRoomId: 'attic', confirmed: true });
+    expect((refused.content as { text: string }[])[0]?.text ?? '').toContain('The rooms are: Bedroom (bedroom-1), Living room (living), Study (study).');
   });
 
   it('saves a confirmed change and reports it; the next read is no longer the default', async () => {

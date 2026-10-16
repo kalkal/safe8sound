@@ -40,6 +40,8 @@ export interface PreferencesModuleDeps {
 
 /** A changed field holds a temperature when one of its path segments is a °C value (comfortC, maxC, heatIndexCapC…). */
 const isTemperatureField = (field: string): boolean => field.split('.').some((part) => /C$/.test(part));
+/** A logged field path as words, "safety.heatIndexCapC" → "safety heat index cap"; room fields without 'Id' (#192). */
+const fieldWords = (field: string): string => field.replace(/Id$/, '').replace(/([a-z])C(?=[.]|$)/g, '$1').replace(/[.]/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
 const changeValue = (field: string, value: unknown, unit: TempUnit): string =>
   typeof value === 'number' && isTemperatureField(field) && unit === 'F' ? formatTempForInput(value, unit) : String(value);
 
@@ -63,16 +65,17 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
     input: z.strictObject({}),
     output: GetPreferencesOutputSchema,
     summarize: (o, ctx) => {
-      // The name for people, the id in parentheses for the model (#274).
       const id = o.preferences.safeRoomId;
       const name = deps.roomNameFor?.(ctx.homeId, id);
+      // For tool calls only, never said aloud: the ids set_preferences takes (#192).
+      const idsLine = ` Room ids for tools (do not say them): ${deps.roomIdsFor(ctx.homeId).map((r) => `${deps.roomNameFor?.(ctx.homeId, r) ?? 'a room'} = ${r}`).join('; ')}.`;
       // The safe room's limits as the guard plays them (#266 review): the maximum, the toggle and both caps.
       const heat = effectiveHeatSafety(o.preferences.safety);
       const unit = deps.unitsFor?.(ctx.homeId) ?? 'C';
       const limits =
         `Safe room limits: at most ${formatTempForInput(o.preferences.safety.cooling.maxC, unit)}, the stricter night limit ${heat.stricterNightLimit ? 'on' : 'off'}, ` +
         `a heat-index cap of ${formatTempForInput(heat.heatIndexCapC, unit)}, an older-person cap of ${formatTempForInput(heat.elderlyCapC, unit)}.`;
-      return `${o.isDefault ? 'Default' : 'Saved'} preferences: cool to ${formatTempForInput(o.preferences.comfortC.cooling, unit)}, safe room ${name === undefined ? id : `${name} (${id})`}. ${limits}`;
+      return `${o.isDefault ? 'Default' : 'Saved'} preferences: cool to ${formatTempForInput(o.preferences.comfortC.cooling, unit)}, safe room${name === undefined ? '' : ` ${name}`}. ${limits}${idsLine}`;
     },
     handler: async (_args, ctx) => {
       const read = await current(ctx.homeId);
@@ -93,7 +96,9 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
     summarize: (o, ctx) => {
       if (o.changes.length === 0) return 'Nothing changed.';
       const unit = deps.unitsFor?.(ctx.homeId) ?? 'C';
-      return `Saved: ${o.changes.map((c) => `${c.field} from ${changeValue(c.field, c.from, unit)} to ${changeValue(c.field, c.to, unit)}`).join(', ')}.`;
+      const room = (v: unknown) => String(v).split(',').map((id) => deps.roomNameFor?.(ctx.homeId, id) ?? 'a room').join(', ');
+      const val = (field: string, v: unknown) => (field === 'safeRoomId' || field === 'roomPriority' ? room(v) : changeValue(field, v, unit));
+      return `Saved: ${o.changes.map((c) => `${fieldWords(c.field)} from ${val(c.field, c.from)} to ${val(c.field, c.to)}`).join(', ')}.`;
     },
     handler: async (args, ctx) => {
       const read = await current(ctx.homeId);
@@ -103,6 +108,7 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
       const next = updatePreferences(read.value.preferences, update, {
         limits: deps.limits,
         roomIds: deps.roomIdsFor(ctx.homeId),
+        roomNames: Object.fromEntries(deps.roomIdsFor(ctx.homeId).flatMap((id) => { const n = deps.roomNameFor?.(ctx.homeId, id); return n === undefined ? [] : [[id, n]]; })),
         at: new Date((deps.clockFor?.(ctx.homeId) ?? deps.clock).now()).toISOString(),
         by: 'user',
         // The model passed confirmed: true after the host prompt; the log says so, not more.

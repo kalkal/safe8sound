@@ -54,6 +54,7 @@ export const reserveOutlook = () => exampleReserveOutlook();
 
 export const safeRoomStatus = () => ({
   safeRoomId: 'living_room',
+  safeRoomName: 'Living room',
   tempC: 26.1,
   occupantRoles: ['grandpa'],
   level: 'balanced',

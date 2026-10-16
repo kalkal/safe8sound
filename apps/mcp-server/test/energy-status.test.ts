@@ -73,7 +73,7 @@ describe('the get_home_status text', () => {
 
   const status = (grid: { gridAvailable: boolean; gridW: number }) => ({ batterySocPct: 10, level: 'essential', rooms: [], origin: { energy: 'simulated' }, homeLink: 'ok', ...grid }) as unknown as HomeStatus;
 
-  it('lists every room as "Name (id)" with whether it is served or waiting, so the model never guesses an id (#274)', () => {
+  it('lists every room by name in the spoken part, and its id only in the separate "for tools" line (#192, #274)', () => {
     const s = {
       batterySocPct: 100, level: 'comfort', origin: { energy: 'simulated' }, homeLink: 'ok', gridAvailable: true, gridW: 300,
       rooms: [
@@ -82,7 +82,10 @@ describe('the get_home_status text', () => {
       ],
     } as unknown as HomeStatus;
     const text = homeStatusSummary(s, 'Europe/Rome', { 'bedroom-1': 'Bedroom', living: 'Living room' });
-    expect(text).toContain('Rooms: Bedroom (bedroom-1) served, Living room (living) waiting.');
+    expect(text).toContain('Rooms: Bedroom served, Living room waiting.');
+    const spokenText = text.slice(0, text.indexOf(' Room ids for tools'));
+    expect(spokenText).not.toMatch(/bedroom-1|\bliving\b/);
+    expect(text).toContain('Room ids for tools (do not say them): Bedroom = bedroom-1; Living room = living.');
   });
 
   it('#271: says who is in each room, a fictional name with its role, "Leo (grandpa)"', () => {
@@ -94,7 +97,7 @@ describe('the get_home_status text', () => {
       ],
     } as unknown as HomeStatus;
     const text = homeStatusSummary(s, 'Europe/Rome', { 'bedroom-1': 'Bedroom', study: 'Study' }, { grandpa: 'Leo' });
-    expect(text).toContain('Rooms: Bedroom (bedroom-1) served with Leo (grandpa), Study (study) served with adult.');
+    expect(text).toContain('Rooms: Bedroom served with Leo (grandpa), Study served with adult.');
   });
 
   it('says whether the grid is on, in words, with what it draws or takes (#273): the model reads only the text', () => {

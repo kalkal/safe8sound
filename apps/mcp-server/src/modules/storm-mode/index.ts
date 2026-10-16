@@ -59,11 +59,10 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
   };
 }
 
-/** The safe room said by its name from the home profile, with its id: "Bedroom 1 (bedroom-1)"; the id alone if unknown. */
+/** The safe room said by its name from the home profile; never its id (#192). */
 function roomLabel(deps: StormModeDeps, homeId: HomeId): RoomLabel {
   const rooms = deps.homes(homeId)?.profile.rooms ?? [];
   return (roomId) => {
-    const name = rooms.find((r) => r.id === roomId)?.name;
-    return name === undefined ? roomId : `${name} (${roomId})`;
+    return rooms.find((r) => r.id === roomId)?.name;
   };
 }

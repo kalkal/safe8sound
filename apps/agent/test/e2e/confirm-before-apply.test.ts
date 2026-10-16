@@ -128,7 +128,7 @@ describe('the person confirms before the agent applies (#230)', () => {
     expect(first.ok && first.value.text).toBe('Here is the plan. Shall I apply it?');
     const second = await agent.ask('Yes, apply it.', randomUUID());
     if (!second.ok) throw new Error(second.error.message);
-    expect(second.value.text).toBe(`Plan ${planId ?? ''} applied.`);
+    expect(second.value.text).toBe(`The plan was applied.`);
   }, 60_000);
 
   it('only ever connected to the loopback', () => {

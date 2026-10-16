@@ -1,7 +1,7 @@
 import { HomeIdSchema, HomeProfileSchema, SandboxHomeIdSchema, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type Result, type TempUnit } from '@cold-reserve/contracts';
 import { darkWindow, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
 import { FallbackSource } from '@cold-reserve/source-fallback';
-import { SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, profileAtPlace } from '@cold-reserve/source-simulator';
+import { SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, demoStoryProfile, profileAtPlace } from '@cold-reserve/source-simulator';
 import { withCardResources, type CardDocuments } from './cards.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
@@ -121,9 +121,10 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const levelSince = new Date(scenarioStartMs).toISOString();
   const startHMs = scenarioStartMs - Date.parse(builtIn.startAt);
 
-  const demo = demoProfile();
+  const base = demoProfile();
+  const demo = demoStoryProfile();
   // The real home never gets the demo's fictional names (#271): the schema refuses them there (R17).
-  const homeProfile = homeProfileOf({ ...demo, homeId: HOME, people: undefined }, opts.logger, 'startup');
+  const homeProfile = homeProfileOf({ ...base, homeId: HOME, people: undefined }, opts.logger, 'startup');
   if (!homeProfile.ok) return homeProfile;
   const home = homeProfile.value;
   const simulator = (profile: typeof demo) => new SimulatorSource({ profile, scenario, params, clock });

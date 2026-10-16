@@ -93,7 +93,7 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       expect(s.safeUntil).toMatch(/T15:30:00\+02:00$/);
       expect(textOf(status)).toContain(`Safe for at least ${s.safeHours.toFixed(1)} hours, at least until`);
       expect((await inbox()).map((m) => `${m.transition}:${m.role}`)).toEqual(['storm_started:daughter', 'storm_prepared:daughter']);
-      expect((await inbox())[0]?.text).toContain('Bedroom is at');
+      expect((await inbox())[0]?.text).toContain("Leo's room is at");
 
       // 3. The model tells the family the house went to Essential: roles only in what it reads.
       const told = await call('notify_family', { transition: 'essential_level' });

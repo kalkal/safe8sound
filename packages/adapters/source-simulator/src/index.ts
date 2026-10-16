@@ -44,6 +44,12 @@ function orThrow<T>(r: Result<T, ErrorEnvelope>): T {
 /** The demo home: the real plant from spike S6, with example rooms. Placeholder location. */
 export const demoProfile = (): HomeProfile => HomeProfileSchema.parse(demoHome);
 
+/** The demo and sandbox homes (invented): the safe room is the grandpa Leo's room (#192). Never used for the real home (R17). */
+export const demoStoryProfile = (): HomeProfile => {
+  const p = demoProfile();
+  return { ...p, rooms: p.rooms.map((r) => (r.id === 'bedroom-1' ? { ...r, name: "Leo's room" } : r)) };
+};
+
 export const defaultSimParams = (): SimulatorParams => orThrow(parseSimParams(simulatorParams));
 
 /** The real July 2024 of Turin and Houston, hour by hour, for the nights study (D1, #247). */

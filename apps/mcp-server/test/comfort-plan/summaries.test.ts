@@ -22,13 +22,14 @@ describe('what the model reads', () => {
     expect(planSummary(p, { ...NIGHT, roomNames: {} })).toMatch(new RegExp(`Plan ${p.id} is waiting for the person's yes: when they say yes, call apply_plan with planId ${p.id}\\.$`));
   });
 
-  it('plan_comfort names the safe room in the counterfactual, its id only in parentheses (#274)', async () => {
+  it('plan_comfort names the safe room in the counterfactual, never its id (#192)', async () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     if (r.value.counterfactual === undefined) throw new Error('no counterfactual');
     const text = planSummary(r.value, { ...NIGHT, roomNames: { 'bedroom-1': 'Bedroom' } });
-    expect(text).toContain('Without the plan the safe room, Bedroom (bedroom-1), would peak at');
+    expect(text).toContain('Without the plan the safe room, Bedroom, would peak at');
+    expect(text).not.toContain('bedroom-1');
   });
 
   describe('in the unit the sandbox chose (#306)', () => {
@@ -137,12 +138,15 @@ describe('what the model reads', () => {
     if (!r.ok) throw new Error(r.error.message);
     const p = r.value;
     const text = planSummary(p, NIGHT);
-    expect(text).toContain(p.id);
+    // #192: the plan id appears only in the instruction for the model, never in a spoken sentence.
+    const spoken = text.slice(0, text.lastIndexOf("Say it to the person"));
+    expect(spoken).not.toContain(p.id);
+    expect(spoken).not.toMatch(/plan_|[a-z]+-\d\b|\b(bedroom|room) ?\d+\b/i);
     expect(text).toContain(`${p.steps[0]?.level ?? ''} level`);
     expect(text).toContain(`until ${localTimeText(p.horizonAt)}`);
     // Every time in the text as a clock time in the home's zone, never an ISO stamp (#160 acceptance test).
     expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
-    for (const g of p.guarantees) expect(text).toContain(`${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`);
+    for (const g of p.guarantees) expect(text).toContain(`${g.id.replace(/_/g, ' ')} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`);
     expect(text).toContain(`${one(p.reserveWh / 1000)} kWh`);
     expect(text).toContain(`${one(p.reserveFloorSocPct ?? -1)} %`);
     // The 36-hour heatwave shows the whole night: the hours are required and reported.
@@ -155,7 +159,7 @@ describe('what the model reads', () => {
     expect(c).toBeDefined();
     // The peak as the home's clock time, with the offset of the plan's own local times.
     const clock = (iso: string) => localTimeText(localIso(Date.parse(iso), w.profile.location.tz));
-    expect(text).toContain(`Without the plan the safe room (${c?.roomId ?? ''}) would peak at ${String(c?.scenarios.noPlan.peakTempC)} °C at ${clock(c?.scenarios.noPlan.peakAt ?? '')}`);
+    expect(text).toContain(`Without the plan the safe room would peak at ${String(c?.scenarios.noPlan.peakTempC)} °C at ${clock(c?.scenarios.noPlan.peakAt ?? '')}`);
     for (const line of Object.values(c?.scenarios ?? {})) {
       expect(text).toContain(`${String(line.peakTempC)} °C at ${clock(line.peakAt)}`);
       expect(text).toContain(`${one(line.heatIndexDegreeHours)} heat-index degree-hours, ${one(line.hoursAtOrBelowThreshold)} night hours at or below the threshold`);
@@ -257,7 +261,7 @@ describe('what the model reads', () => {
     // none for the room's threshold, the counterfactual's night hours included.
     const durations = text.split(/(?<=\.) /).filter((s) => /\d+(\.\d+)? (night )?(hours?|minutes?|min|h)\b/.test(s));
     expect(durations).toEqual([
-      expect.stringMatching(/^pacing_on_track FAILS: At this pace the battery runs out at 00:50, \d+ min before the next recharge at 08:00\.$/),
+      expect.stringMatching(/^pacing on track FAILS: At this pace the battery runs out at 00:50, \d+ min before the next recharge at 08:00\.$/),
     ]);
     // #364: the warning says the room's time first and the battery's after it, with no duration.
     expect(text).toContain('Warning: No plan keeps the Bedroom within its limits until the next recharge: within them until about 3:35 AM, the battery until 12:50 AM; then it warms up.');
@@ -297,19 +301,19 @@ describe('what the model reads', () => {
     const base = examplePlan();
     const lr = { safeUntil: '2026-07-18T01:20:00+02:00', safeHours: 9.33, limitedBy: 'temperature' as const };
     const text = planSummary({ ...base, lastResort: lr } as Plan, NIGHT);
-    expect(text.startsWith(`Proposed last-resort plan ${base.id}: the safe room alone, within its limits until ${localTimeText(lr.safeUntil)} (nothing changes until apply_plan)`)).toBe(true);
+    expect(text.startsWith(`Proposed last-resort plan: the safe room alone, within its limits until ${localTimeText(lr.safeUntil)} (nothing changes until apply_plan)`)).toBe(true);
     expect(text).not.toContain(`level until ${localTimeText(base.horizonAt)}`);
     const battery = planSummary({ ...base, lastResort: { ...lr, limitedBy: 'battery' as const } } as Plan, NIGHT);
     // #364: no window with the battery: the room stays inside its limits to the next recharge, said first.
-    expect(battery.startsWith(`Proposed last-resort plan ${base.id}: the safe room alone, within its limits until ${localTimeText(base.horizonAt)}, the next recharge, the battery until ${localTimeText(lr.safeUntil)} (`)).toBe(true);
+    expect(battery.startsWith(`Proposed last-resort plan: the safe room alone, within its limits until ${localTimeText(base.horizonAt)}, the next recharge, the battery until ${localTimeText(lr.safeUntil)} (`)).toBe(true);
     const crossing = { ...lr, limitedBy: 'battery' as const, comfortLimitC: 24, worstC: 26.1, worstAt: '2026-07-18T06:00:00+02:00', limitCrossedAt: '2026-07-18T03:35:00+02:00', limitCrossedC: 24 };
     const crossed = planSummary({ ...base, lastResort: crossing } as Plan, NIGHT);
-    expect(crossed.startsWith(`Proposed last-resort plan ${base.id}: the safe room alone, within its limits until about 3:35 AM, the battery until 1:20 AM (`)).toBe(true);
+    expect(crossed.startsWith(`Proposed last-resort plan: the safe room alone, within its limits until about 3:35 AM, the battery until 1:20 AM (`)).toBe(true);
     expect(crossed).toContain('until when the safe room stays within its limits (3:35 AM)');
     const window = { ...lr, limitedBy: 'battery' as const, comfortLimitC: 24, worstC: 26.1, worstAt: '2026-07-18T06:00:00+02:00' };
-    expect(planSummary({ ...base, lastResort: window } as Plan, NIGHT).startsWith(`Proposed last-resort plan ${base.id}: the safe room alone, until the battery runs out at 1:20 AM`)).toBe(true);
+    expect(planSummary({ ...base, lastResort: window } as Plan, NIGHT).startsWith(`Proposed last-resort plan: the safe room alone, until the battery runs out at 1:20 AM`)).toBe(true);
     // A plan that holds keeps its first sentence.
-    expect(planSummary(base as Plan, NIGHT).startsWith(`Proposed plan ${base.id}: `)).toBe(true);
+    expect(planSummary(base as Plan, NIGHT).startsWith(`Proposed plan: `)).toBe(true);
   });
 
   it('when the temperature ends it: safe until, then how far past which limit; heating says down to; no window, nothing more', () => {
@@ -393,7 +397,7 @@ describe('what the model reads', () => {
     expect(lr.loweredLimitC).toBeUndefined();
     const until = localTimeText(lr.safeUntil);
     const text = planSummary(r.value, NIGHT);
-    expect(text.startsWith(`Proposed last-resort plan ${r.value.id}: the safe room alone, `)).toBe(true);
+    expect(text.startsWith(`Proposed last-resort plan: the safe room alone, `)).toBe(true);
     if (lr.limitCrossedAt !== undefined) expect(text).toContain(`(the battery lasts until ${until}), then warms up`);
     else expect(text).toContain(`${lr.limitedBy === 'battery' ? `The battery lasts until ${until}` : `Safe until ${until}`}; `);
     expect(text).toContain(`${String(lr.worstC)} °C`);
@@ -417,7 +421,8 @@ describe('what the model reads', () => {
     for (const rung of p.ladder) {
       const offset = `${rung.setpointOffsetK >= 0 ? '+' : ''}${String(rung.setpointOffsetK)} K`;
       expect(text).toContain(`${rung.level}: setpoint ${offset}, ${rung.preferredModes.join(' or ')}, fans ${rung.fansOn ? 'on' : 'off'}`);
-      expect(text).toContain(rung.roomIds.length > 0 ? rung.roomIds.join(', ') : 'no rooms');
+      expect(text).toContain(rung.roomIds.length > 0 ? rung.roomIds.map((id) => names[id] ?? 'a room').join(', ') : 'no rooms');
+      for (const id of rung.roomIds) expect(text).not.toContain(id);
     }
   });
 
@@ -442,7 +447,8 @@ describe('what the model reads', () => {
     const r = await applyPlan(w.deps, { planId: planned.value.id }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const text = applySummary(r.value);
-    expect(text).toContain(`Plan ${planned.value.id} applied as advice`);
+    expect(text).toContain('The plan was applied as advice');
+    expect(text).not.toContain(planned.value.id);
     for (const m of r.value.manualInstructions) expect(text).toContain(m.text);
     expect(applySummary({ ...r.value, alreadyApplied: true })).toContain('was already applied');
   });
@@ -524,7 +530,7 @@ describe('what the model reads', () => {
     if (!r.ok) throw new Error(r.error.message);
     const text = planSummary(r.value, NIGHT);
     expect(r.value.refusedProposal?.message).toMatch(/Nearest allowed: 6000 W\.$/);
-    expect(text.startsWith(`The safety check refused the plan you proposed: ${r.value.refusedProposal?.message ?? ''} This plan holds instead and is ready to apply. Proposed plan ${r.value.id}: `)).toBe(true);
+    expect(text.startsWith(`The safety check refused the plan you proposed: ${r.value.refusedProposal?.message ?? ''} This plan holds instead and is ready to apply. Proposed plan: `)).toBe(true);
     // Never sends the model back to propose again: the plan that holds is already here.
     expect(text).not.toMatch(/call plan_comfort again/);
   });

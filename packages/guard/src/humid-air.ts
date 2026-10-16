@@ -1,4 +1,5 @@
 import type { PlanWarning } from '@cold-reserve/contracts';
+import { theRoom } from '@cold-reserve/core';
 import type { GuardContext } from './context.js';
 
 // Humid air without heat danger (#248, approved in #248): above the person's humidity maximum (60 % by default, the
@@ -21,6 +22,6 @@ export function humidAirWarning(ctx: GuardContext): PlanWarning | undefined {
   const room = profile.rooms.find((r) => r.id === preferences.safeRoomId)?.name ?? preferences.safeRoomId;
   return {
     code: 'humid_air',
-    message: `The air in the ${room} is humid (up to ${Math.round(Math.max(...humid)).toString()} %, over ${maxPct.toString()} %): less comfortable and a risk of mould, but no heat danger at this temperature.`.slice(0, 300),
+    message: `The air in ${theRoom(room)} is humid (up to ${Math.round(Math.max(...humid)).toString()} %, over ${maxPct.toString()} %): less comfortable and a risk of mould, but no heat danger at this temperature.`.slice(0, 300),
   };
 }

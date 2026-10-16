@@ -66,22 +66,22 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       // What the agent actually reads: the text content, with the facts it may say.
       const text = textOf(proposed);
       expect(text).toContain(plan.id);
-      expect(text).toContain('storm_reserve holds');
-      // The safe room by name, its id only in parentheses (#274).
-      expect(text).toMatch(/Without the plan the safe room, Bedroom \(bedroom-1\), would peak at \d+(\.\d)? °C/);
+      expect(text).toContain('storm reserve holds');
+      // The safe room by name, never its id (#192).
+      expect(text).toMatch(/Without the plan the safe room, Leo's room, would peak at \d+(\.\d)? °C/);
       expect(text).toMatch(new RegExp(`Plan ${plan.id} is waiting for the person's yes: when they say yes, call apply_plan with planId ${plan.id}\\.$`));
       expect(text).toContain('simulated data');
       // The 36-hour heatwave shows the whole night: the night-recovery guarantee is met and said with its hours.
       expect(plan.nightRecovery?.status).toBe('met');
       expect(text).toMatch(/Night recovery \(elderly\) met: [\d.]+ of 6 hours at or below 24 °C/);
-      expect(text).toMatch(/What it does: Bedroom: (cool|dry) at \d+(\.\d)? °C/);
+      expect(text).toMatch(/What it does: Leo's room: (cool|dry) at \d+(\.\d)? °C/);
       expect(plan.counterfactual?.scenarios.noPlan.peakTempC).toBeGreaterThan(plan.counterfactual?.scenarios.plan.peakTempC ?? Infinity);
       // An ordinary summer day (#203): the battery is full at 2 PM, so the solar surplus cools the house instead
       // of going to the grid, the safe room first; the text says where, in order, and the kWh kept at home.
       const surplus = plan.surplus;
       if (surplus === undefined) throw new Error('no solar surplus on the hot day');
       expect(surplus.rooms[0]?.reason).toBe('safe_room');
-      expect(text).toMatch(/Solar surplus from \d{1,2}:\d\d [AP]M to \d{1,2}:\d\d [AP]M: [\d.]+ kWh kept at home instead of exported to the grid\. Where it went, in order: 1\) Bedroom \(safe room\), now [\d.]+ °C, [\d.]+ °C (above|below) the [\d.]+ °C comfort, cooling to [\d.]+ °C/);
+      expect(text).toMatch(/Solar surplus from \d{1,2}:\d\d [AP]M to \d{1,2}:\d\d [AP]M: [\d.]+ kWh kept at home instead of exported to the grid\. Where it went, in order: 1\) Leo's room \(safe room\), now [\d.]+ °C, [\d.]+ °C (above|below) the [\d.]+ °C comfort, cooling to [\d.]+ °C/);
       expect(text).toContain(`${surplus.keptKWh.toFixed(1)} kWh kept at home`);
       // With the battery full the sun keeps exporting (#219): the text suggests a load and until when, advice only.
       if (plan.householdTip === undefined) throw new Error('no household tip on the hot day');
@@ -94,8 +94,8 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       const retried = ApplyPlanOutputSchema.parse(again.structuredContent);
       expect([applied.alreadyApplied, retried.alreadyApplied]).toEqual([false, true]);
       expect(retried.plan).toEqual(applied.plan);
-      expect(textOf(first)).toBe(`Plan ${plan.id} applied.`);
-      expect(textOf(again)).toBe(`Plan ${plan.id} was already applied.`);
+      expect(textOf(first)).toBe(`The plan was applied.`);
+      expect(textOf(again)).toBe(`The plan was already applied.`);
 
       // 4. The ice cubes.
       const ice = await call(TOKEN, 'get_reserve_outlook', {});
@@ -148,7 +148,7 @@ describe('humid air, not hot (#248): the plan passes with a warning, never a ref
       const plan = PlanSchema.parse(r.structuredContent);
       expect(plan.refusedProposal).toBeUndefined();
       expect(plan.guarantees.every((g) => g.ok)).toBe(true);
-      expect(plan.warnings?.find((w) => w.code === 'humid_air')?.message).toMatch(/^The air in the Bedroom is humid \(up to \d+ %, over 60 %\): less comfortable and a risk of mould, but no heat danger at this temperature\.$/);
+      expect(plan.warnings?.find((w) => w.code === 'humid_air')?.message).toMatch(/^The air in Leo's room is humid \(up to \d+ %, over 60 %\): less comfortable and a risk of mould, but no heat danger at this temperature\.$/);
       expect(textOf(r)).toContain('humid');
       const applied = await call(TOKEN, 'apply_plan', { planId: plan.id });
       expect(applied.isError).toBeFalsy();

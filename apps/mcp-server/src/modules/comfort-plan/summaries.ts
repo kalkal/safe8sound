@@ -36,9 +36,9 @@ function roomSettings(p: Plan, names: Readonly<Record<string, string>> | undefin
     .join('; ');
 }
 
-function rungText(r: LevelStep): string {
+function rungText(r: LevelStep, names: Readonly<Record<string, string>> | undefined): string {
   const offset = `${r.setpointOffsetK >= 0 ? '+' : ''}${String(r.setpointOffsetK)} K`;
-  const rooms = r.roomIds.length > 0 ? r.roomIds.join(', ') : 'no rooms';
+  const rooms = r.roomIds.length > 0 ? r.roomIds.map((id) => names?.[id] ?? 'a room').join(', ') : 'no rooms';
   return `${r.level}: setpoint ${offset}, ${r.preferredModes.join(' or ')}, fans ${r.fansOn ? 'on' : 'off'}, ${rooms}`;
 }
 
@@ -190,8 +190,8 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   // A last resort opens with its honest window (CE-21): the model reads the first sentence first.
   const head =
     lr === undefined
-      ? `Proposed plan ${p.id}: ${level} level until ${localTimeText(p.horizonAt)}`
-      : `Proposed last-resort plan ${p.id}: the safe room alone, ${lastResortHead(lr, p.horizonAt)}`;
+      ? `Proposed plan: ${level} level until ${localTimeText(p.horizonAt)}`
+      : `Proposed last-resort plan: the safe room alone, ${lastResortHead(lr, p.horizonAt)}`;
   // A refused proposal (#202): the first words say so and that this plan holds, so the model offers it at once.
   const refused =
     p.refusedProposal === undefined ? [] : [`The safety check refused the plan you proposed: ${p.refusedProposal.message} This plan holds instead and is ready to apply.`];
@@ -201,8 +201,8 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
     `What it does: ${roomSettings(p, opts.roomNames, opts.unit ?? 'C')}.`,
     ...(p.surplus === undefined ? [] : [surplusText(p.surplus, opts)]),
     ...(p.householdTip === undefined ? [] : [householdTipText(p.householdTip)]),
-    `Confirming it also allows these steps down if the battery falls behind: ${p.ladder.map(rungText).join('; ')}.`,
-    `Guarantees: ${p.guarantees.map((g) => `${g.id} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`).join(' ')}`,
+    `Confirming it also allows these steps down if the battery falls behind: ${p.ladder.map((r) => rungText(r, opts.roomNames)).join('; ')}.`,
+    `Guarantees: ${p.guarantees.map((g) => `${g.id.replace(/_/g, ' ')} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`).join(' ')}`,
     `Storm reserve ${one(p.reserveWh / 1000)} kWh${p.reserveFloorSocPct === undefined ? '' : `: the battery stays at or above ${one(p.reserveFloorSocPct)} % while the grid is up`}.`,
   ];
   // With a crossing time the window says the one end time; the night's hours (grace minutes counted) stay in
@@ -217,7 +217,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
     // (grace minutes counted) stay in the structured counterfactual for the card.
     const nightHours = lr?.limitCrossedAt === undefined;
     parts.push(
-      `Without the plan the safe room${opts.roomNames?.[c.roomId] === undefined ? ` (${c.roomId})` : `, ${opts.roomNames[c.roomId]} (${c.roomId}),`} would peak at ${lineText(noPlan, opts.timeZone, nightHours, opts.unit ?? 'C')}; ` +
+      `Without the plan the safe room${opts.roomNames?.[c.roomId] === undefined ? '' : `, ${opts.roomNames[c.roomId]},`} would peak at ${lineText(noPlan, opts.timeZone, nightHours, opts.unit ?? 'C')}; ` +
         `with the naive plan (air conditioning until the battery dies) at ${lineText(naive, opts.timeZone, nightHours, opts.unit ?? 'C')}; ` +
         `with this plan at ${lineText(plan, opts.timeZone, nightHours, opts.unit ?? 'C')}.`,
     );
@@ -276,7 +276,7 @@ export function applySummary(o: ApplyPlanOutput): string {
       'Never ask the person for a token or a code, and never make one up.'
     );
   }
-  const applied = o.alreadyApplied ? `Plan ${o.plan.id} was already applied.` : `Plan ${o.plan.id} applied${o.advisoryOnly ? ' as advice' : ''}.`;
+  const applied = o.alreadyApplied ? `The plan was already applied.` : `The plan was applied${o.advisoryOnly ? ' as advice' : ''}.`;
   const head = o.familyAlert === undefined ? applied : `${applied} ${familyAlertText(o.familyAlert)}`;
   if (!o.advisoryOnly) return head;
   const steps = o.manualInstructions.map((m) => m.text).join('; ');
