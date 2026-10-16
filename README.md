@@ -189,12 +189,12 @@ spikes/           throwaway spike code, outside the workspace
 ## Status
 | Milestone | Due |
 |---|---|
-| [M0 · Plan checks and spikes](https://github.com/kalkal/cold-reserve/milestone/1) | 2026-09-29 |
-| [M1 · Hello home (real home + fallback)](https://github.com/kalkal/cold-reserve/milestone/2) | 2026-10-05 |
-| [M2 · Cold reserve (plan, guard, pacing)](https://github.com/kalkal/cold-reserve/milestone/3) | 2026-10-10 |
-| [M3 · Storm mode](https://github.com/kalkal/cold-reserve/milestone/4) | 2026-10-14 |
-| [M4 · Voice and Alexa](https://github.com/kalkal/cold-reserve/milestone/5) | 2026-10-18 |
-| [M5 · Real home extensions](https://github.com/kalkal/cold-reserve/milestone/6) | 2026-10-18 |
-| [M6 · Submission](https://github.com/kalkal/cold-reserve/milestone/7) | 2026-10-23 |
+| [M0 · Plan checks and spikes](https://github.com/kalkal/safe-8-sound/milestone/1) | 2026-09-29 |
+| [M1 · Hello home (real home + fallback)](https://github.com/kalkal/safe-8-sound/milestone/2) | 2026-10-05 |
+| [M2 · Cold reserve (plan, guard, pacing)](https://github.com/kalkal/safe-8-sound/milestone/3) | 2026-10-10 |
+| [M3 · Storm mode](https://github.com/kalkal/safe-8-sound/milestone/4) | 2026-10-14 |
+| [M4 · Voice and Alexa](https://github.com/kalkal/safe-8-sound/milestone/5) | 2026-10-18 |
+| [M5 · Real home extensions](https://github.com/kalkal/safe-8-sound/milestone/6) | 2026-10-18 |
+| [M6 · Submission](https://github.com/kalkal/safe-8-sound/milestone/7) | 2026-10-23 |
 
-All work is tracked in [issues](https://github.com/kalkal/cold-reserve/issues).
+All work is tracked in [issues](https://github.com/kalkal/safe-8-sound/issues).

@@ -26,3 +26,7 @@ reports/conformance/
 
 # Mutation testing sandbox
 .stryker-tmp/
+
+# Deploy outputs (account ids, endpoints): never commit
+infra/cdk-outputs*.json
+cdk-outputs*.json
