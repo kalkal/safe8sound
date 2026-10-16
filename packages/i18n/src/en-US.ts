@@ -341,6 +341,11 @@ export const enUS = {
   'receipt.pass': 'PASS',
   'receipt.fail': 'FAIL',
   'receipt.nearest': 'nearest allowed {value}',
+  // A passing row says in words that its limit is kept (#187): a bare "79.6% > 49.2%" next to PASS read like a violation.
+  'receipt.kept.storm_reserve': 'lowest {measured}, at or above the {limit} kept',
+  'receipt.kept.storm_reserve_stays': 'at {measured}, not lowered below where it is (reserve {limit})',
+  'receipt.kept.inverter_limit': 'peak {measured}, within the {limit} limit',
+  'receipt.kept.battery_power': 'peak {measured}, within the {limit} limit',
   'receipt.summary': '{passed}/{total} PASS · no AI in this check',
   'receipt.approved': 'APPROVED',
   'receipt.rejected': 'REJECTED',

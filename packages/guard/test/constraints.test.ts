@@ -67,6 +67,14 @@ describe('storm_reserve', () => {
     });
   });
 
+  it('quotes the floor rounded up, like the limit, and says a battery already below it is not taken lower', () => {
+    const held = check('storm_reserve', ctx({ targets: [at(0, 36)], points: [point(0, { soc: 50 })] }));
+    expect(held.reason).toBe(`Keeps 4.0 kWh for a storm: the battery stays at or above ${String(held.limit)} %.`);
+    const low = check('storm_reserve', ctx({ targets: [at(0, 36)], points: [point(0, { soc: 30 })], snapshotSoc: 30 }));
+    expect(low).toMatchObject({ ok: true });
+    expect(low.reason).toBe('Keeps 4.0 kWh for a storm: the battery is not taken lower than it is now (30 %, under the 36 % kept).');
+  });
+
   it('fails just below the floor and names both numbers', () => {
     const r = check('storm_reserve', ctx({ targets: [at(0, 35.9)], points: [point(0, { soc: 50 })] }));
     expect(r).toMatchObject({ ok: false, measured: 35.9, limit: 36, nearestAllowed: 36 });

@@ -100,12 +100,31 @@ function compare(measured: number, limit: number): string {
   return measured > limit ? '>' : '<';
 }
 
-function ReceiptRow({ result }: { result: GuaranteeResult }) {
+/** Guarantees whose passing numbers are said in words (#187): a minimum kept, or a maximum not exceeded. */
+const KEPT_KEYS = { storm_reserve: 'receipt.kept.storm_reserve', inverter_limit: 'receipt.kept.inverter_limit', battery_power: 'receipt.kept.battery_power' } as const;
+
+/** The guard rounds the two sides apart by at most one tenth; compared in whole tenths, never in floating point. */
+const tenths = (x: number): number => Math.round(x * 10);
+
+/** The numbers of one row. A passing row with a known direction reads as satisfied; the rest keep the plain comparison. */
+export function receiptNumbers(result: GuaranteeResult): string[] {
   const { measured, limit, nearestAllowed, unit } = result;
-  const numbers = [
+  if (result.ok && measured !== undefined && limit !== undefined && result.id in KEPT_KEYS) {
+    const minimum = result.id === 'storm_reserve';
+    // The guard rounds the two sides apart (the limit up): a pass within that rounding reads as exactly on the limit, same rounding both sides.
+    const shown = tenths(measured) < tenths(limit) && tenths(measured) >= tenths(limit) - 1 ? limit : measured;
+    // A battery already below the floor may stay where it is (the plan only must not lower it): said so, never "above".
+    if (minimum && tenths(shown) < tenths(limit)) return [t('receipt.kept.storm_reserve_stays', { measured: formatMeasure(shown, unit), limit: formatMeasure(limit, unit) })];
+    return [t(KEPT_KEYS[result.id as keyof typeof KEPT_KEYS], { measured: formatMeasure(shown, unit), limit: formatMeasure(limit, unit) })];
+  }
+  return [
     measured !== undefined && limit !== undefined ? `${formatMeasure(measured, unit)} ${compare(measured, limit)} ${formatMeasure(limit, unit)}` : null,
     nearestAllowed !== undefined ? t('receipt.nearest', { value: formatMeasure(nearestAllowed, unit) }) : null,
   ].filter((part) => part !== null);
+}
+
+function ReceiptRow({ result }: { result: GuaranteeResult }) {
+  const numbers = receiptNumbers(result);
   return (
     <li className="receipt-row" data-ok={result.ok}>
       <span className="receipt-name" data-testid="guarantee-name">

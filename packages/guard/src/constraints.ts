@@ -52,11 +52,16 @@ const stormReserve: Constraint = {
     const ok = minTarget >= floor && minProjected >= Math.min(floor, ctx.input.snapshot.batterySocPct) - EPS;
     const measured = Math.min(minTarget, minProjected);
     const kwh = (ctx.reserveWh / 1000).toFixed(1);
+    const soc = ctx.input.snapshot.batterySocPct;
+    // The floor is quoted rounded up, like `limit`: the receipt shows both side by side.
+    const kept = soc < floor - EPS
+      ? `Keeps ${kwh} kWh for a storm: the battery is not taken lower than it is now (${r1(soc).toString()} %, under the ${up1(floor).toString()} % kept).`
+      : `Keeps ${kwh} kWh for a storm: the battery stays at or above ${up1(floor).toString()} %.`;
     return {
       id: 'storm_reserve',
       ok,
       reason: ok
-        ? `Keeps ${kwh} kWh for a storm: the battery stays at or above ${r1(floor).toString()} %.`
+        ? kept
         : `The plan takes the battery to ${r1(measured).toString()} %, below the ${r1(floor).toString()} % kept for a storm (${kwh} kWh).`,
       measured: r1(measured),
       limit: up1(floor),

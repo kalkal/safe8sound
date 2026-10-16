@@ -1,5 +1,6 @@
 import { DATA_GROUPS, epochMs, formatTemp, isFullyLive, tempGap, type ApplyPlanOutput, type TempUnit, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
 import { localIso, localTimeText } from '@cold-reserve/core';
+import { up1 } from '@cold-reserve/guard';
 import { lastResortAdvice } from '@cold-reserve/i18n';
 import { roomTimeLeads } from './family-alert.js';
 
@@ -203,7 +204,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
     ...(p.householdTip === undefined ? [] : [householdTipText(p.householdTip)]),
     `Confirming it also allows these steps down if the battery falls behind: ${p.ladder.map((r) => rungText(r, opts.roomNames)).join('; ')}.`,
     `Guarantees: ${p.guarantees.map((g) => `${g.id.replace(/_/g, ' ')} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`).join(' ')}`,
-    `Storm reserve ${one(p.reserveWh / 1000)} kWh${p.reserveFloorSocPct === undefined ? '' : `: the battery stays at or above ${one(p.reserveFloorSocPct)} % while the grid is up`}.`,
+    `Storm reserve ${one(p.reserveWh / 1000)} kWh${p.reserveFloorSocPct === undefined ? '' : `: the battery stays at or above ${one(up1(p.reserveFloorSocPct))} % while the grid is up`}.`,
   ];
   // With a crossing time the window says the one end time; the night's hours (grace minutes counted) stay in
   // nightRecovery for the card, never a second duration in the text (#272 review).

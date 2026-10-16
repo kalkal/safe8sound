@@ -2,10 +2,14 @@
 import { PlanSchema, type Plan } from '@cold-reserve/contracts';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { GuardReceipt, RefusalReceipt } from '../src/GuardReceipt.js';
+import { setLocale } from '@cold-reserve/i18n';
+import { GuardReceipt, receiptNumbers, RefusalReceipt } from '../src/GuardReceipt.js';
 import { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, rejectedPlan, stormReserveRefusal } from '../src/fixtures.js';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLocale('en-US');
+});
 
 const CAVEAT = 'Checked on simulated data, not on the live readings of your home.';
 const rows = (plan: Plan) =>
@@ -56,14 +60,14 @@ describe('GuardReceipt', () => {
     expect(screen.getByTestId('receipt-stamp').textContent).toBe('REJECTED');
   });
 
-  it('prints = when the measured value sits exactly on the limit', () => {
+  it('a passing row exactly on its limit still reads as kept, never as a comparison', () => {
     const plan = rejectedPlan();
     const atLimit = PlanSchema.parse({
       ...plan,
       guarantees: plan.guarantees.map((g) => (g.id === 'inverter_limit' ? { ...g, ok: true, measured: 5000, limit: 5000, nearestAllowed: undefined } : g)),
     });
     render(<GuardReceipt plan={atLimit} />);
-    expect(screen.getByText('5 kW = 5 kW')).toBeTruthy();
+    expect(screen.getByText('peak 5 kW, within the 5 kW limit')).toBeTruthy();
   });
 
   it('rejects a plan where every guarantee fails', () => {
@@ -148,5 +152,59 @@ describe('GuardReceipt', () => {
     cleanup();
     render(<RefusalReceipt refusal={{ ...refusal, details: { ...refusal.details, origin, realHome: true } }} />);
     expect(screen.getByText(CAVEAT)).toBeTruthy();
+  });
+});
+
+describe('receiptNumbers (#187)', () => {
+  const storm = (ok: boolean, measured: number, limit: number) =>
+    ({ id: 'storm_reserve', ok, reason: 'x', measured, limit, nearestAllowed: limit, unit: '%' }) as const;
+
+  it('a passing storm reserve reads as kept, not as a comparison', () => {
+    expect(receiptNumbers(storm(true, 79.6, 49.2))).toEqual(['lowest 79.6%, at or above the 49.2% kept']);
+  });
+
+  it('a pass within the guard rounding (48.7 against 48.8) shows the same number on both sides', () => {
+    expect(receiptNumbers(storm(true, 48.7, 48.8))).toEqual(['lowest 48.8%, at or above the 48.8% kept']);
+  });
+
+  it('a pass within one tenth never falls into the "not lowered" line (floating point: 49.2 - 49.1 is 0.10000000000000142)', () => {
+    for (const [measured, limit] of [[49.1, 49.2], [48.6, 48.7], [49.11, 49.2]] as const) {
+      expect(receiptNumbers(storm(true, measured, limit))[0]).toBe(`lowest ${String(limit)}%, at or above the ${String(limit)}% kept`);
+    }
+  });
+
+  it('a battery already below the floor that is not lowered says so, never "above"', () => {
+    expect(receiptNumbers(storm(true, 30, 49.2))).toEqual(['at 30%, not lowered below where it is (reserve 49.2%)']);
+  });
+
+  it('a failing storm reserve keeps the plain comparison and the nearest allowed value', () => {
+    expect(receiptNumbers(storm(false, 40, 49.2))).toEqual(['40% < 49.2%', 'nearest allowed 49.2%']);
+  });
+
+  it('a passing row never renders < or > against its own limit, across many values', () => {
+    for (let limit = 10; limit <= 90; limit += 0.7) {
+      for (const delta of [-0.1, -0.05, 0, 0.05, 0.1, 1, 30]) {
+        const [line] = receiptNumbers(storm(true, limit + delta, limit));
+        expect(line).not.toMatch(/[<>]/);
+      }
+    }
+    const inverter = { id: 'inverter_limit', ok: true, reason: 'x', measured: 4200, limit: 5000, nearestAllowed: 5000, unit: 'W' } as const;
+    expect(receiptNumbers(inverter)).toEqual(['peak 4.2 kW, within the 5 kW limit']);
+  });
+
+  it('speaks Italian', () => {
+    setLocale('it-IT');
+    expect(receiptNumbers(storm(true, 79.6, 49.2))).toEqual(['minimo 79.6%, non sotto il 49.2% tenuto da parte']);
+  });
+
+  it('renders the issue case (48.7 against 48.8) as one kept line, with no comparison sign', () => {
+    const plan = hotDayPlan();
+    const withNumbers = PlanSchema.parse({
+      ...plan,
+      guarantees: plan.guarantees.map((g) => (g.id === 'storm_reserve' ? { ...g, ok: true, measured: 48.7, limit: 48.8, nearestAllowed: 48.8, unit: '%' } : g)),
+    });
+    render(<GuardReceipt plan={withNumbers} />);
+    expect(screen.getByText('lowest 48.8%, at or above the 48.8% kept')).toBeTruthy();
+    expect(screen.queryByText(/48\.7% < 48\.8%/)).toBeNull();
   });
 });

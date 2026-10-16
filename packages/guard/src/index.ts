@@ -3,7 +3,7 @@ export const packageName = '@cold-reserve/guard';
 
 export { GuardConfigSchema, parseGuardConfig, type GuardConfig } from './config.js';
 export { counterfactualOf } from './counterfactual.js';
-export { CONSTRAINTS, type Constraint } from './constraints.js';
+export { CONSTRAINTS, up1, type Constraint } from './constraints.js';
 export { buildContext, currentControls, projectFrom, reserveOf, type CandidatePlan, type GuardContext, type GuardInput } from './context.js';
 export { runGuard, type GuardVerdict } from './guard.js';
 export { evaluateNight, nightWindowHours } from './night.js';
