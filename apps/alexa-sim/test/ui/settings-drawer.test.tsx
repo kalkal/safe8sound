@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setLocale } from '@cold-reserve/i18n';
+import { SCRIPT_FIXTURES } from '../../src/agent/script-fixtures.js';
 import { scriptedDemoSettings } from '../../src/ui/demo-settings.js';
-import { DemoSettingsControl } from '../../src/ui/SettingsDrawer.js';
+import type { LimitChange } from '../../src/ui/limits.js';
+import { DemoSettingsControl, type LimitSave } from '../../src/ui/SettingsDrawer.js';
 
 // B1 (additions plan): the scenario badge opens the judge's settings drawer. Radio groups with the choice written,
 // not only coloured; places not shipped yet say so; Escape closes and the focus goes back to the badge.
@@ -109,5 +111,108 @@ describe('DemoSettingsControl', () => {
     fireEvent.keyDown(screen.getByRole('dialog', { name: 'Demo settings' }), { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(badge);
+  });
+});
+
+// #402: the "Temperatures and limits" section. Values and bounds come from the preferences and their hard limits.
+describe('Temperatures and limits section', () => {
+  const view = (() => {
+    const card = SCRIPT_FIXTURES.preferences();
+    if (card.tool !== 'get_preferences') throw new Error('fixture');
+    return card.result;
+  })();
+  const open = (units: 'C' | 'F' = 'C') => {
+    const onLimit = vi.fn<(change: LimitChange) => Promise<LimitSave>>(() => Promise.resolve('saved'));
+    const onChange = vi.fn(() => Promise.resolve(true));
+    render(
+      <DemoSettingsControl settings={{ ...scriptedDemoSettings(), units }} availablePlaces={['reference']} onChange={onChange} locale="en-US" onLocale={vi.fn()} limits={view} onLimit={onLimit} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    return { onLimit, onChange, section: screen.getByRole('region', { name: 'Temperatures and limits' }) };
+  };
+
+  it('holds the safe room, the comfort, the maximum, the units and the night limits with their sources', () => {
+    const { section } = open();
+    expect(within(section).getByRole('radiogroup', { name: 'Safe room' })).toBeTruthy();
+    expect(within(section).getByRole('group', { name: 'Comfort temperature' }).querySelector('output')?.textContent).toBe('25 °C');
+    expect(within(section).getByRole('radiogroup', { name: 'Temperature units' })).toBeTruthy();
+    expect(section.textContent).toContain('Adult, 22:00–07:00: at most 26 °C');
+    expect(section.textContent).toContain('With an older person: at most 24 °C');
+    expect(section.textContent).toContain('CIBSE TM59');
+  });
+
+  it('the steps and choices change a draft; Save sends it as one write, and the draft is gone once saved', async () => {
+    const { section, onLimit } = open();
+    const other = view.preferences.roomPriority[1] as string;
+    fireEvent.click(within(section).getByRole('button', { name: 'Lower: Comfort temperature' }));
+    fireEvent.click(within(section).getAllByRole('radio').filter((r) => (r as HTMLInputElement).name === 'safe-room')[1] as HTMLElement);
+    fireEvent.click(within(section).getByRole('checkbox', { name: /night limit to every plan/ }));
+    expect(onLimit).not.toHaveBeenCalled();
+    expect(within(section).getByRole('group', { name: 'Comfort temperature' }).querySelector('output')?.textContent).toBe('24.5 °C');
+    fireEvent.click(within(section).getByRole('button', { name: 'Save' }));
+    await waitFor(() => {
+      expect(onLimit).toHaveBeenCalledTimes(1);
+    });
+    expect(onLimit).toHaveBeenCalledWith({
+      comfortC: { cooling: 24.5 },
+      safeRoomId: other,
+      roomPriority: [other, ...view.preferences.roomPriority.filter((id) => id !== other)],
+      safety: { stricterNightLimit: true },
+    });
+    // Nothing left to save: a second Save sends nothing.
+    await waitFor(() => {
+      expect(within(section).getByRole('button', { name: 'Save' }).getAttribute('aria-disabled')).toBe('true');
+    });
+    fireEvent.click(within(section).getByRole('button', { name: 'Save' }));
+    expect(onLimit).toHaveBeenCalledTimes(1);
+  });
+
+  it('unsaved changes say so, and are still there when the drawer is closed and opened again', () => {
+    const { section } = open();
+    fireEvent.click(within(section).getByRole('button', { name: 'Lower: Comfort temperature' }));
+    expect(screen.getByText('Not saved yet: press Save.')).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    expect(screen.getByText('Not saved yet: press Save.')).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Comfort temperature' }).querySelector('output')?.textContent).toBe('24.5 °C');
+  });
+
+  it('Save is blocked while it saves: a second press sends nothing', async () => {
+    const { section, onLimit } = open();
+    onLimit.mockImplementationOnce(() => new Promise<LimitSave>(() => undefined));
+    fireEvent.click(within(section).getByRole('button', { name: 'Lower: Comfort temperature' }));
+    const save = within(section).getByRole('button', { name: 'Save' });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    expect(onLimit).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(save.getAttribute('aria-disabled')).toBe('true');
+    });
+  });
+
+  it('a step against the rule sends nothing and says why; Save with no change sends nothing', () => {
+    const { section, onLimit } = open();
+    fireEvent.click(within(section).getByRole('button', { name: 'Raise: Cap with an older person' }));
+    expect(screen.getByTestId('limit-refusal').textContent).toContain('can only be made stricter');
+    fireEvent.click(within(section).getByRole('button', { name: 'Save' }));
+    expect(onLimit).not.toHaveBeenCalled();
+  });
+
+  it('the daily limit of the demo is said as it is, not as "try again"', async () => {
+    const { section, onLimit } = open();
+    onLimit.mockResolvedValueOnce('rate_limited');
+    fireEvent.click(within(section).getByRole('button', { name: 'Lower: Comfort temperature' }));
+    fireEvent.click(within(section).getByRole('button', { name: 'Save' }));
+    await waitFor(() => {
+      expect(screen.getByText(/limited number of changes per day/)).toBeTruthy();
+    });
+  });
+
+  it('shows every value in °F when chosen, and the units choice stays here', () => {
+    const { section, onChange } = open('F');
+    expect(within(section).getByRole('group', { name: 'Comfort temperature' }).querySelector('output')?.textContent).toBe('77 °F');
+    expect(section.textContent).toContain('at most 78.8 °F');
+    fireEvent.click(within(section).getByRole('radio', { name: '°C' }));
+    expect(onChange).toHaveBeenCalledWith({ units: 'C' });
   });
 });

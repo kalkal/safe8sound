@@ -114,6 +114,8 @@ export const ToolCallRequestSchema = z.discriminatedUnion('name', [
   z.strictObject({ name: z.literal('apply_plan'), arguments: ApplyPlanInputSchema }),
   z.strictObject({ name: z.literal('set_preferences'), arguments: SetPreferencesInputSchema }),
   z.strictObject({ name: z.literal('get_home_status'), arguments: z.strictObject({}) }),
+  // #402 (additive, approval to be cited in the PR): the settings drawer reads the preferences and the limits it may move, read-only.
+  z.strictObject({ name: z.literal('get_preferences'), arguments: z.strictObject({}) }),
   // B2 (additive): the judge's settings drawer reads and saves its own sandbox only.
   z.strictObject({ name: z.literal('get_demo_settings'), arguments: z.strictObject({}) }),
   z.strictObject({ name: z.literal('set_scenario'), arguments: SetScenarioInputSchema }),
@@ -133,6 +135,7 @@ export type ToolCallRequest = z.infer<typeof ToolCallRequestSchema>;
 export const CARD_TOOL_ACCESS: Readonly<Record<ToolCallRequest['name'], 'read' | 'write'>> = {
   apply_plan: 'write',
   set_preferences: 'write',
+  get_preferences: 'read',
   get_home_status: 'read',
   get_demo_settings: 'read',
   set_scenario: 'write',

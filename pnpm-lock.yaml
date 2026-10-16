@@ -258,6 +258,9 @@ importers:
       '@cold-reserve/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
+      '@cold-reserve/guard':
+        specifier: workspace:*
+        version: link:../../packages/guard
       '@cold-reserve/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n

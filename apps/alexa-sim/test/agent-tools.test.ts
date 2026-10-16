@@ -1,4 +1,4 @@
-import { ApplyPlanOutputSchema, SetPreferencesOutputSchema, err, ok, toolError } from '@cold-reserve/contracts';
+import { ApplyPlanOutputSchema, GetPreferencesOutputSchema, SetPreferencesOutputSchema, err, ok, toolError } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '../src/agent/agent.js';
 import { withScriptedFallback } from '../src/agent/fallback-agent.js';
@@ -51,6 +51,18 @@ describe('ScriptedAgent.callTool: simulated actions on the scripted home', () =>
     expect(out.preferences.comfortC.cooling).toBe(24);
     expect(out.preferences.roomPriority).toEqual(['bedroom-1', 'study', 'living']);
     expect(out.changes.map((c) => c.field)).toEqual(['comfortC.cooling', 'roomPriority']);
+  });
+
+  it('#402: reads the preferences with their limits, and keeps what was saved for the next read, safety limits and safe room too', async () => {
+    const agent = scripted();
+    const first = GetPreferencesOutputSchema.parse((await agent.callTool('get_preferences', {}, ctx)).structuredContent);
+    expect(first.hardLimits.elderlyCapC).toBeDefined();
+    const saved = await agent.callTool('set_preferences', { safety: { cooling: { maxC: 26 }, elderlyCapC: 29, stricterNightLimit: true }, safeRoomId: 'study', roomPriority: ['study', 'bedroom-1', 'living'], confirmed: true }, ctx);
+    expect(SetPreferencesOutputSchema.parse(saved.structuredContent).changes.map((c) => c.field)).toEqual(['safeRoomId', 'roomPriority', 'safety.cooling.maxC', 'safety.stricterNightLimit', 'safety.elderlyCapC']);
+    const again = GetPreferencesOutputSchema.parse((await agent.callTool('get_preferences', {}, ctx)).structuredContent);
+    expect(again.preferences).toMatchObject({ safeRoomId: 'study', roomPriority: ['study', 'bedroom-1', 'living'], safety: { cooling: { maxC: 26 }, elderlyCapC: 29, stricterNightLimit: true } });
+    const other = GetPreferencesOutputSchema.parse((await scripted().callTool('get_preferences', {}, ctx)).structuredContent);
+    expect(other.preferences.safety.cooling.maxC).toBe(first.preferences.safety.cooling.maxC);
   });
 
   it('in degraded mode never performs an action: an honest error, nothing changed', async () => {

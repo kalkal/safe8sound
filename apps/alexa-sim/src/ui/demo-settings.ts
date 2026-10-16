@@ -66,9 +66,9 @@ export function skyOfScenario(id: ScenarioId): Sky {
 /** The places the server plays (all three since #280); a place missing here shows "Not available yet". */
 export const SHIPPED_PLACES: readonly LocationId[] = ['reference', 'turin', 'houston'];
 
-async function callFor<T>(
+export async function callFor<T>(
   agent: Agent,
-  name: 'get_demo_settings' | 'set_scenario',
+  name: 'get_demo_settings' | 'set_scenario' | 'get_preferences' | 'set_preferences',
   args: Record<string, unknown>,
   parse: (value: unknown) => { success: true; data: T } | { success: false },
   context: AskContext,

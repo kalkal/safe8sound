@@ -1,7 +1,7 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import '@cold-reserve/ui-cards/cubes.css';
 import './app.css';
-import { ok, type ErrorEnvelope, type HomeStatus, type ReserveOutlook, type Result, type SetScenarioInput } from '@cold-reserve/contracts';
+import { categoryOf, ok, type ErrorEnvelope, type GetPreferencesOutput, type HomeStatus, type ReserveOutlook, type Result, type SetScenarioInput } from '@cold-reserve/contracts';
 import { getLocale, setLocale, subscribeLocale, type Locale } from '@cold-reserve/i18n';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -29,7 +29,9 @@ import { clockTime, cutThePower, isPowerCut, planIdOf, readClock, skipAhead, typ
 import { isAppliedPlan } from './ui/steps.js';
 import { fetchReserve } from './ui/reserve.js';
 import { SHIPPED_PLACES, applyChange, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario, type DemoSettingsView } from './ui/demo-settings.js';
-import { DemoSettingsControl } from './ui/SettingsDrawer.js';
+import { DemoSettingsControl, type LimitSave } from './ui/SettingsDrawer.js';
+import { withSaved, type LimitChange } from './ui/limits.js';
+import { fetchPreferences, savePreferences } from './ui/preferences-settings.js';
 import { LanguageToggle, nextLocale } from './ui/LanguageToggle.js';
 import { readLocale, saveLocale } from './ui/locale-setting.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
@@ -204,6 +206,32 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [agent, scripted],
   );
+  // #402: the preferences and the limits they move inside, for the temperatures and limits section of the drawer.
+  // Read with the sandbox (and again when its day or place changes); a failed read leaves the section without them.
+  const [limits, setLimits] = useState<GetPreferencesOutput | undefined>(undefined);
+  const limitsKey = `${demoSettings?.scenarioId ?? ''}/${demoSettings?.locationId ?? ''}`;
+  useEffect(() => {
+    if (!scripted && sessionToken === undefined) return undefined;
+    let current = true;
+    void fetchPreferences(agent, { correlationId: crypto.randomUUID() }).then((read) => {
+      if (current && read.ok) setLimits(read.value);
+    });
+    return () => {
+      current = false;
+    };
+  }, [agent, scripted, sessionToken, limitsKey]);
+  const onLimit = useCallback(
+    async (change: LimitChange): Promise<LimitSave> => {
+      const saved = await savePreferences(agent, change, { correlationId: crypto.randomUUID() });
+      // What the tool stored is what is shown: the view comes from its output, with no second read.
+      if (saved.ok) {
+        setLimits((previous) => (previous === undefined ? previous : withSaved(previous, saved.value.preferences)));
+        return 'saved';
+      }
+      return categoryOf(saved.error.code) === 'rate_limited' ? 'rate_limited' : 'failed';
+    },
+    [agent],
+  );
   // #263: the page's language, this viewer's own setting kept in the browser; every text re-renders with it.
   const locale = useSyncExternalStore(subscribeLocale, getLocale);
   const onLocale = useCallback((next: Locale) => {
@@ -320,7 +348,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const clockDock = hasSandbox && clock !== undefined ? <SimClock state={clock} busy={clockBusy} onSkip={onSkip} {...(clockNote === undefined ? {} : { note: clockNote })} /> : undefined;
   const settingsControl = (
     <>
-      <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} locale={locale} onLocale={onLocale} />
+      <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} locale={locale} onLocale={onLocale} limits={limits} onLimit={onLimit} />
       {/* The language icon at the top (owner, 10 Oct), at the end of the row, quiet beside the badge. */}
       <LanguageToggle locale={locale} onLocale={onLocale} />
     </>

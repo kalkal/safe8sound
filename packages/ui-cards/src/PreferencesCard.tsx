@@ -2,6 +2,7 @@ import { SetPreferencesInputSchema, formatTemp, toDisplayTemp, type DataOriginVa
 import { CATALOGS, type MessageKey } from '@cold-reserve/i18n';
 import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CardShell } from './CardShell.js';
+import { priorityBroken, withSafeRoom } from './safe-room.js';
 import { getTempUnit } from './temp-unit.js';
 import { formatHours, t } from './text.js';
 
@@ -38,7 +39,7 @@ type Draft = GetPreferencesOutput['preferences'];
 /** The rules the tool will check, said in words before sending (no codes, error-handling §3). */
 function saveProblem(draft: Draft, cooling: number): string | null {
   if (cooling > draft.safety.cooling.maxC) return t('prefs.error.comfortAboveMax');
-  if (draft.roomPriority[0] !== draft.safeRoomId || new Set(draft.roomPriority).size !== draft.roomPriority.length) return t('prefs.error.priority');
+  if (priorityBroken(draft)) return t('prefs.error.priority');
   return null;
 }
 
@@ -152,6 +153,8 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave }: Prefer
                 max: formatTemp(limits.cooling.maxC.max, getTempUnit()),
               })}
             </p>
+            {/* #402: temperatures and limits are changed in one place, the settings. */}
+            <p className="muted">{t('prefs.limitsHint')}</p>
           </fieldset>
         </Fragment>,
         <Fragment key="safe-room">
@@ -164,7 +167,7 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave }: Prefer
                   name="safe-room"
                   checked={draft.safeRoomId === room.id}
                   onChange={() => {
-                    setDraft({ ...draft, safeRoomId: room.id, roomPriority: [room.id, ...draft.roomPriority.filter((id) => id !== room.id)] });
+                    setDraft(withSafeRoom(draft, room.id));
                   }}
                 />
                 {room.name}

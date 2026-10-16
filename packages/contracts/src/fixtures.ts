@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import type { HomeProfileSchema, HvacUnitSchema } from './home.js';
 import type { GuaranteeId } from './guarantees.js';
 import type { PlanSchema } from './plan.js';
-import type { PreferencesSchema, SafetyHardLimitsSchema } from './preferences.js';
+import { ELDERLY_CAP_MAX_C, HEAT_INDEX_CAP_MAX_C, type PreferencesSchema, type SafetyHardLimitsSchema } from './preferences.js';
 import type { ReserveOutlookSchema } from './reserve-outlook.js';
 import type { ForecastSchema, SnapshotSchema } from './snapshot.js';
 
@@ -159,6 +159,10 @@ export function exampleSafetyLimits(): z.input<typeof SafetyHardLimitsSchema> {
     cooling: { maxC: { min: 24, max: 30, default: 27 } },
     heating: { minC: { min: 16, max: 22, default: 18 } },
     humidity: { minPct: { min: 30, max: 50, default: 40 }, maxPct: { min: 50, max: 70, default: 60 } },
+    // #402: the heat caps may only be stricter than their health constants (#266); the bounds are those of the config.
+    stricterNightLimit: { default: false },
+    heatIndexCapC: { min: 26.7, max: HEAT_INDEX_CAP_MAX_C, default: HEAT_INDEX_CAP_MAX_C },
+    elderlyCapC: { min: 26, max: ELDERLY_CAP_MAX_C, default: ELDERLY_CAP_MAX_C },
   };
 }
 

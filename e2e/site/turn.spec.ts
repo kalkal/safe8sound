@@ -49,7 +49,7 @@ test('B2: the settings drawer saves to the visitor sandbox through /api; the bad
   // Turin and Houston ship with #280: a new place is saved too, and the badge names it as the server does.
   await drawer.getByText('Houston, Texas').click();
   await expect(badge).toContainText('Houston, Texas', { timeout: 20_000 });
-  await drawer.getByText('°F').click();
+  await drawer.getByRole('radiogroup', { name: 'Temperature units' }).getByText('°F').click();
   await expect(drawer.getByRole('radio', { name: '°F' })).toBeChecked({ timeout: 20_000 });
   await page.keyboard.press('Escape');
   await expect(badge).toBeFocused();

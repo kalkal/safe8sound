@@ -18,6 +18,7 @@
     "@cold-reserve/contracts": "workspace:*",
     "@cold-reserve/core": "workspace:*",
     "@cold-reserve/design-tokens": "workspace:*",
+    "@cold-reserve/guard": "workspace:*",
     "@cold-reserve/i18n": "workspace:*",
     "@cold-reserve/ui-cards": "workspace:*",
     "@modelcontextprotocol/ext-apps": "1.7.5",

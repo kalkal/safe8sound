@@ -65,6 +65,9 @@ describe('card tool calls: POST /v1/tools/call', () => {
   it('accepts only the card actions, with contract-checked arguments', () => {
     expect(ToolCallRequestSchema.safeParse({ name: 'apply_plan', arguments: { planId: 'plan-0001' } }).success).toBe(true);
     expect(ToolCallRequestSchema.safeParse({ name: 'notify_family', arguments: {} }).success).toBe(false);
+    // #402: the settings drawer reads the preferences, with no arguments (the home comes from the token).
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_preferences', arguments: {} }).success).toBe(true);
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_preferences', arguments: { homeId: 'home' } }).success).toBe(false);
     expect(ToolCallRequestSchema.safeParse({ name: 'apply_plan', arguments: {} }).success).toBe(false);
   });
 

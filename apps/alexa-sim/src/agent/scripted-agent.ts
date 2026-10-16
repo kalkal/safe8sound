@@ -6,7 +6,7 @@ import { PHONE_FIXTURE_NAMES, phoneMessage } from '../phone/phone-fixtures.js';
 import type { ScriptedPhone } from '../phone/phone-feed.js';
 import { SCRIPT_FIXTURES, SCRIPT_FIXTURE_NAMES } from './script-fixtures.js';
 import { createScriptedClock } from './scripted-clock.js';
-import { refuseAction, scriptedToolCall } from './scripted-tools.js';
+import { createScriptedPreferences, refuseAction, scriptedToolCall } from './scripted-tools.js';
 import { StatusFactsSchema, type ToolName } from './wire.js';
 
 const TOOL_NAMES = ['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences', 'get_safe_room_status', 'get_home_status'] as const satisfies readonly ToolName[];
@@ -78,6 +78,7 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
     .map((entry) => ({ ...entry, patterns: entry.patterns.map(normalise) }));
   const fallback = options.degraded === true ? script.degradedFallback : script.fallback;
   // The simulated clock of the scripted home: the storm night's moments, the phone told on the way.
+  const preferences = createScriptedPreferences();
   const clock = createScriptedClock(options.phone === undefined ? {} : { phone: options.phone });
 
   return ok({
@@ -86,7 +87,7 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
       if (options.degraded === true) return Promise.resolve(refuseAction());
       const clocked = clock.call(name, args);
       if (clocked !== undefined) return Promise.resolve(clocked);
-      const result = scriptedToolCall(name, args, script.status?.ts);
+      const result = scriptedToolCall(name, args, script.status?.ts, preferences);
       // The card says the family was told (familyAlert.sent): the scripted phone gets that message, as the server sends it.
       const alert = result.structuredContent?.['familyAlert'];
       const sent = typeof alert === 'object' && alert !== null && 'sent' in alert && typeof alert.sent === 'number' ? alert.sent : 0;

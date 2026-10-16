@@ -1,4 +1,4 @@
-import { SetPreferencesInputSchema, SetPreferencesOutputSchema, toolError, type ConfigChange, type PublicPreferences } from '@cold-reserve/contracts';
+import { GetPreferencesOutputSchema, SafetyThresholdsSchema, SetPreferencesInputSchema, SetPreferencesOutputSchema, effectiveHeatSafety, toolError, type ConfigChange, type GetPreferencesOutput, type PublicPreferences } from '@cold-reserve/contracts';
 import { toolErrorResult, type ToolCallResult } from './agent.js';
 import { SCRIPT_FIXTURES, SCRIPTED_LAST_RESORT_TOKEN } from './script-fixtures.js';
 
@@ -30,40 +30,86 @@ function applyLastResort(token: unknown): ToolCallResult {
   return success(SCRIPT_FIXTURES['last-resort-applied']().result, 'The last-resort plan is applied.');
 }
 
+/** The scripted home's preferences (#402): the fixture, then what the settings and the cards saved, for this agent only. */
+export interface ScriptedPreferences {
+  read: () => GetPreferencesOutput | undefined;
+  save: (next: PublicPreferences) => void;
+}
+
+export function createScriptedPreferences(): ScriptedPreferences {
+  let current = SCRIPT_FIXTURES.preferences();
+  return {
+    read: () => (current.tool === 'get_preferences' ? current.result : undefined),
+    save: (next) => {
+      if (current.tool === 'get_preferences') current = { tool: 'get_preferences', result: { ...current.result, preferences: next, isDefault: false } };
+    },
+  };
+}
+
+function getPreferences(store: ScriptedPreferences): ToolCallResult {
+  const view = store.read();
+  return view === undefined ? toolErrorResult(toolError('invalid_input', 'The preferences cannot be read.')) : success(GetPreferencesOutputSchema.parse(view), 'Preferences.');
+}
+
 // TODO(#330): this scripted save skips the server's preference rules (core updatePreferences: the safety limits, heating
-// at or below cooling, an unconverted °F number); alexa-sim does not depend on core.
-function setPreferences(args: Record<string, unknown>, at: string | undefined): ToolCallResult {
+// at or below cooling, an unconverted °F number); alexa-sim does not depend on core. The settings section (#402)
+// refuses a move against those rules before it sends one.
+function setPreferences(args: Record<string, unknown>, at: string | undefined, store: ScriptedPreferences): ToolCallResult {
   const input = SetPreferencesInputSchema.safeParse(args);
-  const view = SCRIPT_FIXTURES.preferences();
-  if (!input.success || view.tool !== 'get_preferences') return toolErrorResult(toolError('invalid_input', 'These preferences cannot be saved.'));
-  const before = view.result.preferences;
+  const view = store.read();
+  if (!input.success || view === undefined) return toolErrorResult(toolError('invalid_input', 'These preferences cannot be saved.'));
+  const before = view.preferences;
   const change = input.data;
+  const heat = effectiveHeatSafety(before.safety);
+  const safetyRaw = {
+    ...before.safety,
+    cooling: { maxC: change.safety?.cooling?.maxC ?? before.safety.cooling.maxC },
+    heating: { minC: change.safety?.heating?.minC ?? before.safety.heating.minC },
+    humidity: { minPct: change.safety?.humidity?.minPct ?? before.safety.humidity.minPct, maxPct: change.safety?.humidity?.maxPct ?? before.safety.humidity.maxPct },
+    ...(change.safety?.stricterNightLimit === undefined ? {} : { stricterNightLimit: change.safety.stricterNightLimit }),
+    ...(change.safety?.heatIndexCapC === undefined ? {} : { heatIndexCapC: change.safety.heatIndexCapC }),
+    ...(change.safety?.elderlyCapC === undefined ? {} : { elderlyCapC: change.safety.elderlyCapC }),
+  };
+  // The contract brands the temperatures: they are parsed, never cast.
+  const parsedSafety = SafetyThresholdsSchema.safeParse(safetyRaw);
+  if (!parsedSafety.success) return toolErrorResult(toolError('invalid_input', 'These preferences cannot be saved.'));
+  const safety = parsedSafety.data;
   const after = {
     ...before,
     comfortC: { cooling: change.comfortC?.cooling ?? before.comfortC.cooling, heating: change.comfortC?.heating ?? before.comfortC.heating },
     safeRoomId: change.safeRoomId ?? before.safeRoomId,
     roomPriority: change.roomPriority ?? before.roomPriority,
+    safety,
   };
+  const played = effectiveHeatSafety(safety);
   // The simulated log, timestamped on the script clock; nothing is logged without one.
-  const fields: Array<[string, number | string, number | string]> = [
+  const fields: Array<[string, number | string | boolean, number | string | boolean]> = [
     ['comfortC.cooling', before.comfortC.cooling, after.comfortC.cooling],
     ['comfortC.heating', before.comfortC.heating, after.comfortC.heating],
     ['safeRoomId', before.safeRoomId, after.safeRoomId],
     ['roomPriority', before.roomPriority.join(','), after.roomPriority.join(',')],
+    ['safety.cooling.maxC', before.safety.cooling.maxC, safety.cooling.maxC],
+    ['safety.heating.minC', before.safety.heating.minC, safety.heating.minC],
+    ['safety.stricterNightLimit', heat.stricterNightLimit, played.stricterNightLimit],
+    ['safety.heatIndexCapC', heat.heatIndexCapC, played.heatIndexCapC],
+    ['safety.elderlyCapC', heat.elderlyCapC, played.elderlyCapC],
   ];
   const changes: ConfigChange[] =
     at === undefined ? [] : fields.filter(([, from, to]) => from !== to).map(([field, from, to]) => ({ ts: at, field, from, to, by: 'user', confirmed: true }));
   const output = SetPreferencesOutputSchema.safeParse({ preferences: after satisfies Record<keyof PublicPreferences, unknown>, changes });
-  return output.success ? success(output.data, 'Preferences saved.') : toolErrorResult(toolError('invalid_input', 'These preferences cannot be saved.'));
+  if (!output.success) return toolErrorResult(toolError('invalid_input', 'These preferences cannot be saved.'));
+  store.save(output.data.preferences);
+  return success(output.data, 'Preferences saved.');
 }
 
-export function scriptedToolCall(name: string, args: Record<string, unknown>, at: string | undefined): ToolCallResult {
+export function scriptedToolCall(name: string, args: Record<string, unknown>, at: string | undefined, preferences: ScriptedPreferences = createScriptedPreferences()): ToolCallResult {
   if (name === 'apply_plan') return applyPlan(args);
   // The idle screen's cold reserve clock (owner, 11 Oct): read-only, the reserve of the scripted home.
   if (name === 'get_reserve_outlook') {
     const reserve = SCRIPT_FIXTURES['reserve-outlook']();
     return success(reserve.result, 'Cold reserve.');
   }
-  if (name === 'set_preferences') return setPreferences(args, at);
+  if (name === 'set_preferences') return setPreferences(args, at, preferences);
+  if (name === 'get_preferences') return getPreferences(preferences);
   return toolErrorResult(toolError('invalid_input', `The simulator does not run ${name}.`));
 }
