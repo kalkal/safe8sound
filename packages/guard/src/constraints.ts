@@ -50,22 +50,29 @@ const stormReserve: Constraint = {
     // The plan's own targets are compared exactly (the nearest allowed value is rounded up, so it passes);
     // only the projected SOC, which accumulates float noise over hundreds of steps, gets a tolerance.
     const ok = minTarget >= floor && minProjected >= Math.min(floor, ctx.input.snapshot.batterySocPct) - EPS;
-    const measured = Math.min(minTarget, minProjected);
+    const lowest = Math.min(minTarget, minProjected);
     const kwh = (ctx.reserveWh / 1000).toFixed(1);
     const soc = ctx.input.snapshot.batterySocPct;
-    // The floor is quoted rounded up, like `limit`: the receipt shows both side by side.
-    const kept = soc < floor - EPS
-      ? `Keeps ${kwh} kWh for a storm: the battery is not taken lower than it is now (${r1(soc).toString()} %, under the ${up1(floor).toString()} % kept).`
-      : `Keeps ${kwh} kWh for a storm: the battery stays at or above ${up1(floor).toString()} %.`;
+    const limit = up1(floor);
+    // One rounding per row, so the reason and the receipt numbers never contradict each other (#414): the floor is
+    // quoted rounded up (it is also the limit and the nearest allowed value), a failing level rounded down, a passing
+    // level at least at the limit. The receipt reads a level within one tenth under the limit as "kept"
+    // (whole tenths, #413), so a battery at most that far under the floor is said to stay at it, never "under" it.
+    const below = soc < floor - EPS ? down1(soc) : undefined;
+    const stays = below !== undefined && Math.round(limit * 10) - Math.round(below * 10) > 1;
+    const measured = ok ? (stays ? down1(soc) : Math.max(r1(lowest), limit)) : down1(lowest);
+    const kept = stays
+      ? `Keeps ${kwh} kWh for a storm: the battery is not taken lower than it is now (${measured.toString()} %, under the ${limit.toString()} % kept).`
+      : `Keeps ${kwh} kWh for a storm: the battery stays at or above ${limit.toString()} %.`;
     return {
       id: 'storm_reserve',
       ok,
       reason: ok
         ? kept
-        : `The plan takes the battery to ${r1(measured).toString()} %, below the ${r1(floor).toString()} % kept for a storm (${kwh} kWh).`,
-      measured: r1(measured),
-      limit: up1(floor),
-      nearestAllowed: up1(floor),
+        : `The plan takes the battery to ${measured.toString()} %, below the ${limit.toString()} % kept for a storm (${kwh} kWh).`,
+      measured,
+      limit,
+      nearestAllowed: limit,
       unit: '%',
     };
   },

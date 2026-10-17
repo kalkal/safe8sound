@@ -75,6 +75,34 @@ describe('storm_reserve', () => {
     expect(low.reason).toBe('Keeps 4.0 kWh for a storm: the battery is not taken lower than it is now (30 %, under the 36 % kept).');
   });
 
+  it('a battery at most one tenth under the floor is said to stay at it, never "under" it (#414)', () => {
+    const r = check('storm_reserve', ctx({ reserveFloorSocPct: pct(48.78), targets: [at(0, 48.78)], points: [point(0, { soc: 48.76 })], snapshotSoc: 48.76 }));
+    expect(r).toMatchObject({ ok: true, measured: 48.8, limit: 48.8, nearestAllowed: 48.8 });
+    expect(r.reason).toBe('Keeps 4.0 kWh for a storm: the battery stays at or above 48.8 %.');
+    const edge = check('storm_reserve', ctx({ reserveFloorSocPct: pct(48.8), targets: [at(0, 48.8)], points: [point(0, { soc: 48.7 })], snapshotSoc: 48.7 }));
+    expect(edge.reason).toBe('Keeps 4.0 kWh for a storm: the battery stays at or above 48.8 %.');
+  });
+
+  it('a battery two tenths or more under the floor is quoted rounded down, under it', () => {
+    const r = check('storm_reserve', ctx({ reserveFloorSocPct: pct(48.78), targets: [at(0, 48.78)], points: [point(0, { soc: 48.66 })], snapshotSoc: 48.66 }));
+    expect(r).toMatchObject({ ok: true, measured: 48.6, limit: 48.8 });
+    expect(r.reason).toBe('Keeps 4.0 kWh for a storm: the battery is not taken lower than it is now (48.6 %, under the 48.8 % kept).');
+  });
+
+  it('a passing level is never shown under its own limit (48.74 against a 48.74 floor)', () => {
+    const r = check('storm_reserve', ctx({ reserveFloorSocPct: pct(48.74), targets: [at(0, 48.74)], points: [point(0, { soc: 60 })] }));
+    expect(r).toMatchObject({ ok: true, measured: 48.8, limit: 48.8 });
+  });
+
+  it('a failing row quotes the floor and the level with the same rounding as the receipt (48.7 against 48.8)', () => {
+    const r = check('storm_reserve', ctx({ reserveFloorSocPct: pct(48.78), targets: [at(0, 48.76)], points: [point(0, { soc: 60 })] }));
+    expect(r).toMatchObject({ ok: false, measured: 48.7, limit: 48.8, nearestAllowed: 48.8 });
+    expect(r.reason).toBe('The plan takes the battery to 48.7 %, below the 48.8 % kept for a storm (4.0 kWh).');
+    const r2 = check('storm_reserve', ctx({ reserveFloorSocPct: pct(48.72), targets: [at(0, 48.6)], points: [point(0, { soc: 60 })] }));
+    expect(r2.reason).toBe('The plan takes the battery to 48.6 %, below the 48.8 % kept for a storm (4.0 kWh).');
+    expect(r2.nearestAllowed).toBe(48.8);
+  });
+
   it('fails just below the floor and names both numbers', () => {
     const r = check('storm_reserve', ctx({ targets: [at(0, 35.9)], points: [point(0, { soc: 50 })] }));
     expect(r).toMatchObject({ ok: false, measured: 35.9, limit: 36, nearestAllowed: 36 });
