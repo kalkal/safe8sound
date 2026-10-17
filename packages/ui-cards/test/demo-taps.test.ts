@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEMO_CONTEXT_KEY, TAP_MARK_MS, installTapMarks, isDemoContext } from '../src/demo-taps.js';
+import { DEMO_CONTEXT_KEY, TAP_COUNT_ATTRIBUTE, TAP_MARK_MS, installTapMarks, isDemoContext } from '../src/demo-taps.js';
 
 // Demo mode for the video (scene recording): each tap leaves a short circle where the pointer pressed, so a
 // viewer sees what was touched. Off unless the host turns it on; never in a real Alexa+ host.
@@ -86,5 +86,35 @@ describe('tap marks', () => {
     expect(isDemoContext({ [DEMO_CONTEXT_KEY]: 'true' })).toBe(false);
     expect(isDemoContext({ theme: 'dark' })).toBe(false);
     expect(isDemoContext(undefined)).toBe(false);
+  });
+
+  it('counts the presses on the root element so a test can wait on it, and removes the count on uninstall (#289)', () => {
+    vi.useFakeTimers();
+    const root = document.documentElement;
+    expect(root.hasAttribute(TAP_COUNT_ATTRIBUTE)).toBe(false);
+    const uninstall = installTapMarks(document);
+    expect(root.getAttribute(TAP_COUNT_ATTRIBUTE)).toBe('0');
+    press(1, 1);
+    expect(root.getAttribute(TAP_COUNT_ATTRIBUTE)).toBe('1');
+    press(2, 2);
+    vi.advanceTimersByTime(TAP_MARK_MS);
+    expect(document.querySelector('.demo-tap')).toBeNull();
+    expect(root.getAttribute(TAP_COUNT_ATTRIBUTE)).toBe('2');
+    uninstall();
+    expect(root.hasAttribute(TAP_COUNT_ATTRIBUTE)).toBe(false);
+  });
+
+  it('the count goes up only after the mark is in the page (#289)', () => {
+    const root = document.documentElement;
+    const uninstall = installTapMarks(document);
+    const seen: Array<string | null> = [];
+    document.body.addEventListener('pointerdown', () => {
+      seen.push(root.getAttribute(TAP_COUNT_ATTRIBUTE));
+    });
+    press(3, 3);
+    // The capture listener ran first; at the bubble phase the mark and the count are both done.
+    expect(seen).toEqual(['1']);
+    expect(document.querySelectorAll('.demo-tap')).toHaveLength(1);
+    uninstall();
   });
 });

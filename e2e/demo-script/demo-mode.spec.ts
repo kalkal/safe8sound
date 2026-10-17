@@ -19,21 +19,37 @@ test('off by default: no tap marks, no caption, no light bar', async ({ page }) 
 });
 
 test('a tap on the page and a tap inside a card each leave a mark; the question is captioned', async ({ page }) => {
+  // The mark lives 650 ms, so the test never polls for it: the root element counts the presses (`data-demo-taps`,
+  // '0' once the listener is attached, kept after the mark is gone) and an observer notes where each mark was put (#289).
   await page.goto('/?demo=1');
+  await expect(page.locator('html')).toHaveAttribute('data-demo-taps', '0');
+  await page.evaluate(`(() => {
+    const seen = [];
+    globalThis.__tapX = seen;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node.classList?.contains('demo-tap')) seen.push(Number.parseFloat(node.style.left));
+        }
+      }
+    }).observe(document.body, { childList: true });
+  })()`);
   await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
   const ask = page.getByRole('button', { name: 'Ask' });
+  const button = await ask.boundingBox();
   await ask.click();
-  const mark = page.locator('.demo-tap');
-  await expect(mark).toHaveCount(1);
+  await expect(page.locator('html')).toHaveAttribute('data-demo-taps', '1');
   // The mark is centred where the pointer went down (Playwright presses the button's centre; the button may
   // shift a few pixels once the answer starts, so the check allows less than a sixth of the mark).
-  const [button, circle] = await Promise.all([ask.boundingBox(), mark.boundingBox()]);
-  expect(button && circle && Math.abs(circle.x + circle.width / 2 - (button.x + button.width / 2))).toBeLessThan(8);
+  const markX = await page.evaluate(() => (globalThis as { __tapX?: number[] }).__tapX?.[0]);
+  expect(button && markX !== undefined && Math.abs(markX - (button.x + button.width / 2))).toBeLessThan(8);
   await expect(page.getByTestId('demo-caption')).toHaveText('You said: “It\'s going to be 36 degrees tomorrow. Keep Grandpa comfortable.”');
 
   const card = page.frameLocator('iframe[title="Plan card"]');
+  // The card attaches its listener a render after it shows its button: wait for it before the tap.
+  await expect(card.locator('html')).toHaveAttribute('data-demo-taps', '0');
   await card.getByRole('button', { name: 'Apply plan' }).click();
-  await expect(card.locator('.demo-tap')).toHaveCount(1);
+  await expect(card.locator('html')).toHaveAttribute('data-demo-taps', '1');
   await expect(card.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
   // Marks go away by themselves.
   await expect(card.locator('.demo-tap')).toHaveCount(0);

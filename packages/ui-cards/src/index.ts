@@ -26,7 +26,7 @@ export { FloorPlanCard } from './FloorPlanCard.js';
 export { ManualControlCard, type ManualReason } from './ManualControlCard.js';
 export { SafeRoomCard, roomLabel } from './SafeRoomCard.js';
 export { priorityBroken, withSafeRoom } from './safe-room.js';
-export { DEMO_CONTEXT_KEY, TAP_MARK_MS, installTapMarks, isDemoContext } from './demo-taps.js';
+export { DEMO_CONTEXT_KEY, TAP_COUNT_ATTRIBUTE, TAP_MARK_MS, installTapMarks, isDemoContext } from './demo-taps.js';
 export { UNITS_CONTEXT_KEY, getTempUnit, setTempUnit, unitOfContext } from './temp-unit.js';
 export { homeCalm, homeInStorm } from './home-fixtures.js';
 export { advisoryPlan, hotDayPlan, inverterRefusal, lastResortBatteryPlan, lastResortPlan, planThatHolds, rejectedPlan, safeRoomAboveNightLimit, safeRoomBatteryFirst, safeRoomCalm, safeRoomInStorm, stormPlan, stormReserveRefusal, surplusPlan } from './fixtures.js';

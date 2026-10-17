@@ -35,12 +35,14 @@ test('demo mode for the video (?demo=1) runs under the same CSP: tap marks on th
   });
 
   await page.goto('/?demo=1');
+  await expect(page.locator('html')).toHaveAttribute('data-demo-taps', '0');
   await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
   await page.getByRole('button', { name: 'Ask' }).click();
-  await expect(page.locator('.demo-tap')).toHaveCount(1);
+  await expect(page.locator('html')).toHaveAttribute('data-demo-taps', '1');
   const card = page.locator('iframe[title="Plan card"]').last().contentFrame();
+  await expect(card.locator('html')).toHaveAttribute('data-demo-taps', '0');
   await card.getByRole('button', { name: 'Apply plan' }).click();
-  await expect(card.locator('.demo-tap')).toHaveCount(1);
+  await expect(card.locator('html')).toHaveAttribute('data-demo-taps', '1');
   await expect(page.getByTestId('demo-caption')).toBeVisible();
 
   expect(violations).toEqual([]);

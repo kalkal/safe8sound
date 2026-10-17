@@ -12,6 +12,11 @@
 export const DEMO_CONTEXT_KEY = 'coldReserveDemo';
 /** How long a mark stays on screen. */
 export const TAP_MARK_MS = 650;
+/**
+ * Press count on the root element: '0' once the listener is attached, +1 after each mark is in the page, kept when the
+ * mark is gone, removed on uninstall. A test waits on it instead of racing the mark's 650 ms (#289).
+ */
+export const TAP_COUNT_ATTRIBUTE = 'data-demo-taps';
 
 export function isDemoContext(context: Readonly<Record<string, unknown>> | undefined): boolean {
   return context?.[DEMO_CONTEXT_KEY] === true;
@@ -34,6 +39,8 @@ const reducedMotion = (): boolean => typeof matchMedia === 'function' && matchMe
 
 /** Draws a tap mark at every press in `doc`; returns the function that stops it and removes the marks left. */
 export function installTapMarks(doc: Document): () => void {
+  const root = doc.documentElement;
+  let taps = 0;
   const marks = new Set<HTMLElement>();
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const onDown = (event: Event) => {
@@ -62,11 +69,15 @@ export function installTapMarks(doc: Document): () => void {
       timers.delete(timer);
     }, TAP_MARK_MS);
     timers.add(timer);
+    taps += 1;
+    root.setAttribute(TAP_COUNT_ATTRIBUTE, String(taps));
   };
   // Capture, passive: the mark is drawn before the page reacts, and never stops the press.
   doc.addEventListener('pointerdown', onDown, { capture: true, passive: true });
+  root.setAttribute(TAP_COUNT_ATTRIBUTE, '0');
   return () => {
     doc.removeEventListener('pointerdown', onDown, { capture: true });
+    root.removeAttribute(TAP_COUNT_ATTRIBUTE);
     timers.forEach((timer) => {
       clearTimeout(timer);
     });
