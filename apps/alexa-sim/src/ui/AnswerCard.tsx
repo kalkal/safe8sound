@@ -14,6 +14,8 @@ export interface AnswerCardProps {
 
 export function AnswerCard({ answer, timeZone, turnId }: AnswerCardProps) {
   const { status } = answer;
+  // An empty list of cards is no card: the words then keep the screen (never an empty Echo screen after an answer).
+  const cards = answer.cards !== undefined && answer.cards.length > 0 ? answer.cards : undefined;
   // #398: on a phone, under a card, the words keep two lines; a touch opens them (CSS shows the button only there).
   const [open, setOpen] = useState(false);
   return (
@@ -27,7 +29,7 @@ export function AnswerCard({ answer, timeZone, turnId }: AnswerCardProps) {
         <p className="answer-text" id="answer-words-text">
           {answer.text}
         </p>
-        {answer.cards !== undefined && (
+        {cards !== undefined && (
           <button
             type="button"
             className="answer-more"
@@ -55,7 +57,7 @@ export function AnswerCard({ answer, timeZone, turnId }: AnswerCardProps) {
           </div>
         </dl>
       )}
-      {answer.cards !== undefined && <ToolCards cards={answer.cards} turnId={turnId} />}
+      {cards !== undefined && <ToolCards cards={cards} turnId={turnId} />}
     </article>
   );
 }

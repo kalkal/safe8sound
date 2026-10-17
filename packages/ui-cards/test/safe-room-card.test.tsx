@@ -79,6 +79,12 @@ describe('SafeRoomCard', () => {
     expect(screen.getByText('About 10½ h on the battery for this room.')).toBeTruthy();
   });
 
+  it("#192: titles the room by the name the home profile gives it (the demo home's \"Leo's room\"), its id only without one", () => {
+    render(<SafeRoomCard status={{ ...safeRoomInStorm(), safeRoomName: "Leo's room" }} />);
+    expect(screen.getByRole('region', { name: "Safe room · Leo's room" })).toBeTruthy();
+    expect(screen.queryByText(/Bedroom 1/)).toBeNull();
+  });
+
   it('lists who is in the room, the measured air, and the level with its reason', () => {
     render(<SafeRoomCard status={safeRoomInStorm()} />);
     const facts = screen.getByRole('list', { name: 'In the safe room', hidden: true });

@@ -41,6 +41,12 @@ describe('demo settings', () => {
     expect(applyChange({ ...houston, units: 'C' }, { scenarioId: 'storm-blackout' })).toMatchObject({ units: 'C' });
   });
 
+  it("a new place drops the old place's time zone (never Houston's times on Turin's clock); other choices keep it", () => {
+    const chicago = { ...scriptedDemoSettings(), locationId: 'houston' as const, timeZone: 'America/Chicago' };
+    expect(applyChange(chicago, { locationId: 'turin' })).not.toHaveProperty('timeZone');
+    expect(applyChange(chicago, { scenarioId: 'storm-blackout' })).toMatchObject({ timeZone: 'America/Chicago' });
+  });
+
   it('each scenario has its sky', () => {
     expect(skyOfScenario('clear-day')).toBe('mild');
     expect(skyOfScenario('heatwave')).toBe('hot');
@@ -69,7 +75,20 @@ describe('remote demo settings (B2): read and saved through the card tool route'
 
   it('reads the sandbox settings; the place is named at render time, never kept from the server\'s label (#284)', async () => {
     const { agent } = agentAnswering({ get_demo_settings: reply({ settings, place }) });
-    expect(await fetchDemoSettings(agent, ctx)).toEqual({ ok: true, value: { scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' } });
+    expect(await fetchDemoSettings(agent, ctx)).toEqual({ ok: true, value: { scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man', timeZone: 'Europe/Rome' } });
+  });
+
+  it("every time on screen is on the sandbox place's clock (Houston: America/Chicago), whatever the browser's zone", async () => {
+    const houston = { ...settings, locationId: 'houston' as const, units: 'F' as const };
+    const { agent } = agentAnswering({ get_demo_settings: reply({ settings: houston, place: { id: 'houston', label: 'Houston', tz: 'America/Chicago' } }) });
+    expect(await fetchDemoSettings(agent, ctx)).toMatchObject({ ok: true, value: { locationId: 'houston', timeZone: 'America/Chicago' } });
+  });
+
+  it('a zone this browser does not know is left out: the page keeps its configured home zone', async () => {
+    const { agent } = agentAnswering({ get_demo_settings: reply({ settings, place: { ...place, tz: 'Mars/Olympus' } }) });
+    const read = await fetchDemoSettings(agent, ctx);
+    expect(read).toMatchObject({ ok: true, value: { locationId: 'reference' } });
+    expect(read.ok ? read.value : undefined).not.toHaveProperty('timeZone');
   });
 
   it('a home that is not a sandbox (a tool error) has no settings to show', async () => {

@@ -12,6 +12,7 @@ import {
   type ScenarioId,
   type SetScenarioInput,
 } from '@cold-reserve/contracts';
+import { isTimeZone } from '@cold-reserve/core';
 import type { Agent, AskContext } from '../agent/agent.js';
 import { log as defaultLog, type Log } from '../log.js';
 import type { Sky } from './sky.js';
@@ -25,6 +26,11 @@ export interface DemoSettingsView {
   locationId: LocationId;
   units: 'C' | 'F';
   household: Household;
+  /**
+   * IANA zone of the sandbox's place (Houston: America/Chicago): every time on screen is on the home's own clock,
+   * never the browser's or the page's configured zone. Unknown in scripted mode and right after a new place is chosen there.
+   */
+  timeZone?: string;
 }
 
 export const SCENARIOS: readonly ScenarioId[] = ['clear-day', 'heatwave', 'storm-blackout'];
@@ -48,8 +54,11 @@ export function badgeText(view: DemoSettingsView): string {
 export function applyChange(view: DemoSettingsView, change: SetScenarioInput): DemoSettingsView {
   const placeUnit = change.locationId === undefined || change.locationId === view.locationId ? undefined : defaultUnitOf(change.locationId);
   const units = change.units ?? placeUnit;
+  // A new place: its zone is no longer the old place's (remote mode reads the new one back at once).
+  const base: DemoSettingsView = { ...view };
+  if (placeUnit !== undefined) delete base.timeZone;
   return {
-    ...view,
+    ...base,
     ...(change.scenarioId === undefined ? {} : { scenarioId: change.scenarioId }),
     ...(change.locationId === undefined ? {} : { locationId: change.locationId }),
     ...(units === undefined ? {} : { units }),
@@ -94,8 +103,9 @@ export async function callFor<T>(
 export async function fetchDemoSettings(agent: Agent, context: AskContext, logEvent: Log = defaultLog): Promise<Result<DemoSettingsView, ErrorEnvelope>> {
   const read = await callFor(agent, 'get_demo_settings', {}, (v) => GetDemoSettingsOutputSchema.safeParse(v), context, logEvent);
   if (!read.ok) return read;
-  const { settings } = read.value;
-  return ok({ scenarioId: settings.scenarioId, locationId: settings.locationId, units: settings.units, household: settings.household });
+  const { settings, place } = read.value;
+  // The zone is host data: one this browser does not know is left out, and the page keeps its configured zone.
+  return ok({ scenarioId: settings.scenarioId, locationId: settings.locationId, units: settings.units, household: settings.household, ...(isTimeZone(place.tz) ? { timeZone: place.tz } : {}) });
 }
 
 /** B2: saves one change, then reads the settings back, so what is shown is what is stored (never an optimistic guess). */

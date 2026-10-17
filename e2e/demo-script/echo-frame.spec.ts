@@ -63,3 +63,20 @@ test('at 375 px: no bezel, the sky behind the page, and nothing scrolls sideways
   await expect(page.getByTestId('echo-screen')).toHaveAttribute('data-sky', 'hot');
   expect(await page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(375);
 });
+
+test('on a 960 × 480 Echo an answer with no card keeps its words on screen; with a card, the card owns the screen', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 480 });
+  await page.goto('/');
+  // No card and no battery fact (the storm being prepared, "Not now", the fallback): the screen is never left empty.
+  await ask(page, 'Tell me a joke.');
+  const words = page.getByTestId('answer').locator('.answer-text');
+  await expect(words).toContainText('In scripted mode I can only answer a few questions.');
+  await expect(words).toBeInViewport();
+  const box = await words.boundingBox();
+  expect(box !== null && box.width > 100 && box.height > 10).toBe(true);
+  // A card: the words are spoken and kept for screen readers only.
+  await ask(page, 'How long will it last?');
+  await expect(page.locator('iframe[title="Cold reserve card"]')).toBeVisible();
+  const spoken = await page.getByTestId('answer').locator('.answer-words').boundingBox();
+  expect(spoken !== null && spoken.width <= 1).toBe(true);
+});

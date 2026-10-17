@@ -684,9 +684,10 @@
     }
 
     /* The question and the answer's words are spoken: on a short screen they stay for screen readers only, and the
-       card owns the content band. */
+       card (or the battery fact) owns the content band. An answer with neither keeps its words on screen: the screen
+       is never empty after an answer (storm prepared, "Not now"). */
     .echo-screen .bubble,
-    .echo-screen .answer-words {
+    .echo-screen .answer:has(> .tool-cards, > .facts) .answer-words {
       position: absolute;
       overflow: hidden;
       inline-size: 1px;

@@ -49,7 +49,7 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
       : t(status.storeUnavailable !== true ? (overLimit === undefined ? 'safeRoom.until' : 'safeRoom.untilHeld') : status.stricterNightLimit === true ? 'safeRoom.untilStrict' : 'safeRoom.untilLive');
   return (
     <CardShell
-      title={t('safeRoom.title', { room: roomLabel(status.safeRoomId) })}
+      title={t('safeRoom.title', { room: status.safeRoomName ?? roomLabel(status.safeRoomId) })}
       origin={status.origin.rooms}
       pages={[
         // Page 1: the storm, the giant time and the ice cubes (owner, 10 and 11 Oct).

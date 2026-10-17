@@ -147,11 +147,19 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // Three bands (owner, 10 Oct): the home button in the header band, the home in the content band.
   const homePanel = useHomePanel({ status: home, renderCard: (status) => <HomeCard status={status} />, load: homeLoad, onOpen: loadHome, onRetry: loadHome });
   const closeHome = homePanel.close;
+  // The judge's demo settings (B1, B2): kept in the page in scripted mode; in remote mode read from the visitor's
+  // sandbox once the demo session starts, and saved there (what is shown is what is stored). A new scenario starts on
+  // its own sky. A home that is not a sandbox has no settings: the badge then opens the language row only (#284).
+  const scripted = config.agent === 'scripted';
+  const [demoSettings, setDemoSettings] = useState<DemoSettingsView | undefined>(() => (scripted ? scriptedDemoSettings() : undefined));
+  // Every time on screen (phone, cards, answers, sky) is on the home's own clock: the sandbox place's zone (Houston:
+  // America/Chicago) when known, else the configured home zone; never the browser's or the server's.
+  const homeTimeZone = demoSettings?.timeZone ?? config.homeTimeZone;
   // The plan on screen (time pack): the simulated clock lists its own moments too (the essential level, the emergency plan).
   const [planId, setPlanId] = useState<string | undefined>(undefined);
   const onAnswer = useCallback(
     (answer: AgentAnswer) => {
-      setSky((previous) => skyFor(answer.cards ?? [], config.homeTimeZone, previous));
+      setSky((previous) => skyFor(answer.cards ?? [], homeTimeZone, previous));
       setHome((previous) => homeFor(answer.cards ?? [], previous, homeMode));
       if (homeFor(answer.cards ?? [], undefined, homeMode) !== undefined) setHomeTold(true);
       const shownPlan = planIdOf(answer.cards);
@@ -159,7 +167,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       // A new answer takes the content band: the home closes (its button says so).
       closeHome();
     },
-    [config.homeTimeZone, homeMode, closeHome],
+    [homeTimeZone, homeMode, closeHome],
   );
   // The steps (idea 5): the turns whose plan was applied from its card are at "Confirm"; a last resort's first step
   // (still "proposed", waiting for the second yes) is not (review of #350).
@@ -173,11 +181,6 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [homeMode, loadHome],
   );
-  // The judge's demo settings (B1, B2): kept in the page in scripted mode; in remote mode read from the visitor's
-  // sandbox once the demo session starts, and saved there (what is shown is what is stored). A new scenario starts on
-  // its own sky. A home that is not a sandbox has no settings: the badge then opens the language row only (#284).
-  const scripted = config.agent === 'scripted';
-  const [demoSettings, setDemoSettings] = useState<DemoSettingsView | undefined>(() => (scripted ? scriptedDemoSettings() : undefined));
   const subscribeSession = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const sessionToken = useSyncExternalStore(subscribeSession, () => session?.token());
   useEffect(() => {
@@ -356,17 +359,17 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
   const phonePanel = (
     <ErrorBoundary>
-      <PhonePanel feed={phone} timeZone={config.homeTimeZone} units={demoSettings?.units ?? 'C'} />
+      <PhonePanel feed={phone} timeZone={homeTimeZone} units={demoSettings?.units ?? 'C'} />
     </ErrorBoundary>
   );
   return (
     <EchoFrame sky={sky} aside={phonePanel} top={settingsControl} {...(clockDock === undefined ? {} : { dock: clockDock })}>
-      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: config.homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', place: demoSettings?.locationId, onCardAction }}>
+      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', place: demoSettings?.locationId, onCardAction }}>
         <QueryClientProvider client={queryClient}>
           <Conversation
             agent={agent}
             turnBudgetMs={config.turnBudgetMs}
-            timeZone={config.homeTimeZone}
+            timeZone={homeTimeZone}
             voice={config.voice}
             demo={config.demo}
             onAnswer={onAnswer}
