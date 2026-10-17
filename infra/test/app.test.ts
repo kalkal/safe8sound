@@ -23,6 +23,20 @@ describe('loadInfraConfig (region and stages always from config)', () => {
     expect(loadInfraConfig((key) => cdk.context[key])).toMatchObject({ ok: true });
   });
 
+  it('the real infra/cdk.json: dev keeps its caps; demo has the judges\' day, the owner\'s code, Polly on and the warm-up still off', () => {
+    const cdk = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf8')) as { context: Record<string, unknown> };
+    const loaded = loadInfraConfig((key) => cdk.context[key]);
+    if (!loaded.ok) throw new Error('cdk.json is not valid');
+    const { simApi, warmup, alexa } = loaded.value;
+    expect(simApi.limits).toEqual(config.simApi.limits);
+    expect(simApi.codeLimits).toEqual(config.simApi.codeLimits);
+    expect(simApi.limits.demo).toMatchObject({ turnsPerCodePerDay: 100, turnsGlobalPerDay: 120 });
+    expect(simApi.codeLimits.demo['owner']?.turnsPerCodePerDay).toBe(20);
+    expect(simApi.speech.enabled).toEqual({ dev: false, demo: true });
+    expect(warmup.enabled).toEqual({ dev: false, demo: false });
+    expect(alexa.stages).toEqual(['dev']);
+  });
+
   it('rejects a missing or malformed region with invalid_config', () => {
     const result = loadInfraConfig((key) => ({ 'cold-reserve:region': 'US East', 'cold-reserve:stages': ['dev'] })[key]);
     expect(result).toMatchObject({ ok: false, error: { code: 'invalid_config', category: 'internal' } });

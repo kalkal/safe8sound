@@ -46,7 +46,16 @@ export const exampleConfig = (): InfraConfig => ({
     allowedOrigins: [],
     demoEnabled: { dev: true, demo: true },
     tokenTtlS: 3600,
-    limits: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, readCallsPerCodePerDay: 200, readCallsGlobalPerDay: 2000, demoCallsPerCodePerDay: 150, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 20, phoneReadsPerCodePerMinute: 120, logLinesPerSessionPerMinute: 30, logLinesGlobalPerMinute: 600 },
+    // Caps per stage: dev keeps the values it was built with; demo gives the judges' one shared code the whole day
+    // (100 turns), and the owner's own code small caps outside it, so the global caps are the two added up.
+    limits: {
+      dev: { turnsPerCodePerDay: 20, turnsGlobalPerDay: 30, toolCallsPerCodePerDay: 20, readCallsPerCodePerDay: 200, readCallsGlobalPerDay: 2000, demoCallsPerCodePerDay: 150, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 20, phoneReadsPerCodePerMinute: 120, logLinesPerSessionPerMinute: 30, logLinesGlobalPerMinute: 600 },
+      demo: { turnsPerCodePerDay: 100, turnsGlobalPerDay: 120, toolCallsPerCodePerDay: 100, readCallsPerCodePerDay: 2000, readCallsGlobalPerDay: 2200, demoCallsPerCodePerDay: 500, codeAttemptsPerIpPerHour: 10, speechCharsPerCodePerDay: 30_000, speechCharsGlobalPerDay: 36_000, phoneReadsPerSessionPerMinute: 20, phoneReadsPerCodePerMinute: 120, logLinesPerSessionPerMinute: 30, logLinesGlobalPerMinute: 600 },
+    },
+    codeLimits: {
+      dev: {},
+      demo: { owner: { turnsPerCodePerDay: 20, toolCallsPerCodePerDay: 20, readCallsPerCodePerDay: 200, demoCallsPerCodePerDay: 150, speechCharsPerCodePerDay: 6000 } },
+    },
     speech: { enabled: { dev: false, demo: true }, engine: 'neural', voice: 'Joanna', pollyTimeoutMs: 2500, cacheTimeoutMs: 1000, cacheDays: 30 },
   },
 });

@@ -43,6 +43,9 @@ export class SimApiStack extends Stack {
     super(scope, id, props);
     const { stage, simApi, state, table } = props;
     const parameter = (name: string) => name.replace('{stage}', stage);
+    const limits = simApi.limits[stage];
+    // Per-code caps of single code ids (the owner's code on demo); left out when the stage lists none.
+    const codeLimits = simApi.codeLimits[stage];
     const parameters = [simApi.demoCodesParameter, simApi.tokenKeysParameter, simApi.mcpTokenParameter, simApi.originSecretParameter, simApi.originSecretPreviousParameter, simApi.phoneTokenParameter].map(parameter);
 
     const logGroup = new LogGroup(this, 'Logs', { retention: simApi.logRetentionDays, removalPolicy: RemovalPolicy.DESTROY });
@@ -113,19 +116,20 @@ export class SimApiStack extends Stack {
         SIM_ALLOWED_ORIGINS: simApi.allowedOrigins.join(','),
         SIM_DEMO_ENABLED: String(simApi.demoEnabled[stage]),
         SIM_TOKEN_TTL_S: String(simApi.tokenTtlS),
-        SIM_LIMIT_TURNS_PER_CODE: String(simApi.limits.turnsPerCodePerDay),
-        SIM_LIMIT_TURNS_GLOBAL: String(simApi.limits.turnsGlobalPerDay),
-        SIM_LIMIT_TOOL_CALLS_PER_CODE: String(simApi.limits.toolCallsPerCodePerDay),
-        SIM_LIMIT_READ_CALLS_PER_CODE: String(simApi.limits.readCallsPerCodePerDay),
-        SIM_LIMIT_READ_CALLS_GLOBAL: String(simApi.limits.readCallsGlobalPerDay),
-        SIM_LIMIT_DEMO_CALLS_PER_CODE: String(simApi.limits.demoCallsPerCodePerDay),
-        SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR: String(simApi.limits.codeAttemptsPerIpPerHour),
-        SIM_LIMIT_SPEECH_CHARS_PER_CODE: String(simApi.limits.speechCharsPerCodePerDay),
-        SIM_LIMIT_SPEECH_CHARS_GLOBAL: String(simApi.limits.speechCharsGlobalPerDay),
-        SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE: String(simApi.limits.phoneReadsPerSessionPerMinute),
-        SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE: String(simApi.limits.phoneReadsPerCodePerMinute),
-        SIM_LIMIT_LOG_LINES_PER_SESSION_PER_MINUTE: String(simApi.limits.logLinesPerSessionPerMinute),
-        SIM_LIMIT_LOG_LINES_GLOBAL_PER_MINUTE: String(simApi.limits.logLinesGlobalPerMinute),
+        SIM_LIMIT_TURNS_PER_CODE: String(limits.turnsPerCodePerDay),
+        SIM_LIMIT_TURNS_GLOBAL: String(limits.turnsGlobalPerDay),
+        SIM_LIMIT_TOOL_CALLS_PER_CODE: String(limits.toolCallsPerCodePerDay),
+        SIM_LIMIT_READ_CALLS_PER_CODE: String(limits.readCallsPerCodePerDay),
+        SIM_LIMIT_READ_CALLS_GLOBAL: String(limits.readCallsGlobalPerDay),
+        SIM_LIMIT_DEMO_CALLS_PER_CODE: String(limits.demoCallsPerCodePerDay),
+        SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR: String(limits.codeAttemptsPerIpPerHour),
+        SIM_LIMIT_SPEECH_CHARS_PER_CODE: String(limits.speechCharsPerCodePerDay),
+        SIM_LIMIT_SPEECH_CHARS_GLOBAL: String(limits.speechCharsGlobalPerDay),
+        SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE: String(limits.phoneReadsPerSessionPerMinute),
+        SIM_LIMIT_PHONE_READS_PER_CODE_PER_MINUTE: String(limits.phoneReadsPerCodePerMinute),
+        SIM_LIMIT_LOG_LINES_PER_SESSION_PER_MINUTE: String(limits.logLinesPerSessionPerMinute),
+        SIM_LIMIT_LOG_LINES_GLOBAL_PER_MINUTE: String(limits.logLinesGlobalPerMinute),
+        ...(Object.keys(codeLimits).length === 0 ? {} : { SIM_LIMIT_CODE_OVERRIDES: JSON.stringify(codeLimits) }),
         SIM_SPEECH_ENABLED: String(simApi.speech.enabled[stage]),
         SIM_SPEECH_ENGINE: simApi.speech.engine,
         SIM_SPEECH_VOICE: simApi.speech.voice,

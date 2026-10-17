@@ -39,6 +39,22 @@ describe('loadSimApiConfig (only hashes of codes and key ids reach logs; values 
     }
   });
 
+  it('reads the per-code caps of single code ids (demo stage, owner code): unset = none, JSON of code id -> some per-code caps', () => {
+    expect(loadSimApiConfig(ENV)).toMatchObject({ ok: true, value: { limits: { perCode: new Map() } } });
+    const owner = loadSimApiConfig({ ...ENV, SIM_DEMO_CODES: `judges:${HASH},owner:${'b'.repeat(64)}`, SIM_LIMIT_CODE_OVERRIDES: '{"owner":{"turnsPerCodePerDay":20,"speechCharsPerCodePerDay":6000}}' });
+    expect(owner.ok && owner.value.limits.perCode?.get('owner')).toEqual({ turnsPerCodePerDay: 20, speechCharsPerCodePerDay: 6000 });
+    for (const bad of ['not json', '{"Owner":{"turnsPerCodePerDay":20}}', '{"owner":{"turnsGlobalPerDay":20}}', '{"owner":{"turnsPerCodePerDay":0}}', '{"owner":{"turnsPerCodePerDay":"20"}}', '["owner"]']) {
+      expect(loadSimApiConfig({ ...ENV, SIM_LIMIT_CODE_OVERRIDES: bad }), bad).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+    }
+  });
+
+  it('refuses per-code caps for a code id that is not one of the demo codes (a typo would leave the real code on the shared caps), naming the id, never a hash', () => {
+    const typo = loadSimApiConfig({ ...ENV, SIM_LIMIT_CODE_OVERRIDES: '{"ownr":{"turnsPerCodePerDay":20}}' });
+    expect(typo).toMatchObject({ ok: false, error: { code: 'invalid_config', message: expect.stringContaining('ownr') as unknown, details: { field: 'SIM_LIMIT_CODE_OVERRIDES' } } });
+    expect(JSON.stringify(typo)).not.toContain(HASH);
+    expect(loadSimApiConfig({ ...ENV, SIM_LIMIT_CODE_OVERRIDES: '{"judges":{"turnsPerCodePerDay":5}}' })).toMatchObject({ ok: true });
+  });
+
   it('takes only true or false for the kill switch (unset = on): a typo is invalid_config, never a silently open demo', () => {
     expect(loadSimApiConfig({ ...ENV, SIM_DEMO_ENABLED: 'true' })).toMatchObject({ ok: true, value: { demoEnabled: true } });
     for (const value of ['maybe', 'off', '0']) expect(loadSimApiConfig({ ...ENV, SIM_DEMO_ENABLED: value })).toMatchObject({ ok: false, error: { code: 'invalid_config' } });

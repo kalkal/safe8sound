@@ -251,3 +251,39 @@ describe('browser log lines per session and overall per minute (#125)', () => {
     expect(await quota(NOW, throttled).logLines('tab-1', 1)).toMatchObject({ ok: false, error: { code: 'store_unavailable' } });
   });
 });
+
+describe('per-code caps of one code id (demo stage: the owner tests on her own code without using the judges\' room)', () => {
+  const OWNER: QuotaLimits = { ...LIMITS, turnsGlobalPerDay: 10, readCallsGlobalPerDay: 10, speechCharsGlobalPerDay: 1000, perCode: new Map([['owner', { turnsPerCodePerDay: 1, toolCallsPerCodePerDay: 2, readCallsPerCodePerDay: 1, demoCallsPerCodePerDay: 1, speechCharsPerCodePerDay: 10, phoneReadsPerCodePerMinute: 1 }]]) };
+  const q = () => createQuota({ store: memoryQuotaStore(), limits: OWNER, clock: fixedClock(NOW), ipSalt: SALT });
+
+  it('uses the caps listed for that code id; every other code keeps the shared per-code caps', async () => {
+    const quota = q();
+    expect((await quota.turn('owner')).ok).toBe(true);
+    expect(await quota.turn('owner')).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded' } });
+    expect((await quota.turn('judges')).ok).toBe(true);
+    expect((await quota.turn('judges')).ok).toBe(true);
+    expect((await quota.turn('judges')).ok).toBe(false);
+  });
+
+  it('applies to every per-code count: writes, reads, the clock, the spoken characters and the phone', async () => {
+    const quota = q();
+    expect((await quota.toolCall('owner', 'write')).ok).toBe(true);
+    expect((await quota.toolCall('owner', 'write')).ok).toBe(true);
+    expect((await quota.toolCall('owner', 'write')).ok).toBe(false);
+    expect((await quota.toolCall('owner', 'read')).ok).toBe(true);
+    expect((await quota.toolCall('owner', 'read')).ok).toBe(false);
+    expect((await quota.toolCall('owner', 'demo')).ok).toBe(true);
+    expect((await quota.toolCall('owner', 'demo')).ok).toBe(false);
+    expect((await quota.speech('owner', 10)).ok).toBe(true);
+    expect((await quota.speech('owner', 1)).ok).toBe(false);
+    expect((await quota.phoneRead('owner', 'tab-1')).ok).toBe(true);
+    expect((await quota.phoneRead('owner', 'tab-2')).ok).toBe(false);
+  });
+
+  it('a code id listed with only some caps keeps the shared value of the others', async () => {
+    const quota = createQuota({ store: memoryQuotaStore(), limits: { ...LIMITS, perCode: new Map([['owner', { toolCallsPerCodePerDay: 3 }]]) }, clock: fixedClock(NOW), ipSalt: SALT });
+    expect((await quota.turn('owner')).ok).toBe(true);
+    expect((await quota.turn('owner')).ok).toBe(true);
+    expect((await quota.turn('owner')).ok).toBe(false);
+  });
+});

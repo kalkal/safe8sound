@@ -94,6 +94,54 @@ const simApiParameter = z.string().regex(/^\/[a-z0-9-]+\/\{stage\}\/sim-api\/[A-
 /** An exact origin: scheme, host and optional port, no path (CORS compares origins exactly). */
 const origin = z.url().refine((u) => new URL(u).origin === u, { message: 'An origin has no path or trailing slash.' });
 
+/** The daily and per-minute caps of sim-api, one block per stage. */
+export const SimApiLimitsSchema = z.strictObject({
+  turnsPerCodePerDay: z.number().int().min(1).max(10_000),
+  turnsGlobalPerDay: z.number().int().min(1).max(100_000),
+  toolCallsPerCodePerDay: z.number().int().min(1).max(10_000),
+  /** Card reads (contracts CARD_TOOL_ACCESS) per demo code and overall per UTC day (#334): reads never use up the writes. */
+  readCallsPerCodePerDay: z.number().int().min(1).max(10_000),
+  readCallsGlobalPerDay: z.number().int().min(1).max(1_000_000),
+  /** The simulated clock and the scenario (set_scenario, get_milestones, advance_clock) per demo code per UTC day (time pack). */
+  demoCallsPerCodePerDay: z.number().int().min(1).max(10_000),
+  codeAttemptsPerIpPerHour: z.number().int().min(1).max(1000),
+  /** Characters Polly may speak per demo code and overall per UTC day; cache hits are free (approved in #25). */
+  speechCharsPerCodePerDay: z.number().int().min(1).max(1_000_000),
+  speechCharsGlobalPerDay: z.number().int().min(1).max(10_000_000),
+  /** Phone panel reads per minute, per session and per demo code (#294): a panel polls every 5 s, 12 a minute. */
+  phoneReadsPerSessionPerMinute: z.number().int().min(1).max(600),
+  phoneReadsPerCodePerMinute: z.number().int().min(1).max(600),
+  /** Browser log lines (POST /v1/log, #125) per minute, per session and overall: a few lines a minute is a broken page. */
+  logLinesPerSessionPerMinute: z.number().int().min(1).max(600),
+  logLinesGlobalPerMinute: z.number().int().min(1).max(10_000),
+});
+export type SimApiLimits = z.infer<typeof SimApiLimitsSchema>;
+
+/** A demo code id, as in the demo-codes parameter (`<codeId>:<sha256 hex>`). */
+const codeId = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/);
+/**
+ * Per-code caps of single code ids, in place of the shared per-code caps of the stage (sim-api SIM_LIMIT_CODE_OVERRIDES):
+ * on demo the owner's own test code has small caps, while the judges' shared code gets the whole day.
+ */
+export const CodeLimitsSchema = z.record(
+  codeId,
+  z.strictObject({
+    turnsPerCodePerDay: z.number().int().min(1).max(10_000).optional(),
+    toolCallsPerCodePerDay: z.number().int().min(1).max(10_000).optional(),
+    readCallsPerCodePerDay: z.number().int().min(1).max(10_000).optional(),
+    demoCallsPerCodePerDay: z.number().int().min(1).max(10_000).optional(),
+    speechCharsPerCodePerDay: z.number().int().min(1).max(1_000_000).optional(),
+    phoneReadsPerCodePerMinute: z.number().int().min(1).max(600).optional(),
+  }),
+);
+export type CodeLimits = z.infer<typeof CodeLimitsSchema>;
+
+/**
+ * The caps that have an overall count too: the global cap must hold the shared code plus every listed code. It assumes
+ * exactly one code without caps of its own (the shared one); every other demo code of the stage must be listed.
+ */
+const GLOBAL_OF = [['turnsPerCodePerDay', 'turnsGlobalPerDay'], ['readCallsPerCodePerDay', 'readCallsGlobalPerDay'], ['speechCharsPerCodePerDay', 'speechCharsGlobalPerDay']] as const;
+
 /**
  * The sim-api Lambda (#17): the demo API the web simulator calls. Only parameter NAMES live here, never
  * the codes, keys or tokens; `{stage}` is replaced by the stage name.
@@ -124,26 +172,9 @@ export const SimApiConfigSchema = z
     /** Kill switch per stage (plan §13.2.4). */
     demoEnabled: z.strictObject({ dev: z.boolean(), demo: z.boolean() }),
     tokenTtlS: z.number().int().min(60).max(3600),
-    limits: z.strictObject({
-      turnsPerCodePerDay: z.number().int().min(1).max(10_000),
-      turnsGlobalPerDay: z.number().int().min(1).max(100_000),
-      toolCallsPerCodePerDay: z.number().int().min(1).max(10_000),
-      /** Card reads (contracts CARD_TOOL_ACCESS) per demo code and overall per UTC day (#334): reads never use up the writes. */
-      readCallsPerCodePerDay: z.number().int().min(1).max(10_000),
-      readCallsGlobalPerDay: z.number().int().min(1).max(1_000_000),
-      /** The simulated clock and the scenario (set_scenario, get_milestones, advance_clock) per demo code per UTC day (time pack). */
-      demoCallsPerCodePerDay: z.number().int().min(1).max(10_000),
-      codeAttemptsPerIpPerHour: z.number().int().min(1).max(1000),
-      /** Characters Polly may speak per demo code and overall per UTC day; cache hits are free (approved in #25). */
-      speechCharsPerCodePerDay: z.number().int().min(1).max(1_000_000),
-      speechCharsGlobalPerDay: z.number().int().min(1).max(10_000_000),
-      /** Phone panel reads per minute, per session and per demo code (#294): a panel polls every 5 s, 12 a minute. */
-      phoneReadsPerSessionPerMinute: z.number().int().min(1).max(600),
-      phoneReadsPerCodePerMinute: z.number().int().min(1).max(600),
-      /** Browser log lines (POST /v1/log, #125) per minute, per session and overall: a few lines a minute is a broken page. */
-      logLinesPerSessionPerMinute: z.number().int().min(1).max(600),
-      logLinesGlobalPerMinute: z.number().int().min(1).max(10_000),
-    }),
+    /** Caps per stage: dev keeps its own, demo gives the judges' shared code the whole day (decision of 17 Oct). */
+    limits: z.strictObject({ dev: SimApiLimitsSchema, demo: SimApiLimitsSchema }),
+    codeLimits: z.strictObject({ dev: CodeLimitsSchema, demo: CodeLimitsSchema }),
     /** The studio voice (F8d, #25, approved in #25): on per stage, one voice, the S3 cache of spoken replies. */
     speech: z.strictObject({
       enabled: z.strictObject({ dev: z.boolean(), demo: z.boolean() }),
@@ -154,6 +185,20 @@ export const SimApiConfigSchema = z
       cacheTimeoutMs: z.number().int().min(100).max(10_000),
       cacheDays: z.number().int().min(1).max(365),
     }),
+  })
+  .superRefine((s, ctx) => {
+    // A listed code (the owner's) never takes room from the shared one (the judges'): each global cap holds the shared
+    // per-code cap plus the cap of every listed code (its own, or the shared one when it lists none).
+    for (const stage of StageNameSchema.options) {
+      const limits = s.limits[stage];
+      const codes = Object.values(s.codeLimits[stage]);
+      for (const [perCode, global] of GLOBAL_OF) {
+        const needed = limits[perCode] + codes.reduce((sum, c) => sum + (c[perCode] ?? limits[perCode]), 0);
+        if (codes.length > 0 && limits[global] < needed) {
+          ctx.addIssue({ code: 'custom', path: ['limits', stage, global], message: `${global} must be at least ${String(needed)}: the shared code plus every code of codeLimits.${stage}.` });
+        }
+      }
+    }
   });
 export type SimApiConfig = z.infer<typeof SimApiConfigSchema>;
 

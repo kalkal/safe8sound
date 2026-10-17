@@ -1,6 +1,6 @@
 import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { z } from 'zod';
-import type { QuotaLimits } from './quota.js';
+import type { PerCodeCaps, QuotaLimits } from './quota.js';
 import type { TokenKey } from './token.js';
 
 export interface SimApiConfig {
@@ -66,6 +66,33 @@ const NumbersSchema = z.object({
   maxBodyBytes: int(256, 1_048_576),
 });
 
+const count = (min: number, max: number) => z.number().int().min(min).max(max).optional();
+/** Per-code caps of single code ids (SIM_LIMIT_CODE_OVERRIDES): the same bounds as the shared per-code caps. */
+const CodeOverridesSchema = z.record(
+  z.string().regex(ID),
+  z.strictObject({
+    turnsPerCodePerDay: count(1, 10_000),
+    toolCallsPerCodePerDay: count(1, 10_000),
+    readCallsPerCodePerDay: count(1, 10_000),
+    demoCallsPerCodePerDay: count(1, 10_000),
+    speechCharsPerCodePerDay: count(1, 1_000_000),
+    phoneReadsPerCodePerMinute: count(1, 600),
+  }),
+);
+
+function codeOverrides(raw: string | undefined): Result<ReadonlyMap<string, PerCodeCaps>, ErrorEnvelope> {
+  if (raw === undefined || raw.trim() === '') return ok(new Map());
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return invalid('SIM_LIMIT_CODE_OVERRIDES must be JSON: {"<codeId>": {"<per-code cap>": <number>}}.');
+  }
+  const parsed = CodeOverridesSchema.safeParse(json);
+  if (!parsed.success) return invalid(`SIM_LIMIT_CODE_OVERRIDES is not valid: ${parsed.error.issues.map((i) => i.path.join('.')).join(', ')}.`);
+  return ok(new Map(Object.entries(parsed.data).map(([id, caps]) => [id, Object.fromEntries(Object.entries(caps).filter(([, v]) => v !== undefined)) as PerCodeCaps])));
+}
+
 function entries(raw: string | undefined): [string, string][] {
   return (raw ?? '')
     .split(',')
@@ -108,7 +135,10 @@ export function loadPlainSimApiSettings(env: Readonly<Record<string, string | un
     maxBodyBytes: env['SIM_MAX_BODY_BYTES'] ?? '16384',
   });
   if (!numbers.success) return invalid(`A SIM_* number is not valid: ${numbers.error.issues.map((i) => i.path.join('.')).join(', ')}.`);
-  const { tokenTtlS, skewS, maxBodyBytes, ...limits } = numbers.data;
+  const { tokenTtlS, skewS, maxBodyBytes, ...shared } = numbers.data;
+  const perCode = codeOverrides(env['SIM_LIMIT_CODE_OVERRIDES']);
+  if (!perCode.ok) return perCode;
+  const limits: QuotaLimits = { ...shared, perCode: perCode.value };
 
   // The kill switch takes true or false only (unset = on): a typo never silently leaves the demo open.
   const enabled = env['SIM_DEMO_ENABLED']?.trim().toLowerCase();
@@ -149,5 +179,11 @@ export function loadSimApiConfig(env: Readonly<Record<string, string | undefined
   if (env['SIM_ORIGIN_SECRET_PREVIOUS'] !== undefined && env['SIM_ORIGIN_SECRET'] === undefined) return invalid('SIM_ORIGIN_SECRET_PREVIOUS needs SIM_ORIGIN_SECRET.');
 
   const plain = loadPlainSimApiSettings(env);
-  return plain.ok ? ok({ demoCodes, keys, originSecrets, ...plain.value }) : plain;
+  if (!plain.ok) return plain;
+  // Per-code caps name code ids: one that is not a demo code (a typo) would silently leave the real code on the shared
+  // caps, so it stops the start. The ids are names, never the codes or their hashes.
+  const known = new Set(demoCodes.values());
+  const unknownCodeIds = [...(plain.value.limits.perCode?.keys() ?? [])].filter((id) => !known.has(id));
+  if (unknownCodeIds.length > 0) return err(toolError('invalid_config', `SIM_LIMIT_CODE_OVERRIDES names code ids that are not demo codes: ${unknownCodeIds.join(', ')}.`, { details: { field: 'SIM_LIMIT_CODE_OVERRIDES' } }));
+  return ok({ demoCodes, keys, originSecrets, ...plain.value });
 }

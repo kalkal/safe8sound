@@ -51,7 +51,17 @@ export interface QuotaLimits {
   /** Browser log lines (POST /v1/log, #125) per session (token jti) per minute, and overall per minute. */
   readonly logLinesPerSessionPerMinute: number;
   readonly logLinesGlobalPerMinute: number;
+  /**
+   * Per-code caps of single code ids, in place of the shared ones above (demo stage: the owner's own test code has
+   * small caps, while the judges' shared code gets the whole day). A cap not listed keeps the shared value.
+   */
+  readonly perCode?: ReadonlyMap<string, PerCodeCaps>;
 }
+
+/** The caps that count one code: the only ones a single code id may set for itself. */
+export const PER_CODE_CAP_NAMES = ['turnsPerCodePerDay', 'toolCallsPerCodePerDay', 'readCallsPerCodePerDay', 'demoCallsPerCodePerDay', 'speechCharsPerCodePerDay', 'phoneReadsPerCodePerMinute'] as const;
+export type PerCodeCapName = (typeof PER_CODE_CAP_NAMES)[number];
+export type PerCodeCaps = Partial<Readonly<Record<PerCodeCapName, number>>>;
 
 export type Quota = ReturnType<typeof createQuota>;
 
@@ -74,6 +84,7 @@ const ID_LENGTH: Readonly<Record<number, number>> = { [DAY_MS]: 10, [HOUR_MS]: 1
 /** Daily caps reset at midnight UTC (one rule, approved in #101), checked BEFORE calling the agent. */
 export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; clock: Clock; ipSalt: Uint8Array }) {
   const { store, limits, clock } = deps;
+  const capOf = (codeId: string, name: PerCodeCapName): number => limits.perCode?.get(codeId)?.[name] ?? limits[name];
   // The client IP is personal data: the table (with 35 days of PITR) holds only a salted hash of it.
   const ipKey = (ip: string) => createHmac('sha256', deps.ipSalt).update(ip).digest('hex').slice(0, 32);
   const window = (sizeMs: number) => {
@@ -113,7 +124,7 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
       const perSession = await counted(() => store.consume(`PHONE#SESSION#${jti}#${minute.id}`, limits.phoneReadsPerSessionPerMinute, minute.endMs));
       if (!perSession.ok) return perSession;
       if (!perSession.value) return tooOften();
-      const perCode = await counted(() => store.consume(`PHONE#CODE#${codeId}#${minute.id}`, limits.phoneReadsPerCodePerMinute, minute.endMs));
+      const perCode = await counted(() => store.consume(`PHONE#CODE#${codeId}#${minute.id}`, capOf(codeId, 'phoneReadsPerCodePerMinute'), minute.endMs));
       if (!perCode.ok) return perCode;
       return perCode.value ? ok(undefined) : tooOften();
     },
@@ -133,7 +144,7 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
     },
     async turn(codeId: string): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);
-      const perCode = await counted(() => store.consume(`TURNS#${codeId}#${day.id}`, limits.turnsPerCodePerDay, day.endMs));
+      const perCode = await counted(() => store.consume(`TURNS#${codeId}#${day.id}`, capOf(codeId, 'turnsPerCodePerDay'), day.endMs));
       if (!perCode.ok) return perCode;
       if (!perCode.value) return over(day.retryAfterMs, DAILY);
       const overall = await counted(() => store.consume(`TURNS#GLOBAL#${day.id}`, limits.turnsGlobalPerDay, day.endMs));
@@ -143,7 +154,7 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
     /** The characters of one reply Polly is about to speak: per code, then overall (F8d, #25). */
     async speech(codeId: string, chars: number, onGiveBackFailed?: (errorName: string) => void): Promise<Result<void, ErrorEnvelope>> {
       const day = window(DAY_MS);
-      const perCode = await counted(() => store.consume(`SPEECH#${codeId}#${day.id}`, limits.speechCharsPerCodePerDay, day.endMs, chars));
+      const perCode = await counted(() => store.consume(`SPEECH#${codeId}#${day.id}`, capOf(codeId, 'speechCharsPerCodePerDay'), day.endMs, chars));
       if (!perCode.ok) return perCode;
       if (!perCode.value) return over(day.retryAfterMs, SPOKEN);
       const overall = await counted(() => store.consume(`SPEECH#GLOBAL#${day.id}`, limits.speechCharsGlobalPerDay, day.endMs, chars));
@@ -170,16 +181,16 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
       const day = window(DAY_MS);
       // The simulated clock and the scenario (time pack): their own count, so a storm story never blocks apply_plan.
       if (access === 'demo') {
-        const allowed = await counted(() => store.consume(`DEMO#${codeId}#${day.id}`, limits.demoCallsPerCodePerDay, day.endMs));
+        const allowed = await counted(() => store.consume(`DEMO#${codeId}#${day.id}`, capOf(codeId, 'demoCallsPerCodePerDay'), day.endMs));
         if (!allowed.ok) return allowed;
         return allowed.value ? ok(undefined) : over(day.retryAfterMs, DAILY);
       }
       if (access === 'write') {
-        const allowed = await counted(() => store.consume(`TOOLS#${codeId}#${day.id}`, limits.toolCallsPerCodePerDay, day.endMs));
+        const allowed = await counted(() => store.consume(`TOOLS#${codeId}#${day.id}`, capOf(codeId, 'toolCallsPerCodePerDay'), day.endMs));
         if (!allowed.ok) return allowed;
         return allowed.value ? ok(undefined) : over(day.retryAfterMs, DAILY);
       }
-      const perCode = await counted(() => store.consume(`READS#${codeId}#${day.id}`, limits.readCallsPerCodePerDay, day.endMs));
+      const perCode = await counted(() => store.consume(`READS#${codeId}#${day.id}`, capOf(codeId, 'readCallsPerCodePerDay'), day.endMs));
       if (!perCode.ok) return perCode;
       if (!perCode.value) return over(day.retryAfterMs, DAILY);
       const overall = await counted(() => store.consume(`READS#GLOBAL#${day.id}`, limits.readCallsGlobalPerDay, day.endMs));

@@ -83,19 +83,48 @@
       },
       "tokenTtlS": 3600,
       "limits": {
-        "turnsPerCodePerDay": 20,
-        "turnsGlobalPerDay": 30,
-        "toolCallsPerCodePerDay": 20,
-        "readCallsPerCodePerDay": 200,
-        "readCallsGlobalPerDay": 2000,
-        "demoCallsPerCodePerDay": 150,
-        "codeAttemptsPerIpPerHour": 10,
-        "speechCharsPerCodePerDay": 6000,
-        "speechCharsGlobalPerDay": 30000,
-        "phoneReadsPerSessionPerMinute": 20,
-        "phoneReadsPerCodePerMinute": 120,
-        "logLinesPerSessionPerMinute": 30,
-        "logLinesGlobalPerMinute": 600
+        "dev": {
+          "turnsPerCodePerDay": 20,
+          "turnsGlobalPerDay": 30,
+          "toolCallsPerCodePerDay": 20,
+          "readCallsPerCodePerDay": 200,
+          "readCallsGlobalPerDay": 2000,
+          "demoCallsPerCodePerDay": 150,
+          "codeAttemptsPerIpPerHour": 10,
+          "speechCharsPerCodePerDay": 6000,
+          "speechCharsGlobalPerDay": 30000,
+          "phoneReadsPerSessionPerMinute": 20,
+          "phoneReadsPerCodePerMinute": 120,
+          "logLinesPerSessionPerMinute": 30,
+          "logLinesGlobalPerMinute": 600
+        },
+        "demo": {
+          "turnsPerCodePerDay": 100,
+          "turnsGlobalPerDay": 120,
+          "toolCallsPerCodePerDay": 100,
+          "readCallsPerCodePerDay": 2000,
+          "readCallsGlobalPerDay": 2200,
+          "demoCallsPerCodePerDay": 500,
+          "codeAttemptsPerIpPerHour": 10,
+          "speechCharsPerCodePerDay": 30000,
+          "speechCharsGlobalPerDay": 36000,
+          "phoneReadsPerSessionPerMinute": 20,
+          "phoneReadsPerCodePerMinute": 120,
+          "logLinesPerSessionPerMinute": 30,
+          "logLinesGlobalPerMinute": 600
+        }
+      },
+      "codeLimits": {
+        "dev": {},
+        "demo": {
+          "owner": {
+            "turnsPerCodePerDay": 20,
+            "toolCallsPerCodePerDay": 20,
+            "readCallsPerCodePerDay": 200,
+            "demoCallsPerCodePerDay": 150,
+            "speechCharsPerCodePerDay": 6000
+          }
+        }
       },
       "speech": {
         "enabled": {

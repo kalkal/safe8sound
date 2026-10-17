@@ -13,15 +13,15 @@ const TABLE_ARN = 'arn:aws:dynamodb:us-east-1:111122223333:table/ColdReserve-dev
 // The cdk.json values, with a simulator origin so the CORS rules are on.
 const exampleSimApi = (): SimApiConfig => ({ ...exampleConfig().simApi, allowedOrigins: ['https://sim.example'] });
 
-function synth(simApi: SimApiConfig = exampleSimApi()): Template {
+function synth(simApi: SimApiConfig = exampleSimApi(), stage: 'dev' | 'demo' = 'dev'): Template {
   const app = applyGuardrails(new App({ context: { 'aws:cdk:bundling-stacks': [] } }));
   const stack = new SimApiStack(app, 'sim', {
     env: { region: 'us-east-1', account: '111122223333' },
-    stage: 'dev',
+    stage,
     simApi,
     state: { connectTimeoutMs: 500, requestTimeoutMs: 1500, maxAttempts: 3 },
     turnTiming: exampleConfig().turnTiming,
-    table: { tableArn: TABLE_ARN, tableName: 'ColdReserve-dev' },
+    table: { tableArn: TABLE_ARN, tableName: `ColdReserve-${stage}` },
     mcpFunctionUrl: 'https://mcp.lambda-url.us-east-1.on.aws/',
     runtimeArn: RUNTIME_ARN,
   });
@@ -90,6 +90,26 @@ describe('sim-api stack (#17)', () => {
       STATE_STORE_REQUEST_TIMEOUT_MS: '1500',
     });
     for (const secret of ['SIM_DEMO_CODES', 'SIM_TOKEN_KEYS', 'SIM_MCP_TOKEN']) expect(vars[secret]).toBeUndefined();
+    // dev lists no code of its own caps: the variable is left out, so the dev function keeps its settings.
+    expect(vars['SIM_LIMIT_CODE_OVERRIDES']).toBeUndefined();
+  });
+
+  it('takes the caps of its own stage: on demo the judges\' shared code has the whole day, the owner\'s code its own small caps', () => {
+    const demo = synth(exampleSimApi(), 'demo');
+    const vars = (Object.values(demo.findResources('AWS::Lambda::Function'))[0] as { Properties: { Environment: { Variables: Record<string, unknown> } } }).Properties.Environment.Variables;
+    expect(vars).toMatchObject({
+      SIM_DEMO_CODES_PARAMETER: '/cold-reserve/demo/sim-api/demo-codes',
+      SIM_LIMIT_TURNS_PER_CODE: '100',
+      SIM_LIMIT_TURNS_GLOBAL: '120',
+      SIM_LIMIT_TOOL_CALLS_PER_CODE: '100',
+      SIM_LIMIT_READ_CALLS_PER_CODE: '2000',
+      SIM_LIMIT_READ_CALLS_GLOBAL: '2200',
+      SIM_LIMIT_DEMO_CALLS_PER_CODE: '500',
+      SIM_LIMIT_SPEECH_CHARS_PER_CODE: '30000',
+      SIM_LIMIT_SPEECH_CHARS_GLOBAL: '36000',
+      SIM_SPEECH_ENABLED: 'true',
+    });
+    expect(JSON.parse(String(vars['SIM_LIMIT_CODE_OVERRIDES']))).toEqual({ owner: { turnsPerCodePerDay: 20, toolCallsPerCodePerDay: 20, readCallsPerCodePerDay: 200, demoCallsPerCodePerDay: 150, speechCharsPerCodePerDay: 6000 } });
   });
 
   it('is reached through a Function URL with auth NONE (the handler checks the demo token) and NO CORS of its own (review of #156)', () => {
@@ -219,6 +239,31 @@ describe('SimApiConfigSchema', () => {
 
   it('refuses an origin with a path (CORS matches exact origins)', () => {
     expect(SimApiConfigSchema.safeParse({ ...exampleSimApi(), allowedOrigins: ['https://sim.example/app'] }).success).toBe(false);
+  });
+
+  it('caps per stage, and per-code caps of single code ids that only name per-code caps of a valid code id', () => {
+    const base = exampleSimApi();
+    const withCodes = (demo: unknown) => SimApiConfigSchema.safeParse({ ...base, codeLimits: { dev: {}, demo } });
+    expect(SimApiConfigSchema.safeParse({ ...base, limits: base.limits.dev }).success).toBe(false);
+    expect(withCodes(base.codeLimits.demo).success).toBe(true);
+    expect(withCodes({ Owner: { turnsPerCodePerDay: 20 } }).success).toBe(false);
+    expect(withCodes({ owner: { turnsGlobalPerDay: 20 } }).success).toBe(false);
+    expect(withCodes({ owner: { turnsPerCodePerDay: 0 } }).success).toBe(false);
+  });
+
+  it('keeps a global cap at least the shared per-code cap plus every listed code: a listed code never takes room from the shared one', () => {
+    const base = exampleSimApi();
+    const demo = (limits: Partial<SimApiConfig['limits']['demo']>, owner: Record<string, number> = { turnsPerCodePerDay: 20, readCallsPerCodePerDay: 200, speechCharsPerCodePerDay: 6000 }) =>
+      SimApiConfigSchema.safeParse({ ...base, limits: { ...base.limits, demo: { ...base.limits.demo, ...limits } }, codeLimits: { dev: {}, demo: { owner } } });
+    expect(demo({}).success).toBe(true);
+    for (const bad of [{ turnsGlobalPerDay: 119 }, { readCallsGlobalPerDay: 2199 }, { speechCharsGlobalPerDay: 35_999 }]) {
+      const r = demo(bad);
+      expect(r.success, JSON.stringify(bad)).toBe(false);
+      expect(JSON.stringify(r.error?.issues)).toContain(Object.keys(bad)[0]);
+    }
+    // A listed code without its own turn cap takes the shared one: the global cap must hold two of them.
+    expect(demo({}, { toolCallsPerCodePerDay: 5 }).success).toBe(false);
+    expect(demo({ turnsGlobalPerDay: 200, readCallsGlobalPerDay: 4000, speechCharsGlobalPerDay: 60_000 }, { toolCallsPerCodePerDay: 5 }).success).toBe(true);
   });
 });
 
