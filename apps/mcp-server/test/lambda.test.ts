@@ -1,5 +1,5 @@
-import { HomeIdSchema, err, ok, toolError } from '@cold-reserve/contracts';
-import { seededRng } from '@cold-reserve/core';
+import { HomeIdSchema, LogEntrySchema, err, ok, toolError, type LogEntry } from '@cold-reserve/contracts';
+import { WARMUP_EVENT, seededRng } from '@cold-reserve/core';
 import { dynamoStateStoreFactory, type TableClient } from '@cold-reserve/store-dynamodb';
 import { describe, expect, it, vi } from 'vitest';
 import { createLambdaHandler, installProcessHooks, storeErrorLine, storeErrorLogger, type FunctionUrlEvent, type LambdaLogEntry } from '../src/lambda.js';
@@ -200,5 +200,56 @@ describe('store error log line (#112)', () => {
 
   it('copes with a cause that is not an Error', () => {
     expect(storeErrorLine({ code: 'unexpected_error', operation: 'putPlan', cause: 'weird' })).toMatchObject({ level: 'error', category: 'internal', errorName: 'string' });
+  });
+});
+
+describe('the scheduled warm-up (#407)', () => {
+  function sinks() {
+    const errors: LambdaLogEntry[] = [];
+    const infos: LogEntry[] = [];
+    return { errors, infos, log: (entry: LambdaLogEntry) => errors.push(entry), info: (entry: LogEntry) => infos.push(entry) };
+  }
+
+  it('builds the app once, never calls it (no token check, no store), and writes one info line', async () => {
+    const { errors, infos, log, info } = sinks();
+    const app = vi.fn(makeHandler().handler);
+    const load = vi.fn(() => Promise.resolve(ok(app)));
+    const lambda = createLambdaHandler(load, { log, info });
+    expect(await lambda(WARMUP_EVENT)).toEqual({ statusCode: 204, headers: {}, body: '', isBase64Encoded: false });
+    await lambda(WARMUP_EVENT);
+    expect(app).not.toHaveBeenCalled();
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(errors).toEqual([]);
+    expect(infos.map((l) => ({ ...l, ts: 'T' }))).toEqual([
+      { ts: 'T', level: 'info', component: 'mcp-server', message: 'warmup', correlationId: 'warmup', details: { cold: true } },
+      { ts: 'T', level: 'info', component: 'mcp-server', message: 'warmup', correlationId: 'warmup', details: { cold: false } },
+    ]);
+    for (const line of infos) LogEntrySchema.parse(line);
+    expect((await lambda(event())).statusCode).toBe(200);
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs a failed build once, keeps nothing, and lets the next call retry', async () => {
+    const { errors, infos, log, info } = sinks();
+    const load = vi.fn().mockResolvedValueOnce(err(toolError('config_unavailable', 'SSM timed out.'))).mockRejectedValueOnce(new TypeError('boom')).mockResolvedValueOnce(ok(makeHandler().handler));
+    const lambda = createLambdaHandler(load, { log, info });
+    for (let i = 0; i < 3; i++) expect((await lambda(WARMUP_EVENT)).statusCode).toBe(204);
+    expect(load).toHaveBeenCalledTimes(3);
+    expect(errors).toMatchObject([
+      { level: 'warn', code: 'config_unavailable', correlationId: 'warmup' },
+      { level: 'error', code: 'unexpected_error', correlationId: 'warmup', errorName: 'TypeError' },
+    ]);
+    expect(infos).toMatchObject([{ message: 'warmup', details: { cold: true } }]);
+  });
+
+  it('treats a Function URL request that carries the warm-up object in its body, path and headers as an ordinary request: no token, 401', async () => {
+    const { infos, log, info } = sinks();
+    const app = vi.fn(makeHandler().handler);
+    const lambda = createLambdaHandler(() => Promise.resolve(ok(app)), { log, info });
+    const lookalike = event({ rawPath: '/mcp', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', source: 'cold-reserve.warmup', version: '1' }, body: JSON.stringify(WARMUP_EVENT) });
+    const result = await lambda({ ...lookalike, ...WARMUP_EVENT });
+    expect(app).toHaveBeenCalledTimes(1);
+    expect(result.statusCode).toBe(401);
+    expect(infos).toEqual([]);
   });
 });

@@ -449,6 +449,9 @@ importers:
       '@cold-reserve/contracts':
         specifier: workspace:*
         version: link:../packages/contracts
+      '@cold-reserve/core':
+        specifier: workspace:*
+        version: link:../packages/core
       aws-cdk-lib:
         specifier: 2.271.0
         version: 2.271.0(constructs@10.8.1)

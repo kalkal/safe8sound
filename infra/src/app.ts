@@ -31,7 +31,9 @@ export class ColdReserveStage extends Stage {
     });
     new FoundationStack(this, 'foundation', common('foundation'));
     const data = new DataStack(this, 'data', { ...common('data'), retain: stageName === 'demo' });
-    const mcp = new McpStack(this, 'mcp', { ...common('mcp'), stage: stageName, mcp: config.mcp, state: config.state, table: data.table });
+    // The scheduled warm-up (#407): on only for the stages the config switches on (the judging window).
+    const warmup = config.warmup.enabled[stageName] ? { warmup: { rateMinutes: config.warmup.rateMinutes } } : {};
+    const mcp = new McpStack(this, 'mcp', { ...common('mcp'), stage: stageName, mcp: config.mcp, state: config.state, table: data.table, ...warmup });
     const agent = new AgentStack(this, 'agent', { ...common('agent'), stage: stageName, agent: config.agent, turnTiming: config.turnTiming, mcpFunctionUrl: mcp.functionUrl });
     const simApi = new SimApiStack(this, 'sim-api', {
       ...common('sim-api'),
@@ -42,6 +44,7 @@ export class ColdReserveStage extends Stage {
       table: data.table,
       mcpFunctionUrl: mcp.functionUrl,
       runtimeArn: agent.runtimeArn,
+      ...warmup,
     });
     // The simulator website (K1, #242), with sim-api behind it at /api.
     new WebStack(this, 'web', {

@@ -65,6 +65,8 @@ The function has its own role, with no managed policies:
 - `s3:GetObject` and `s3:PutObject` on `speech/*` in its own cache bucket, and nothing else in S3;
 - writing to its own log group.
 
+During the judging window only, an EventBridge rule may also invoke the function directly with a fixed warm-up event, which never runs a request ([warmup.md](warmup.md)).
+
 ## The browser side
 
 - **CORS** is answered by the handler only, for the exact simulator origins in `SIM_ALLOWED_ORIGINS`: preflight `OPTIONS` (`POST` only, the headers `authorization`, `content-type` and `x-correlation-id`), and `Access-Control-Allow-Origin` with `x-correlation-id` exposed on every answer to an allowed origin. Any other origin gets `origin_not_allowed`. The Function URL has **no CORS configuration** of its own: for `POST`, Lambda would send its CORS headers as well as the function's, and the browser refuses two `Access-Control-Allow-Origin` values (review of #156). Until the web stack sets an origin, the function answers `invalid_config`.

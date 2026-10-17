@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { CORRELATION_ID_HEADER, PROBLEM_JSON_CONTENT_TYPE, categoryOf, correlationIdFrom, toProblemDetails, toolError, type ErrorCategory, type ErrorEnvelope, type LogEntry, type Result } from '@cold-reserve/contracts';
-import { jsonLineSink, loggerTo } from '@cold-reserve/core';
+import { WARMUP_CORRELATION_ID, isWarmupEvent, jsonLineSink, loggerTo, type WarmupEvent } from '@cold-reserve/core';
 import type { StoreErrorEvent } from '@cold-reserve/store-dynamodb';
 import type { McpHandler } from './handler.js';
 
@@ -20,6 +20,9 @@ export interface FunctionUrlResult {
   body: string;
   isBase64Encoded: false;
 }
+
+/** The answer to the scheduled warm-up (#407): nobody reads it. */
+const WARMED: FunctionUrlResult = { statusCode: 204, headers: {}, body: '', isBase64Encoded: false };
 
 /**
  * One line of the error log, in the shape of docs/error-handling.md §6.1 until L1 brings the shared
@@ -111,13 +114,40 @@ function publicStartupError(error: ErrorEnvelope): ErrorEnvelope {
  * Lambda entry around the same Web-standard handler as the local Node entry. The app is built once per
  * container; a failed or rejected build is not kept, so the next request tries again. Nothing escapes as
  * a raw 502: every failure is an RFC 9457 answer with a log line carrying the correlation id.
+ * The scheduled warm-up (#407) only builds the app, as a first request would, and never calls it; its one
+ * success line goes to `info` (the error log takes warnings and errors only).
  */
 export function createLambdaHandler(
   load: () => Promise<Result<McpHandler, ErrorEnvelope>>,
-  deps: { readonly log?: (entry: LambdaLogEntry) => void } = {},
-): (event: FunctionUrlEvent) => Promise<FunctionUrlResult> {
+  deps: { readonly log?: (entry: LambdaLogEntry) => void; readonly info?: (entry: LogEntry) => void } = {},
+): (event: FunctionUrlEvent | WarmupEvent) => Promise<FunctionUrlResult> {
   const log = deps.log ?? defaultLog;
+  const info =
+    deps.info ??
+    ((entry: LogEntry) => {
+      stdoutLogger.log(entry);
+    });
   let ready: Promise<Result<McpHandler, ErrorEnvelope>> | undefined;
+
+  // No request, no token check, no store: the SSM read of the build happens once per container, as on a first
+  // request, and the line says whether this ping paid for it. A failed build is logged and not kept.
+  const warmUp = async (): Promise<FunctionUrlResult> => {
+    const cold = ready === undefined;
+    try {
+      ready ??= load();
+      const app = await ready;
+      if (app.ok) {
+        info({ ts: new Date().toISOString(), level: 'info', component: 'mcp-server', message: 'warmup', correlationId: WARMUP_CORRELATION_ID, details: { cold } });
+      } else {
+        ready = undefined;
+        log({ ts: new Date().toISOString(), level: levelOf(app.error.category), component: 'mcp-server', code: app.error.code, category: app.error.category, correlationId: WARMUP_CORRELATION_ID, message: app.error.message });
+      }
+    } catch (e) {
+      ready = undefined;
+      log({ ts: new Date().toISOString(), level: 'error', component: 'mcp-server', code: 'unexpected_error', category: 'internal', correlationId: WARMUP_CORRELATION_ID, errorName: nameOf(e) });
+    }
+    return WARMED;
+  };
 
   const unexpected = (e: unknown, correlationId: string) => {
     log({ ts: new Date().toISOString(), level: 'error', component: 'mcp-server', code: 'unexpected_error', category: 'internal', correlationId, errorName: nameOf(e) });
@@ -125,6 +155,8 @@ export function createLambdaHandler(
   };
 
   return async (event) => {
+    // Only a direct invoke can carry this exact shape (see isWarmupEvent): never a Function URL request.
+    if (isWarmupEvent(event)) return warmUp();
     const correlationId = correlationIdFrom(event.headers[CORRELATION_ID_HEADER], randomUUID);
 
     let app: Result<McpHandler, ErrorEnvelope>;

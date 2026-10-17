@@ -57,5 +57,11 @@ export const handler = createLambdaHandler(
     );
     return app.ok ? ok(app.value.handler) : app;
   },
-  { log },
+  {
+    log,
+    // The warm-up's line (#407) goes through the same sink as every other line.
+    info: (entry) => {
+      logger.log(entry);
+    },
+  },
 );

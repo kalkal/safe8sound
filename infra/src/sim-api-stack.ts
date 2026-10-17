@@ -9,6 +9,7 @@ import { BlockPublicAccess, Bucket, BucketEncryption, type CfnBucket } from 'aws
 import { FilterPattern, LogGroup, MetricFilter, type CfnLogGroup } from 'aws-cdk-lib/aws-logs';
 import type { Construct } from 'constructs';
 import { simApiAgentTimeoutMs, type SimApiConfig, type StageName, type StateConfig, type TurnTiming } from './config.js';
+import { addWarmup, type WarmupSchedule } from './warmup.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -24,6 +25,8 @@ export interface SimApiStackProps extends StackProps {
   readonly mcpFunctionUrl: string;
   /** The AgentCore runtime of the same stage: the only one this function may invoke. */
   readonly runtimeArn: string;
+  /** The scheduled warm-up (#407): only while it is switched on for this stage. */
+  readonly warmup?: WarmupSchedule;
 }
 
 /**
@@ -154,6 +157,7 @@ export class SimApiStack extends Stack {
     const url = fn.addFunctionUrl({ authType: FunctionUrlAuthType.NONE });
     new CfnOutput(this, 'SimApiUrl', { value: url.url });
     this.functionUrl = url.url;
+    if (props.warmup !== undefined) addWarmup(this, fn, props.warmup);
 
     fn.metricErrors({ period: Duration.minutes(5), statistic: 'Sum' }).createAlarm(this, 'Errors', {
       alarmDescription: 'The sim-api Lambda failed at least once in 5 minutes.',

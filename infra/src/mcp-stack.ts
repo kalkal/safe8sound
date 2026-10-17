@@ -8,6 +8,7 @@ import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { FilterPattern, LogGroup, MetricFilter, type CfnLogGroup } from 'aws-cdk-lib/aws-logs';
 import type { Construct } from 'constructs';
 import type { McpConfig, StageName, StateConfig } from './config.js';
+import { addWarmup, type WarmupSchedule } from './warmup.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -17,6 +18,8 @@ export interface McpStackProps extends StackProps {
   readonly state: StateConfig;
   /** Only what the function needs: the name for its env, the ARN for its policy. */
   readonly table: { readonly tableArn: string; readonly tableName: string };
+  /** The scheduled warm-up (#407): only while it is switched on for this stage. */
+  readonly warmup?: WarmupSchedule;
 }
 
 /**
@@ -96,6 +99,7 @@ export class McpStack extends Stack {
     const url = fn.addFunctionUrl({ authType: FunctionUrlAuthType.NONE });
     new CfnOutput(this, 'McpUrl', { value: url.url });
     this.functionUrl = url.url;
+    if (props.warmup !== undefined) addWarmup(this, fn, props.warmup);
 
     fn.metricErrors({ period: Duration.minutes(5), statistic: 'Sum' }).createAlarm(this, 'Errors', {
       alarmDescription: 'The MCP server Lambda failed at least once in 5 minutes.',

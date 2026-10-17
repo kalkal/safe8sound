@@ -56,6 +56,13 @@
       "mcpTimeoutMs": 4000,
       "tempUnit": "C"
     },
+    "cold-reserve:warmup": {
+      "enabled": {
+        "dev": false,
+        "demo": false
+      },
+      "rateMinutes": 5
+    },
     "cold-reserve:simApi": {
       "demoCodesParameter": "/cold-reserve/{stage}/sim-api/demo-codes",
       "tokenKeysParameter": "/cold-reserve/{stage}/sim-api/token-keys",

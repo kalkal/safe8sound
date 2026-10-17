@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",
+    "@cold-reserve/core": "workspace:*",
     "aws-cdk-lib": "2.271.0",
     "cdk-nag": "3.0.2",
     "constructs": "10.8.1",

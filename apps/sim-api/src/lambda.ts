@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { CORRELATION_ID_HEADER, PROBLEM_JSON_CONTENT_TYPE, correlationIdFrom, toProblemDetails, toolError, type ErrorEnvelope, type LogEntry, type Result } from '@cold-reserve/contracts';
+import { WARMUP_CORRELATION_ID, isWarmupEvent, type WarmupEvent } from '@cold-reserve/core';
 import type { SimApiHandler } from './handler.js';
 
 /** The subset of the Lambda Function URL event (payload 2.0) the adapter reads. */
@@ -18,6 +19,9 @@ export interface FunctionUrlResult {
   body: string;
   isBase64Encoded: boolean;
 }
+
+/** The answer to the scheduled warm-up (#407): nobody reads it. */
+const WARMED: FunctionUrlResult = { statusCode: 204, headers: {}, body: '', isBase64Encoded: false };
 
 /** JSON, Problem Details and text travel as text; anything else (the spoken reply's mp3) as base64 (review of #180). */
 const isText = (contentType: string | null) => contentType === null || /^(text\/|application\/(problem\+)?json)/i.test(contentType);
@@ -49,11 +53,12 @@ function problem(error: ErrorEnvelope, correlationId: string): FunctionUrlResult
  * never X-Forwarded-For or another header the caller writes (review of #110). The handler is built once
  * per container; a failed or rejected build is not kept, and nothing escapes as a raw 502: every failure
  * is RFC 9457 with a log line carrying the correlation id (same last resort as the MCP Lambda, #112).
+ * The scheduled warm-up (#407) only builds the handler, as a first request would, and never calls it.
  */
 export function createSimApiLambda(
   load: () => Promise<Result<SimApiHandler, ErrorEnvelope>>,
   deps: { readonly log: (entry: LogEntry) => void },
-): (event: FunctionUrlEvent) => Promise<FunctionUrlResult> {
+): (event: FunctionUrlEvent | WarmupEvent) => Promise<FunctionUrlResult> {
   let ready: Promise<Result<SimApiHandler, ErrorEnvelope>> | undefined;
   const line = (error: ErrorEnvelope, correlationId: string, extra: { errorName?: string; reason?: string } = {}): LogEntry => ({
     ts: new Date().toISOString(),
@@ -72,7 +77,29 @@ export function createSimApiLambda(
     return problem(error, correlationId);
   };
 
+  // No request, no demo code, no caps, no DynamoDB: the SSM reads of the build happen once per container, as on
+  // a first request, and the line says whether this ping paid for them. A failed build is logged and not kept.
+  const warmUp = async (): Promise<FunctionUrlResult> => {
+    const cold = ready === undefined;
+    try {
+      ready ??= load();
+      const built = await ready;
+      if (built.ok) {
+        deps.log({ ts: new Date().toISOString(), level: 'info', component: 'sim-api', message: 'warmup', correlationId: WARMUP_CORRELATION_ID, details: { cold } });
+      } else {
+        ready = undefined;
+        deps.log(line(built.error, WARMUP_CORRELATION_ID, { reason: built.error.message }));
+      }
+    } catch (e) {
+      ready = undefined;
+      deps.log(line(toolError('unexpected_error', 'Something went wrong on our side.'), WARMUP_CORRELATION_ID, { errorName: e instanceof Error ? e.name : typeof e }));
+    }
+    return WARMED;
+  };
+
   return async (event) => {
+    // Only a direct invoke can carry this exact shape (see isWarmupEvent): never a Function URL request.
+    if (isWarmupEvent(event)) return warmUp();
     const correlationId = correlationIdFrom(event.headers[CORRELATION_ID_HEADER], randomUUID);
     let built: Result<SimApiHandler, ErrorEnvelope>;
     try {

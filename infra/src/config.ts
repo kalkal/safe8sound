@@ -171,6 +171,19 @@ export const TurnTimingSchema = z.strictObject({
 });
 export type TurnTiming = z.infer<typeof TurnTimingSchema>;
 
+/**
+ * The scheduled warm-up (#407): an EventBridge rule per function invokes the sim-api and MCP Lambdas every
+ * `rateMinutes` with a fixed event, so a judge's first tap does not pay a cold start. Off on every stage by
+ * default: it is switched on per stage for the judging window only (docs/warmup.md). Never the AgentCore agent
+ * (that would spend Nova), never provisioned concurrency.
+ */
+export const WarmupConfigSchema = z.strictObject({
+  enabled: z.strictObject({ dev: z.boolean(), demo: z.boolean() }),
+  /** An idle Lambda container is usually kept for 5 to 15 minutes: 5 keeps it, more risks losing it. */
+  rateMinutes: z.number().int().min(1).max(14),
+});
+export type WarmupConfig = z.infer<typeof WarmupConfigSchema>;
+
 /** How long sim-api waits for the agent: the agent's own deadline plus the margin. */
 export const simApiAgentTimeoutMs = (t: TurnTiming): number => t.agentDeadlineMs + t.agentMarginMs;
 
@@ -184,6 +197,8 @@ export const InfraConfigSchema = z.strictObject({
   simApi: SimApiConfigSchema,
   turnTiming: TurnTimingSchema,
   alexa: AlexaConfigSchema,
+  /** Absent = off on every stage. */
+  warmup: WarmupConfigSchema.default({ enabled: { dev: false, demo: false }, rateMinutes: 5 }),
 })
   .superRefine((c, ctx) => {
     // The sim-api worst case (Copilot on #156): the SSM reads at a cold start, two DynamoDB calls with every
@@ -231,10 +246,11 @@ export function loadInfraConfig(context: (key: string) => unknown): Result<Infra
     simApi: context('cold-reserve:simApi'),
     turnTiming: context('cold-reserve:turnTiming'),
     alexa: context('cold-reserve:alexa'),
+    warmup: context('cold-reserve:warmup'),
   });
   if (parsed.success) return ok(parsed.data);
   return err(
-    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp, :state, :agent, :simApi, :turnTiming or :alexa.', {
+    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp, :state, :agent, :simApi, :turnTiming, :alexa or :warmup.', {
       details: { issues: parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message.slice(0, 200) })) },
     }),
   );

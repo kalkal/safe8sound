@@ -1,4 +1,5 @@
 import { LogEntrySchema, ProblemDetailsSchema, err, ok, toolError, type LogEntry } from '@cold-reserve/contracts';
+import { WARMUP_EVENT } from '@cold-reserve/core';
 import { describe, expect, it, vi } from 'vitest';
 import type { SimApiHandler } from '../src/handler.js';
 import { createSimApiLambda, type FunctionUrlEvent } from '../src/lambda.js';
@@ -108,5 +109,51 @@ describe('createSimApiLambda: binary answers (review of #180)', () => {
     const handler: SimApiHandler = () => Promise.resolve(new Response('{"text":"ok"}', { headers: { 'content-type': 'application/json' } }));
     const result = await createSimApiLambda(() => Promise.resolve(ok(handler)), capture())(event());
     expect(result).toMatchObject({ isBase64Encoded: false, body: '{"text":"ok"}' });
+  });
+});
+
+describe('createSimApiLambda: the scheduled warm-up (#407)', () => {
+  it('builds the handler once, never calls it (no demo code, no caps, no DynamoDB), and writes one info line', async () => {
+    const { logs, log } = capture();
+    const handler = vi.fn<SimApiHandler>(() => Promise.resolve(new Response('{}')));
+    const load = vi.fn(() => Promise.resolve(ok(handler)));
+    const lambda = createSimApiLambda(load, { log });
+    expect(await lambda(WARMUP_EVENT)).toEqual({ statusCode: 204, headers: {}, body: '', isBase64Encoded: false });
+    await lambda(WARMUP_EVENT);
+    expect(handler).not.toHaveBeenCalled();
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(logs.map((l) => ({ ...l, ts: 'T' }))).toEqual([
+      { ts: 'T', level: 'info', component: 'sim-api', message: 'warmup', correlationId: 'warmup', details: { cold: true } },
+      { ts: 'T', level: 'info', component: 'sim-api', message: 'warmup', correlationId: 'warmup', details: { cold: false } },
+    ]);
+    for (const line of logs) LogEntrySchema.parse(line);
+    // The first real request finds the handler already built.
+    await lambda(event());
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs a failed build once, keeps nothing, and lets the next call retry', async () => {
+    const { logs, log } = capture();
+    const load = vi.fn().mockResolvedValueOnce(err(toolError('config_unavailable', 'SSM timed out.'))).mockRejectedValueOnce(new TypeError('boom')).mockResolvedValueOnce(ok(() => Promise.resolve(new Response('{}'))));
+    const lambda = createSimApiLambda(load, { log });
+    expect((await lambda(WARMUP_EVENT)).statusCode).toBe(204);
+    expect((await lambda(WARMUP_EVENT)).statusCode).toBe(204);
+    expect((await lambda(WARMUP_EVENT)).statusCode).toBe(204);
+    expect(load).toHaveBeenCalledTimes(3);
+    expect(logs).toMatchObject([
+      { level: 'warn', code: 'config_unavailable', correlationId: 'warmup' },
+      { level: 'error', code: 'unexpected_error', correlationId: 'warmup', errorName: 'TypeError' },
+      { level: 'info', message: 'warmup', details: { cold: true } },
+    ]);
+    for (const line of logs) LogEntrySchema.parse(line);
+  });
+
+  it('treats a Function URL request that carries the warm-up object in its body, path and headers as an ordinary request', async () => {
+    const handler = vi.fn<SimApiHandler>(() => Promise.resolve(new Response('{"text":"handled"}', { headers: { 'content-type': 'application/json' } })));
+    const lambda = createSimApiLambda(() => Promise.resolve(ok(handler)), capture());
+    const lookalike = event({ rawPath: '/cold-reserve.warmup', headers: { source: 'cold-reserve.warmup', version: '1' }, body: JSON.stringify(WARMUP_EVENT) });
+    expect(await lambda({ ...lookalike, ...WARMUP_EVENT })).toMatchObject({ statusCode: 200, body: '{"text":"handled"}' });
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 });

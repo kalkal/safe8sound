@@ -23,6 +23,7 @@ export const exampleConfig = (): InfraConfig => ({
     scenarioAnchor: 'daily',
   },
   state: { connectTimeoutMs: 500, requestTimeoutMs: 1500, maxAttempts: 3 },
+  warmup: { enabled: { dev: false, demo: false }, rateMinutes: 5 },
   agent: {
     modelId: 'us.amazon.nova-2-lite-v1:0',
     foundationModelId: 'amazon.nova-2-lite-v1:0',
