@@ -29,6 +29,17 @@ export const down1 = (x: number): number => {
   const n = Math.round(x * 10);
   return (n / 10 <= x ? n : n - 1) / 10 + 0;
 };
+/**
+ * What the storm reserve promises, in the one wording the reason, the receipt and the agent's plan summary share (#417):
+ * "stays at or above" the limit, or, when `under` is given (the battery is already more than a tenth below it),
+ * "not taken lower than it is now". Numbers are whole tenths, as in the reason.
+ */
+export const stormKeptClause = (limit: number, under?: number): string =>
+  under === undefined
+    ? `the battery stays at or above ${limit.toString()} %`
+    : `the battery is not taken lower than it is now (${under.toString()} %, under the ${limit.toString()} % kept)`;
+/** True when the storm_reserve row's measured level is a held level under the limit (the "not taken lower" case). */
+export const isHeldUnderFloor = (measured: number, limit: number): boolean => Math.round(measured * 10) < Math.round(limit * 10);
 const kw = (w: number) => (w / 1000).toFixed(1);
 const clock = (ms: number, tz: string) => {
   const h = localHour(ms, tz);
@@ -61,9 +72,7 @@ const stormReserve: Constraint = {
     const below = soc < floor - EPS ? down1(soc) : undefined;
     const stays = below !== undefined && Math.round(limit * 10) - Math.round(below * 10) > 1;
     const measured = ok ? (stays ? down1(soc) : Math.max(r1(lowest), limit)) : down1(lowest);
-    const kept = stays
-      ? `Keeps ${kwh} kWh for a storm: the battery is not taken lower than it is now (${measured.toString()} %, under the ${limit.toString()} % kept).`
-      : `Keeps ${kwh} kWh for a storm: the battery stays at or above ${limit.toString()} %.`;
+    const kept = `Keeps ${kwh} kWh for a storm: ${stormKeptClause(limit, stays ? measured : undefined)}.`;
     return {
       id: 'storm_reserve',
       ok,

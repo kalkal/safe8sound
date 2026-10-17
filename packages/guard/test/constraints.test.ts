@@ -3,7 +3,7 @@ import { exampleHomeProfile, examplePreferences } from '@cold-reserve/contracts/
 import type { ProjectionPoint } from '@cold-reserve/core';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { CONSTRAINTS } from '../src/constraints.js';
+import { CONSTRAINTS, isHeldUnderFloor, stormKeptClause } from '../src/constraints.js';
 import { dryAirWarning } from '../src/dry-air.js';
 import { humidAirWarning } from '../src/humid-air.js';
 import type { GuardContext } from '../src/context.js';
@@ -456,5 +456,18 @@ describe('pacing_on_track', () => {
 
   it('a target applies only from its own time', () => {
     expect(check('pacing_on_track', ctx({ targets: [at(1, 90)], points: [point(0, { soc: 50 })] })).ok).toBe(true);
+  });
+});
+
+describe('storm floor wording helpers (#417)', () => {
+  it('stormKeptClause: "stays at or above" without a held level, "not taken lower" with one', () => {
+    expect(stormKeptClause(48.8)).toBe('the battery stays at or above 48.8 %');
+    expect(stormKeptClause(48.8, 30)).toBe('the battery is not taken lower than it is now (30 %, under the 48.8 % kept)');
+  });
+
+  it('isHeldUnderFloor compares whole tenths', () => {
+    expect(isHeldUnderFloor(48.8, 48.8)).toBe(false);
+    expect(isHeldUnderFloor(48.9, 48.8)).toBe(false);
+    expect(isHeldUnderFloor(48.6, 48.8)).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { celsius, pct, type Plan } from '@cold-reserve/contracts';
 import { examplePlan } from '@cold-reserve/contracts/fixtures';
-import { nightWindowHours } from '@cold-reserve/guard';
+import { CONSTRAINTS, nightWindowHours, up1, type GuardContext } from '@cold-reserve/guard';
 import { describe, expect, it } from 'vitest';
 import { applySummary, outlookSummary, planSummary } from '../../src/modules/comfort-plan/summaries.js';
 import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
@@ -117,6 +117,43 @@ describe('what the model reads', () => {
     expect(planSummary(examplePlan() as Plan, { ...NIGHT, roomNames: names })).not.toContain('Solar surplus');
   });
 
+  describe('the storm floor in the summary says what the guard row says (#417)', () => {
+    // The storm_reserve row comes from the real guard check, floor 48.78 %, for a battery at `soc`.
+    const guardRow = (soc: number) => {
+      const check = CONSTRAINTS.find((c) => c.id === 'storm_reserve');
+      if (check === undefined) throw new Error('storm_reserve');
+      const floor = 48.78;
+      const point = { ms: 0, socPct: soc, rooms: [], flows: {} };
+      return check.check({ gridAvailable: true, reserveWh: 6000, reserveFloorSocPct: floor, targets: [{ ms: 0, pct: floor }], points: [point], input: { snapshot: { batterySocPct: soc } } } as unknown as GuardContext);
+    };
+    const line = (soc: number): { text: string; reason: string } => {
+      const row = guardRow(soc);
+      const base = examplePlan();
+      const p = { ...base, reserveFloorSocPct: 48.78, guarantees: base.guarantees.map((g) => (g.id === 'storm_reserve' ? row : g)) } as Plan;
+      return { text: planSummary(p, { ...NIGHT, roomNames: {} }), reason: row.reason };
+    };
+
+    it('a normal pass, the battery above the floor: stays at or above it', () => {
+      const { text, reason } = line(60);
+      expect(reason).toContain('stays at or above 48.8 %');
+      expect(text).toContain('Storm reserve 6.0 kWh: the battery stays at or above 48.8 % while the grid is up.');
+    });
+
+    it('a battery at most one tenth under the floor (48.7 %): still "stays", like the guard reason (#414)', () => {
+      const { text, reason } = line(48.7);
+      expect(reason).toContain('stays at or above 48.8 %');
+      expect(text).toContain('the battery stays at or above 48.8 % while the grid is up.');
+      expect(text).not.toContain('not taken lower');
+    });
+
+    it('a battery clearly under the floor (30 %): "not taken lower than it is now", the same clause and numbers as the guard reason', () => {
+      const { text, reason } = line(30);
+      expect(reason).toContain('the battery is not taken lower than it is now (30 %, under the 48.8 % kept)');
+      expect(text).toContain('Storm reserve 6.0 kWh: the battery is not taken lower than it is now (30 %, under the 48.8 % kept) while the grid is up.');
+      expect(text).not.toContain('stays at or above');
+    });
+  });
+
   it('plan_comfort: the household tip from the surplus, its cycle, its window and every time in it (#219)', () => {
     const tip = { load: 'washing' as const, cycle: 'eco' as const, windowFrom: '2026-07-16T12:00:00+02:00', windowTo: '2026-07-16T17:30:00+02:00', probable: false };
     const text = planSummary({ ...examplePlan(), householdTip: tip } as Plan, { ...NIGHT, roomNames: {} });
@@ -148,7 +185,7 @@ describe('what the model reads', () => {
     expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
     for (const g of p.guarantees) expect(text).toContain(`${g.id.replace(/_/g, ' ')} ${g.ok ? 'holds' : 'FAILS'}: ${g.reason}`);
     expect(text).toContain(`${one(p.reserveWh / 1000)} kWh`);
-    expect(text).toContain(`${one(p.reserveFloorSocPct ?? -1)} %`);
+    expect(text).toContain(`${String(up1(p.reserveFloorSocPct ?? -1))} %`);
     // The 36-hour heatwave shows the whole night: the hours are required and reported.
     const n = p.nightRecovery;
     expect(n?.requiredHours).toBeGreaterThan(0);
