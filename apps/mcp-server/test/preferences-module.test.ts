@@ -203,4 +203,19 @@ describe('preferences module (MCP tools)', () => {
       structuredContent: { code: 'store_unavailable', retryable: true },
     });
   });
+
+  it('reads and writes preferences through a store that knows the request correlation id (#368)', async () => {
+    const id = '0b7f2b8e-4c1d-4a53-9e7a-5a1c3f6d9e10';
+    const scopes: Array<string | undefined> = [];
+    const inner = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: { now: () => NOW_MS } });
+    const d = deps({ storeFor: (home, scope) => { scopes.push(scope?.correlationId); return inner(home, scope); } });
+    const { handler } = makeHandler({ modules: [preferencesModule(d)] });
+    const headers = { authorization: `Bearer ${HOME_TOKEN}`, 'x-correlation-id': id };
+    await post(handler, initializeRequest, headers);
+    await post(handler, callTool('get_preferences', {}), headers);
+    expect(scopes).toEqual([id]);
+    await post(handler, callTool('set_preferences', { safety: { cooling: { maxC: 28 } }, confirmed: true }), headers);
+    expect(scopes.length).toBeGreaterThan(1);
+    expect(scopes.every((s) => s === id)).toBe(true);
+  });
 });

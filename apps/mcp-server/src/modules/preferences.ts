@@ -50,8 +50,8 @@ const changeValue = (field: string, value: unknown, unit: TempUnit): string =>
 const annotations = (readOnly: boolean) => ({ readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: true, openWorldHint: false });
 
 export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule {
-  const current = async (homeId: HomeId) => {
-    const saved = await deps.storeFor(homeId).getPreferences();
+  const current = async (homeId: HomeId, correlationId: string) => {
+    const saved = await deps.storeFor(homeId, { correlationId }).getPreferences();
     if (!saved.ok) return saved;
     return ok(saved.value === undefined ? { preferences: deps.defaultsFor(homeId), isDefault: true } : { preferences: saved.value, isDefault: false });
   };
@@ -78,7 +78,7 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
       return `${o.isDefault ? 'Default' : 'Saved'} preferences: cool to ${formatTempForInput(o.preferences.comfortC.cooling, unit)}, safe room${name === undefined ? '' : ` ${name}`}. ${limits}${idsLine}`;
     },
     handler: async (_args, ctx) => {
-      const read = await current(ctx.homeId);
+      const read = await current(ctx.homeId, ctx.correlationId);
       if (!read.ok) return read;
       return ok({ preferences: toPublicPreferences(read.value.preferences), isDefault: read.value.isDefault, hardLimits: deps.limits });
     },
@@ -101,7 +101,7 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
       return `Saved: ${o.changes.map((c) => `${fieldWords(c.field)} from ${val(c.field, c.from)} to ${val(c.field, c.to)}`).join(', ')}.`;
     },
     handler: async (args, ctx) => {
-      const read = await current(ctx.homeId);
+      const read = await current(ctx.homeId, ctx.correlationId);
       if (!read.ok) return read;
       // `confirmed` is checked by the input schema (literal true); the rest is the update.
       const update = { ...args, confirmed: undefined };
