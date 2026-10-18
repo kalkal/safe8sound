@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => {
   if (mode === 'aws') {
     process.env['VITE_AGENT'] = 'remote';
     process.env['VITE_SIM_API_URL'] = '/api';
+    // The judges' site is an Amazon contest: always the Alexa layout, whatever the shell says (#432).
+    process.env['VITE_LAYOUT'] = 'alexa-echo-show';
     // The browser's waits from the one timing table of a turn (#270), never a default.
     Object.assign(process.env, siteTimingEnv(JSON.parse(readFileSync(new URL('../../infra/cdk.json', import.meta.url), 'utf8'))));
   }

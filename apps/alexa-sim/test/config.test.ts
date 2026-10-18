@@ -15,6 +15,7 @@ describe('simulator config', () => {
         phonePollMs: 5_000,
         demo: false,
         view: 'full',
+        layout: 'alexa-echo-show',
         voice: {
           speech: 'browser',
           lang: 'en-US',
@@ -60,6 +61,15 @@ describe('simulator config', () => {
     // The values vite.config.ts sets for `--mode aws`: no secret, no absolute URL in the bundle.
     const parsed = parseConfig({ VITE_AGENT: 'remote', VITE_SIM_API_URL: '/api' }, '?agent=scripted', false);
     expect(parsed).toMatchObject({ ok: true, value: { agent: 'remote', simApiUrl: '/api' } });
+  });
+
+  it('#432: the device layout comes from VITE_LAYOUT (Alexa Echo Show by default); ?layout= works only in dev; an unknown layout is refused', () => {
+    expect(parseConfig({}, '', false)).toMatchObject({ ok: true, value: { layout: 'alexa-echo-show' } });
+    expect(parseConfig({ VITE_LAYOUT: 'plain' }, '', false)).toMatchObject({ ok: true, value: { layout: 'plain' } });
+    expect(parseConfig({}, '?layout=plain', true)).toMatchObject({ ok: true, value: { layout: 'plain' } });
+    expect(parseConfig({}, '?layout=plain', false)).toMatchObject({ ok: true, value: { layout: 'alexa-echo-show' } });
+    expect(parseConfig({}, '?layout=', true)).toMatchObject({ ok: true, value: { layout: 'alexa-echo-show' } });
+    expect(parseConfig({ VITE_LAYOUT: 'google-nest-hub' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
   it('reads the remote agent settings from the environment', () => {

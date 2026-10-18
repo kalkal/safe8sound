@@ -1,0 +1,541 @@
+/* The judges' demo controls (badge, settings drawer, simulated clock) and the reduced-motion overrides. Moved as is
+   from app.css (#432); loaded after the layout, as before. They move to their own panel in step S4. */
+@layer reset, tokens, base, components, surfaces, overrides;
+
+/* The judge's demo settings (B1): the scenario badge above the device (never inside its 16:10 screen), and the
+   drawer: at the side on a wide screen, a sheet from the bottom on a phone. Rows of 56 px; the choice is marked ✓. */
+@layer surfaces {
+  /* The badge and the simulated clock (time pack, 12 Oct) at the start, the language at the end (owner, 10 Oct). */
+  .echo-top {
+    display: flex;
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    align-items: center;
+    gap: var(--space-2);
+    min-inline-size: 0;
+    padding: var(--space-3) var(--space-3) 0;
+  }
+
+  /* The first of the language note and icon takes the free space before it: the language sits at the end. */
+  .echo-top > :is(.language-toggle, .language-top-note):not(.language-top-note + *) {
+    margin-inline-start: auto;
+  }
+
+  /* The language icon at the top (owner, 10 Oct): quiet, the icon and the other language's name. */
+  .language-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    padding-inline: var(--space-3);
+    font-size: var(--font-size-min);
+  }
+
+  .language-icon {
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Another language than English: one quiet line before the button says the answers are still in English. On the
+     card surface like the badge (the bezel is dark in both themes), one line, never bright. */
+  .language-top-note {
+    overflow: hidden;
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    margin: 0 0 0 auto;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card-raised);
+    color: var(--text-secondary);
+    font-size: var(--font-size-min);
+    line-height: var(--space-4);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The badge's short form (the scenario alone), shown only where the top row is narrow (below). */
+  .badge-short {
+    display: none;
+  }
+
+  /* Where the note or the simulated clock shares the row with a long badge, the badge shows the scenario alone so they fit. */
+  @media (width < 80rem) {
+    .echo-top:has(> .language-top-note) .badge-long {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .echo-top:has(> .language-top-note) .badge-short {
+      display: inline;
+    }
+  }
+
+  /* On a phone: the icon alone (a target-sized circle), the badge with the scenario alone on one line, so the row stays
+     one target high; the names stay for screen readers. The note takes a second line of its own in the gap
+     above the screen. */
+  @media (width < 48rem) {
+    .echo-top {
+      flex-wrap: wrap;
+    }
+
+    .echo-top > .scenario-badge {
+      overflow: hidden;
+      min-inline-size: 0;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .echo-top .badge-short {
+      display: inline;
+    }
+
+    .language-toggle {
+      justify-content: center;
+      min-inline-size: var(--target-min);
+      padding-inline: 0;
+    }
+
+    .language-name,
+    .echo-top .badge-long {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .echo-top:has(> .language-top-note) {
+      row-gap: var(--space-1);
+    }
+
+    .language-top-note {
+      flex-basis: 100%;
+      order: 3;
+      box-sizing: border-box;
+      margin: 0;
+      padding-block: 0;
+    }
+
+    /* The note's line (4 + 16 + 4 px) takes the place of the gap above the screen (24 px): the screen keeps its height. */
+    .echo-stage:has(> .echo-top > .language-top-note) {
+      row-gap: var(--space-1);
+    }
+
+    .echo-stage:has(> .echo-top > .language-top-note) .echo-screen {
+      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-1) - var(--space-4) - var(--space-1) - var(--dock-h, 0px) - var(--space-4));
+    }
+  }
+
+  .scenario-badge {
+    min-block-size: var(--target-min);
+    padding-inline: var(--space-4);
+    border: var(--border-thin) dashed var(--status-neutral);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .echo-top > .scenario-badge {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The simulated clock under the Echo frame (#391; the pill in the top bar went unseen): the time large with its
+     SIMULATED mark, one big button that says where it goes, and the line on what happened or why it cannot move.
+     The dock is paid for with the frame's chrome (padding, bezel), never with the Echo screen, which keeps its size:
+     on a laptop-sized window --dock-h is 0; on a small Echo and a phone it is the little the chrome cannot give. */
+  .echo-stage:has(.sim-dock) {
+    --dock-btn: 4rem;
+    /* The button and its gap, less the top row's padding it takes back (below). */
+    --dock-h: calc(var(--dock-btn) + var(--space-2) - var(--space-3));
+  }
+
+  .echo-stage:has(.sim-dock) > .echo-top {
+    padding-block-start: 0;
+  }
+
+  .echo-column {
+    display: grid;
+    justify-items: stretch;
+    gap: var(--space-2);
+    min-inline-size: 0;
+  }
+
+  .sim-dock {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "time button";
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 80rem;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-card);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+  }
+
+  .sim-dock-time {
+    grid-area: time;
+    display: grid;
+    justify-items: start;
+    font-family: var(--font-data);
+    line-height: 1.1;
+    white-space: nowrap;
+
+    & time {
+      font-size: calc(var(--font-size-lead) * 1.4);
+      font-weight: var(--font-weight-bold);
+    }
+  }
+
+  .sim-dock-badge {
+    color: var(--text-secondary);
+    font-size: var(--font-size-min);
+    letter-spacing: 0.08em;
+  }
+
+  /* A small ring that turns while a button waits (clock, Ask, Speak). Still with reduced motion (overrides layer). */
+  .spinner {
+    display: inline-block;
+    box-sizing: border-box;
+    flex: none;
+    inline-size: 1.1em;
+    block-size: 1.1em;
+    margin-inline-start: var(--space-2);
+    vertical-align: -0.15em;
+    border: 0.18em solid currentcolor;
+    border-block-start-color: transparent;
+    border-radius: var(--radius-pill);
+    animation: spinner-turn 0.9s linear infinite;
+  }
+
+  /* Before a status line's words the ring has its own gap after it, not before. */
+  .thinking .spinner {
+    margin-inline: 0 var(--space-2);
+  }
+
+  @keyframes spinner-turn {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .sim-dock-skip {
+    grid-area: button;
+    box-sizing: border-box;
+    min-inline-size: 0;
+    block-size: calc(var(--dock-btn) - var(--space-2));
+    padding-inline: var(--space-4);
+    border: calc(var(--border-thin) * 2) solid var(--accent);
+    background: var(--surface-card);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-bold);
+    text-align: start;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+
+    &:hover:not(:disabled) {
+      background: var(--surface-card-raised);
+    }
+  }
+
+  /* The words give way (two lines, then an ellipsis); the full target stays in the button's name. */
+  .sim-dock-words {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    min-inline-size: 0;
+    overflow: hidden;
+    line-height: 1.25;
+  }
+
+  /* A phone: the line stays for screen readers (and is said); the button's words are what the eye needs. */
+  .sim-dock-note {
+    position: absolute;
+    overflow: hidden;
+    inline-size: 1px;
+    block-size: 1px;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A small Echo and a phone: one compact 48 px row (the time and the button, whose words shorten with an ellipsis).
+     It takes back the top row's padding and rests on 20 px of the screen's bottom padding (empty), so the screen keeps
+     its height and the cubes and the big time stay in the first view. */
+  @media (width < 64rem) {
+    .echo-stage:has(.sim-dock) {
+      --dock-btn: 3rem;
+      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-4) - var(--space-1));
+    }
+
+    .echo-column {
+      gap: 0;
+    }
+
+    .sim-dock {
+      position: relative;
+      margin-block-start: calc((var(--space-4) + var(--space-1)) * -1);
+      padding-block: 0;
+    }
+
+    .sim-dock-skip {
+      block-size: var(--target-min);
+    }
+  }
+
+  /* A short landscape Echo (960 × 480) has no gap above the screen, and its dock rests on 24 px of the screen's bottom padding. */
+  @media (width >= 56rem) and (width < 64rem) and (height < 40rem) {
+    .echo-stage:has(.sim-dock) {
+      row-gap: 0;
+      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-6) - var(--space-2));
+    }
+
+    .sim-dock {
+      margin-block-start: calc(var(--space-6) * -1);
+    }
+  }
+
+  /* A phone gives back 16 px of the gap above the screen. */
+  @media (width < 48rem) {
+    .echo-stage:has(.sim-dock) {
+      row-gap: var(--space-2);
+      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-4) - var(--space-1) - var(--space-4));
+    }
+  }
+
+  /* From a small Echo up there is room for the line beside the button. */
+  @media (width >= 48rem) {
+    .sim-dock {
+      grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr);
+      grid-template-areas: "time button note";
+    }
+
+    .sim-dock-skip {
+      font-size: var(--font-size-lead);
+    }
+
+    .sim-dock-note {
+      grid-area: note;
+      position: static;
+      inline-size: auto;
+      block-size: auto;
+      min-inline-size: 0;
+      clip-path: none;
+      overflow: hidden;
+      color: var(--text-secondary);
+      font-size: var(--font-size-min);
+      line-height: 1.25;
+      white-space: normal;
+    }
+  }
+
+  @media (width >= 48rem) and (height < 40rem) {
+    .sim-dock-skip {
+      font-size: var(--font-size-body);
+    }
+  }
+
+  /* A laptop-sized window and up: the chrome gives the dock its room, the screen keeps its size. */
+  @media (width >= 64rem) {
+    .echo-column {
+      justify-items: center;
+    }
+
+    .echo-stage:has(.sim-dock) {
+      --dock-h: 0px;
+      padding: var(--space-1) var(--space-6);
+    }
+
+    .echo-stage:has(.sim-dock) .echo-device {
+      padding: var(--space-3);
+    }
+  }
+
+  .settings-drawer {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: 20;
+    display: grid;
+    gap: var(--space-4);
+    max-block-size: 85dvh;
+    overflow: auto;
+    padding: var(--space-4);
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    background: var(--surface-card);
+    color: var(--text-primary);
+
+    & h2 {
+      margin: 0;
+      font-size: var(--font-size-lead);
+    }
+
+    & .muted {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+  }
+
+  /* The page behind the drawer is dimmed (owner, 18 Oct): it is inert, so it must not look tappable; a tap on the veil
+     closes the drawer. The same veil as the sky's, in both themes. */
+  .settings-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    background: var(--sky-veil);
+    cursor: pointer;
+  }
+
+  /* What the last choice did, kept in view at the top of the drawer while it scrolls (Restart and the units are far down). */
+  .settings-applied {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    margin: 0;
+
+    &:not(:empty) {
+      padding: var(--space-2) var(--space-3);
+      border: var(--border-thin) solid var(--accent);
+      border-radius: var(--radius-card);
+      background: var(--surface-card-raised);
+      color: var(--text-primary);
+    }
+
+    &[data-failed="true"] {
+      border-color: var(--status-storm);
+    }
+  }
+
+  .settings-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .chip-group {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    & legend {
+      margin-block-end: var(--space-2);
+      color: var(--text-secondary);
+    }
+  }
+
+  .chip-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-block-size: calc(var(--target-min) + var(--space-2));
+    padding-inline: var(--space-3);
+    border: var(--border-thin) solid var(--surface-card-line);
+    border-radius: var(--radius-cube);
+    background: var(--surface-card-raised);
+    cursor: pointer;
+
+    /* The choice in force is plain to see (owner, 18 Oct): a 2 px accent ring, the card surface and medium weight,
+       besides the filled radio and the check mark. */
+    &[data-checked="true"] {
+      border-color: var(--accent);
+      background: var(--surface-card);
+      border-width: calc(var(--border-thin) * 2);
+      font-weight: var(--font-weight-medium);
+    }
+
+    &[data-disabled="true"] {
+      cursor: not-allowed;
+    }
+
+    & input {
+      inline-size: var(--space-6);
+      block-size: var(--space-6);
+      margin: 0;
+      accent-color: var(--accent);
+    }
+  }
+
+  .chip-text {
+    display: grid;
+    flex: 1;
+  }
+
+  .chip-hint {
+    color: var(--text-secondary);
+    font-size: var(--font-size-min);
+  }
+
+  .chip-mark {
+    color: var(--accent);
+    font-weight: var(--font-weight-bold);
+  }
+
+  /* A sample of the scenario's sky, from the same tokens as the frame. */
+  .chip-sky {
+    inline-size: var(--target-min);
+    block-size: var(--space-6);
+    border-radius: var(--radius-cube);
+
+    &[data-layer="mild"] {
+      background-image: var(--sky-mild);
+    }
+
+    &[data-layer="hot"] {
+      background-image: var(--sky-hot);
+    }
+
+    &[data-layer="storm"] {
+      background-image: var(--sky-storm);
+    }
+  }
+
+  @media (width >= 40rem) {
+    .settings-drawer {
+      inset-block: 0;
+      inset-inline: auto 0;
+      inline-size: min(25rem, 100vw);
+      max-block-size: none;
+      border-radius: 0;
+    }
+  }
+}
+
+/* Calm by default (plan §11.2 p.13, issue #24): with reduced motion nothing moves. In the overrides
+   layer, so no component rule, whatever its specificity, can bring motion back. */
+@layer overrides {
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto;
+      transition-duration: 0ms;
+      animation-duration: 0ms;
+      animation-iteration-count: 1;
+    }
+  }
+}

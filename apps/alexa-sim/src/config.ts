@@ -1,5 +1,6 @@
 import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { z } from 'zod';
+import { DEFAULT_LAYOUT, LAYOUT_IDS } from './surface/contract.js';
 
 // Every threshold comes from config (Vite env), never from the components.
 
@@ -54,6 +55,8 @@ const ConfigSchema = z
      * scripted scene's fixed numbers for the real home. Scripted agent with the inbox phone only; the full page otherwise.
      */
     view: z.enum(['full', 'phone']),
+    /** The device layout (#432): the Alexa Echo Show unless configured; the AWS build always assigns it. */
+    layout: z.enum(LAYOUT_IDS),
   })
   .refine((c) => c.agent === 'scripted' || c.simApiUrl !== undefined, { path: ['simApiUrl'], message: 'The remote agent needs a sim-api URL' })
   .refine((c) => c.turnBudgetMs >= c.agentTimeoutMs, { path: ['turnBudgetMs'], message: 'The turn budget must cover the agent timeout' });
@@ -82,6 +85,8 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>, s
     demo: params.get('demo') === '1',
     // The scripted phone only fills during a turn, and the phone view has none: the real inbox only (review of #302).
     view: agent === 'scripted' && phone === 'inbox' && params.get('view') === 'phone' ? 'phone' : 'full',
+    // Dev only: ?layout= tries another layout without rebuilding; a deployed page keeps its configured one.
+    layout: (isDev ? params.get('layout') : null) || env['VITE_LAYOUT'] || DEFAULT_LAYOUT,
     voice: {
       speech: fakeSpeech ? 'fake' : 'browser',
       lang: env['VITE_VOICE_LANG'] ?? 'en-US',

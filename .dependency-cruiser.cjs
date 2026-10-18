@@ -71,6 +71,40 @@ module.exports = {
       to: { path: '^apps/', pathNot: '^apps/$1/' },
     },
     {
+      name: 'logic-never-imports-layouts',
+      severity: 'error',
+      comment: 'The device look is a layout another can replace (#432): only the root and the layout registry choose one.',
+      from: { path: '^apps/alexa-sim/src/', pathNot: ['^apps/alexa-sim/src/layouts/', '^apps/alexa-sim/src/main\\.tsx$', '^apps/alexa-sim/src/surface/registry\\.ts$'] },
+      to: { path: '^apps/alexa-sim/src/layouts/' },
+    },
+    {
+      name: 'only-the-root-chooses-a-layout',
+      severity: 'error',
+      comment: 'The registry reaches every layout, so only the root may import it (#432).',
+      from: { path: '^apps/alexa-sim/src/', pathNot: '^apps/alexa-sim/src/main\\.tsx$' },
+      to: { path: '^apps/alexa-sim/src/surface/registry\\.ts$' },
+    },
+    {
+      name: 'layouts-are-presentational',
+      severity: 'error',
+      comment: 'A layout places the slots it is given; the session, the data, the voice and their reads stay out of it (#432).',
+      from: { path: '^apps/alexa-sim/src/layouts/' },
+      to: {
+        path: [
+          '^apps/alexa-sim/src/(agent|host|phone|voice|state)/',
+          '^apps/alexa-sim/src/(machine|config|log|remote-log)\\.ts$',
+          '^apps/alexa-sim/src/main\\.tsx$',
+          '^apps/alexa-sim/src/ui/(home|demo-settings|preferences-settings|reserve|sim-clock)\\.ts$',
+        ],
+      },
+    },
+    {
+      name: 'layouts-do-not-import-each-other',
+      severity: 'error',
+      from: { path: '^apps/alexa-sim/src/layouts/([^/]+)/' },
+      to: { path: '^apps/alexa-sim/src/layouts/', pathNot: '^apps/alexa-sim/src/layouts/$1/' },
+    },
+    {
       name: 'nothing-imports-infra',
       severity: 'error',
       from: { path: '^(packages|apps|tooling)/' },

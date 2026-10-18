@@ -1,0 +1,19 @@
+/* The minimal layout (#432): a column on the page background, one screen high; only its viewport scrolls if needed. */
+@layer reset, tokens, base, components, surfaces, overrides;
+
+@layer surfaces {
+  .plain-stage {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    block-size: 100dvh;
+    padding: var(--space-3);
+    box-sizing: border-box;
+  }
+
+  .plain-viewport {
+    flex: 1;
+    min-block-size: 0;
+    overflow: auto;
+  }
+}

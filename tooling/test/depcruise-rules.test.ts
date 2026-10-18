@@ -37,3 +37,22 @@ describe('dependency-cruiser: architecture rules (plan §10.4, §14.2)', () => {
     expect(found.filter((v) => allowed.includes(v.from))).toEqual([]);
   });
 });
+
+describe('dependency-cruiser: the device layout is a template another can replace (separation step S2, #432)', () => {
+  const A = 'apps/alexa-sim/src/';
+  it('logic never imports a layout; a layout never imports logic nor another layout', async () => {
+    const found = await violations();
+    const rules = (from: string) => found.filter((v) => v.from === A + from).map((v) => v.rule);
+    expect(rules('ui/uses-layout.ts')).toContain('logic-never-imports-layouts');
+    expect(rules('layouts/echo/uses-state.ts')).toContain('layouts-are-presentational');
+    expect(rules('layouts/plain/uses-echo.ts')).toContain('layouts-do-not-import-each-other');
+    expect(rules('ui/uses-registry.ts')).toContain('only-the-root-chooses-a-layout');
+    expect(rules('layouts/echo/uses-io.ts')).toContain('layouts-are-presentational');
+  });
+
+  it('only the root and the registry choose a layout; a layout may use the surface and the shared ui', async () => {
+    const found = await violations();
+    const allowed = ['main.tsx', 'surface/registry.ts', 'layouts/plain/uses-ui.ts'].map((f) => A + f);
+    expect(found.filter((v) => allowed.includes(v.from))).toEqual([]);
+  });
+});

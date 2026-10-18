@@ -1,6 +1,9 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import '@cold-reserve/ui-cards/cubes.css';
 import './app.css';
+// The layouts' own styles load between app.css and controls.css, where they always were in the cascade (#432).
+import { LAYOUTS } from './surface/registry.js';
+import './controls.css';
 import { ok, type ErrorEnvelope, type HomeStatus, type Result, type ScenarioId, type SetScenarioInput } from '@cold-reserve/contracts';
 import { setLocale } from '@cold-reserve/i18n';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
@@ -19,7 +22,6 @@ import { createInboxPhone } from './phone/inbox-phone.js';
 import { createScriptedPhone, type PhoneFeed } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
 import { CardFrame } from './host/CardFrame.js';
-import { EchoFrame } from './ui/EchoFrame.js';
 import { examplesFor, isGridDown } from './ui/ExampleQuestions.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { useHomePanel } from './ui/HomePanel.js';
@@ -272,64 +274,74 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       <PhonePanel feed={phone} timeZone={homeTimeZone} units={demoSettings?.units ?? 'C'} />
     </ErrorBoundary>
   );
+  // The device layout from config (#432): the Alexa Echo Show unless configured; the judges' site always has it.
+  const Layout = LAYOUTS[config.layout];
   return (
-    <EchoFrame sky={sky} aside={phonePanel} top={settingsControl} {...(clockDock === undefined ? {} : { dock: clockDock })}>
-      <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', place: demoSettings?.locationId, onCardAction }}>
-        <QueryClientProvider client={queryClient}>
-          <Conversation
-            agent={agent}
-            turnBudgetMs={config.turnBudgetMs}
-            timeZone={homeTimeZone}
-            voice={config.voice}
-            demo={config.demo}
-            onAnswer={onAnswer}
-            examples={examples}
-            commands={[
-              // The clock's button, said or typed (idea 4), while it has a moment to skip to: what is written on it can be said ("Go to 21:10").
-              ...(hasSandbox && clock?.next !== undefined && !clockBusy
-                ? [{ id: 'clock_skip', phrases: [t('clock.skip'), t('clock.skipUtterance'), t('clock.skipToShort', { time: clockTime(clock.next.at) }), t('clock.skipTo', { time: clockTime(clock.next.at), moment: t(`clock.kind.${clock.next.kind}`) })], run: onSkip }]
-                : []),
-              { id: 'home_show', phrases: [t('home.show')], run: homePanel.open },
-              { id: 'home_hide', phrases: [t('home.hide')], run: homePanel.close },
-              { id: 'theme_light', phrases: [t('theme.toggle')], run: () => {
-                  setTheme('light');
-                } },
-              { id: 'language', phrases: [t(`settings.language.${nextLocale(locale)}`)], run: () => {
-                  onLocale(nextLocale(locale));
-                } },
-              { id: 'theme_dark', phrases: [t('theme.darkUtterance')], run: () => {
-                  setTheme('dark');
-                } },
-            ]}
-            head={
-              <>
-                <Title />
-                {homePanel.button}
-                <button
-                  type="button"
-                  className="link-button theme-toggle"
-                  aria-pressed={theme === 'light'}
-                  onClick={() => {
-                    setTheme(theme === 'light' ? 'dark' : 'light');
-                  }}
-                >
-                  {t('theme.toggle')}
-                </button>
-              </>
-            }
-            homeView={homePanel.view}
-            onCloseHome={homePanel.close}
-            appliedTurns={appliedTurns}
-            prepareTurn={prepareTurn}
-            {...(hasSandbox && clock !== undefined ? { simNow: clock.now } : {})}
-            playthrough={playthrough}
-            {...(reserve === undefined ? {} : { idle: <ReserveClock outlook={reserve} storm={gridDown} /> })}
-            {...(session === undefined ? {} : { session })}
-            {...(studioVoice === undefined ? {} : { studioVoice })}
-          />
-        </QueryClientProvider>
-      </CardHostProvider>
-    </EchoFrame>
+    <Layout
+      state={{ sky }}
+      slots={{
+        demoControls: settingsControl,
+        companion: phonePanel,
+        ...(clockDock === undefined ? {} : { clock: clockDock }),
+        screen: (
+          <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', place: demoSettings?.locationId, onCardAction }}>
+            <QueryClientProvider client={queryClient}>
+              <Conversation
+                agent={agent}
+                turnBudgetMs={config.turnBudgetMs}
+                timeZone={homeTimeZone}
+                voice={config.voice}
+                demo={config.demo}
+                onAnswer={onAnswer}
+                examples={examples}
+                commands={[
+                  // The clock's button, said or typed (idea 4), while it has a moment to skip to: what is written on it can be said ("Go to 21:10").
+                  ...(hasSandbox && clock?.next !== undefined && !clockBusy
+                    ? [{ id: 'clock_skip', phrases: [t('clock.skip'), t('clock.skipUtterance'), t('clock.skipToShort', { time: clockTime(clock.next.at) }), t('clock.skipTo', { time: clockTime(clock.next.at), moment: t(`clock.kind.${clock.next.kind}`) })], run: onSkip }]
+                    : []),
+                  { id: 'home_show', phrases: [t('home.show')], run: homePanel.open },
+                  { id: 'home_hide', phrases: [t('home.hide')], run: homePanel.close },
+                  { id: 'theme_light', phrases: [t('theme.toggle')], run: () => {
+                      setTheme('light');
+                    } },
+                  { id: 'language', phrases: [t(`settings.language.${nextLocale(locale)}`)], run: () => {
+                      onLocale(nextLocale(locale));
+                    } },
+                  { id: 'theme_dark', phrases: [t('theme.darkUtterance')], run: () => {
+                      setTheme('dark');
+                    } },
+                ]}
+                head={
+                  <>
+                    <Title />
+                    {homePanel.button}
+                    <button
+                      type="button"
+                      className="link-button theme-toggle"
+                      aria-pressed={theme === 'light'}
+                      onClick={() => {
+                        setTheme(theme === 'light' ? 'dark' : 'light');
+                      }}
+                    >
+                      {t('theme.toggle')}
+                    </button>
+                  </>
+                }
+                homeView={homePanel.view}
+                onCloseHome={homePanel.close}
+                appliedTurns={appliedTurns}
+                prepareTurn={prepareTurn}
+                {...(hasSandbox && clock !== undefined ? { simNow: clock.now } : {})}
+                playthrough={playthrough}
+                {...(reserve === undefined ? {} : { idle: <ReserveClock outlook={reserve} storm={gridDown} /> })}
+                {...(session === undefined ? {} : { session })}
+                {...(studioVoice === undefined ? {} : { studioVoice })}
+              />
+            </QueryClientProvider>
+          </CardHostProvider>
+        ),
+      }}
+    />
   );
 }
 
