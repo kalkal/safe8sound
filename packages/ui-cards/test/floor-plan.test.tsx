@@ -29,6 +29,14 @@ describe('FloorPlanCard (signature element 3: the thermal floor plan, generated 
     expect(living.textContent).toContain('Waiting: the level cools fewer rooms right now');
   });
 
+  it('#422: names a room by its display name when the status has one, by its readable id otherwise', () => {
+    const status = homeInStorm();
+    render(<FloorPlanCard status={{ ...status, rooms: status.rooms.map((r) => (r.roomId === 'bedroom-1' ? { ...r, name: "Leo's room" } : r)) }} />);
+    expect(screen.getByRole('listitem', { name: "Leo's room", hidden: true }).textContent).toContain("Leo's room");
+    expect(screen.queryByRole('listitem', { name: 'Bedroom 1', hidden: true })).toBeNull();
+    expect(screen.getByRole('listitem', { name: 'Living', hidden: true })).toBeTruthy();
+  });
+
   it('°F everywhere (owner decision, 9 Oct): each room in the chosen unit', () => {
     setTempUnit('F');
     render(<FloorPlanCard status={homeInStorm()} />);

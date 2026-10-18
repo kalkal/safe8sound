@@ -524,6 +524,14 @@ describe('solar surplus at home instead of on the grid (#203)', () => {
     expect(p.guarantees.every((g) => g.ok)).toBe(true);
   });
 
+  it('#422: names each surplus room from the home profile, so the card never shows its id', async () => {
+    const w = sunny();
+    const p = await planned(w);
+    const rooms = p.surplus?.rooms ?? [];
+    expect(rooms.length).toBeGreaterThan(0);
+    for (const r of rooms) expect(r.name).toBe(w.profile.rooms.find((room) => room.id === r.roomId)?.name);
+  });
+
   it('carries the cooling comfort the rooms are measured from, so the card can say "now X °C, Y °C above the Z °C comfort"', async () => {
     const p = await planned(sunny());
     expect(p.surplus?.comfortC).toBe(preferences.comfortC.cooling);

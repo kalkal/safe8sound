@@ -44,6 +44,14 @@ describe('preferences module (MCP tools)', () => {
     expect((text ?? '').slice(0, (text ?? '').indexOf(' Room ids for tools'))).not.toContain('bedroom-1');
   });
 
+  it('#422: names the rooms for the cards and the settings; without names, no rooms field', async () => {
+    const names: Record<string, string> = { 'bedroom-1': "Leo's room", living: 'Living room', study: 'Study' };
+    const named = await call(deps({ roomNameFor: (_home, id) => names[id] }), 'get_preferences', {});
+    expect(named.structuredContent).toMatchObject({ rooms: [{ id: 'bedroom-1', name: "Leo's room" }, { id: 'living', name: 'Living room' }, { id: 'study', name: 'Study' }] });
+    const bare = await call(deps(), 'get_preferences', {});
+    expect(bare.structuredContent).not.toHaveProperty('rooms');
+  });
+
   it('returns the defaults for a home with nothing saved, with the hard limits', async () => {
     const result = await call(deps(), 'get_preferences', {});
     expect(result.isError).toBeFalsy();

@@ -32,6 +32,15 @@ describe('HomeStatusSchema', () => {
     expect(HomeStatusSchema.safeParse(status).success).toBe(true);
   });
 
+  it('#422: a room may carry its display name for the cards (optional, additive)', () => {
+    const named = valid();
+    named.rooms[0] = { ...named.rooms[0], name: "Leo's room" };
+    expect(HomeStatusSchema.parse(named).rooms[0]?.name).toBe("Leo's room");
+    expect(HomeStatusSchema.parse(valid()).rooms[0]?.name).toBeUndefined();
+    named.rooms[0] = { ...named.rooms[0], name: '' };
+    expect(HomeStatusSchema.safeParse(named).success).toBe(false);
+  });
+
   it('rejects a waiting room without a reason and a served room with one', () => {
     const waiting = valid();
     waiting.rooms[1] = { roomId: 'living', tempC: 28, occupants: [], state: 'waiting' };

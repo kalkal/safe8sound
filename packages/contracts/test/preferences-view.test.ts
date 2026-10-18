@@ -39,6 +39,15 @@ describe('get_preferences and set_preferences shapes', () => {
     expect(GetPreferencesOutputSchema.safeParse({ ...output, isDefault: 'yes' }).success).toBe(false);
   });
 
+  it('#422: get_preferences may name the rooms for the cards (optional, additive); old outputs stay valid', () => {
+    const output = { preferences: toPublicPreferences(preferences()), isDefault: true, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };
+    const rooms = [{ id: 'bedroom-1', name: "Leo's room" }, { id: 'living', name: 'Living room' }];
+    expect(GetPreferencesOutputSchema.parse({ ...output, rooms }).rooms).toEqual(rooms);
+    expect(GetPreferencesOutputSchema.parse(output).rooms).toBeUndefined();
+    expect(GetPreferencesOutputSchema.safeParse({ ...output, rooms: [{ id: 'living', name: '' }] }).success).toBe(false);
+    expect(GetPreferencesOutputSchema.safeParse({ ...output, rooms: [{ id: 'living', name: 'Living', occupant: 'Leo' }] }).success).toBe(false);
+  });
+
   it('set_preferences takes a partial change, only once the person confirmed it', () => {
     expect(SetPreferencesInputSchema.safeParse({ comfortC: { cooling: 24 }, confirmed: true }).success).toBe(true);
     expect(SetPreferencesInputSchema.safeParse({ comfortC: { cooling: 24 } }).success).toBe(false);

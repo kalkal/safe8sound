@@ -1,4 +1,4 @@
-import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
+import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences, type Plan } from '@cold-reserve/contracts';
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import { homeInStorm, hotDayPlan, lastResortBatteryPlan, lastResortPlan, planThatHolds, safeRoomBatteryFirst, safeRoomCalm, safeRoomInStorm, stormPlan, surplusPlan } from '@cold-reserve/ui-cards';
 import { ToolCardSchema, type ToolCard } from './wire.js';
@@ -8,6 +8,16 @@ import { ToolCardSchema, type ToolCard } from './wire.js';
 // the same schema as a remote result, so the script can never show what the contracts refuse.
 
 const card = (value: unknown): ToolCard => ToolCardSchema.parse(value);
+
+/** The demo home's display names (as its profile has them) on the surplus rooms, so the card says "Leo's room" (#422). */
+const DEMO_ROOM_NAMES: Readonly<Record<string, string>> = { 'bedroom-1': "Leo's room", living: 'Living room' };
+const withDemoRoomNames = (plan: Plan): Plan =>
+  plan.surplus === undefined
+    ? plan
+    : { ...plan, surplus: { ...plan.surplus, rooms: plan.surplus.rooms.map((r) => {
+          const name = DEMO_ROOM_NAMES[r.roomId];
+          return name === undefined ? r : { ...r, name };
+        }) } };
 
 /** The scripted home's last-resort confirmation (#160): a fixed, fake token, the shape the server returns. */
 export const SCRIPTED_LAST_RESORT_TOKEN = `lr_${'scripted'.repeat(3)}`;
@@ -21,7 +31,8 @@ export const SCRIPT_FIXTURES = {
     }),
   /** The model proposed too much (#186, scene 2b): the guard refused it, and the answer is the plan that holds (#202). */
   /** An ordinary sunny afternoon (#227, video scene 2a): where the solar surplus went instead of the grid. */
-  'daily-routing': () => card({ tool: 'plan_comfort', result: surplusPlan() }),
+  // The demo home's own room names (#422): the scripted home is the invented one with the grandpa Leo, never the real home.
+  'daily-routing': () => card({ tool: 'plan_comfort', result: withDemoRoomNames(surplusPlan()) }),
   'plan-that-holds': () => card({ tool: 'plan_comfort', result: planThatHolds() }),
   /** A last resort (#160): the night limit cannot hold; the plan says until when, and how warm after. */
   'last-resort-plan': () => card({ tool: 'plan_comfort', result: lastResortPlan() }),

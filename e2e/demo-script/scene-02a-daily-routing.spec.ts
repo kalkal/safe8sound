@@ -15,7 +15,7 @@ for (const width of [375, 1280]) {
     const card = page.frameLocator('iframe[title="Plan card"]');
     const surplus = card.getByRole('region', { name: 'Solar surplus, 12:00 to 16:00' });
     await expect(surplus.getByTestId('surplus-kept')).toHaveText('2.4 kWh');
-    await expect(surplus.getByRole('listitem')).toHaveText([/^Bedroom 1Safe room/, /^LivingOccupied/]);
+    await expect(surplus.getByRole('listitem')).toHaveText([/^Leo's roomSafe room/, /^Living roomOccupied/]);
     await expect(card.getByTestId('origin-badge').first()).toContainText('SIMULATED');
     await expect(page.getByTestId('answer').last()).toContainText('2.4 kWh between 12:00 and 16:00');
     await expectVoiceMatchesCards(page, ['Plan card']);

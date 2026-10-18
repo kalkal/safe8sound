@@ -90,8 +90,11 @@ export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {
             rooms: snapshot.rooms.map((r) => {
               // A room the deriver skipped fails the output schema (a bug, reported as output_schema_violation).
               const s = service.get(r.id);
+              // The display name from the home profile (#422): the cards show it, never the id.
+              const name = home.profile.rooms.find((p) => p.id === r.id)?.name;
               return {
                 roomId: r.id,
+                ...(name === undefined ? {} : { name }),
                 tempC: r.tempC,
                 ...(r.humidityPct === undefined ? {} : { humidityPct: r.humidityPct }),
                 occupants: r.occupants,

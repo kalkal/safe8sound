@@ -80,7 +80,12 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
     handler: async (_args, ctx) => {
       const read = await current(ctx.homeId, ctx.correlationId);
       if (!read.ok) return read;
-      return ok({ preferences: toPublicPreferences(read.value.preferences), isDefault: read.value.isDefault, hardLimits: deps.limits });
+      // The rooms by name for the cards and the settings (#422); none when the home has no names.
+      const rooms = deps.roomIdsFor(ctx.homeId).flatMap((id) => {
+        const name = deps.roomNameFor?.(ctx.homeId, id);
+        return name === undefined ? [] : [{ id, name }];
+      });
+      return ok({ preferences: toPublicPreferences(read.value.preferences), isDefault: read.value.isDefault, hardLimits: deps.limits, ...(rooms.length === 0 ? {} : { rooms }) });
     },
   });
 

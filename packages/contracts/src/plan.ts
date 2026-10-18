@@ -67,7 +67,14 @@ export const PlanSurplusSchema = z
     keptKWh: z.number().nonnegative(),
     /** The rooms in the order the surplus went: the safe room first, then the hottest above target. */
     rooms: z
-      .array(z.strictObject({ roomId: EntityIdSchema, setpointC: CelsiusSchema, reason: SurplusReasonSchema, aboveTargetK: z.number() }))
+      .array(z.strictObject({
+          roomId: EntityIdSchema,
+          /** #422 (additive): the display name from the home profile, so the card never shows the id. */
+          name: z.string().min(1).max(40).optional(),
+          setpointC: CelsiusSchema,
+          reason: SurplusReasonSchema,
+          aboveTargetK: z.number(),
+        }))
       .min(1)
       .max(12),
     /**

@@ -9,6 +9,8 @@ import { CelsiusSchema, PctSchema, WattSchema } from './units.js';
 export const HomeStatusRoomSchema = z
   .strictObject({
     roomId: EntityIdSchema,
+    /** #422 (additive): the display name from the home profile, so a card never shows the id. */
+    name: z.string().min(1).max(40).optional(),
     tempC: CelsiusSchema,
     humidityPct: PctSchema.optional(),
     /** Roles only, never names (plan §3.1). */

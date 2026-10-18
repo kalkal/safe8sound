@@ -41,6 +41,8 @@ export const GetPreferencesOutputSchema = z.strictObject({
   preferences: PublicPreferencesSchema,
   isDefault: z.boolean(),
   hardLimits: SafetyHardLimitsSchema,
+  /** #422 (additive): the rooms by their display name from the home profile, so a card or the settings never show an id. */
+  rooms: z.array(z.strictObject({ id: EntityIdSchema, name: z.string().min(1).max(40) })).max(20).optional(),
 });
 export type GetPreferencesOutput = z.infer<typeof GetPreferencesOutputSchema>;
 

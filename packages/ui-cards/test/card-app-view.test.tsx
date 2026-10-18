@@ -196,6 +196,13 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(onCallTool).toHaveBeenCalledWith('set_preferences', { comfortC: { cooling: 24.5 }, confirmed: true });
   });
 
+  it('#422: the preferences card names the rooms get_preferences names', () => {
+    const view = { preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()), rooms: [{ id: 'bedroom-1', name: "Leo's room" }, { id: 'living', name: 'Living room' }, { id: 'study', name: 'Study' }] };
+    show({ kind: 'preferences', data: view });
+    expect(document.body.textContent).toContain("Leo's room");
+    expect(document.body.textContent).not.toContain('Bedroom 1');
+  });
+
   it('says what went wrong in words, never a code', () => {
     show({ kind: 'error', message: 'The plan expired: ask for a new one.', retryable: false });
     expect(screen.getByRole('alert').textContent).toBe('The plan expired: ask for a new one.');

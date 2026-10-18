@@ -37,6 +37,16 @@ describe('get_home_status on the demo home (simulator, clear-day, fixed seed)', 
     expect(result.content[0]?.text).toMatch(/simulated/i);
   });
 
+  it('#422: names each room for the cards from the home profile; the real home names no one', async () => {
+    const statusOf = async (headers: Record<string, string> = {}) => HomeStatusSchema.parse((await toolResult(await post(app().handler, callTool('get_home_status', {}), headers))).structuredContent);
+    const demo = await statusOf();
+    expect(demo.rooms.find((r) => r.roomId === 'bedroom-1')?.name).toBe("Leo's room");
+    expect(demo.rooms.every((r) => r.name !== undefined)).toBe(true);
+    const real = await statusOf({ authorization: `Bearer ${HOME_TOKEN}` });
+    expect(real.rooms.every((r) => r.name !== undefined)).toBe(true);
+    expect(JSON.stringify(real)).not.toContain('Leo');
+  });
+
   it('is reproducible: the same scenario second gives the same answer', async () => {
     const a = await toolResult(await post(app().handler, callTool('get_home_status', {})));
     const b = await toolResult(await post(app().handler, callTool('get_home_status', {})));

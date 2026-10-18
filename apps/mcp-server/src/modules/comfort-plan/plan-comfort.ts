@@ -276,7 +276,7 @@ export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput
     ...(refusedProposal === undefined ? {} : { refusedProposal }),
     ...(ctx.turnId === undefined ? {} : { proposedInTurn: ctx.turnId }),
     ...(counterfactual === undefined ? {} : { counterfactual }),
-    ...(chosen.surplus === undefined ? {} : { surplus: chosen.surplus }),
+    ...(chosen.surplus === undefined ? {} : { surplus: withRoomNames(chosen.surplus, profile.rooms) }),
     ...householdTipBeside(chosen, safest),
   };
   const parsed = PlanSchema.safeParse(draft);
@@ -786,4 +786,15 @@ function withHumidityControl(steps: readonly PlanStep[], deps: ComfortPlanDeps, 
 /** The last resort with the home's place, when the home has one (#376). */
 function withPlace(lr: NonNullable<Plan['lastResort']>, place: LocationId | undefined): NonNullable<Plan['lastResort']> {
   return place === undefined ? lr : { ...lr, place };
+}
+
+/** The surplus rooms with their display names from the home profile (#422), so the card never shows an id. */
+function withRoomNames(surplus: NonNullable<Plan['surplus']>, rooms: readonly { id: string; name: string }[]): NonNullable<Plan['surplus']> {
+  return {
+    ...surplus,
+    rooms: surplus.rooms.map((r) => {
+      const name = rooms.find((room) => room.id === r.roomId)?.name;
+      return name === undefined ? r : { ...r, name };
+    }),
+  };
 }

@@ -324,7 +324,7 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
                   name="safe-room"
                   value={shown.preferences.safeRoomId}
                   // A steady order by name: the priority order moves the chosen room to the head, and a list that jumps is hard to use.
-                  options={shown.preferences.roomPriority.map((id) => ({ value: id, label: roomLabel(id) })).sort((a, b) => a.label.localeCompare(b.label))}
+                  options={shown.preferences.roomPriority.map((id) => ({ value: id, label: shown.rooms?.find((r) => r.id === id)?.name ?? roomLabel(id) })).sort((a, b) => a.label.localeCompare(b.label))}
                   onPick={(id) => {
                     const chosen = chooseSafeRoom(shown, id);
                     if (chosen.ok) addToDraft(chosen.change);

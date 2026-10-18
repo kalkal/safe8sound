@@ -203,6 +203,12 @@ describe('PlanSchema', () => {
       expect(PlanSchema.parse({ ...examplePlan(), surplus: { ...surplus, comfortC: 24 } }).surplus?.comfortC).toBe(24);
       expect(PlanSchema.safeParse({ ...examplePlan(), surplus: { ...surplus, comfortC: 'warm' } }).success).toBe(false);
     });
+
+    it('#422: a surplus room may carry its display name for the card (optional, additive)', () => {
+      const named = { ...surplus, rooms: [{ ...surplus.rooms[0], name: "Leo's room" }, surplus.rooms[1]] };
+      expect(PlanSchema.parse({ ...examplePlan(), surplus: named }).surplus?.rooms[0]?.name).toBe("Leo's room");
+      expect(PlanSchema.safeParse({ ...examplePlan(), surplus: { ...surplus, rooms: [{ ...surplus.rooms[0], name: '' }] } }).success).toBe(false);
+    });
   });
 
   describe('household tip from the solar surplus (optional, additive, approved in #219)', () => {

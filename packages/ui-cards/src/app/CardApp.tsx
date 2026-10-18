@@ -116,6 +116,7 @@ function CardContent({ state, timeZone, canAct, onCallTool }: Omit<CardAppProps,
         <>
           <PreferencesCard
             view={state.data}
+            {...(state.data.rooms !== undefined && { rooms: state.data.rooms })}
             {...(canAct && {
               onSave: (change: Parameters<typeof onCallTool>[1]) => {
                 onCallTool('set_preferences', change);

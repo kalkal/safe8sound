@@ -159,7 +159,7 @@ function SurplusRouting({ surplus, timeZone }: { surplus: Surplus; timeZone: str
       <ol className="surplus-rooms" aria-label={t('plan.surplusRooms')}>
         {surplus.rooms.map((room) => (
           <li key={room.roomId}>
-            <strong>{roomLabel(room.roomId)}</strong>
+            <strong>{room.name ?? roomLabel(room.roomId)}</strong>
             <span>
               {surplusRoomText(room, surplus.comfortC)}
             </span>

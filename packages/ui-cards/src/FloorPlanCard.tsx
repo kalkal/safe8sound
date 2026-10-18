@@ -37,7 +37,7 @@ export function FloorPlanCard({ status }: { status: HomeStatus }) {
         <Fragment key="more">
           <ul className="floor-plan" aria-label={t('floor.rooms')}>
             {status.rooms.map((room) => {
-              const name = roomLabel(room.roomId);
+              const name = room.name ?? roomLabel(room.roomId);
               return (
                 <li key={room.roomId} className="room-tile" data-state={room.state} aria-label={name}>
                   <DeviceIcon device="split" on={room.state === 'served'} />

@@ -134,6 +134,11 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                       "minimum": 0,
                       "type": "number",
                     },
+                    "name": {
+                      "maxLength": 40,
+                      "minLength": 1,
+                      "type": "string",
+                    },
                     "occupants": {
                       "items": {
                         "pattern": "^[a-z][a-z_-]{0,31}$",

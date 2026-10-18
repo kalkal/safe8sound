@@ -141,6 +141,17 @@ describe('Temperatures and limits section', () => {
     expect(section.textContent).toContain('CIBSE TM59');
   });
 
+  it('#422: names the safe room choices by the names get_preferences gives, by their readable id otherwise', () => {
+    const rooms = view.preferences.roomPriority.map((id) => ({ id, name: id === 'bedroom-1' ? "Leo's room" : 'Room ' + id }));
+    render(
+      <DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={vi.fn(() => Promise.resolve(true))} locale="en-US" onLocale={vi.fn()} limits={{ ...view, rooms }} onLimit={vi.fn<(change: LimitChange) => Promise<LimitSave>>(() => Promise.resolve('saved'))} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    const safeRoom = screen.getByRole('radiogroup', { name: 'Safe room' });
+    expect(within(safeRoom).getByRole('radio', { name: /Leo's room/ })).toHaveProperty('checked', true);
+    expect(safeRoom.textContent).not.toContain('Bedroom 1');
+  });
+
   it('the steps and choices change a draft; Save sends it as one write, and the draft is gone once saved', async () => {
     const { section, onLimit } = open();
     const other = view.preferences.roomPriority[1] as string;

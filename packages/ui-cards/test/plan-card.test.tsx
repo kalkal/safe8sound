@@ -35,6 +35,14 @@ describe('PlanCard', () => {
     expect(surplus.textContent).not.toContain('target');
   });
 
+  it('#422: names a surplus room by its display name when the plan has one', () => {
+    const plan = surplusPlan();
+    if (plan.surplus === undefined) throw new Error('no surplus');
+    show({ ...plan, surplus: { ...plan.surplus, rooms: plan.surplus.rooms.map((r) => (r.roomId === 'bedroom-1' ? { ...r, name: "Leo's room" } : r)) } });
+    const rooms = screen.getByRole('list', { name: 'Where it went, in order' });
+    expect(within(rooms).getAllByRole('listitem').map((r) => r.querySelector('strong')?.textContent)).toEqual(["Leo's room", 'Living']);
+  });
+
   it('a plan without the comfort (older) says how far from comfort, without a "now" figure it cannot know', () => {
     const plan = surplusPlan();
     if (plan.surplus === undefined) throw new Error('no surplus');
