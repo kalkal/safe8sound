@@ -1,6 +1,7 @@
 import { homeInStorm } from '../../packages/ui-cards/src/home-fixtures.js';
 import { expect, test } from '../no-network.js';
 import { openRemote } from '../remote-session.js';
+import { demoControls, demoControlsButton } from '../surface.js';
 
 // #268: the example buttons under the question follow the scenario and the home's state. In a storm with the grid
 // down there is no "36 degrees tomorrow" example; the storm examples are answered by the scripted demo.
@@ -13,8 +14,8 @@ test('scripted: choosing the storm scenario swaps the hot-day examples for the s
   await page.goto('/');
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toBeVisible();
 
-  await page.getByRole('button', { name: /SCENARIO/ }).click();
-  const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+  await demoControlsButton(page).click();
+  const drawer = demoControls(page);
   await drawer.getByText('Storm · power outage').click();
   await page.keyboard.press('Escape');
 

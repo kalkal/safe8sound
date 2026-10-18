@@ -39,7 +39,7 @@ test('ask by voice → the answer is shown and read aloud, then the mic is free 
   await expect(page.getByTestId('battery-soc')).toHaveText('78%');
   const spoken = await voice(page, (d) => d.spoken());
   expect(spoken).toHaveLength(1);
-  expect(await page.getByTestId('answer').locator('.answer-text').textContent()).toBe(spoken[0]);
+  expect(await page.getByTestId('answer').getByTestId('answer-caption').textContent()).toBe(spoken[0]);
   // While the answer is read, Stop speaking takes the place of Speak (three bands, 10 Oct).
   await expect(page.getByRole('button', { name: 'Speak', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Stop speaking' })).toBeVisible();
@@ -201,7 +201,7 @@ for (const [width, height] of [
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     const phone = width < 896;
-    for (const selector of phone ? ['.echo-scroll'] : ['.echo-scroll', '.band-content']) {
+    for (const selector of phone ? ['[data-testid="screen-viewport"]'] : ['[data-testid="screen-viewport"]', '[data-testid="slot-content"]']) {
       const s = await page.locator(selector).evaluate((el: { scrollHeight: number; clientHeight: number }) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
       expect(s.scroll, selector).toBeLessThanOrEqual(s.client + 1);
     }

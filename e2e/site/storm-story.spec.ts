@@ -1,5 +1,6 @@
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE } from './chain.js';
+import { demoControlsButton } from '../surface.js';
 
 // Time pack (12 Oct), as on the deployed site: the AWS build, the remote agent through /api, the real local sim-api,
 // agent (fake model) and MCP server, a visitor sandbox on a calm day. The bug this catches: "Power cut" with the grid
@@ -19,7 +20,7 @@ test('Power cut → the simulated grid goes down and Ana is told; Skip ahead to 
   await page.goto('/');
   await page.getByLabel('Demo code').fill(DEMO_CODE);
   await page.getByRole('button', { name: 'Start' }).click();
-  const badge = page.getByRole('button', { name: /SCENARIO/ });
+  const badge = demoControlsButton(page);
   await expect(badge).toContainText('Clear day', { timeout: 20_000 });
   const clock = page.getByRole('group', { name: 'Simulated time' });
   await expect(clock).toContainText('SIMULATED', { timeout: 20_000 });

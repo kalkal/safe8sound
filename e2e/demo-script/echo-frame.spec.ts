@@ -23,7 +23,7 @@ test('at 1280 × 800 the device and its 16:10 screen fit the window, with no sid
   expect(box.y + box.height).toBeLessThanOrEqual(800);
   expect(box.width / box.height).toBeCloseTo(1.6, 1);
   // The scroller fits the screen: nothing can hide under the bezel, out of sight and out of reach (#258).
-  const scroller = await page.locator('.echo-scroll').boundingBox();
+  const scroller = await page.getByTestId('screen-viewport').boundingBox();
   expect(scroller && Math.abs(scroller.y + scroller.height - (box.y + box.height))).toBeLessThan(1);
   expect(await page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(1280);
 });
@@ -50,8 +50,8 @@ test('the sky follows the weather of the answers: sun, heat haze, storm clouds, 
 test('with reduced motion the sky changes at once, without a fade', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.locator('.sky-layer').first()).toBeAttached();
-  const duration = await page.evaluate<string>("getComputedStyle(document.querySelector('.sky-layer')).transitionDuration");
+  await expect(page.getByTestId('slot-background').locator('[data-layer]').first()).toBeAttached();
+  const duration = await page.evaluate<string>("getComputedStyle(document.querySelector('[data-slot=background] [data-layer]')).transitionDuration");
   expect(duration).toBe('0s');
 });
 
@@ -69,7 +69,7 @@ test('on a 960 × 480 Echo an answer with no card keeps its words on screen; wit
   await page.goto('/');
   // No card and no battery fact (the storm being prepared, "Not now", the fallback): the screen is never left empty.
   await ask(page, 'Tell me a joke.');
-  const words = page.getByTestId('answer').locator('.answer-text');
+  const words = page.getByTestId('answer').getByTestId('answer-caption');
   await expect(words).toContainText('In scripted mode I can only answer a few questions.');
   await expect(words).toBeInViewport();
   const box = await words.boundingBox();

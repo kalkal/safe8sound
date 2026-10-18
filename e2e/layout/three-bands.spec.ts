@@ -23,12 +23,12 @@ async function ask(page: Page, example: string) {
 async function screenDoesNotScroll(page: Page) {
   // On a phone (narrower than a landscape Echo) the content band scrolls like a page; the screen itself never does.
   const phone = (page.viewportSize()?.width ?? 0) < 896;
-  for (const selector of phone ? ['.echo-scroll'] : ['.echo-scroll', '.band-content']) {
+  for (const selector of phone ? ['[data-testid="screen-viewport"]'] : ['[data-testid="screen-viewport"]', '[data-testid="slot-content"]']) {
     const sizes = await page.locator(selector).evaluate((el: { scrollHeight: number; clientHeight: number }) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
     expect(sizes.scroll, selector).toBeLessThanOrEqual(sizes.client + 1);
   }
-  const band = await page.locator('.band-content').boundingBox();
-  const frames = page.locator(phone ? '.none' : '.band-content iframe:visible');
+  const band = await page.getByTestId('slot-content').boundingBox();
+  const frames = page.locator(phone ? '.none' : '[data-testid="slot-content"] iframe:visible');
   for (let i = 0; i < (await frames.count()); i++) {
     const box = await frames.nth(i).boundingBox();
     if (band === null || box === null) continue;
@@ -90,19 +90,19 @@ for (const [width, height] of SIZES) {
     await ask(page, 'Battery level');
     const answer = page.getByTestId('answer');
     await expect(answer).toHaveCount(1);
-    const first = await answer.locator('.answer-text').innerText();
+    const first = await answer.getByTestId('answer-caption').innerText();
     await bandsOnScreen(page);
 
     await ask(page, 'A hot day');
     await expect(answer).toHaveCount(1);
-    await expect(answer.locator('.answer-text')).not.toHaveText(first);
+    await expect(answer.getByTestId('answer-caption')).not.toHaveText(first);
     const answers = page.getByRole('navigation', { name: 'Answers' });
     await expect(answers).toContainText('Answer 2 of 2');
     await bandsOnScreen(page);
 
     await answers.getByRole('button', { name: 'Previous answer' }).click();
     await expect(answers).toContainText('Answer 1 of 2');
-    await expect(answer.locator('.answer-text')).toHaveText(first);
+    await expect(answer.getByTestId('answer-caption')).toHaveText(first);
     await answers.getByRole('button', { name: 'Next answer' }).click();
     await expect(answers).toContainText('Answer 2 of 2');
 

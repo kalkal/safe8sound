@@ -1,6 +1,7 @@
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE, SIM_API_URL } from './chain.js';
 import { toCardPage } from '../card-pages.js';
+import { demoControls, demoControlsButton } from '../surface.js';
 
 // K1 (#244 review): the AWS build of the site, its /api through the very CloudFront Function the distribution runs
 // (a stand-in for CloudFront), and a REAL local sim-api configured as on AWS (no allowed origin) in front of the real
@@ -36,11 +37,11 @@ test('B2: the settings drawer saves to the visitor sandbox through /api; the bad
   await page.getByLabel('Demo code').fill(DEMO_CODE);
   await page.getByRole('button', { name: 'Start' }).click();
   // Each demo session plays its own sandbox: the badge comes from its get_demo_settings.
-  const badge = page.getByRole('button', { name: /SCENARIO/ });
+  const badge = demoControlsButton(page);
   await expect(badge).toContainText('Reference home (central Italy)', { timeout: 20_000 });
 
   await badge.click();
-  const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+  const drawer = demoControls(page);
   await drawer.getByText('Storm · power outage').click();
   // set_scenario, then get_demo_settings: the badge and the checked radio are what is stored.
   await expect(badge).toContainText('Storm · power outage', { timeout: 20_000 });

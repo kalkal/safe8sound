@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { demoControls, demoControlsButton } from '../surface.js';
 
 // Time pack (12 Oct): "Power cut" makes the simulated grid go down before the question reaches the assistant (the badge
 // says Storm, the clock says so), and the simulated clock skips to each next moment, so Ana's phone receives each
@@ -13,7 +14,7 @@ test('Power cut → the grid goes down and Ana is told; Skip ahead → Essential
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/');
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
-  const badge = page.getByRole('button', { name: /SCENARIO/ });
+  const badge = demoControlsButton(page);
   await expect(badge).toContainText('Heat wave');
   const clock = clockOf(page);
   await expect(clock).toContainText('SIMULATED');
@@ -122,9 +123,9 @@ test('Restart the day takes the clock back to the start of the day, and the draw
   await expect(clock.getByRole('status')).toHaveText('Now: the battery reaches the essential level.');
   const skipped = await clock.locator('time').textContent();
 
-  const badge = page.getByRole('button', { name: /SCENARIO/ });
+  const badge = demoControlsButton(page);
   await badge.click();
-  const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+  const drawer = demoControls(page);
   await drawer.getByRole('button', { name: 'Restart the day' }).click();
   await drawer.getByRole('button', { name: 'Yes, restart it now' }).click();
   // The clock is read again: back to the start of the day, with its storm ahead.
@@ -151,9 +152,9 @@ test('the drawer is a modal over a dimmed page: a tap on the page closes it and 
   ]) {
     await page.setViewportSize(size);
     await page.goto('/');
-    const badge = page.getByRole('button', { name: /SCENARIO/ });
+    const badge = demoControlsButton(page);
     await badge.click();
-    const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+    const drawer = demoControls(page);
     await expect(drawer).toBeVisible();
     const scrim = page.getByTestId('settings-scrim');
     await expect(scrim).toBeVisible();

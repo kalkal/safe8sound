@@ -37,6 +37,17 @@ const NEVER_CASTS = [
   },
 ];
 
+/**
+ * The device look is a layout another can replace (separation of the device layout, step S0): e2e reads the screen
+ * through the slot test ids and roles (e2e/surface.ts), never through the Echo layout's own classes.
+ */
+const LAYOUT_CLASS = '/\\.(echo|band|sky|sim-dock)-|\\.(scenario-badge|answer-text|welcome)\\b/';
+const LAYOUT_MESSAGE = "Do not select a layout's own class in e2e: use a slot test id, a role or e2e/surface.ts.";
+const LAYOUT_SELECTORS = [
+  { selector: `Literal[value=${LAYOUT_CLASS}]`, message: LAYOUT_MESSAGE },
+  { selector: `TemplateElement[value.raw=${LAYOUT_CLASS}]`, message: LAYOUT_MESSAGE },
+];
+
 /** @type {import('eslint').Linter.RuleEntry} */
 export const unitCastRule = ['error', ...UNIT_CASTS];
 /** Tests: the units and the message brand (a test may still build a fake with `as never`). */
@@ -48,6 +59,9 @@ export const srcCastRule = ['error', ...UNIT_CASTS, ...MESSAGE_CASTS, ...NEVER_C
 /** packages/i18n/src builds the message text from its templates; everything else still applies. */
 /** @type {import('eslint').Linter.RuleEntry} */
 export const i18nSrcCastRule = ['error', ...UNIT_CASTS, ...NEVER_CASTS];
+/** e2e specs: the test rule, and no layout classes. */
+/** @type {import('eslint').Linter.RuleEntry} */
+export const e2eRule = ['error', ...UNIT_CASTS, ...MESSAGE_CASTS, ...LAYOUT_SELECTORS];
 
 export default defineConfig(
   {
@@ -68,6 +82,10 @@ export default defineConfig(
   {
     files: ['packages/**/src/**', 'apps/**/src/**', 'infra/src/**'],
     rules: { 'no-restricted-syntax': srcCastRule },
+  },
+  {
+    files: ['e2e/**'],
+    rules: { 'no-restricted-syntax': e2eRule },
   },
   {
     files: ['packages/i18n/src/**'],

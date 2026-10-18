@@ -17,6 +17,12 @@ describe('AnswerCard', () => {
     expect(screen.getByText('Storm mode is prepared.')).toBeTruthy();
   });
 
+  it('shows its words as captions, under the test id the specs read', () => {
+    render(<AnswerCard answer={{ text: 'Power is back.' }} timeZone="Europe/Rome" turnId="t1" />);
+    expect(screen.getByTestId('answer').contains(screen.getByTestId('answer-caption'))).toBe(true);
+    expect(screen.getByTestId('answer-caption').textContent).toBe('Power is back.');
+  });
+
   it('an answer given before the clock last moved says so inside the answer, with its simulated time (owner, 18 Oct)', () => {
     render(<AnswerCard answer={{ text: 'The storm reserve is now powering the home.' }} timeZone="Europe/Rome" turnId="t1" earlierAt="15:00" />);
     const when = screen.getByTestId('answer').querySelector('[data-testid="answer-when"]');

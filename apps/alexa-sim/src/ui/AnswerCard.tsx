@@ -34,7 +34,7 @@ export function AnswerCard({ answer, timeZone, turnId, earlierAt }: AnswerCardPr
         </p>
       )}
       <div className="answer-words">
-        <p className="answer-text" id="answer-words-text">
+        <p className="answer-text" id="answer-words-text" data-testid="answer-caption">
           {answer.text}
         </p>
         {cards !== undefined && (

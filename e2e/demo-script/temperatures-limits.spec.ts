@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { demoControls, demoControlsButton } from '../surface.js';
 
 // #402: one "Temperatures and limits" section in the settings: the safe room, the comfort temperature, the safe room
 // maximum (stricter only), the night health limits with their sources, the units. Scripted mode, no network.
@@ -6,8 +7,8 @@ import { expect, test } from '../no-network.js';
 test('open the settings, change the comfort, refuse a looser maximum, choose another safe room, switch to °F', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/');
-  await page.getByRole('button', { name: /SCENARIO/ }).click();
-  const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+  await demoControlsButton(page).click();
+  const drawer = demoControls(page);
   const section = drawer.getByRole('region', { name: 'Temperatures and limits' });
   await expect(section).toBeVisible();
 

@@ -13,7 +13,7 @@ export function numberTokens(text: string): Set<string> {
 /** `cards`: the titles of the card frames the sentence describes (for example "Safe room card"). */
 export async function expectVoiceMatchesCards(page: Page, cards: readonly string[]): Promise<void> {
   const answer = page.getByTestId('answer').last();
-  const spoken = numberTokens(await answer.locator('.answer-text').innerText());
+  const spoken = numberTokens(await answer.getByTestId('answer-caption').innerText());
   const shown = new Set<string>();
   for (const title of cards) {
     const frame = answer.frameLocator(`iframe[title="${title}"]`);

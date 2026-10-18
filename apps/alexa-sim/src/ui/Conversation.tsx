@@ -281,7 +281,7 @@ export function Conversation({
 
   return (
     <div className="bands">
-      <div className="band-head">
+      <div className="band-head" data-slot="head" data-testid="slot-head">
         <StepNav step={where} onBack={goBack} onFocusLost={focusQuestion} />
         {head}
         {/* An answer given before the clock last moved says so, with its simulated time; an answer of now needs no
@@ -302,7 +302,7 @@ export function Conversation({
           />
         )}
       </div>
-      <section className="conversation band-content">
+      <section className="conversation band-content" data-slot="content" data-testid="slot-content">
         {/* While a turn runs, its question; otherwise the question of the answer on screen. */}
         {busy && question !== null && !listening && <p className="bubble">{question}</p>}
         {!busy && !homeShown && shownTurn !== undefined && questions.current.has(shownTurn) && <p className="bubble">{questions.current.get(shownTurn)}</p>}
@@ -360,7 +360,7 @@ export function Conversation({
         </div>
         {homeShown && homeView}
         {firstScreen && (
-          <p id="question-hint" className="welcome">
+          <p id="question-hint" className="welcome" data-testid="welcome-hint">
             {t('chat.hint')}
           </p>
         )}
@@ -386,7 +386,7 @@ export function Conversation({
       {session !== undefined && token === undefined ? (
         <DemoCodeGate session={session} />
       ) : (
-      <form className="ask band-actions" onSubmit={onSubmit}>
+      <form className="ask band-actions" data-slot="actions" data-testid="slot-actions" onSubmit={onSubmit}>
         {/* Three bands: the label is said, not shown (the placeholder and Ask show it); the hint is the first
             screen's content, and once answers come it stays only as the field's description. */}
         <label htmlFor="question" className="visually-hidden">

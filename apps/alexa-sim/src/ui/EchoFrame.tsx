@@ -24,12 +24,12 @@ export function EchoFrame({ sky, children, aside, top, dock }: EchoFrameProps) {
       <div className="echo-column">
         <div className="echo-device">
           <div className="echo-screen" data-testid="echo-screen" data-sky={sky}>
-            <div className="sky" aria-hidden="true">
+            <div className="sky" aria-hidden="true" data-slot="background" data-testid="slot-background">
               {SKIES.map((s) => (
                 <div key={s} className="sky-layer" data-layer={s} data-shown={s === sky} />
               ))}
             </div>
-            <div className="echo-scroll">
+            <div className="echo-scroll" data-testid="screen-viewport">
               <main className="surface">{children}</main>
             </div>
           </div>

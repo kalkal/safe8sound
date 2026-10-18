@@ -19,14 +19,14 @@ test('typed labels: Previous / Next answer, Show / Hide my home, Light / Dark th
   const answer = page.getByTestId('answer');
   await type(page, 'Battery level');
   await expect(answer).toHaveCount(1);
-  const first = await answer.locator('.answer-text').innerText();
+  const first = await answer.getByTestId('answer-caption').innerText();
   await type(page, 'A hot day');
   await expect(answers).toContainText('Answer 2 of 2');
 
   // The pager's buttons, said as shown, with "Alexa," or punctuation around them.
   await type(page, 'Previous answer');
   await expect(answers).toContainText('Answer 1 of 2');
-  await expect(answer.locator('.answer-text')).toHaveText(first);
+  await expect(answer.getByTestId('answer-caption')).toHaveText(first);
   await type(page, 'Alexa, next.');
   await expect(answers).toContainText('Answer 2 of 2');
 
@@ -64,7 +64,7 @@ test('labels that ask Alexa: the safe-room chip and the plan card button, said a
   await type(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
   await expect(page.locator('iframe[title="Plan card"]')).toBeVisible();
   await type(page, 'Apply plan');
-  await expect(page.getByTestId('answer').locator('.answer-text')).toContainText('the plan is applied');
+  await expect(page.getByTestId('answer').getByTestId('answer-caption')).toContainText('the plan is applied');
 });
 
 /** Runs one step on the scripted voice in the page (?voice=fake, dev only). */

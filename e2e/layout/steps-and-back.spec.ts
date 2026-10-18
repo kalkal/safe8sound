@@ -54,7 +54,7 @@ test('tapped: the step follows the screen, and Back walks back to the first scre
   await back.click();
   await expect(page.getByTestId('answer')).toHaveCount(0);
   await expect(answers).toHaveCount(0);
-  await expect(page.locator('.welcome')).toBeVisible();
+  await expect(page.getByTestId('welcome-hint')).toBeVisible();
   await expectStep(page, 'Conversation');
   await expect(back).toBeDisabled();
 
@@ -74,7 +74,7 @@ test('typed: "Go back" and "Alexa, back." do what Back does, and are never asked
   await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
   await expectStep(page, 'Plan');
   await ask(page, 'Alexa, back.');
-  await expect(page.locator('.welcome')).toBeVisible();
+  await expect(page.getByTestId('welcome-hint')).toBeVisible();
   await expectStep(page, 'Conversation');
   // Neither was a question: one answer only, so the next one is the second.
   await ask(page, 'Battery level');
@@ -133,7 +133,7 @@ test('said aloud: "Go back" is Back while listening, no turn is sent; Back stops
   await page.getByRole('button', { name: 'Speak', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Stop listening' })).toHaveAttribute('aria-pressed', 'true');
   expect(await driver<boolean>(page, { say: 'Go back' })).toBe(true);
-  await expect(page.locator('.welcome')).toBeVisible();
+  await expect(page.getByTestId('welcome-hint')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Speak', exact: true })).toBeEnabled();
   expect(await driver<readonly string[]>(page, 'spoken')).toHaveLength(2);
   await ask(page, 'Battery level');

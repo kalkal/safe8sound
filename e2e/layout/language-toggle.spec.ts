@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { demoControls, demoControlsButton } from '../surface.js';
 
 // The language icon at the top (owner, 10 Oct): English by default; one quiet button offers Italiano and changes the
 // page at once, remembered like the drawer's Language row. In view, at least 44 px, and the Echo screen never
@@ -54,10 +55,10 @@ for (const { width, height, italian, storm } of CASES) {
       });
     }
     await page.goto('/');
-    const badge = page.getByRole('button', { name: /SCENARIO/ });
+    const badge = demoControlsButton(page);
     if (storm) {
       await badge.click();
-      await page.getByRole('dialog').getByText(italian ? 'Temporale · blackout' : 'Storm · power outage').click();
+      await demoControls(page, italian ? 'it-IT' : 'en-US').getByText(italian ? 'Temporale · blackout' : 'Storm · power outage').click();
       await page.keyboard.press('Escape');
     }
     const toggle = page.getByRole('button', { name: italian ? 'Lingua: English' : 'Language: Italiano' });
@@ -82,7 +83,7 @@ for (const { width, height, italian, storm } of CASES) {
     await expect(page.getByTestId('echo-screen')).toBeInViewport({ ratio: 1 });
     // On a phone the note's line uses the gap above the screen: the screen starts where it does in English (12 + 48 + 24 px).
     if (width === 375) expect((await page.getByTestId('echo-screen').boundingBox())?.y).toBeLessThanOrEqual(85);
-    const scroll = await page.locator('.echo-scroll').evaluate((el: { scrollHeight: number; clientHeight: number }) => el.scrollHeight - el.clientHeight);
+    const scroll = await page.getByTestId('screen-viewport').evaluate((el: { scrollHeight: number; clientHeight: number }) => el.scrollHeight - el.clientHeight);
     expect(scroll).toBeLessThanOrEqual(1);
     expect(await page.locator('html').evaluate((el: { scrollWidth: number; clientWidth: number }) => el.scrollWidth - el.clientWidth)).toBe(0);
   });

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
+import { demoControls, demoControlsButton } from '../surface.js';
 
 // °F everywhere (owner decision, 9 Oct): the judge picks °F in the settings drawer and every card follows: the home
 // floor plan and the safe room in the storm (the plan card is covered by its unit tests); a card already on screen
@@ -12,16 +13,16 @@ const ask = async (page: Page, question: string) => {
 };
 
 const pickUnits = async (page: Page, unit: '°C' | '°F') => {
-  await page.getByRole('button', { name: /SCENARIO/ }).click();
-  const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+  await demoControlsButton(page).click();
+  const drawer = demoControls(page);
   await drawer.getByRole('radiogroup', { name: 'Temperature units' }).getByText(unit).click();
   await page.keyboard.press('Escape');
 };
 
 test('Houston starts in °F: choosing the place switches the unit, and the judge can switch back', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /SCENARIO/ }).click();
-  const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+  await demoControlsButton(page).click();
+  const drawer = demoControls(page);
   const units = drawer.getByRole('radiogroup', { name: 'Temperature units' });
   await expect(units.getByRole('radio', { name: '°C' })).toBeChecked();
   await drawer.getByText('Houston, Texas').click();

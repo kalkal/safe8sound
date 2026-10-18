@@ -32,6 +32,15 @@ describe('EchoFrame', () => {
     expect(container.querySelector('.sky')?.getAttribute('aria-hidden')).toBe('true');
   });
 
+  it('names its background slot and its scroll area with the test ids the specs read, inside the screen', () => {
+    render(<EchoFrame sky="mild">x</EchoFrame>);
+    const screenEl = screen.getByTestId('echo-screen');
+    const background = screen.getByTestId('slot-background');
+    expect(background.dataset['slot']).toBe('background');
+    expect(screenEl.contains(background)).toBe(true);
+    expect(screen.getByTestId('screen-viewport').contains(screen.getByRole('main'))).toBe(true);
+  });
+
   it('puts the family phone beside the device, outside the screen', () => {
     render(
       <EchoFrame sky="mild" aside={<section aria-label="Phone">phone</section>}>

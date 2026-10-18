@@ -1,6 +1,7 @@
 import { exampleReserveOutlook } from '../../packages/contracts/src/fixtures.js';
 import { expect, test } from '../no-network.js';
 import { openRemote } from '../remote-session.js';
+import { demoControls, demoControlsButton } from '../surface.js';
 
 // The cold reserve clock (owner, 11 Oct): the idle Echo screen shows the ice cubes of the current reserve, in the
 // first view at every size; in the storm the cube of the hour being used melts. ScriptedAgent, except the long reserve (remote, mocked sim-api).
@@ -24,8 +25,8 @@ for (const [width, height] of [
 test('storm scenario: the idle clock melts the cube of the hour being used', async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 480 });
   await page.goto('/');
-  await page.getByRole('button', { name: /SCENARIO/ }).click();
-  await page.getByRole('dialog', { name: 'Demo settings' }).getByText('Storm · power outage').click();
+  await demoControlsButton(page).click();
+  await demoControls(page).getByText('Storm · power outage').click();
   await page.keyboard.press('Escape');
   const clock = page.getByRole('region', { name: 'Cold reserve' });
   await expect(clock.locator('[data-melting="true"]')).toHaveCount(1);

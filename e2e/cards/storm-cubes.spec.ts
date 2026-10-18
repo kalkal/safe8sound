@@ -126,7 +126,7 @@ for (const italian of [false, true]) {
     if (italian) await page.getByRole('button', { name: 'Language: Italiano' }).click();
     await page.getByLabel(italian ? 'Fai una domanda' : 'Ask a question').fill(italian ? 'Blackout' : "The power's out");
     await page.getByRole('button', { name: italian ? 'Chiedi' : 'Ask', exact: true }).click();
-    const words = page.locator('.answer-text');
+    const words = page.getByTestId('answer-caption');
     await expect(words).toBeInViewport({ ratio: 1 });
     const button = page.getByRole('button', { name: italian ? 'Leggi tutta la risposta' : 'Read the whole answer' });
     await expect(button).toHaveAttribute('aria-expanded', 'false');

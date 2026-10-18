@@ -1,5 +1,6 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '../no-network.js';
+import { demoControls, demoControlsButton } from '../surface.js';
 
 // B1 (additions plan): the judge's settings behind the scenario badge, in scripted mode. The badge sits outside the
 // Echo screen; the drawer is a modal dialog; a new scenario changes the badge and the sky; every place ships;
@@ -9,13 +10,13 @@ for (const width of [375, 1280]) {
   test(`at ${String(width)} px: the badge opens the settings; Storm changes the badge and the sky; Escape returns`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/');
-    const badge = page.getByRole('button', { name: /SCENARIO/ });
+    const badge = demoControlsButton(page);
     await expect(badge).toContainText('SCENARIO · Reference home (central Italy) · Heat wave');
     // Never inside the 16:10 screen.
-    expect(await page.getByTestId('echo-screen').locator('.scenario-badge').count()).toBe(0);
+    expect(await demoControlsButton(page.getByTestId('echo-screen')).count()).toBe(0);
 
     await badge.click();
-    const drawer = page.getByRole('dialog', { name: 'Demo settings' });
+    const drawer = demoControls(page);
     await expect(drawer).toBeVisible();
     // All three places ship since #280.
     await expect(drawer.getByRole('radio', { name: /Houston, Texas/ })).toBeEnabled();

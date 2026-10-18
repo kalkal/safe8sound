@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { ESLint, Linter } from 'eslint';
 import tseslint from 'typescript-eslint';
 import { describe, expect, it } from 'vitest';
-import { brandCastRule, i18nSrcCastRule, srcCastRule, unitCastRule } from '../../eslint.config.mjs';
+import { brandCastRule, e2eRule, i18nSrcCastRule, srcCastRule, unitCastRule } from '../../eslint.config.mjs';
 
 const linter = new Linter({ configType: 'flat' });
 const lint = (code: string) =>
@@ -78,7 +78,31 @@ describe('ESLint: which files get which cast rule (the real config)', () => {
     expect(await ruleFor('packages/core/test/notifications.test.ts')).toEqual(normalised(brandCastRule));
   });
 
+  it('e2e specs: the test rule plus no layout classes', async () => {
+    expect(await ruleFor('e2e/layout/three-bands.spec.ts')).toEqual(normalised(e2eRule));
+  });
+
   it('contracts define the brands, so the rule is off there', async () => {
     expect(((await ruleFor('packages/contracts/src/storm.ts')) as unknown[])[0]).toBe(0);
+  });
+});
+
+describe('ESLint: e2e reads the screen through slot test ids and roles, never a layout class (separation step S0)', () => {
+  const lintE2e = (code: string) =>
+    linter
+      .verify(code, [{ files: ['**/*.ts'], languageOptions: { parser: tseslint.parser }, rules: { 'no-restricted-syntax': e2eRule } }], 'probe.ts')
+      .map((m) => m.message);
+
+  it('rejects the Echo layout classes in a selector, also inside a longer one or a template', () => {
+    for (const selector of ['.echo-scroll', '.band-content iframe', '.sky-layer', '.sim-dock-time', '.scenario-badge', '.answer-text', '.welcome']) {
+      expect(lintE2e(`page.locator('${selector}');`), selector).toHaveLength(1);
+    }
+    expect(lintE2e('page.locator(`.band-head ${tag}`);')).toHaveLength(1);
+  });
+
+  it('leaves test ids, roles, other classes and plain words alone, and still applies the cast rules', () => {
+    expect(lintE2e(`page.getByTestId('slot-content'); page.locator('[data-testid="screen-viewport"]'); page.locator('iframe.card-frame');`)).toEqual([]);
+    expect(lintE2e(`page.getByText('Welcome home. The sky is clear.');`)).toEqual([]);
+    expect(lintE2e('const x = 5 as Watt;')).toHaveLength(1);
   });
 });
