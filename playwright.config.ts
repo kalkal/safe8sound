@@ -10,7 +10,8 @@ export default defineConfig({
   testDir: 'e2e',
   // The built site has its own run with its own servers: pnpm e2e:site (playwright.site.config.ts).
   testIgnore: 'site/**',
-  workers: 1,
+  // `pnpm heavy` sets E2E_WORKERS from the free memory: 2 with more than 6 GB free, else 1 (O7, 18 Oct).
+  workers: Number(process.env['E2E_WORKERS'] ?? 1),
   retries: CI ? 1 : 0,
   timeout: 20_000,
   reporter: 'list',

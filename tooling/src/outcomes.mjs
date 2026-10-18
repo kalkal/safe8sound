@@ -12,6 +12,7 @@
 //   JOURNEY_BASE_URL=https://<site> JOURNEY_CODE_FILE=<local file, first line = the demo code> pnpm journey:judge 1904x870
 // No local server then; the code is read from the file by the journey (e2e/support/target.ts), never printed.
 import { spawnSync } from 'node:child_process';
+import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -82,13 +83,29 @@ if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.
   /** @type {[string, number][]} */
   const results = [];
   if (plan.golden) results.push(['golden', node(['tooling/src/golden.mjs'])]);
-  for (const id of plan.sizes) {
-    const grep = plan.grep === undefined ? '' : ` --grep "${plan.grep}"`;
-    const playwright = `node node_modules/@playwright/test/cli.js test -c playwright.site.config.ts --project journey-${id}${grep}`;
-    console.log(`\noutcomes: ${plan.label} at ${id}`);
-    results.push([id, node(['tooling/src/heavy.mjs', playwright])]);
+  if (process.env['JOURNEY_BASE_URL'] === undefined) {
+    // The local chain: one build of the site and one start of the chain for every size (O4), each size a heavy slice.
+    console.log(`\noutcomes: ${plan.label} at ${plan.sizes.join(', ')}`);
+    const grep = plan.grep === undefined ? [] : ['--grep', plan.grep];
+    // Ports of their own (e2e/site/chain.ts): the chain stays up between slices, when another session may run e2e:site.
+    // Random, not from the pid (Windows pids are multiples of 4): two sessions rarely pick the same ports.
+    const offset = String(100 + randomInt(0, 90) * 10);
+    const chain = spawnSync(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'e2e/site/with-chain.ts', ...grep, ...plan.sizes], {
+      cwd: ROOT,
+      stdio: 'inherit',
+      env: { ...process.env, SITE_E2E_PORT_OFFSET: offset },
+    });
+    results.push([plan.sizes.join(', '), chain.status ?? 1]);
+  } else {
+    // A deployed site: no local server, one Playwright run per size.
+    for (const id of plan.sizes) {
+      const grep = plan.grep === undefined ? '' : ` --grep "${plan.grep}"`;
+      const playwright = `node node_modules/@playwright/test/cli.js test -c playwright.site.config.ts --project journey-${id}${grep}`;
+      console.log(`\noutcomes: ${plan.label} at ${id}`);
+      results.push([id, node(['tooling/src/heavy.mjs', playwright])]);
+    }
   }
   console.log(`\noutcomes: ${plan.label}`);
-  for (const [what, status] of results) console.log(`  ${status === 0 ? 'pass' : 'FAIL'}  ${what}${status === 0 ? '' : `  (screenshots: e2e-results/journeys/${what}/)`}`);
+  for (const [what, status] of results) console.log(`  ${status === 0 ? 'pass' : 'FAIL'}  ${what}${status === 0 ? '' : '  (screenshots: e2e-results/journeys/<size>/)'}`);
   process.exit(results.every(([, status]) => status === 0) ? 0 : 1);
 }

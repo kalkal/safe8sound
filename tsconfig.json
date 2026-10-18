@@ -3,7 +3,9 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "allowJs": true,
-    "checkJs": true
+    "checkJs": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsc/root.tsbuildinfo"
   },
   "include": [
     "packages/**/*.ts",

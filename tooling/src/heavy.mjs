@@ -6,7 +6,8 @@ import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { HEAVY_HOLDER_ENV, acquireHeavyLock, heldForUs, isProcessAlive } from './heavy-lock.mjs';
+import { freemem } from 'node:os';
+import { HEAVY_HOLDER_ENV, acquireHeavyLock, heldForUs, isProcessAlive, workersFor } from './heavy-lock.mjs';
 
 const LOCK_PATH = join(tmpdir(), 'cold-reserve-heavy.lock');
 const POLL_MS = 5_000;
@@ -28,7 +29,8 @@ const options = { pid: process.pid, now: Date.now, isAlive: isProcessAlive, stal
  * @param {string} holder
  */
 function run(release, holder) {
-  const child = spawn(command, { stdio: 'inherit', shell: true, env: { ...process.env, [HEAVY_HOLDER_ENV]: holder } });
+  // The workers fit the free memory when the step starts (O7): 2 with more than 4 GB free, else 1.
+  const child = spawn(command, { stdio: 'inherit', shell: true, env: { ...process.env, ...workersFor(freemem(), process.env), [HEAVY_HOLDER_ENV]: holder } });
   const forward = (/** @type {NodeJS.Signals} */ signal) => child.kill(signal);
   process.on('SIGINT', forward);
   process.on('SIGTERM', forward);

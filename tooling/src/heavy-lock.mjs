@@ -89,6 +89,21 @@ export function isProcessAlive(pid) {
   }
 }
 
+const GB = 1024 ** 3;
+
+/**
+ * Workers for the tests a heavy step runs, from the free memory now (O7, 18 Oct): the unit tests keep their 2 workers
+ * unless less than 2 GB is free; the browser tests take a second worker only with more than 6 GB free (a run grows
+ * while it goes: at 4 GB the PC ran out of memory on 18 Oct). A value
+ * already set (by the person or CI) wins.
+ * @param {number} freeBytes
+ * @param {Readonly<Record<string, string | undefined>>} env
+ * @returns {{ VITEST_MAX_WORKERS: string, E2E_WORKERS: string }}
+ */
+export function workersFor(freeBytes, env) {
+  return { VITEST_MAX_WORKERS: env['VITEST_MAX_WORKERS'] ?? (freeBytes > 2 * GB ? '2' : '1'), E2E_WORKERS: env['E2E_WORKERS'] ?? (freeBytes > 6 * GB ? '2' : '1') };
+}
+
 /** What a heavy step tells the command it runs: the pid that holds the lock for it. */
 export const HEAVY_HOLDER_ENV = 'COLD_RESERVE_HEAVY_HOLDER';
 

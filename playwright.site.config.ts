@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test';
-import { AWS_SITE_URL, PORTS, SCRIPTED_SITE_URL, SIM_API_URL, chainEnv, originSecret } from './e2e/site/chain.js';
+import { CHAIN_UP, siteServers } from './e2e/site/servers.js';
 import { SIZES, projectOf } from './e2e/support/sizes.js';
 
 // The site E2E (K1, #242/#244): the BUILT simulator, as CloudFront serves it, in its own run (`pnpm e2e:site`), so the
@@ -9,10 +9,6 @@ import { SIZES, projectOf } from './e2e/support/sizes.js';
 //   of the real local chain: MCP server, agent (fake model), sim-api with no allowed origin (e2e/site/turn.spec.ts).
 // Local servers only: no network, no LLM. Commands run node directly, never through pnpm (see playwright.config.ts).
 const CI = process.env['CI'] !== undefined;
-const env = chainEnv();
-const vite = 'node node_modules/vite/bin/vite.js';
-const headers = 'node node_modules/tsx/dist/cli.mjs scripts/site-headers.ts';
-const local = 'node --import tsx src/local.ts';
 
 export default defineConfig({
   testDir: 'e2e/site',
@@ -36,30 +32,17 @@ export default defineConfig({
       use: { viewport: { width: size.width, height: size.height }, screenshot: 'only-on-failure' as const },
     })),
   ],
-  // A deployed site (JOURNEY_BASE_URL, journeys only: e2e/support/target.ts) needs no local server.
-  webServer: process.env['JOURNEY_BASE_URL'] !== undefined ? [] : [
-    {
-      command: [`${vite} build --outDir dist-e2e --emptyOutDir`, `${headers} dist-e2e`, `${vite} preview --outDir dist-e2e --host 127.0.0.1 --port ${String(PORTS.scriptedSite)} --strictPort`].join(' && '),
-      cwd: 'apps/alexa-sim',
-      url: SCRIPTED_SITE_URL,
-      reuseExistingServer: false,
-      timeout: 180_000,
-      env: { VITE_AGENT: 'scripted', SITE_E2E_OUT_DIR: 'dist-e2e' },
-    },
-    { command: local, cwd: 'apps/mcp-server', port: PORTS.mcp, reuseExistingServer: false, timeout: 120_000, env: env.mcp },
-    { command: local, cwd: 'apps/agent', port: PORTS.agent, reuseExistingServer: false, timeout: 120_000, env: env.agent },
-    { command: local, cwd: 'apps/sim-api', port: PORTS.simApi, reuseExistingServer: false, timeout: 120_000, env: env.simApi },
-    {
-      command: [
-        `${vite} build --mode aws --outDir dist-e2e-aws --emptyOutDir`,
-        `${headers} dist-e2e-aws`,
-        `${vite} preview --outDir dist-e2e-aws --host 127.0.0.1 --port ${String(PORTS.awsSite)} --strictPort`,
-      ].join(' && '),
-      cwd: 'apps/alexa-sim',
-      url: AWS_SITE_URL,
-      reuseExistingServer: false,
-      timeout: 180_000,
-      env: { SITE_E2E_OUT_DIR: 'dist-e2e-aws', SITE_E2E_SIM_API: SIM_API_URL, SITE_E2E_ORIGIN_SECRET: originSecret() },
-    },
-  ],
+  // A deployed site (JOURNEY_BASE_URL, journeys only: e2e/support/target.ts) needs no local server. Started once by
+  // e2e/site/with-chain.ts (SITE_CHAIN_UP=1), the servers are reused by every run instead of built again (O4).
+  webServer:
+    process.env['JOURNEY_BASE_URL'] !== undefined
+      ? []
+      : siteServers().map((server) => ({
+          command: server.build === undefined ? server.serve : `${server.build} && ${server.serve}`,
+          cwd: server.cwd,
+          ...(server.url !== undefined ? { url: server.url } : server.port !== undefined ? { port: server.port } : {}),
+          reuseExistingServer: CHAIN_UP,
+          timeout: server.timeoutMs,
+          env: { ...server.env },
+        })),
 });
