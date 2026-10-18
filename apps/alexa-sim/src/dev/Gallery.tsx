@@ -75,6 +75,7 @@ export function Gallery({ hostTheme }: { hostTheme: 'light' | 'dark' | undefined
           { roomId: 'living', text: 'Living room: off' },
         ]}
         reason="cloud_unreachable"
+        origin="simulated"
       />
       <SafeRoomCard status={{ ...safeRoomCalm(), homeLink: 'stale' }} />
       {/* #114: the store cannot be read: the live reading only, at the stricter older-person limit. */}

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences } from '@cold-reserve/contracts';
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CARD_WAITING_MIN_PX, CardApp } from '../src/app/CardApp.js';
 import type { CardState } from '../src/app/card-kinds.js';
@@ -141,6 +141,8 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(screen.queryByText('Plan applied.')).toBeNull();
     const manual = screen.getByRole('region', { name: 'Manual control' });
     expect(manual.textContent).toContain('This home is read-only for now');
+    // The plan's data origin, as on the plan and its receipt (#193).
+    expect(within(manual).getByTestId('origin-badge').getAttribute('data-origin')).toBe('live');
     expect(screen.getByRole('list', { name: 'Set by hand' }).textContent).toContain('Bedroom: dry at 26.5 °C');
     expect(screen.getByRole('button', { name: 'Done: Bedroom: dry at 26.5 °C' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();

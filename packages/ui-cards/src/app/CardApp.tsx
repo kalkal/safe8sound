@@ -7,7 +7,7 @@ import { PreferencesCard } from '../PreferencesCard.js';
 import { FloorPlanCard } from '../FloorPlanCard.js';
 import { ManualControlCard } from '../ManualControlCard.js';
 import { SafeRoomCard } from '../SafeRoomCard.js';
-import { homeClock } from '../plan-model.js';
+import { homeClock, isSimulated } from '../plan-model.js';
 import { t } from '../text.js';
 import { CardShell, DisplaySlot, DisplayToggle, type DisplayControl } from '../CardShell.js';
 import { CardErrorBoundary } from './CardErrorBoundary.js';
@@ -233,7 +233,9 @@ function AppliedPlan({ result, timeZone, fromThisFrame, canConfirm, onConfirm }:
       {familyAlert !== undefined && <FamilyAlert sent={familyAlert.sent} failed={familyAlert.failed} />}
       </div>
       {/* The real home is read-only during the hackathon: the splits are set by hand (plan §11.6). */}
-      {advisoryOnly && manualInstructions.length > 0 && <ManualControlCard instructions={manualInstructions} reason="read_only" />}
+      {advisoryOnly && manualInstructions.length > 0 && (
+        <ManualControlCard instructions={manualInstructions} reason="read_only" origin={isSimulated(plan) ? 'simulated' : 'live'} />
+      )}
       {/* Every plan keeps its safety check once applied (owner feedback, 6 Oct; a last resort since CE-22): its last page. */}
       <PlanCard plan={plan} timeZone={timeZone} extraPages={[<GuardReceipt key="receipt" plan={plan} />]} />
     </>

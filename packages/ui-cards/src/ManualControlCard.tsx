@@ -1,4 +1,4 @@
-import type { ManualInstruction } from '@cold-reserve/contracts';
+import type { DataOriginValue, ManualInstruction } from '@cold-reserve/contracts';
 import { useState } from 'react';
 import { CardShell } from './CardShell.js';
 import { t } from './text.js';
@@ -9,8 +9,17 @@ export type ManualReason = 'cloud_unreachable' | 'read_only';
  * The manual-control card (plan §11.6): when the split cloud does not answer, or the home is read-only,
  * the card lists what to set by hand in each room. Each room is ticked off by touch (48 px target);
  * nothing here commands the home. Ticking off by voice comes with the voice-parity work.
+ * `origin` gives the data badge every other card has (#193); without it, no badge is guessed.
  */
-export function ManualControlCard({ instructions, reason }: { instructions: readonly ManualInstruction[]; reason: ManualReason }) {
+export function ManualControlCard({
+  instructions,
+  reason,
+  origin,
+}: {
+  instructions: readonly ManualInstruction[];
+  reason: ManualReason;
+  origin?: DataOriginValue;
+}) {
   const [done, setDone] = useState<ReadonlySet<string>>(new Set());
   const toggle = (roomId: string) => {
     const next = new Set(done);
@@ -20,7 +29,7 @@ export function ManualControlCard({ instructions, reason }: { instructions: read
   };
   const count = instructions.filter((i) => done.has(i.roomId)).length;
   return (
-    <CardShell title={t('manual.title')}>
+    <CardShell title={t('manual.title')} {...(origin === undefined ? {} : { origin })}>
       <p className="advice">{t(`manual.${reason}`)}</p>
       <ul className="manual-list" aria-label={t('manual.list')}>
         {instructions.map((i) => (

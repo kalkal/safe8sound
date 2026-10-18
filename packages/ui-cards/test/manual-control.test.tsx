@@ -38,4 +38,12 @@ describe('ManualControlCard (plan §11.6: the splits are set by hand)', () => {
     for (const button of screen.getAllByRole('button', { name: /^Done:/ })) fireEvent.click(button);
     expect(screen.getByRole('status').textContent).toBe('All rooms are set. Thank you.');
   });
+
+  it('shows the data badge like the other cards (#193): SIMULATED on simulated data, none when no origin is given', () => {
+    const { unmount } = render(<ManualControlCard instructions={instructions} reason="cloud_unreachable" origin="simulated" />);
+    expect(screen.getByTestId('origin-badge').textContent).toBe('≈ SIMULATED');
+    unmount();
+    render(<ManualControlCard instructions={instructions} reason="cloud_unreachable" />);
+    expect(screen.queryByTestId('origin-badge')).toBeNull();
+  });
 });
