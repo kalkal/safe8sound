@@ -1,6 +1,8 @@
 // One answer at a time (owner's choice, 10 Oct): the turns that answered, newest last, and the one on screen.
 // Pure, so the paging rules are tested without a page. The answers themselves stay in the query cache.
 
+import { clockTime } from './sim-clock.js';
+
 /** How many answers Previous can go back through: the page never grows without end. */
 export const ANSWER_HISTORY_MAX = 10;
 
@@ -45,3 +47,23 @@ export function historyPosition(history: AnswerHistory): HistoryPosition | undef
 
 /** Back from the first answer (idea 5): the first screen again; every answer is kept, the next one is added at the end. */
 export const backToStart = (history: AnswerHistory): AnswerHistory => ({ turns: history.turns, index: -1 });
+
+/** The simulated time an answer speaks of, and whether the clock has moved on since (owner, 18 Oct). */
+export interface AnswerMoment {
+  /** "HH:MM" on the home's own clock. */
+  readonly time: string;
+  /** The clock is now at another moment: the answer describes the home as it was then, not as it is. */
+  readonly earlier: boolean;
+}
+
+/**
+ * `at`: the simulated time when the answer came (local ISO, the home's zone); `now`: the simulated time now. No label
+ * without a time to give; never "earlier" when the clock now is unknown.
+ */
+export function answerMoment(at: string | undefined, now: string | undefined): AnswerMoment | undefined {
+  if (at === undefined || Number.isNaN(Date.parse(at))) return undefined;
+  const time = clockTime(at);
+  if (time === '') return undefined;
+  const earlier = now !== undefined && !Number.isNaN(Date.parse(now)) && Date.parse(now) !== Date.parse(at);
+  return { time, earlier };
+}

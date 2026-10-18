@@ -14,7 +14,7 @@ import { useSlowTurn } from './slow-turn.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { pagerSayable, runScreenCommand, type ScreenCommand } from './screen-commands.js';
 import { AnswerCard } from './AnswerCard.js';
-import { addAnswer, backToStart, currentAnswer, emptyHistory, historyPosition, stepAnswer } from './answer-history.js';
+import { addAnswer, answerMoment, backToStart, currentAnswer, emptyHistory, historyPosition, stepAnswer } from './answer-history.js';
 import { StepNav } from './StepNav.js';
 import { backAction, stepOf } from './steps.js';
 import { AnswerPager } from './AnswerPager.js';
@@ -59,6 +59,13 @@ export interface ConversationProps {
    * down. A failure fails the turn, honestly, and Retry runs it again.
    */
   prepareTurn?: (question: string, context: AskContext) => Promise<Result<void, ErrorEnvelope>>;
+  /**
+   * The simulated time now (local ISO, the home's zone), when there is a simulated clock: each answer is labelled with
+   * the time it came, and marked as earlier once the clock has moved on (owner, 18 Oct).
+   */
+  simNow?: string;
+  /** Counts the plays of the simulated day: a new one clears the answers of the last. */
+  playthrough?: number;
 }
 
 export function Conversation({
@@ -78,10 +85,15 @@ export function Conversation({
   onCloseHome,
   appliedTurns,
   prepareTurn,
+  simNow,
+  playthrough = 0,
 }: ConversationProps) {
   // Read when a turn starts: the machine is built once, the frame may hand a new function at each render.
   const prepareRef = useRef(prepareTurn);
   prepareRef.current = prepareTurn;
+  // Read when an answer arrives: "Power cut" moves the clock before the answer, so the answer gets the time it speaks of.
+  const simNowRef = useRef(simNow);
+  simNowRef.current = simNow;
   const subscribe = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
   const token = useSyncExternalStore(subscribe, () => session?.token());
   const queryClient = useQueryClient();
@@ -143,6 +155,9 @@ export function Conversation({
   const notice = voiceNotice(snapshot.context);
   const listening = snapshot.matches('listening');
   const speaking = snapshot.matches('speaking');
+  // Read by the reset of a new play: only a reading voice is stopped, never a turn on its way ("Power cut" restarts the day).
+  const speakingRef = useRef(speaking);
+  speakingRef.current = speaking;
   const turn = useQuery<TurnResult>({ queryKey: turnKey(turnId), queryFn: skipToken });
   const answer = turn.data?.ok === true ? turn.data.value : undefined;
   useEffect(() => {
@@ -151,12 +166,28 @@ export function Conversation({
   // One answer at a time (owner's choice, 10 Oct): every answered turn is kept, with its question, for Previous / Next.
   const [history, setHistory] = useState(emptyHistory);
   const questions = useRef(new Map<string, string>());
+  // The simulated time of each answer (owner, 18 Oct): once the clock moves on, an older answer says it is earlier.
+  const answeredAt = useRef(new Map<string, string>());
   useEffect(() => {
     if (answer === undefined || turnId === null) return;
     if (question !== null) questions.current.set(turnId, question);
+    if (simNowRef.current !== undefined && !answeredAt.current.has(turnId)) answeredAt.current.set(turnId, simNowRef.current);
     setHistory((previous) => addAnswer(previous, turnId));
   }, [answer, turnId, question]);
+  // A new play of the day (Restart, a new scenario or place): the answers of the last one describe another day, so
+  // they go and the first screen comes back (owner, 18 Oct).
+  const lastPlay = useRef(playthrough);
+  useEffect(() => {
+    if (lastPlay.current === playthrough) return;
+    lastPlay.current = playthrough;
+    // The voice stops reading an answer of the last play.
+    if (speakingRef.current) sendRef.current({ type: 'CANCEL' });
+    questions.current.clear();
+    answeredAt.current.clear();
+    setHistory(emptyHistory);
+  }, [playthrough]);
   const shownTurn = currentAnswer(history);
+  const moment = shownTurn === undefined ? undefined : answerMoment(answeredAt.current.get(shownTurn), simNow);
   const shown = useQuery<TurnResult>({ queryKey: turnKey(shownTurn ?? null), queryFn: skipToken });
   const position = historyPosition(history);
   const [draft, setDraft] = useState('');
@@ -253,6 +284,14 @@ export function Conversation({
       <div className="band-head">
         <StepNav step={where} onBack={goBack} onFocusLost={focusQuestion} />
         {head}
+        {/* An answer given before the clock last moved says so, with its simulated time; an answer of now needs no
+            label (the clock under the screen says the time). The pill in the header band is what the eye sees, on a row
+            the header already has; the answer itself carries the same words for screen readers (AnswerCard). */}
+        {!busy && !homeShown && moment?.earlier === true && shown.data?.ok === true && (
+          <p className="answer-when" aria-hidden="true">
+            {t('answers.earlier', { time: moment.time })}
+          </p>
+        )}
         {/* Where we are among the answers: in the header band, so the content band is the answer's alone. */}
         {!busy && !homeShown && position !== undefined && (
           <AnswerPager
@@ -316,7 +355,7 @@ export function Conversation({
         <div aria-live="polite">
           {!busy && !homeShown && shown.data?.ok === true && shownTurn !== undefined && (
             // One answer, one state: Previous / Next never carry a tab or a frame from another answer.
-            <AnswerCard key={shownTurn} answer={shown.data.value} timeZone={timeZone} turnId={shownTurn} />
+            <AnswerCard key={shownTurn} answer={shown.data.value} timeZone={timeZone} turnId={shownTurn} {...(moment?.earlier === true ? { earlierAt: moment.time } : {})} />
           )}
         </div>
         {homeShown && homeView}

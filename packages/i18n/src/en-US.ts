@@ -40,6 +40,7 @@ export const enUS = {
   'answers.previousShort': 'Previous',
   'answers.nextShort': 'Next',
   'answers.position': 'Answer {n} of {of}',
+  'answers.earlier': 'Earlier answer · {time}',
   // "Back" always there and the path of the steps (idea 5): the button's label is what a person would say.
   'nav.back': 'Back',
   /** Said aloud only: the other way to ask for Back. */
@@ -114,6 +115,8 @@ export const enUS = {
   'settings.restartAsk': 'The day starts again from its beginning.',
   'settings.saving': 'Saving…',
   'settings.failed': "That change wasn't saved. Try again.",
+  'settings.applied': 'Saved. Now: {place} · {scenario}',
+  'settings.restarted': 'Done: the day starts again. Now: {place} · {scenario}',
   // #402: one section for every temperature and limit. The limits that guard health may only be made stricter.
   'settings.limits.title': 'Temperatures and limits',
   'settings.limits.intro': 'Limits that protect health can only be made stricter, never looser.',
@@ -173,6 +176,7 @@ export const enUS = {
   'home.loading': 'Getting your home…',
   'home.failed': "I can't reach your home right now.",
   'home.empty': 'Ask about your rooms or the storm to see your home here.',
+  'home.needsCode': 'Enter the demo code to see your home.',
   'status.battery': 'Battery',
   'surface.failed': 'This part of the screen stopped working. Reload the page to try again.',
   'config.invalid': 'The simulator is not configured correctly. Check its settings and reload the page.',

@@ -37,6 +37,7 @@ describe('createScriptedClock', () => {
     expect(milestones(clock).milestones).toHaveLength(3);
   });
 
+it('a new play of the day (restart, another scenario) empties the phone, as the server starts a new inbox (owner, 18 Oct)', () => {    const phone = createScriptedPhone();    const clock = createScriptedClock({ phone, startScenario: 'storm-blackout' });    const [, , back] = milestones(clock).milestones;    clock.call('advance_clock', { kind: back?.kind, at: back?.at });    expect(phone.messages()).toHaveLength(3);    clock.call('set_scenario', { restart: true });    expect(phone.messages()).toEqual([]);    clock.call('advance_clock', { kind: back?.kind, at: back?.at });    clock.call('set_scenario', { scenarioId: 'heatwave' });    expect(phone.messages()).toEqual([]);  });
   it('answers only the clock tools', () => {
     expect(createScriptedClock().call('apply_plan', {})).toBeUndefined();
   });

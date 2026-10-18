@@ -588,19 +588,48 @@
     }
   }
 
-  /* Wide enough for the phone too: it stands beside the device. */
-  @media (width >= 100rem) {
+  /* Wide enough for the phone too: it stands beside the device. Everything on one screen, no page scroll, from a
+     1366 px laptop up (owner, 18 Oct): the phone is narrower there, and its messages scroll inside it, never the page.
+     At 1280 px the phone stays under the Echo: beside it the screen got too small for the cards (open question). */
+  @media (width >= 85rem) {
     .echo-stage {
-      grid-template-columns: auto 24rem;
+      --phone-w: 18rem;
+      /* The room the chrome takes beside the screen: the stage padding, the gap to the phone, the bezel (102 px without
+         the clock dock, 86 px with it). Below 1600 px they are tighter, so a 1366 px laptop keeps the screen it had. */
+      --side-room: calc(var(--space-6) * 4 + var(--space-2));
+
+      grid-template-columns: auto var(--phone-w);
+      column-gap: var(--space-3);
+      padding-inline: var(--space-3);
       justify-content: center;
     }
 
+    .echo-stage > .phone {
+      align-self: center;
+      box-sizing: border-box;
+      /* The window less the stage's padding, the top row and its gap: the phone never makes the page taller. */
+      max-block-size: calc(100dvh - var(--space-6) * 3 - var(--target-min));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
     .echo-screen {
-      inline-size: min(calc(100vw - 24rem - var(--space-6) * 8), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px)) * 1.6), 80rem);
+      inline-size: min(calc(100vw - var(--phone-w) - var(--side-room)), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px)) * 1.6), 80rem);
     }
 
     .echo-stage:has(> .echo-top) .echo-screen {
-      inline-size: min(calc(100vw - 24rem - var(--space-6) * 8), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px) - var(--target-min) - var(--space-3)) * 1.6), 80rem);
+      inline-size: min(calc(100vw - var(--phone-w) - var(--side-room)), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px) - var(--target-min) - var(--space-3)) * 1.6), 80rem);
+    }
+  }
+
+  /* A wide screen: the phone at its full width and more room around the device, as before. */
+  @media (width >= 100rem) {
+    .echo-stage {
+      --phone-w: 24rem;
+      --side-room: calc(var(--space-6) * 8);
+
+      column-gap: var(--space-6);
+      padding-inline: var(--space-6);
     }
   }
 }
@@ -948,6 +977,32 @@
     color: var(--text-secondary);
     font-family: var(--font-data);
     font-size: var(--font-size-min);
+  }
+
+  /* An answer given before the clock last moved (owner, 18 Oct), before the pager at the header band's end: marked
+     like the SIMULATED badge, so an older answer never reads as the home now. */
+  .answer-when {
+    margin: 0 0 0 auto;
+    padding: var(--space-1) var(--space-3);
+    border: var(--border-thin) dashed var(--status-neutral);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+    white-space: nowrap;
+  }
+
+  .answer-when + .answer-pager {
+    margin-inline-start: 0;
+  }
+
+  /* A small Echo and a phone have no row to spare: the cubes stay in the first screen (owner rule, 11 Oct). There the
+     pill is not drawn; the answer still says it for screen readers. How to show it on these screens is an open question. */
+  @media (width < 64rem) {
+    .answer-when {
+      display: none;
+    }
   }
 
   /* "Back" always there and the path of the steps (idea 5): Back at the start of the header band, then one dot per
@@ -1452,6 +1507,36 @@
     }
   }
 
+  /* The page behind the drawer is dimmed (owner, 18 Oct): it is inert, so it must not look tappable; a tap on the veil
+     closes the drawer. The same veil as the sky's, in both themes. */
+  .settings-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    background: var(--sky-veil);
+    cursor: pointer;
+  }
+
+  /* What the last choice did, kept in view at the top of the drawer while it scrolls (Restart and the units are far down). */
+  .settings-applied {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    margin: 0;
+
+    &:not(:empty) {
+      padding: var(--space-2) var(--space-3);
+      border: var(--border-thin) solid var(--accent);
+      border-radius: var(--radius-card);
+      background: var(--surface-card-raised);
+      color: var(--text-primary);
+    }
+
+    &[data-failed="true"] {
+      border-color: var(--status-storm);
+    }
+  }
+
   .settings-head {
     display: flex;
     align-items: center;
@@ -1483,8 +1568,13 @@
     background: var(--surface-card-raised);
     cursor: pointer;
 
+    /* The choice in force is plain to see (owner, 18 Oct): a 2 px accent ring, the card surface and medium weight,
+       besides the filled radio and the check mark. */
     &[data-checked="true"] {
       border-color: var(--accent);
+      background: var(--surface-card);
+      border-width: calc(var(--border-thin) * 2);
+      font-weight: var(--font-weight-medium);
     }
 
     &[data-disabled="true"] {

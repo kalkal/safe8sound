@@ -8,11 +8,13 @@ import { ToolCards } from './ToolCards.js';
 export interface AnswerCardProps {
   answer: AgentAnswer;
   timeZone: string;
+  /** Set when the answer was given before the simulated clock last moved: its "HH:MM" (owner, 18 Oct). */
+  earlierAt?: string;
   /** The turn that produced the answer: the correlation id of its cards. */
   turnId: string;
 }
 
-export function AnswerCard({ answer, timeZone, turnId }: AnswerCardProps) {
+export function AnswerCard({ answer, timeZone, turnId, earlierAt }: AnswerCardProps) {
   const { status } = answer;
   // An empty list of cards is no card: the words then keep the screen (never an empty Echo screen after an answer).
   const cards = answer.cards !== undefined && answer.cards.length > 0 ? answer.cards : undefined;
@@ -20,6 +22,12 @@ export function AnswerCard({ answer, timeZone, turnId }: AnswerCardProps) {
   const [open, setOpen] = useState(false);
   return (
     <article className="answer" data-testid="answer" data-words-open={open}>
+      {/* Read with the answer by screen readers; the eye sees the same words as a pill in the header band. */}
+      {earlierAt !== undefined && (
+        <p className="visually-hidden" data-testid="answer-when" data-earlier="true">
+          {t('answers.earlier', { time: earlierAt })}
+        </p>
+      )}
       {answer.degradedBy !== undefined && (
         <p className="notice" role="note">
           {t('chat.degraded')}

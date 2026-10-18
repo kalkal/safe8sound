@@ -23,18 +23,34 @@ interface ChipOption {
   sky?: string;
 }
 
-function ChipGroup({ label, name, options, value, onPick }: { label: string; name: string; options: readonly ChipOption[]; value: string; onPick: (value: string) => void }) {
+function ChipGroup({
+  label,
+  name,
+  options,
+  value,
+  onPick,
+  pending,
+}: {
+  label: string;
+  name: string;
+  options: readonly ChipOption[];
+  value: string;
+  onPick: (value: string) => void;
+  /** The choice just tapped, while it is saved (owner, 18 Oct): shown as chosen at once, saying it is being saved. */
+  pending?: string | undefined;
+}) {
   const labelId = useId();
+  const chosen = pending ?? value;
   return (
     <fieldset className="chip-group" role="radiogroup" aria-labelledby={labelId}>
       <legend id={labelId}>{label}</legend>
       {options.map((o) => (
-        <label key={o.value} className="chip-row" data-checked={o.value === value} data-disabled={o.disabled === true}>
+        <label key={o.value} className="chip-row" data-checked={o.value === chosen} data-disabled={o.disabled === true}>
           <input
             type="radio"
             name={name}
             value={o.value}
-            checked={o.value === value}
+            checked={o.value === chosen}
             disabled={o.disabled === true}
             onChange={() => {
               onPick(o.value);
@@ -44,9 +60,10 @@ function ChipGroup({ label, name, options, value, onPick }: { label: string; nam
           <span className="chip-text">
             <span>{o.label}</span>
             {o.hint !== undefined && <span className="chip-hint">{o.hint}</span>}
+            {o.value === pending && <span className="chip-hint">{t('settings.saving')}</span>}
           </span>
           <span className="chip-mark" aria-hidden="true">
-            {o.value === value ? '✓' : ''}
+            {o.value === chosen ? '✓' : ''}
           </span>
         </label>
       ))}
@@ -141,12 +158,14 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
   const [rateLimited, setRateLimited] = useState(false);
   const badgeRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
   const close = () => {
     setOpen(false);
     setConfirmRestart(false);
     setRefusal(undefined);
+    setApplied(undefined);
     // The draft stays: reopening the drawer shows it again with "Not saved yet", so nothing is lost by closing.
   };
   // Back to the badge once the page is no longer inert (the inert effect's cleanup runs first).
@@ -159,7 +178,7 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
   useEffect(() => {
     if (!open || drawerRef.current === null) return undefined;
     drawerRef.current.focus();
-    const restoreRest = makeRestInert(drawerRef.current);
+    const restoreRest = makeRestInert(layerRef.current ?? drawerRef.current);
     // Escape closes it wherever the focus is, even after the tapped button went away (Restart → its confirmation).
     const onEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') close();
@@ -176,14 +195,28 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
     if (confirmRestart) confirmRef.current?.focus();
   }, [confirmRestart]);
 
-  const send = (change: SetScenarioInput) => {
-    setSaving(true);
-    setFailed(false);
+  // A choice of the demo (scenario, place, household, units, restart) says what happened (owner, 18 Oct): the tapped row
+  // is chosen at once with "Saving…", then a line at the top says what the demo plays now, or that it was not saved.
+  const [pick, setPick] = useState<{ name: string; value: string } | undefined>(undefined);
+  const [sending, setSending] = useState(false);
+  const [applied, setApplied] = useState<'saved' | 'restarted' | 'failed' | undefined>(undefined);
+  const send = (change: SetScenarioInput, picked?: { name: string; value: string }) => {
+    setPick(picked);
+    setSending(true);
+    setApplied(undefined);
     void onChange(change).then((saved) => {
-      setSaving(false);
-      setFailed(!saved);
+      setSending(false);
+      setPick(undefined);
+      setApplied(saved ? (change.restart === true ? 'restarted' : 'saved') : 'failed');
     });
   };
+  const pendingOf = (name: string) => (pick?.name === name ? pick.value : undefined);
+  const appliedText =
+    sending ? t('settings.saving')
+    : applied === 'failed' ? t('settings.failed')
+    : applied !== undefined && settings !== undefined
+      ? t(applied === 'restarted' ? 'settings.restarted' : 'settings.applied', { place: t(`settings.place.${settings.locationId}`), scenario: t(`settings.scenario.${settings.scenarioId}`) })
+      : '';
 
   const units: TempUnit = settings?.units ?? 'C';
   // What the section shows: the saved preferences with the draft on them.
@@ -256,6 +289,9 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
         <span aria-hidden="true"> ▾</span>
       </button>
       {open && (
+        <div ref={layerRef} className="settings-layer">
+          {/* The page behind is dimmed and inert (owner, 18 Oct): a tap on it closes the drawer, as Escape does. */}
+          <div className="settings-scrim" aria-hidden="true" data-testid="settings-scrim" onClick={close} />
         <div ref={drawerRef} className="settings-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
           <div className="settings-head">
             <h2 id={titleId}>{t(settings === undefined ? 'settings.open' : 'settings.title')}</h2>
@@ -265,6 +301,11 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
           </div>
           {/* Without demo settings there is no demo to change: plain "Settings", no demo intro (review of #290). */}
           {settings !== undefined && <p className="muted">{t('settings.intro')}</p>}
+          {settings !== undefined && (
+            <p className="notice settings-applied" role="status" data-testid="settings-applied" data-failed={applied === 'failed'}>
+              {appliedText}
+            </p>
+          )}
           <ChipGroup
             label={t('settings.language')}
             name="language"
@@ -287,30 +328,33 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
             label={t('settings.scenario')}
             name="scenario"
             value={settings.scenarioId}
+            pending={pendingOf('scenario')}
             options={SCENARIOS.map((id) => ({ value: id, label: t(`settings.scenario.${id}`), sky: skyOfScenario(id) }))}
             onPick={(v) => {
-              send({ scenarioId: v as (typeof SCENARIOS)[number] });
+              send({ scenarioId: v as (typeof SCENARIOS)[number] }, { name: 'scenario', value: v });
             }}
           />
           <ChipGroup
             label={t('settings.place')}
             name="place"
             value={settings.locationId}
+            pending={pendingOf('place')}
             options={PLACES.map((id) => {
               const available = availablePlaces.includes(id);
               return { value: id, label: t(`settings.place.${id}`), disabled: !available, ...(available ? {} : { hint: t('settings.notYet') }) };
             })}
             onPick={(v) => {
-              send({ locationId: v as LocationId });
+              send({ locationId: v as LocationId }, { name: 'place', value: v });
             }}
           />
           <ChipGroup
             label={t('settings.household')}
             name="household"
             value={settings.household}
+            pending={pendingOf('household')}
             options={HOUSEHOLDS.map((h) => ({ value: h, label: t(`settings.household.${h}`) }))}
             onPick={(v) => {
-              send({ household: v as (typeof HOUSEHOLDS)[number] });
+              send({ household: v as (typeof HOUSEHOLDS)[number] }, { name: 'household', value: v });
             }}
           />
           {/* #402: every temperature and limit in one section (it was the units here and the card's setpoints). */}
@@ -337,9 +381,10 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
               label={t('settings.units')}
               name="units"
               value={settings.units}
+              pending={pendingOf('units')}
               options={(['C', 'F'] as const).map((u) => ({ value: u, label: t(`settings.units.${u}`) }))}
               onPick={(v) => {
-                send({ units: v === 'F' ? 'F' : 'C' });
+                send({ units: v === 'F' ? 'F' : 'C' }, { name: 'units', value: v });
               }}
             />
             {model !== undefined && (
@@ -409,6 +454,7 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
           <p className="notice" role="status">
             {saving ? t('settings.saving') : failed ? t('settings.failed') : rateLimited ? t('settings.limits.rateLimited') : dirty ? t('settings.limits.unsaved') : ''}
           </p>
+        </div>
         </div>
       )}
     </>

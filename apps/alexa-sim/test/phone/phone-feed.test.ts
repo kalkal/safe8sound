@@ -30,6 +30,18 @@ describe('the scripted phone feed (surface C, #24)', () => {
     expect(phone.messages()).toHaveLength(1);
   });
 
+  it('a new play of the day empties the phone and tells its subscribers; the same message can then come again (owner, 18 Oct)', () => {
+    const phone = createScriptedPhone();
+    const listener = vi.fn();
+    phone.subscribe(listener);
+    phone.deliver([phoneMessage('storm-started'), phoneMessage('power-back')]);
+    phone.clear();
+    expect(phone.messages()).toEqual([]);
+    expect(listener).toHaveBeenCalledTimes(2);
+    phone.deliver([phoneMessage('storm-started')]);
+    expect(phone.messages()).toHaveLength(1);
+  });
+
   it('keeps the same snapshot until something changes (useSyncExternalStore needs it)', () => {
     const phone = createScriptedPhone();
     const before = phone.messages();

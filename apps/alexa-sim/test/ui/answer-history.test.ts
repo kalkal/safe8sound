@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANSWER_HISTORY_MAX, addAnswer, backToStart, currentAnswer, emptyHistory, historyPosition, stepAnswer } from '../../src/ui/answer-history.js';
+import { ANSWER_HISTORY_MAX, addAnswer, answerMoment, backToStart, currentAnswer, emptyHistory, historyPosition, stepAnswer } from '../../src/ui/answer-history.js';
 
 // Owner's choice (10 Oct): the screen shows one answer at a time; Previous / Next go through the earlier ones.
 
@@ -50,5 +50,30 @@ describe('answer history', () => {
     h = addAnswer(h, 't3');
     expect(currentAnswer(h)).toBe('t3');
     expect(historyPosition(h)).toEqual({ n: 3, of: 3, hasPrevious: true, hasNext: false });
+  });
+});
+
+describe('answerMoment: the simulated time an answer speaks of (owner, 18 Oct)', () => {
+  const at = '2026-07-14T15:00:00+02:00';
+
+  it('an answer given now is labelled with its time, not as earlier', () => {
+    expect(answerMoment(at, at)).toEqual({ time: '15:00', earlier: false });
+  });
+
+  it('the same moment written another way is still now', () => {
+    expect(answerMoment(at, '2026-07-14T13:00:00Z')).toEqual({ time: '15:00', earlier: false });
+  });
+
+  it('after the clock moves on, the answer is marked earlier: it no longer describes the home', () => {
+    expect(answerMoment(at, '2026-07-15T06:40:00+02:00')).toEqual({ time: '15:00', earlier: true });
+  });
+
+  it('without a simulated clock when it was given, no label (the shared home, a clock not read yet)', () => {
+    expect(answerMoment(undefined, at)).toBeUndefined();
+    expect(answerMoment('not a time', at)).toBeUndefined();
+  });
+
+  it('a clock not read now keeps the time and does not guess it is earlier', () => {
+    expect(answerMoment(at, undefined)).toEqual({ time: '15:00', earlier: false });
   });
 });

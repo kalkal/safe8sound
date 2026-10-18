@@ -2,8 +2,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setLocale } from '@cold-reserve/i18n';
+import { useState } from 'react';
 import { SCRIPT_FIXTURES } from '../../src/agent/script-fixtures.js';
-import { scriptedDemoSettings } from '../../src/ui/demo-settings.js';
+import { applyChange, scriptedDemoSettings } from '../../src/ui/demo-settings.js';
 import type { LimitChange } from '../../src/ui/limits.js';
 import { DemoSettingsControl, type LimitSave } from '../../src/ui/SettingsDrawer.js';
 
@@ -42,6 +43,53 @@ describe('DemoSettingsControl', () => {
     const scenario = screen.getByRole('radiogroup', { name: 'Scenario' });
     expect(within(scenario).getByRole('radio', { name: /Heat wave/ })).toHaveProperty('checked', true);
     for (const name of ['Place', 'Temperature units', 'Who is at home']) expect(screen.getByRole('radiogroup', { name })).toBeTruthy();
+  });
+
+  it('the tapped choice shows at once, marked as being saved, until the save ends (owner, 18 Oct)', () => {
+    const onChange = vi.fn(() => new Promise<boolean>(() => undefined));
+    render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={onChange} locale="en-US" onLocale={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Storm/ }));
+    const scenario = screen.getByRole('radiogroup', { name: 'Scenario' });
+    expect(within(scenario).getByRole('radio', { name: /Storm/ })).toHaveProperty('checked', true);
+    expect(within(scenario).getByRole('radio', { name: /Heat wave/ })).toHaveProperty('checked', false);
+    expect(within(scenario).getByRole('radio', { name: /Storm/ }).closest('label')?.textContent).toContain('Saving…');
+  });
+
+  it('once saved, a line at the top says what the demo plays now', async () => {
+    function Saved() {
+      const [settings, setSettings] = useState(scriptedDemoSettings());
+      return (
+        <DemoSettingsControl
+          settings={settings}
+          availablePlaces={['reference']}
+          onChange={(change) => {
+            setSettings((s) => applyChange(s, change));
+            return Promise.resolve(true);
+          }}
+          locale="en-US"
+          onLocale={vi.fn()}
+        />
+      );
+    }
+    render(<Saved />);
+    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Storm/ }));
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-applied').textContent).toBe('Saved. Now: Reference home (central Italy) · Storm · power outage');
+    });
+    expect(screen.getByRole('radio', { name: /Storm/ }).closest('label')?.getAttribute('data-checked')).toBe('true');
+  });
+
+  it('a failed save puts the choice back and says so', async () => {
+    const onChange = vi.fn(() => Promise.resolve(false));
+    render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={onChange} locale="en-US" onLocale={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Storm/ }));
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-applied').textContent).toBe("That change wasn't saved. Try again.");
+    });
+    expect(screen.getByRole('radio', { name: /Heat wave/ })).toHaveProperty('checked', true);
   });
 
   it('choosing a scenario sends only that change', () => {
@@ -110,6 +158,16 @@ describe('DemoSettingsControl', () => {
     fireEvent.click(badge);
     fireEvent.keyDown(screen.getByRole('dialog', { name: 'Demo settings' }), { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(badge);
+  });
+
+  it('a tap on the dimmed page closes the drawer; the page behind is inert while it shows (owner, 18 Oct)', () => {
+    const { badge } = setup();
+    fireEvent.click(badge);
+    expect(badge.hasAttribute('inert')).toBe(true);
+    fireEvent.click(screen.getByTestId('settings-scrim'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(badge.hasAttribute('inert')).toBe(false);
     expect(document.activeElement).toBe(badge);
   });
 });

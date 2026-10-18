@@ -16,4 +16,16 @@ describe('AnswerCard', () => {
     expect(screen.queryByRole('button', { name: /Read/ })).toBeNull();
     expect(screen.getByText('Storm mode is prepared.')).toBeTruthy();
   });
+
+  it('an answer given before the clock last moved says so inside the answer, with its simulated time (owner, 18 Oct)', () => {
+    render(<AnswerCard answer={{ text: 'The storm reserve is now powering the home.' }} timeZone="Europe/Rome" turnId="t1" earlierAt="15:00" />);
+    const when = screen.getByTestId('answer').querySelector('[data-testid="answer-when"]');
+    expect(when?.getAttribute('data-earlier')).toBe('true');
+    expect(when?.textContent).toBe('Earlier answer · 15:00');
+  });
+
+  it('an answer of now has no such label', () => {
+    render(<AnswerCard answer={{ text: 'Power is back.' }} timeZone="Europe/Rome" turnId="t1" />);
+    expect(screen.queryByTestId('answer-when')).toBeNull();
+  });
 });

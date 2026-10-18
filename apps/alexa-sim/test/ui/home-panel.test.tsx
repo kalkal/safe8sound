@@ -22,6 +22,16 @@ function HomePanel(props: HomePanelProps) {
 }
 
 describe('HomePanel', () => {
+  it('before the demo code: a plain note to enter it, no failure, no read and no stale card (owner, 18 Oct)', () => {
+    const onOpen = vi.fn();
+    render(<HomePanel status={homeCalm()} renderCard={frame} load="locked" onOpen={onOpen} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));
+    expect(screen.getByRole('region', { name: 'My home' }).textContent).toBe('My homeEnter the demo code to see your home.');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByTestId('home-card')).toBeNull();
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('is closed at first: only the button, which says what it opens', () => {
     render(<HomePanel status={homeCalm()} renderCard={frame} />);
     const button = screen.getByRole('button', { name: 'Show my home' });

@@ -19,6 +19,8 @@ export interface PhoneFeed {
 export interface ScriptedPhone extends PhoneFeed {
   /** What the scripted scene sends to the family. A message already on the phone is not shown twice. */
   readonly deliver: (messages: readonly InboxMessage[]) => void;
+  /** A new play of the day (Restart, a new scenario or place): the messages of the last one go. */
+  readonly clear: () => void;
 }
 
 const keyOf = (m: InboxMessage) => `${m.at}|${m.transition}|${m.role}`;
@@ -34,6 +36,11 @@ export function createScriptedPhone(): ScriptedPhone {
     },
     // The scripted home has no server to ask: the reply is accepted, and no safe-room number is invented.
     reply: () => Promise.resolve({ ok: true }),
+    clear: () => {
+      if (current.length === 0) return;
+      current = [];
+      for (const listener of listeners) listener();
+    },
     deliver: (messages) => {
       const seen = new Set(current.map(keyOf));
       const fresh = messages.filter((m) => !seen.has(keyOf(m)));

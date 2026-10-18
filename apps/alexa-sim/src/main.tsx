@@ -134,18 +134,28 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const [home, setHome] = useState(() => initialHome(homeMode));
   // Scripted mode (#268): whether an answer has said what the home is since the scenario was chosen.
   const [homeTold, setHomeTold] = useState(false);
+  const subscribeSession = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
+  const sessionToken = useSyncExternalStore(subscribeSession, () => session?.token());
+  // Remote mode with a demo code: until it is accepted there is no home to read (owner, 18 Oct).
+  const needsCode = session !== undefined && sessionToken === undefined;
   // Remote mode (#262): the panel reads the home on demand, each time it opens and after a plan is applied.
   const [homeLoad, setHomeLoad] = useState<'idle' | 'loading' | 'failed'>('idle');
   const loadHome = useCallback(() => {
-    if (homeMode !== 'remote') return;
+    if (homeMode !== 'remote' || (session !== undefined && session.token() === undefined)) return;
     setHomeLoad('loading');
     void fetchHome(agent, { correlationId: crypto.randomUUID() }).then((read) => {
       if (read.ok) setHome(read.value);
       setHomeLoad(read.ok ? 'idle' : 'failed');
     });
-  }, [agent, homeMode]);
+  }, [agent, homeMode, session]);
   // Three bands (owner, 10 Oct): the home button in the header band, the home in the content band.
-  const homePanel = useHomePanel({ status: home, renderCard: (status) => <HomeCard status={status} />, load: homeLoad, onOpen: loadHome, onRetry: loadHome });
+  const homePanel = useHomePanel({ status: home, renderCard: (status) => <HomeCard status={status} />, load: needsCode ? 'locked' : homeLoad, onOpen: loadHome, onRetry: loadHome });
+  // The home opened before the code (its note asks for it): once the code is accepted it is read at once.
+  const homeOpenRef = useRef(false);
+  homeOpenRef.current = homePanel.view !== null;
+  useEffect(() => {
+    if (sessionToken !== undefined && homeOpenRef.current) loadHome();
+  }, [sessionToken, loadHome]);
   const closeHome = homePanel.close;
   // The judge's demo settings (B1, B2): kept in the page in scripted mode; in remote mode read from the visitor's
   // sandbox once the demo session starts, and saved there (what is shown is what is stored). A new scenario starts on
@@ -181,16 +191,19 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [homeMode, loadHome],
   );
-  const subscribeSession = useCallback((listener: () => void) => (session ? session.subscribe(listener) : () => undefined), [session]);
-  const sessionToken = useSyncExternalStore(subscribeSession, () => session?.token());
   useEffect(() => {
     if (scripted || sessionToken === undefined) return;
     void fetchDemoSettings(agent, { correlationId: crypto.randomUUID() }).then((read) => {
       if (read.ok) setDemoSettings(read.value);
     });
   }, [agent, scripted, sessionToken]);
+  // Each new play of the day (Restart the day, a new scenario or place: the server starts the day again): the clock,
+  // the home and the phone are read again. Restart keeps the scenario, so without this the clock stayed where it was
+  // (owner, 18 Oct).
+  const [playthrough, setPlaythrough] = useState(0);
   const onSettingsChange = useCallback(
     async (change: SetScenarioInput) => {
+      const newPlay = change.restart === true || change.scenarioId !== undefined || change.locationId !== undefined;
       if (scripted) {
         setDemoSettings((previous) => (previous === undefined ? previous : applyChange(previous, change)));
         // The scripted home plays the same change, so its simulated clock follows the scenario.
@@ -199,15 +212,21 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
           setSky(skyOfScenario(change.scenarioId));
           setHomeTold(false);
         }
+        if (newPlay) setPlaythrough((n) => n + 1);
         return true;
       }
       const saved = await saveDemoSettings(agent, change, { correlationId: crypto.randomUUID() });
       if (!saved.ok) return false;
       setDemoSettings(saved.value);
       if (change.scenarioId !== undefined || change.restart === true) setSky(skyOfScenario(saved.value.scenarioId));
+      if (newPlay) {
+        setPlaythrough((n) => n + 1);
+        loadHome();
+        phone.refresh?.();
+      }
       return true;
     },
-    [agent, scripted],
+    [agent, scripted, loadHome],
   );
   // #402: the preferences and the limits they move inside, for the temperatures and limits section of the drawer.
   // Read with the sandbox (and again when its day or place changes); a failed read leaves the section without them.
@@ -277,7 +296,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     return () => {
       current = false;
     };
-  }, [agent, hasSandbox, clockScenario, planId]);
+  }, [agent, hasSandbox, clockScenario, planId, playthrough]);
   /** What follows a move of the clock: the home, the phone and the reserve are read again. */
   const afterMove = useCallback(() => {
     loadHome();
@@ -411,6 +430,8 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
             onCloseHome={homePanel.close}
             appliedTurns={appliedTurns}
             prepareTurn={prepareTurn}
+            {...(hasSandbox && clock !== undefined ? { simNow: clock.now } : {})}
+            playthrough={playthrough}
             {...(reserve === undefined ? {} : { idle: <ReserveClock outlook={reserve} storm={gridDown} /> })}
             {...(session === undefined ? {} : { session })}
             {...(studioVoice === undefined ? {} : { studioVoice })}

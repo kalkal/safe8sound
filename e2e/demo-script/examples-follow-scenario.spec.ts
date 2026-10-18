@@ -50,3 +50,27 @@ test('remote: the home read from sim-api decides; grid down shows the storm exam
   await expect(examples(page).getByRole('button', { name: 'Is Grandpa safe?' })).toBeVisible();
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toHaveCount(0);
 });
+
+test('remote: the home opened before the demo code asks for it, then shows the home once the code is accepted (owner, 18 Oct)', async ({ page }) => {
+  await page.route('**/sim-api/v1/session', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'e2e.demo.token', expiresAt: new Date(Date.now() + 3_600_000).toISOString() }) }),
+  );
+  await page.route('**/sim-api/v1/tools/call', async (route) => {
+    const { name } = route.request().postDataJSON() as { name: string };
+    if (name === 'get_home_status') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: 'Grid down.' }], structuredContent: homeInStorm() }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isError: true, content: [{ type: 'text', text: 'No settings.' }] }) });
+  });
+  await page.goto('/?agent=remote');
+  await page.getByRole('button', { name: 'Show my home' }).click();
+  const homeView = page.getByRole('region', { name: 'My home' });
+  await expect(homeView).toContainText('Enter the demo code to see your home.');
+  await expect(homeView.getByRole('alert')).toHaveCount(0);
+
+  await page.getByLabel('Demo code').fill('e2e-demo-code-0001');
+  await page.getByRole('button', { name: 'Start' }).click();
+  await expect(homeView).not.toContainText('Enter the demo code');
+  await expect(homeView.locator('iframe')).toBeVisible();
+  await expect(homeView.getByRole('alert')).toHaveCount(0);
+});

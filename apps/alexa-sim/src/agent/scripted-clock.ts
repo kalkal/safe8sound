@@ -44,7 +44,11 @@ export function createScriptedClock(o: { readonly phone?: ScriptedPhone; readonl
         const next = args['scenarioId'];
         const changed = typeof next === 'string' && next !== scenario;
         if (changed) scenario = next as ScenarioId;
-        if (changed || args['restart'] === true) passed = 0;
+        // A new play of the day: its clock from the start and an empty phone, as the server's new playthrough has.
+        if (changed || args['restart'] === true) {
+          passed = 0;
+          o.phone?.clear();
+        }
         version += 1;
         return success({ restarted: changed || args['restart'] === true }, 'Saved.');
       }
