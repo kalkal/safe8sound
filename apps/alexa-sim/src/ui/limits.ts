@@ -72,6 +72,8 @@ export type LimitRefusal =
   | { kind: 'safeBelowComfort'; limitC: number };
 
 export type LimitChange = Omit<SetPreferencesInput, 'confirmed'>;
+/** How a Save of the limits ended: `rate_limited` is the demo's daily limit of changes. */
+export type LimitSave = 'saved' | 'rate_limited' | 'failed';
 export type LimitMove = { ok: true; change: LimitChange } | { ok: false; refusal: LimitRefusal };
 
 function changeOf(id: LimitId, valueC: number): LimitChange {

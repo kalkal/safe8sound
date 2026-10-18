@@ -6,7 +6,8 @@ import { useState } from 'react';
 import { SCRIPT_FIXTURES } from '../../src/agent/script-fixtures.js';
 import { applyChange, scriptedDemoSettings } from '../../src/ui/demo-settings.js';
 import type { LimitChange } from '../../src/ui/limits.js';
-import { DemoSettingsControl, type LimitSave } from '../../src/ui/SettingsDrawer.js';
+import { DemoSettingsControl } from '../../src/ui/SettingsDrawer.js';
+import type { LimitSave } from '../../src/ui/limits.js';
 
 // B1 (additions plan): the scenario badge opens the judge's settings drawer. Radio groups with the choice written,
 // not only coloured; places not shipped yet say so; Escape closes and the focus goes back to the badge.

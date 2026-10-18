@@ -1,8 +1,8 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import '@cold-reserve/ui-cards/cubes.css';
 import './app.css';
-import { categoryOf, ok, type ErrorEnvelope, type GetPreferencesOutput, type HomeStatus, type ReserveOutlook, type Result, type SetScenarioInput } from '@cold-reserve/contracts';
-import { getLocale, setLocale, subscribeLocale, type Locale } from '@cold-reserve/i18n';
+import { ok, type ErrorEnvelope, type HomeStatus, type Result, type ScenarioId, type SetScenarioInput } from '@cold-reserve/contracts';
+import { setLocale } from '@cold-reserve/i18n';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
@@ -24,19 +24,21 @@ import { examplesFor, isGridDown } from './ui/ExampleQuestions.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { useHomePanel } from './ui/HomePanel.js';
 import { ReserveClock } from './ui/ReserveClock.js';
-import { SimClock, type ClockNote } from './ui/SimClock.js';
-import { clockTime, cutThePower, isPowerCut, planIdOf, readClock, skipAhead, type ClockState } from './ui/sim-clock.js';
+import { SimClock } from './ui/SimClock.js';
+import { clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
 import { isAppliedPlan } from './ui/steps.js';
-import { fetchReserve } from './ui/reserve.js';
-import { SHIPPED_PLACES, applyChange, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario, type DemoSettingsView } from './ui/demo-settings.js';
-import { DemoSettingsControl, type LimitSave } from './ui/SettingsDrawer.js';
-import { withSaved, type LimitChange } from './ui/limits.js';
-import { fetchPreferences, savePreferences } from './ui/preferences-settings.js';
+import { SHIPPED_PLACES, skyOfScenario } from './ui/demo-settings.js';
+import { DemoSettingsControl } from './ui/SettingsDrawer.js';
 import { LanguageToggle, nextLocale } from './ui/LanguageToggle.js';
-import { readLocale, saveLocale } from './ui/locale-setting.js';
+import { readLocale } from './ui/locale-setting.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
 import { skyFor, type Sky } from './ui/sky.js';
 import { t } from './ui/text.js';
+import { useDemoSettings } from './state/use-demo-settings.js';
+import { useLocaleSetting } from './state/use-locale-setting.js';
+import { usePreferences } from './state/use-preferences.js';
+import { useReserve } from './state/use-reserve.js';
+import { useSimClock } from './state/use-sim-clock.js';
 import type { StudioVoice } from './voice/use-voice.js';
 import { createRemoteSynthesize, createSpeechTickets } from './voice/studio-voice.js';
 
@@ -157,11 +159,23 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     if (sessionToken !== undefined && homeOpenRef.current) loadHome();
   }, [sessionToken, loadHome]);
   const closeHome = homePanel.close;
-  // The judge's demo settings (B1, B2): kept in the page in scripted mode; in remote mode read from the visitor's
-  // sandbox once the demo session starts, and saved there (what is shown is what is stored). A new scenario starts on
-  // its own sky. A home that is not a sandbox has no settings: the badge then opens the language row only (#284).
+  // The judge's demo settings (state/use-demo-settings). A new scenario starts on its own sky; each new play of a
+  // sandbox reads the home and the phone again (Restart keeps the scenario, so without this the clock stayed where it
+  // was, owner, 18 Oct). A home that is not a sandbox has no settings: the badge then opens the language row only (#284).
   const scripted = config.agent === 'scripted';
-  const [demoSettings, setDemoSettings] = useState<DemoSettingsView | undefined>(() => (scripted ? scriptedDemoSettings() : undefined));
+  const onScenario = useCallback((scenarioId: ScenarioId) => {
+    setSky(skyOfScenario(scenarioId));
+    setHomeTold(false);
+  }, []);
+  /** What follows a new play of the day or a move of the clock: the home and the phone are read again. */
+  const readWhatFollows = useCallback(() => {
+    loadHome();
+    phone.refresh?.();
+  }, [loadHome]);
+  const demo = useDemoSettings({ agent, scripted, sessionToken, onScenario, onNewPlay: readWhatFollows });
+  const demoSettings = demo.settings;
+  const onSettingsChange = demo.change;
+  const playthrough = demo.playthrough;
   // Every time on screen (phone, cards, answers, sky) is on the home's own clock: the sandbox place's zone (Houston:
   // America/Chicago) when known, else the configured home zone; never the browser's or the server's.
   const homeTimeZone = demoSettings?.timeZone ?? config.homeTimeZone;
@@ -191,79 +205,14 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [homeMode, loadHome],
   );
-  useEffect(() => {
-    if (scripted || sessionToken === undefined) return;
-    void fetchDemoSettings(agent, { correlationId: crypto.randomUUID() }).then((read) => {
-      if (read.ok) setDemoSettings(read.value);
-    });
-  }, [agent, scripted, sessionToken]);
-  // Each new play of the day (Restart the day, a new scenario or place: the server starts the day again): the clock,
-  // the home and the phone are read again. Restart keeps the scenario, so without this the clock stayed where it was
-  // (owner, 18 Oct).
-  const [playthrough, setPlaythrough] = useState(0);
-  const onSettingsChange = useCallback(
-    async (change: SetScenarioInput) => {
-      const newPlay = change.restart === true || change.scenarioId !== undefined || change.locationId !== undefined;
-      if (scripted) {
-        setDemoSettings((previous) => (previous === undefined ? previous : applyChange(previous, change)));
-        // The scripted home plays the same change, so its simulated clock follows the scenario.
-        await agent.callTool('set_scenario', { ...change }, { correlationId: crypto.randomUUID() });
-        if (change.scenarioId !== undefined) {
-          setSky(skyOfScenario(change.scenarioId));
-          setHomeTold(false);
-        }
-        if (newPlay) setPlaythrough((n) => n + 1);
-        return true;
-      }
-      const saved = await saveDemoSettings(agent, change, { correlationId: crypto.randomUUID() });
-      if (!saved.ok) return false;
-      setDemoSettings(saved.value);
-      if (change.scenarioId !== undefined || change.restart === true) setSky(skyOfScenario(saved.value.scenarioId));
-      if (newPlay) {
-        setPlaythrough((n) => n + 1);
-        loadHome();
-        phone.refresh?.();
-      }
-      return true;
-    },
-    [agent, scripted, loadHome],
-  );
-  // #402: the preferences and the limits they move inside, for the temperatures and limits section of the drawer.
-  // Read with the sandbox (and again when its day or place changes); a failed read leaves the section without them.
-  const [limits, setLimits] = useState<GetPreferencesOutput | undefined>(undefined);
-  const limitsKey = `${demoSettings?.scenarioId ?? ''}/${demoSettings?.locationId ?? ''}`;
-  useEffect(() => {
-    if (!scripted && sessionToken === undefined) return undefined;
-    let current = true;
-    void fetchPreferences(agent, { correlationId: crypto.randomUUID() }).then((read) => {
-      if (current && read.ok) setLimits(read.value);
-    });
-    return () => {
-      current = false;
-    };
-  }, [agent, scripted, sessionToken, limitsKey]);
-  const onLimit = useCallback(
-    async (change: LimitChange): Promise<LimitSave> => {
-      const saved = await savePreferences(agent, change, { correlationId: crypto.randomUUID() });
-      // What the tool stored is what is shown: the view comes from its output, with no second read.
-      if (saved.ok) {
-        setLimits((previous) => (previous === undefined ? previous : withSaved(previous, saved.value.preferences)));
-        return 'saved';
-      }
-      return categoryOf(saved.error.code) === 'rate_limited' ? 'rate_limited' : 'failed';
-    },
-    [agent],
-  );
-  // #263: the page's language, this viewer's own setting kept in the browser; every text re-renders with it.
-  const locale = useSyncExternalStore(subscribeLocale, getLocale);
-  const onLocale = useCallback((next: Locale) => {
-    setLocale(next);
-    saveLocale(next);
-  }, []);
-  useEffect(() => {
-    document.documentElement.lang = locale.slice(0, 2);
-    document.title = t('sim.title');
-  }, [locale]);
+  // #402: the preferences and the limits they move inside (state/use-preferences), read with the sandbox and again when
+  // its day or place changes. One instance for every view of the settings.
+  const { limits, saveLimit: onLimit } = usePreferences({
+    agent,
+    enabled: scripted || sessionToken !== undefined,
+    key: `${demoSettings?.scenarioId ?? ''}/${demoSettings?.locationId ?? ''}`,
+  });
+  const { locale, chooseLocale: onLocale } = useLocaleSetting();
   // The badge is always there: without demo settings it opens the language row only (#284).
   // The example buttons follow the home (#268). Remote mode: the home read from sim-api wins over the scenario.
   // Scripted mode: the scenario decides (its home starts calm whatever the scenario) until an answer says what the
@@ -277,48 +226,9 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // never polled; a failed read leaves no clock, quietly (fetchReserve logs it). Its storm is the
   // examples' storm.
   const gridDown = isGridDown(homeState);
-  // The simulated clock (owner decision, 10 Oct; time pack, 12 Oct): for every visitor of a sandbox (or the scripted
-  // home), read when the scenario or the plan on screen changes, and after each move; never polled.
-  const [clock, setClock] = useState<ClockState | undefined>(undefined);
-  const [clockNote, setClockNote] = useState<ClockNote | undefined>(undefined);
-  const [clockBusy, setClockBusy] = useState(false);
+  // The simulated clock (state/use-sim-clock), for every visitor of a sandbox (or the scripted home).
   const hasSandbox = demoSettings !== undefined;
-  const clockScenario = demoSettings?.scenarioId;
-  // Each move of the clock counts: a read started before a move never draws over the clock the move left.
-  const clockMoves = useRef(0);
-  useEffect(() => {
-    if (!hasSandbox) return undefined;
-    let current = true;
-    const moves = clockMoves.current;
-    void readClock(agent, planId, { correlationId: crypto.randomUUID() }).then((read) => {
-      if (current && read.ok && moves === clockMoves.current) setClock(read.value);
-    });
-    return () => {
-      current = false;
-    };
-  }, [agent, hasSandbox, clockScenario, planId, playthrough]);
-  /** What follows a move of the clock: the home, the phone and the reserve are read again. */
-  const afterMove = useCallback(() => {
-    loadHome();
-    phone.refresh?.();
-  }, [loadHome]);
-  const onSkip = useCallback(() => {
-    if (clockBusy) return;
-    setClockBusy(true);
-    clockMoves.current += 1;
-    void skipAhead(agent, planId, { correlationId: crypto.randomUUID() }).then((moved) => {
-      setClockBusy(false);
-      if (!moved.ok) {
-        // A daily limit says so, never "Try again" (review of #378).
-        setClockNote(moved.error.code === 'demo_quota_exceeded' ? { kind: 'limit' } : { kind: 'failed' });
-        return;
-      }
-      clockMoves.current += 1;
-      setClock(moved.value.state);
-      setClockNote({ kind: 'reached', moment: moved.value.reached.kind });
-      afterMove();
-    });
-  }, [agent, planId, clockBusy, afterMove]);
+  const { clock, busy: clockBusy, note: clockNote, skip: onSkip, cutPower, clearNote } = useSimClock({ agent, enabled: hasSandbox, scenario: demoSettings?.scenarioId, planId, playthrough, afterMove: readWhatFollows });
   // "Power cut" (time pack, 12 Oct): before the question reaches the agent, the simulated grid goes down (the storm
   // scenario, at its storm start), so the assistant answers a real outage and storm mode starts. The latest settings
   // are read through a ref: the turn may start before this render's settings are drawn.
@@ -329,42 +239,23 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       const settings = settingsRef.current;
       // Not a sandbox (the shared demo home): nothing simulated to change, the agent answers as it is.
       if (!isPowerCut(question) || settings === undefined) return ok(undefined);
-      clockMoves.current += 1;
       // Ana's phone says whether the family already heard of this storm.
       const familyTold = phone.messages().some((m) => m.transition === 'storm_started');
-      const cut = await cutThePower(agent, { stormScenario: settings.scenarioId === 'storm-blackout', familyTold, saveStorm: onSettingsChange }, context);
+      const cut = await cutPower({ stormScenario: settings.scenarioId === 'storm-blackout', familyTold, saveStorm: onSettingsChange }, context);
       if (!cut.ok) return cut;
-      clockMoves.current += 1;
-      setClock(cut.value.state);
-      setClockNote(cut.value.changed ? { kind: 'grid_down' } : undefined);
       setSky('storm');
-      afterMove();
       return ok(undefined);
     },
-    [agent, onSettingsChange, afterMove],
+    [cutPower, onSettingsChange],
   );
-  const [reserve, setReserve] = useState<ReserveOutlook | undefined>(undefined);
-  const scenarioId = demoSettings?.scenarioId;
-  useEffect(() => {
-    // A new scenario or grid: the old hours go first (never a calm day's hours beside a melting cube), and a reply
-    // that comes after the next change is dropped.
-    setReserve(undefined);
-    if (!scripted && sessionToken === undefined) return undefined;
-    let current = true;
-    void fetchReserve(agent, { correlationId: crypto.randomUUID() }).then((read) => {
-      if (current && read.ok) setReserve(read.value);
-    });
-    return () => {
-      current = false;
-    };
-  }, [agent, scripted, sessionToken, scenarioId, gridDown, clock?.now]);
+  const reserve = useReserve({ agent, enabled: scripted || sessionToken !== undefined, scenarioId: demoSettings?.scenarioId, gridDown, now: clock?.now });
   // A change from the drawer starts another day (or place): what the clock said about the old one goes.
   const onDrawerChange = useCallback(
     (change: SetScenarioInput) => {
-      setClockNote(undefined);
+      clearNote();
       return onSettingsChange(change);
     },
-    [onSettingsChange],
+    [clearNote, onSettingsChange],
   );
   // The simulated clock sits under the Echo frame, big (#391): the top bar's pill was not noticed.
   const clockDock = hasSandbox && clock !== undefined ? <SimClock state={clock} busy={clockBusy} onSkip={onSkip} {...(clockNote === undefined ? {} : { note: clockNote })} /> : undefined;

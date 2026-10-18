@@ -4,7 +4,7 @@ import { LOCALES, isLocale, type Locale } from '@cold-reserve/i18n';
 import { roomLabel } from '@cold-reserve/ui-cards';
 import { makeRestInert } from '../host/inert.js';
 import { HOUSEHOLDS, PLACES, SCENARIOS, badgeText, skyOfScenario, type DemoSettingsView } from './demo-settings.js';
-import { chooseSafeRoom, limitsView, mergeChange, moveLimit, withDraft, type LimitChange, type LimitId, type LimitRefusal, type LimitRow } from './limits.js';
+import { chooseSafeRoom, limitsView, mergeChange, moveLimit, withDraft, type LimitChange, type LimitId, type LimitRefusal, type LimitRow, type LimitSave } from './limits.js';
 import { t } from './text.js';
 import './limits.css';
 
@@ -125,9 +125,6 @@ function refusalText(id: LimitId, refusal: LimitRefusal, units: TempUnit): strin
       return t('settings.limits.refusedSafeBelowComfort', { value });
   }
 }
-
-/** How a Save of the limits section ended: `rate_limited` is the demo's daily limit of changes. */
-export type LimitSave = 'saved' | 'rate_limited' | 'failed';
 
 export interface DemoSettingsControlProps {
   /** The sandbox's settings; undefined when there are none (not a sandbox, or not read yet): language only (#284). */
