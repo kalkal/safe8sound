@@ -1,0 +1,21 @@
+{
+  "scenarios": [
+    "clear-day",
+    "heatwave",
+    "storm-blackout"
+  ],
+  "places": {
+    "reference": {
+      "unit": "C",
+      "emergency": "112"
+    },
+    "turin": {
+      "unit": "C",
+      "emergency": "112"
+    },
+    "houston": {
+      "unit": "F",
+      "emergency": "911"
+    }
+  }
+}

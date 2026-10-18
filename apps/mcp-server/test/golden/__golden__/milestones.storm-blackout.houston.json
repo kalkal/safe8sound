@@ -1,0 +1,27 @@
+{
+  "startAt": "2024-07-07T12:00:00-05:00",
+  "outages": [
+    {
+      "from": "2024-07-07T15:00:00-05:00",
+      "to": "2024-07-08T06:30:00-05:00"
+    }
+  ],
+  "essentialAt": "2024-07-07T21:00:00-05:00",
+  "milestones": [
+    {
+      "kind": "storm_start",
+      "at": "2024-07-07T15:00:00-05:00",
+      "label": "The storm starts: the grid goes down"
+    },
+    {
+      "kind": "essential_level",
+      "at": "2024-07-07T21:00:00-05:00",
+      "label": "The battery reaches the essential level"
+    },
+    {
+      "kind": "power_back",
+      "at": "2024-07-08T06:40:00-05:00",
+      "label": "Power is back (stable)"
+    }
+  ]
+}

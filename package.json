@@ -22,7 +22,8 @@
     "e2e": "playwright test",
     "e2e:site": "playwright test -c playwright.site.config.ts",
     "conformance": "node tooling/src/conformance.mjs",
-    "mutation": "node tooling/src/mutation.mjs"
+    "mutation": "node tooling/src/mutation.mjs",
+    "golden": "node tooling/src/golden.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

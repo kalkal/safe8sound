@@ -1,0 +1,402 @@
+{
+  "schemaVersion": 1,
+  "id": "heatwave",
+  "version": "1.1.0",
+  "description": "A heatwave day, 38 degrees in the afternoon, a warm night and the next hot morning (36 hours, so a plan sees the whole night). The safe room is cooled all day with the fan on.",
+  "startAt": "2024-07-28T00:00:00+02:00",
+  "durationH": 36,
+  "stepSeconds": 60,
+  "seed": 20260716,
+  "simulatedGroups": [
+    "weather"
+  ],
+  "initial": {
+    "batterySocPct": 50,
+    "rooms": [
+      {
+        "id": "bedroom-1",
+        "tempC": 27.5,
+        "humidityPct": 50
+      },
+      {
+        "id": "bedroom-2",
+        "tempC": 28,
+        "humidityPct": 50
+      },
+      {
+        "id": "study",
+        "tempC": 28.5,
+        "humidityPct": 48
+      },
+      {
+        "id": "living",
+        "tempC": 28.5,
+        "humidityPct": 50
+      }
+    ]
+  },
+  "hourly": [
+    {
+      "tempOutC": 23.9,
+      "humidityOutPct": 79,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 250
+    },
+    {
+      "tempOutC": 23.7,
+      "humidityOutPct": 77,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 230
+    },
+    {
+      "tempOutC": 23.6,
+      "humidityOutPct": 77,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "tempOutC": 23,
+      "humidityOutPct": 79,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "tempOutC": 22.3,
+      "humidityOutPct": 82,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "tempOutC": 22.3,
+      "humidityOutPct": 81,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 240
+    },
+    {
+      "tempOutC": 22.5,
+      "humidityOutPct": 81,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 300
+    },
+    {
+      "tempOutC": 23.6,
+      "humidityOutPct": 75,
+      "irradianceWm2": 21,
+      "stormProb": 0.03,
+      "baseLoadW": 450
+    },
+    {
+      "tempOutC": 24.2,
+      "humidityOutPct": 70,
+      "irradianceWm2": 136,
+      "stormProb": 0.03,
+      "baseLoadW": 500
+    },
+    {
+      "tempOutC": 25.8,
+      "humidityOutPct": 67,
+      "irradianceWm2": 275,
+      "stormProb": 0.03,
+      "baseLoadW": 400
+    },
+    {
+      "tempOutC": 27.8,
+      "humidityOutPct": 66,
+      "irradianceWm2": 437,
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "tempOutC": 29.8,
+      "humidityOutPct": 62,
+      "irradianceWm2": 595,
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "tempOutC": 31.4,
+      "humidityOutPct": 58,
+      "irradianceWm2": 722,
+      "stormProb": 0.03,
+      "baseLoadW": 450
+    },
+    {
+      "tempOutC": 33,
+      "humidityOutPct": 53,
+      "irradianceWm2": 827,
+      "stormProb": 0.03,
+      "baseLoadW": 500
+    },
+    {
+      "tempOutC": 33.9,
+      "humidityOutPct": 50,
+      "irradianceWm2": 804,
+      "stormProb": 0.03,
+      "baseLoadW": 400
+    },
+    {
+      "tempOutC": 35,
+      "humidityOutPct": 47,
+      "irradianceWm2": 831,
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "tempOutC": 34.8,
+      "humidityOutPct": 45,
+      "irradianceWm2": 612,
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "tempOutC": 34.7,
+      "humidityOutPct": 44,
+      "irradianceWm2": 456,
+      "stormProb": 0.03,
+      "baseLoadW": 450
+    },
+    {
+      "tempOutC": 34.5,
+      "humidityOutPct": 44,
+      "irradianceWm2": 413,
+      "stormProb": 0.03,
+      "baseLoadW": 650
+    },
+    {
+      "tempOutC": 33.5,
+      "humidityOutPct": 45,
+      "irradianceWm2": 287,
+      "stormProb": 0.03,
+      "baseLoadW": 800
+    },
+    {
+      "tempOutC": 32.3,
+      "humidityOutPct": 49,
+      "irradianceWm2": 157,
+      "stormProb": 0.03,
+      "baseLoadW": 700
+    },
+    {
+      "tempOutC": 30.1,
+      "humidityOutPct": 50,
+      "irradianceWm2": 35,
+      "stormProb": 0.03,
+      "baseLoadW": 550
+    },
+    {
+      "tempOutC": 27.5,
+      "humidityOutPct": 60,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 400
+    },
+    {
+      "tempOutC": 26.6,
+      "humidityOutPct": 65,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 300
+    },
+    {
+      "tempOutC": 26,
+      "humidityOutPct": 70,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 250
+    },
+    {
+      "tempOutC": 25.5,
+      "humidityOutPct": 71,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 230
+    },
+    {
+      "tempOutC": 25.4,
+      "humidityOutPct": 69,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "tempOutC": 25.8,
+      "humidityOutPct": 69,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "tempOutC": 25.6,
+      "humidityOutPct": 69,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "tempOutC": 25.4,
+      "humidityOutPct": 71,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 240
+    },
+    {
+      "tempOutC": 24.7,
+      "humidityOutPct": 73,
+      "irradianceWm2": 0,
+      "stormProb": 0.03,
+      "baseLoadW": 300
+    },
+    {
+      "tempOutC": 24.3,
+      "humidityOutPct": 76,
+      "irradianceWm2": 17,
+      "stormProb": 0.03,
+      "baseLoadW": 450
+    },
+    {
+      "tempOutC": 24.7,
+      "humidityOutPct": 72,
+      "irradianceWm2": 116,
+      "stormProb": 0.03,
+      "baseLoadW": 500
+    },
+    {
+      "tempOutC": 25.5,
+      "humidityOutPct": 69,
+      "irradianceWm2": 293,
+      "stormProb": 0.03,
+      "baseLoadW": 400
+    },
+    {
+      "tempOutC": 26.9,
+      "humidityOutPct": 71,
+      "irradianceWm2": 453,
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "tempOutC": 28.3,
+      "humidityOutPct": 68,
+      "irradianceWm2": 588,
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    }
+  ],
+  "sun": {
+    "sunrise": [
+      "2024-07-28T06:10:00+02:00",
+      "2024-07-29T06:11:00+02:00"
+    ],
+    "sunset": [
+      "2024-07-28T21:00:00+02:00"
+    ]
+  },
+  "gridOutages": [],
+  "occupancy": [
+    {
+      "roomId": "bedroom-1",
+      "roles": [
+        "grandpa"
+      ],
+      "fromH": 0,
+      "toH": 36
+    },
+    {
+      "roomId": "bedroom-2",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 0,
+      "toH": 7.5
+    },
+    {
+      "roomId": "study",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 9,
+      "toH": 17
+    },
+    {
+      "roomId": "living",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 18,
+      "toH": 21
+    },
+    {
+      "roomId": "bedroom-2",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 21,
+      "toH": 31.5
+    },
+    {
+      "roomId": "study",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 33,
+      "toH": 36
+    }
+  ],
+  "hvac": [
+    {
+      "roomId": "bedroom-1",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": true,
+      "fromH": 0,
+      "toH": 36
+    },
+    {
+      "roomId": "bedroom-2",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": false,
+      "fromH": 0,
+      "toH": 7
+    },
+    {
+      "roomId": "study",
+      "mode": "cool",
+      "setpointC": 27,
+      "fanOn": false,
+      "fromH": 9,
+      "toH": 17
+    },
+    {
+      "roomId": "living",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": false,
+      "fromH": 12,
+      "toH": 23
+    },
+    {
+      "roomId": "bedroom-2",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": false,
+      "fromH": 21,
+      "toH": 31
+    },
+    {
+      "roomId": "study",
+      "mode": "cool",
+      "setpointC": 27,
+      "fanOn": false,
+      "fromH": 33,
+      "toH": 36
+    }
+  ]
+}

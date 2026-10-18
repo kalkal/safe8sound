@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 2,
+  "id": "clear-day",
+  "version": "1.0.0",
+  "description": "A clear, hot July day. Grandpa stays home in the safe room; the daughter works from the study and comes back to the living room in the evening.",
+  "startHour": 0,
+  "durationH": 24,
+  "stepSeconds": 60,
+  "seed": 20260715,
+  "simulatedGroups": [
+    "weather"
+  ],
+  "initial": {
+    "batterySocPct": 45,
+    "rooms": [
+      {
+        "id": "bedroom-1",
+        "tempC": 26,
+        "humidityPct": 55
+      },
+      {
+        "id": "bedroom-2",
+        "tempC": 26.5,
+        "humidityPct": 55
+      },
+      {
+        "id": "study",
+        "tempC": 27,
+        "humidityPct": 52
+      },
+      {
+        "id": "living",
+        "tempC": 27,
+        "humidityPct": 55
+      }
+    ]
+  },
+  "hourly": [
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 250
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 230
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 220
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 220
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 220
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 240
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 300
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 450
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 500
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 400
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 350
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 350
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 450
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 500
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 400
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 350
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 350
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 450
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 650
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 800
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 700
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 550
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 400
+    },
+    {
+      "stormProb": 0.02,
+      "baseLoadW": 300
+    }
+  ],
+  "gridOutages": [],
+  "occupancy": [
+    {
+      "roomId": "bedroom-1",
+      "roles": [
+        "grandpa"
+      ],
+      "fromH": 0,
+      "toH": 24
+    },
+    {
+      "roomId": "bedroom-2",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 0,
+      "toH": 7.5
+    },
+    {
+      "roomId": "study",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 9,
+      "toH": 17
+    },
+    {
+      "roomId": "living",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 18,
+      "toH": 21
+    },
+    {
+      "roomId": "bedroom-2",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 21,
+      "toH": 24
+    }
+  ],
+  "hvac": [
+    {
+      "roomId": "bedroom-1",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": true,
+      "fromH": 10,
+      "toH": 22
+    },
+    {
+      "roomId": "study",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": false,
+      "fromH": 11,
+      "toH": 17
+    },
+    {
+      "roomId": "living",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": false,
+      "fromH": 16,
+      "toH": 22
+    }
+  ]
+}

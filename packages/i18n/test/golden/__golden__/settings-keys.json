@@ -1,0 +1,22 @@
+{
+  "en-US": {
+    "settings.place": "Place",
+    "settings.place.houston": "Houston, Texas",
+    "settings.place.reference": "Reference home (central Italy)",
+    "settings.place.turin": "Turin, Italy",
+    "settings.scenario": "Scenario",
+    "settings.scenario.clear-day": "Clear day",
+    "settings.scenario.heatwave": "Heat wave",
+    "settings.scenario.storm-blackout": "Storm · power outage"
+  },
+  "it-IT": {
+    "settings.place": "Luogo",
+    "settings.place.houston": "Houston, Texas",
+    "settings.place.reference": "Casa di riferimento (Italia centrale)",
+    "settings.place.turin": "Torino, Italia",
+    "settings.scenario": "Scenario",
+    "settings.scenario.clear-day": "Giornata serena",
+    "settings.scenario.heatwave": "Ondata di calore",
+    "settings.scenario.storm-blackout": "Temporale · blackout"
+  }
+}

@@ -1,0 +1,195 @@
+{
+  "calls": [
+    {
+      "tool": "set_scenario",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Saved."
+          }
+        ],
+        "structuredContent": {
+          "restarted": true
+        }
+      }
+    },
+    {
+      "tool": "get_milestones",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The next moments of the day."
+          }
+        ],
+        "structuredContent": {
+          "now": "2026-07-18T12:00:00+02:00",
+          "day": {
+            "from": "2026-07-18T12:00:00+02:00",
+            "to": "2026-07-19T12:00:00+02:00"
+          },
+          "milestones": [
+            {
+              "kind": "storm_start",
+              "at": "2026-07-18T19:42:00+02:00",
+              "label": "The storm starts: the grid goes down"
+            },
+            {
+              "kind": "essential_level",
+              "at": "2026-07-18T21:10:00+02:00",
+              "label": "The battery reaches the essential level"
+            },
+            {
+              "kind": "power_back",
+              "at": "2026-07-19T05:52:00+02:00",
+              "label": "Power is back (stable)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "advance_clock",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The sandbox's time is now 2026-07-18T19:42:00+02:00."
+          }
+        ],
+        "structuredContent": {
+          "now": "2026-07-18T19:42:00+02:00",
+          "settingsVersion": 3
+        }
+      }
+    },
+    {
+      "tool": "get_milestones",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The next moments of the day."
+          }
+        ],
+        "structuredContent": {
+          "now": "2026-07-18T19:42:00+02:00",
+          "day": {
+            "from": "2026-07-18T12:00:00+02:00",
+            "to": "2026-07-19T12:00:00+02:00"
+          },
+          "milestones": [
+            {
+              "kind": "essential_level",
+              "at": "2026-07-18T21:10:00+02:00",
+              "label": "The battery reaches the essential level"
+            },
+            {
+              "kind": "power_back",
+              "at": "2026-07-19T05:52:00+02:00",
+              "label": "Power is back (stable)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "advance_clock",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The sandbox's time is now 2026-07-18T21:10:00+02:00."
+          }
+        ],
+        "structuredContent": {
+          "now": "2026-07-18T21:10:00+02:00",
+          "settingsVersion": 4
+        }
+      }
+    },
+    {
+      "tool": "get_milestones",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The next moments of the day."
+          }
+        ],
+        "structuredContent": {
+          "now": "2026-07-18T21:10:00+02:00",
+          "day": {
+            "from": "2026-07-18T12:00:00+02:00",
+            "to": "2026-07-19T12:00:00+02:00"
+          },
+          "milestones": [
+            {
+              "kind": "power_back",
+              "at": "2026-07-19T05:52:00+02:00",
+              "label": "Power is back (stable)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "advance_clock",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The sandbox's time is now 2026-07-19T05:52:00+02:00."
+          }
+        ],
+        "structuredContent": {
+          "now": "2026-07-19T05:52:00+02:00",
+          "settingsVersion": 5
+        }
+      }
+    },
+    {
+      "tool": "get_milestones",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The next moments of the day."
+          }
+        ],
+        "structuredContent": {
+          "now": "2026-07-19T05:52:00+02:00",
+          "day": {
+            "from": "2026-07-18T12:00:00+02:00",
+            "to": "2026-07-19T12:00:00+02:00"
+          },
+          "milestones": []
+        }
+      }
+    }
+  ],
+  "phone": [
+    {
+      "at": "2026-07-19T05:52:00+02:00",
+      "role": "daughter",
+      "channel": "in_app",
+      "transition": "power_back",
+      "text": "Safe-8-Sound update for Ana: power came back at home at 5:48 AM. Bedroom is at 26.2 °C. Storm mode has ended. No action is needed now."
+    },
+    {
+      "at": "2026-07-18T21:10:00+02:00",
+      "role": "daughter",
+      "channel": "in_app",
+      "transition": "essential_level",
+      "text": "Safe-8-Sound update for Ana: the battery reached the essential level, to keep Bedroom safe until 6:40 AM tomorrow. Bedroom is at 26.8 °C. No action is needed now. Next message: when the level changes or power returns."
+    },
+    {
+      "at": "2026-07-18T19:42:00+02:00",
+      "role": "daughter",
+      "channel": "in_app",
+      "transition": "storm_started",
+      "text": "Safe-8-Sound alert for Ana: a storm cut the power at home. Bedroom is at 26.8 °C and the battery keeps it safe until 6:40 AM tomorrow. No action is needed now. Next message: when the level changes or power returns."
+    }
+  ]
+}

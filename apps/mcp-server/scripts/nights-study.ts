@@ -2,7 +2,7 @@ import { HomeIdSchema, ok, pct, type HomeProfile } from '@cold-reserve/contracts
 import { fixedClock, localIso, memoryLogger, naiveControls, nightMetrics, zonedTimeMs, type ProjectionPoint } from '@cold-reserve/core';
 import { buildContext, currentControls, projectFrom, type GuardInput } from '@cold-reserve/guard';
 import { createInAppNotifier } from '@cold-reserve/notifier-inapp';
-import { SimulatorSource, builtInPlace, defaultSimParams, demoProfile, parseScenario, profileAtPlace, rawScript, type Month } from '@cold-reserve/source-simulator';
+import { SimulatorSource, builtInMonth, builtInPlace, defaultSimParams, demoProfile, parseScenario, profileAtPlace, rawScript, type Month } from '@cold-reserve/source-simulator';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { loadComfortPlanConfig } from '../src/comfort-plan-config.js';
 import type { ComfortPlanDeps } from '../src/modules/comfort-plan/deps.js';
@@ -302,7 +302,8 @@ export interface StudyResults {
   readonly generatedOn: string;
 }
 
-const SLEEPERS: readonly Sleeper[] = ['adult', 'older'];
+/** One adult (the standard night threshold), then one older person (the elderly threshold). */
+export const STUDY_SLEEPERS: readonly Sleeper[] = ['adult', 'older'];
 const kept = (l: LineOutcome, o: NightOutcome) => l.hoursAtOrBelow >= o.windowHours;
 /** The guard's own target, hours only: at least `requiredHours` of the window at or below the threshold. */
 const reachesTarget = (l: LineOutcome, s: StudySetup) => l.hoursAtOrBelow >= s.requiredHours;
@@ -434,10 +435,10 @@ export function nightsReport(r: StudyResults): string {
     '',
     '## Reading the results',
     '',
-    ...SLEEPERS.flatMap((who) => readings(r, who)),
+    ...STUDY_SLEEPERS.flatMap((who) => readings(r, who)),
     '',
   ];
-  for (const sleeper of SLEEPERS) {
+  for (const sleeper of STUDY_SLEEPERS) {
     const runs = r.outcomes.filter((o) => o.sleeper === sleeper);
     const of = (place: CityId, beryl: boolean) => runs.filter((o) => o.placeId === place && o.beryl === beryl);
     const who = whoText(sleeper);
@@ -458,4 +459,30 @@ export function nightsReport(r: StudyResults): string {
     lines.push('### Every night', '', '#### Turin', '', ...nightTable(of('turin', false), false, windowText), '', '#### Houston (°C and °F)', '', ...nightTable([...of('houston', false), ...of('houston', true)], true, windowText), '');
   }
   return lines.join('\n');
+}
+
+/**
+ * Starting charges at 22:00: a typical evening, the edge of the last-resort zone (~35 %) and a low battery. With one
+ * adult, above 35 % every night is kept with or without the plan (100 % gives the same rows as 60 %).
+ */
+export const STUDY_CHARGES = [60, 35, 20] as const;
+/** The hottest nights taken from each city. */
+const PER_CITY = 5;
+
+/** The study's nights: the hottest of Turin, then of Houston, then Beryl. */
+export function studyNights(window: NightWindow): Night[] {
+  const nightsOf = (id: 'turin' | 'houston'): Night[] => {
+    const month = builtInMonth(id);
+    return hottestNights(month, PER_CITY, window).map((n) => monthNight(month, n.date, NIGHT_HOURS, window));
+  };
+  return [...nightsOf('turin'), ...nightsOf('houston'), berylNight(builtInMonth('houston'), NIGHT_HOURS, window)];
+}
+
+/** Runs the whole study, every sleeper at every charge on every night, and writes its page (docs/results/storm-nights.md). */
+export async function runStudy(generatedOn: string): Promise<{ page: string; runs: number }> {
+  const setup = studySetup();
+  const nights = studyNights(setup.window);
+  const outcomes: NightOutcome[] = [];
+  for (const sleeper of STUDY_SLEEPERS) for (const soc of STUDY_CHARGES) for (const night of nights) outcomes.push(await runNight(night, { socPct: soc, sleeper }));
+  return { page: nightsReport({ setup, charges: STUDY_CHARGES, outcomes, generatedOn }), runs: outcomes.length };
 }

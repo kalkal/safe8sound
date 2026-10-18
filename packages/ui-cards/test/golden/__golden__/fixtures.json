@@ -1,0 +1,1964 @@
+{
+  "hotDayPlan": {
+    "schemaVersion": 1,
+    "id": "plan_7Hq2mX9vK3",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 24,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      },
+      {
+        "ts": "2026-07-15T18:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 88
+      },
+      {
+        "ts": "2026-07-15T19:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 26,
+        "fanOn": true,
+        "level": "balanced",
+        "batteryTargetSocPct": 82
+      },
+      {
+        "ts": "2026-07-15T23:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 62
+      },
+      {
+        "ts": "2026-07-16T03:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 52
+      },
+      {
+        "ts": "2026-07-16T06:40:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 46
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "medium",
+    "confidenceReason": "Afternoon clouds possible; the weather models disagree after 15:00.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false,
+    "reserveFloorSocPct": 43,
+    "gridAvailable": true
+  },
+  "surplusPlan": {
+    "schemaVersion": 1,
+    "id": "plan_7Hq2mX9vK3",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 24,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      },
+      {
+        "ts": "2026-07-15T18:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 88
+      },
+      {
+        "ts": "2026-07-15T19:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 26,
+        "fanOn": true,
+        "level": "balanced",
+        "batteryTargetSocPct": 82
+      },
+      {
+        "ts": "2026-07-15T23:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 62
+      },
+      {
+        "ts": "2026-07-16T03:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 52
+      },
+      {
+        "ts": "2026-07-16T06:40:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 46
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "medium",
+    "confidenceReason": "Afternoon clouds possible; the weather models disagree after 15:00.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false,
+    "reserveFloorSocPct": 43,
+    "gridAvailable": true,
+    "surplus": {
+      "from": "2026-07-15T12:00:00+02:00",
+      "to": "2026-07-15T16:00:00+02:00",
+      "keptKWh": 2.4,
+      "rooms": [
+        {
+          "roomId": "bedroom-1",
+          "setpointC": 24,
+          "reason": "safe_room",
+          "aboveTargetK": 0.8
+        },
+        {
+          "roomId": "living",
+          "setpointC": 25,
+          "reason": "occupied",
+          "aboveTargetK": -0.4
+        }
+      ],
+      "comfortC": 24
+    },
+    "householdTip": {
+      "load": "washing",
+      "cycle": "eco",
+      "windowFrom": "2026-07-15T15:10:00+02:00",
+      "windowTo": "2026-07-15T19:00:00+02:00",
+      "probable": false
+    }
+  },
+  "stormPlan": {
+    "schemaVersion": 1,
+    "id": "plan_7Hq2mX9vK3",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 24,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      },
+      {
+        "ts": "2026-07-15T18:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 88
+      },
+      {
+        "ts": "2026-07-15T19:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 26,
+        "fanOn": true,
+        "level": "balanced",
+        "batteryTargetSocPct": 82
+      },
+      {
+        "ts": "2026-07-15T23:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 62
+      },
+      {
+        "ts": "2026-07-16T03:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 52
+      },
+      {
+        "ts": "2026-07-16T06:40:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 46
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "medium",
+    "confidenceReason": "Afternoon clouds possible; the weather models disagree after 15:00.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false,
+    "gridAvailable": false
+  },
+  "rejectedPlan": {
+    "schemaVersion": 1,
+    "id": "plan_7Hq2mX9vK3",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": false,
+        "reason": "Three splits at once need 5.4 kW.",
+        "measured": 5400,
+        "limit": 5000,
+        "nearestAllowed": 4800,
+        "unit": "W"
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "high",
+    "confidenceReason": "Fresh forecast, stable weather.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false
+  },
+  "lastResortPlan": {
+    "schemaVersion": 1,
+    "id": "plan_LastResort01",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 24,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      },
+      {
+        "ts": "2026-07-15T18:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 88
+      },
+      {
+        "ts": "2026-07-15T19:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 26,
+        "fanOn": true,
+        "level": "balanced",
+        "batteryTargetSocPct": 82
+      },
+      {
+        "ts": "2026-07-15T23:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 62
+      },
+      {
+        "ts": "2026-07-16T03:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 52
+      },
+      {
+        "ts": "2026-07-16T06:40:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 46
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": false,
+        "reason": "Above the 24 °C night limit from 22:00."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "high",
+    "confidenceReason": "Fresh forecast, stable weather.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false,
+    "reserveFloorSocPct": 43,
+    "gridAvailable": true,
+    "warnings": [
+      {
+        "code": "last_resort_plan",
+        "message": "Last resort: within its limits until 22:00, then up to 26.1 °C by 03:00."
+      }
+    ],
+    "lastResort": {
+      "safeUntil": "2026-07-15T22:00:00+02:00",
+      "safeHours": 7,
+      "limitedBy": "temperature",
+      "comfortLimitC": 24,
+      "worstC": 26.1,
+      "worstAt": "2026-07-16T03:00:00+02:00",
+      "actions": [
+        "close_curtains",
+        "drink_water",
+        "fan_below_35c"
+      ]
+    }
+  },
+  "planThatHolds": {
+    "schemaVersion": 1,
+    "id": "plan_7Hq2mX9vK3",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 24,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      },
+      {
+        "ts": "2026-07-15T18:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 88
+      },
+      {
+        "ts": "2026-07-15T19:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 26,
+        "fanOn": true,
+        "level": "balanced",
+        "batteryTargetSocPct": 82
+      },
+      {
+        "ts": "2026-07-15T23:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 62
+      },
+      {
+        "ts": "2026-07-16T03:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 52
+      },
+      {
+        "ts": "2026-07-16T06:40:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 46
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "medium",
+    "confidenceReason": "Afternoon clouds possible; the weather models disagree after 15:00.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false,
+    "reserveFloorSocPct": 43,
+    "gridAvailable": true,
+    "refusedProposal": {
+      "code": "storm_reserve_violated",
+      "message": "The plan takes the battery to 34 %, below the 43 % kept for a storm (6.0 kWh). Nearest allowed: 43 %."
+    }
+  },
+  "advisoryPlan": {
+    "schemaVersion": 1,
+    "id": "plan_7Hq2mX9vK3",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "high",
+    "confidenceReason": "Fresh forecast, stable weather.",
+    "sourceOrigin": {
+      "energy": "live",
+      "rooms": "live",
+      "weather": "live"
+    },
+    "advisoryOnly": true,
+    "nightRecovery": {
+      "roomId": "bedroom-1",
+      "mode": "elderly",
+      "thresholdC": 24,
+      "window": {
+        "start": "2026-07-15T22:00:00+02:00",
+        "end": "2026-07-16T07:00:00+02:00"
+      },
+      "requiredHours": 6,
+      "achievedHours": 4,
+      "status": "infeasible",
+      "bestAchievableHours": 4,
+      "heatIndexDegreeHoursAbove26_7": 0,
+      "budgetDegreeHours": 4
+    },
+    "warnings": [
+      {
+        "code": "night_recovery_infeasible",
+        "message": "The bedroom stays at or below 24 °C for 4 of the 6 hours needed tonight."
+      }
+    ]
+  },
+  "safeRoomInStorm": {
+    "safeRoomId": "bedroom-1",
+    "tempC": 26.8,
+    "humidityPct": 55,
+    "occupantRoles": [
+      "grandpa"
+    ],
+    "level": "essential",
+    "levelReason": "storm",
+    "safeHours": 10.4,
+    "safeUntil": "2026-07-18T06:40:00+02:00",
+    "stormPhase": "active",
+    "origin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "storm-blackout"
+    },
+    "homeLink": "ok"
+  },
+  "safeRoomCalm": {
+    "safeRoomId": "bedroom-1",
+    "tempC": 26.8,
+    "humidityPct": 55,
+    "occupantRoles": [
+      "grandpa"
+    ],
+    "level": "comfort",
+    "levelReason": "user_choice",
+    "safeHours": 10.4,
+    "safeUntil": "2026-07-18T06:40:00+02:00",
+    "origin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "storm-blackout"
+    },
+    "homeLink": "ok"
+  },
+  "safeRoomAboveNightLimit": {
+    "safeRoomId": "bedroom-1",
+    "tempC": 27,
+    "humidityPct": 55,
+    "occupantRoles": [
+      "grandpa"
+    ],
+    "level": "comfort",
+    "levelReason": "user_choice",
+    "safeHours": 10.4,
+    "safeUntil": "2026-07-18T06:40:00+02:00",
+    "origin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "storm-blackout"
+    },
+    "homeLink": "ok",
+    "limitNow": {
+      "limitC": 24,
+      "kind": "night"
+    },
+    "people": [
+      {
+        "role": "grandpa",
+        "name": "Leo"
+      }
+    ]
+  },
+  "safeRoomBatteryFirst": {
+    "safeRoomId": "bedroom-1",
+    "tempC": 23.8,
+    "humidityPct": 55,
+    "occupantRoles": [
+      "grandpa"
+    ],
+    "level": "essential",
+    "levelReason": "storm",
+    "safeHours": 7.08,
+    "safeUntil": "2026-07-18T03:05:00+02:00",
+    "stormPhase": "active",
+    "origin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "storm-blackout"
+    },
+    "homeLink": "ok",
+    "withinLimits": {
+      "until": "2026-07-18T06:00:00+02:00",
+      "limitC": 24
+    }
+  },
+  "inverterRefusal": {
+    "code": "inverter_limit_exceeded",
+    "category": "guard_rejection",
+    "message": "Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid. Nearest allowed: 6000 W.",
+    "retryable": false,
+    "details": {
+      "guarantee": "inverter_limit",
+      "measured": 8000,
+      "limit": 6000,
+      "nearestAllowed": 6000,
+      "unit": "W",
+      "guarantees": [
+        {
+          "id": "storm_reserve",
+          "ok": true,
+          "reason": "Holds for the whole horizon."
+        },
+        {
+          "id": "inverter_limit",
+          "ok": false,
+          "reason": "Peak load 8.0 kW is above the 6.0 kW the inverter delivers on grid.",
+          "measured": 8000,
+          "limit": 6000,
+          "nearestAllowed": 6000,
+          "unit": "W"
+        },
+        {
+          "id": "battery_power",
+          "ok": true,
+          "reason": "Holds for the whole horizon."
+        },
+        {
+          "id": "safe_room_comfort",
+          "ok": true,
+          "reason": "Holds for the whole horizon."
+        },
+        {
+          "id": "pacing_on_track",
+          "ok": true,
+          "reason": "Holds for the whole horizon."
+        }
+      ]
+    }
+  },
+  "stormReserveRefusal": {
+    "code": "storm_reserve_violated",
+    "category": "guard_rejection",
+    "message": "The plan takes the battery to 34 %, below the 43 % kept for a storm (6.0 kWh). Nearest allowed: 43 %.",
+    "retryable": false,
+    "details": {
+      "guarantee": "storm_reserve",
+      "measured": 34,
+      "limit": 43,
+      "nearestAllowed": 43,
+      "unit": "%",
+      "guarantees": [
+        {
+          "id": "storm_reserve",
+          "ok": false,
+          "reason": "The plan takes the battery to 34 %, below the 43 % kept for a storm (6.0 kWh).",
+          "measured": 34,
+          "limit": 43,
+          "nearestAllowed": 43,
+          "unit": "%"
+        },
+        {
+          "id": "inverter_limit",
+          "ok": true,
+          "reason": "Holds for the whole horizon."
+        },
+        {
+          "id": "battery_power",
+          "ok": true,
+          "reason": "Holds for the whole horizon."
+        },
+        {
+          "id": "safe_room_comfort",
+          "ok": true,
+          "reason": "Holds for the whole horizon."
+        },
+        {
+          "id": "pacing_on_track",
+          "ok": true,
+          "reason": "Holds for the whole horizon."
+        }
+      ]
+    }
+  },
+  "lastResortBatteryPlan.reference": {
+    "schemaVersion": 1,
+    "id": "plan_LastResort01",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 24,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      },
+      {
+        "ts": "2026-07-15T18:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 88
+      },
+      {
+        "ts": "2026-07-15T19:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 26,
+        "fanOn": true,
+        "level": "balanced",
+        "batteryTargetSocPct": 82
+      },
+      {
+        "ts": "2026-07-15T23:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 62
+      },
+      {
+        "ts": "2026-07-16T03:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 52
+      },
+      {
+        "ts": "2026-07-16T06:40:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 46
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": false,
+        "reason": "Above the 24 °C night limit from 22:00."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "high",
+    "confidenceReason": "Fresh forecast, stable weather.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false,
+    "reserveFloorSocPct": 43,
+    "gridAvailable": true,
+    "warnings": [
+      {
+        "code": "last_resort_plan",
+        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up."
+      }
+    ],
+    "lastResort": {
+      "safeUntil": "2026-07-16T03:05:00+02:00",
+      "safeHours": 13.08,
+      "limitedBy": "battery",
+      "comfortLimitC": 24,
+      "worstC": 26.1,
+      "worstAt": "2026-07-16T07:00:00+02:00",
+      "limitCrossedAt": "2026-07-16T06:00:00+02:00",
+      "limitCrossedC": 24,
+      "actions": [
+        "close_curtains",
+        "drink_water",
+        "fan_below_35c"
+      ],
+      "place": "reference"
+    }
+  },
+  "lastResortBatteryPlan.turin": {
+    "schemaVersion": 1,
+    "id": "plan_LastResort01",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 24,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      },
+      {
+        "ts": "2026-07-15T18:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 88
+      },
+      {
+        "ts": "2026-07-15T19:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 26,
+        "fanOn": true,
+        "level": "balanced",
+        "batteryTargetSocPct": 82
+      },
+      {
+        "ts": "2026-07-15T23:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 62
+      },
+      {
+        "ts": "2026-07-16T03:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 52
+      },
+      {
+        "ts": "2026-07-16T06:40:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 46
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": false,
+        "reason": "Above the 24 °C night limit from 22:00."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "high",
+    "confidenceReason": "Fresh forecast, stable weather.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false,
+    "reserveFloorSocPct": 43,
+    "gridAvailable": true,
+    "warnings": [
+      {
+        "code": "last_resort_plan",
+        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up."
+      }
+    ],
+    "lastResort": {
+      "safeUntil": "2026-07-16T03:05:00+02:00",
+      "safeHours": 13.08,
+      "limitedBy": "battery",
+      "comfortLimitC": 24,
+      "worstC": 26.1,
+      "worstAt": "2026-07-16T07:00:00+02:00",
+      "limitCrossedAt": "2026-07-16T06:00:00+02:00",
+      "limitCrossedC": 24,
+      "actions": [
+        "close_curtains",
+        "drink_water",
+        "fan_below_35c"
+      ],
+      "place": "turin"
+    }
+  },
+  "lastResortBatteryPlan.houston": {
+    "schemaVersion": 1,
+    "id": "plan_LastResort01",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 24,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      },
+      {
+        "ts": "2026-07-15T18:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 88
+      },
+      {
+        "ts": "2026-07-15T19:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 26,
+        "fanOn": true,
+        "level": "balanced",
+        "batteryTargetSocPct": 82
+      },
+      {
+        "ts": "2026-07-15T23:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 62
+      },
+      {
+        "ts": "2026-07-16T03:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 52
+      },
+      {
+        "ts": "2026-07-16T06:40:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 46
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": false,
+        "reason": "Above the 24 °C night limit from 22:00."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "high",
+    "confidenceReason": "Fresh forecast, stable weather.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false,
+    "reserveFloorSocPct": 43,
+    "gridAvailable": true,
+    "warnings": [
+      {
+        "code": "last_resort_plan",
+        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up."
+      }
+    ],
+    "lastResort": {
+      "safeUntil": "2026-07-16T03:05:00+02:00",
+      "safeHours": 13.08,
+      "limitedBy": "battery",
+      "comfortLimitC": 24,
+      "worstC": 26.1,
+      "worstAt": "2026-07-16T07:00:00+02:00",
+      "limitCrossedAt": "2026-07-16T06:00:00+02:00",
+      "limitCrossedC": 24,
+      "actions": [
+        "close_curtains",
+        "drink_water",
+        "fan_below_35c"
+      ],
+      "place": "houston"
+    }
+  },
+  "lastResortBatteryPlan.none": {
+    "schemaVersion": 1,
+    "id": "plan_LastResort01",
+    "homeId": "demo",
+    "status": "proposed",
+    "createdAt": "2026-07-15T14:00:00+02:00",
+    "expiresAt": "2026-07-15T14:10:00+02:00",
+    "horizonAt": "2026-07-16T07:00:00+02:00",
+    "goal": "cool",
+    "ladder": [
+      {
+        "level": "comfort",
+        "setpointOffsetK": 0,
+        "fansOn": false,
+        "preferredModes": [
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "balanced",
+        "setpointOffsetK": 1,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1",
+          "living"
+        ]
+      },
+      {
+        "level": "saver",
+        "setpointOffsetK": 2,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      },
+      {
+        "level": "essential",
+        "setpointOffsetK": 0,
+        "fansOn": true,
+        "preferredModes": [
+          "dry",
+          "cool"
+        ],
+        "roomIds": [
+          "bedroom-1"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "ts": "2026-07-15T15:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 24,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 80
+      },
+      {
+        "ts": "2026-07-15T18:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 25,
+        "fanOn": false,
+        "level": "comfort",
+        "batteryTargetSocPct": 88
+      },
+      {
+        "ts": "2026-07-15T19:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 26,
+        "fanOn": true,
+        "level": "balanced",
+        "batteryTargetSocPct": 82
+      },
+      {
+        "ts": "2026-07-15T23:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 62
+      },
+      {
+        "ts": "2026-07-16T03:00:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 52
+      },
+      {
+        "ts": "2026-07-16T06:40:00+02:00",
+        "roomId": "bedroom-1",
+        "hvacMode": "cool",
+        "setpointC": 27,
+        "fanOn": true,
+        "level": "saver",
+        "batteryTargetSocPct": 46
+      }
+    ],
+    "reserveWh": 6000,
+    "guarantees": [
+      {
+        "id": "storm_reserve",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "inverter_limit",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "battery_power",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      },
+      {
+        "id": "safe_room_comfort",
+        "ok": false,
+        "reason": "Above the 24 °C night limit from 22:00."
+      },
+      {
+        "id": "pacing_on_track",
+        "ok": true,
+        "reason": "Holds for the whole horizon."
+      }
+    ],
+    "forecastConfidence": "high",
+    "confidenceReason": "Fresh forecast, stable weather.",
+    "sourceOrigin": {
+      "energy": "simulated",
+      "rooms": "simulated",
+      "weather": "simulated",
+      "scenario": "heatwave"
+    },
+    "advisoryOnly": false,
+    "reserveFloorSocPct": 43,
+    "gridAvailable": true,
+    "warnings": [
+      {
+        "code": "last_resort_plan",
+        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up."
+      }
+    ],
+    "lastResort": {
+      "safeUntil": "2026-07-16T03:05:00+02:00",
+      "safeHours": 13.08,
+      "limitedBy": "battery",
+      "comfortLimitC": 24,
+      "worstC": 26.1,
+      "worstAt": "2026-07-16T07:00:00+02:00",
+      "limitCrossedAt": "2026-07-16T06:00:00+02:00",
+      "limitCrossedC": 24,
+      "actions": [
+        "close_curtains",
+        "drink_water",
+        "fan_below_35c"
+      ]
+    }
+  }
+}

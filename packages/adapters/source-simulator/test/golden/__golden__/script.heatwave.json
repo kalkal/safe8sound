@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 2,
+  "id": "heatwave",
+  "version": "1.1.0",
+  "description": "A heatwave day, 38 degrees in the afternoon, a warm night and the next hot morning (36 hours, so a plan sees the whole night). The safe room is cooled all day with the fan on.",
+  "startHour": 0,
+  "durationH": 36,
+  "stepSeconds": 60,
+  "seed": 20260716,
+  "simulatedGroups": [
+    "weather"
+  ],
+  "initial": {
+    "batterySocPct": 50,
+    "rooms": [
+      {
+        "id": "bedroom-1",
+        "tempC": 27.5,
+        "humidityPct": 50
+      },
+      {
+        "id": "bedroom-2",
+        "tempC": 28,
+        "humidityPct": 50
+      },
+      {
+        "id": "study",
+        "tempC": 28.5,
+        "humidityPct": 48
+      },
+      {
+        "id": "living",
+        "tempC": 28.5,
+        "humidityPct": 50
+      }
+    ]
+  },
+  "hourly": [
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 250
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 230
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 240
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 300
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 450
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 500
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 400
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 450
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 500
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 400
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 450
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 650
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 800
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 700
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 550
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 400
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 300
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 250
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 230
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 220
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 240
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 300
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 450
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 500
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 400
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    },
+    {
+      "stormProb": 0.03,
+      "baseLoadW": 350
+    }
+  ],
+  "gridOutages": [],
+  "occupancy": [
+    {
+      "roomId": "bedroom-1",
+      "roles": [
+        "grandpa"
+      ],
+      "fromH": 0,
+      "toH": 36
+    },
+    {
+      "roomId": "bedroom-2",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 0,
+      "toH": 7.5
+    },
+    {
+      "roomId": "study",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 9,
+      "toH": 17
+    },
+    {
+      "roomId": "living",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 18,
+      "toH": 21
+    },
+    {
+      "roomId": "bedroom-2",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 21,
+      "toH": 31.5
+    },
+    {
+      "roomId": "study",
+      "roles": [
+        "daughter"
+      ],
+      "fromH": 33,
+      "toH": 36
+    }
+  ],
+  "hvac": [
+    {
+      "roomId": "bedroom-1",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": true,
+      "fromH": 0,
+      "toH": 36
+    },
+    {
+      "roomId": "bedroom-2",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": false,
+      "fromH": 0,
+      "toH": 7
+    },
+    {
+      "roomId": "study",
+      "mode": "cool",
+      "setpointC": 27,
+      "fanOn": false,
+      "fromH": 9,
+      "toH": 17
+    },
+    {
+      "roomId": "living",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": false,
+      "fromH": 12,
+      "toH": 23
+    },
+    {
+      "roomId": "bedroom-2",
+      "mode": "cool",
+      "setpointC": 26,
+      "fanOn": false,
+      "fromH": 21,
+      "toH": 31
+    },
+    {
+      "roomId": "study",
+      "mode": "cool",
+      "setpointC": 27,
+      "fanOn": false,
+      "fromH": 33,
+      "toH": 36
+    }
+  ]
+}

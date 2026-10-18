@@ -1,0 +1,38 @@
+{
+  "calls": [
+    {
+      "tool": "set_scenario",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Saved."
+          }
+        ],
+        "structuredContent": {
+          "restarted": true
+        }
+      }
+    },
+    {
+      "tool": "get_milestones",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The next moments of the day."
+          }
+        ],
+        "structuredContent": {
+          "now": "2026-07-18T12:00:00+02:00",
+          "day": {
+            "from": "2026-07-18T12:00:00+02:00",
+            "to": "2026-07-19T12:00:00+02:00"
+          },
+          "milestones": []
+        }
+      }
+    }
+  ],
+  "phone": []
+}
