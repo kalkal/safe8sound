@@ -49,8 +49,8 @@ test('Power cut → the simulated grid goes down and Ana is told; Skip ahead to 
     reached.push((await status.textContent()) ?? '');
   }
   // #390: one Skip ahead no longer jumps from the storm to the morning: the night stops at the essential level first.
-  expect(reached.slice(0, 2)).toEqual(['Now: the battery reaches the essential level.', 'Now: the power is back.']);
+  expect(reached.slice(0, 2)).toEqual(['Now: the home steps down to its essential settings.', 'Now: the power is back.']);
   await expect(skip).toBeDisabled();
   const notes = phone.getByRole('list', { name: 'Notifications' }).getByRole('heading');
-  await expect(notes).toHaveText(['Power is back at home', 'Switched to Essential', 'Power outage (storm) at home'], { timeout: 20_000 });
+  await expect(notes).toHaveText(['Power is back at home', 'Essential settings on', 'Power outage (storm) at home'], { timeout: 20_000 });
 });

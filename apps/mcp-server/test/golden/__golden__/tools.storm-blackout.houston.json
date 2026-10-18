@@ -365,7 +365,7 @@
     "tool": "get_milestones",
     "args": {},
     "isError": false,
-    "text": "Now 2024-07-07T12:00:00-05:00; the day runs from 2024-07-07T12:00:00-05:00 to 2024-07-08T12:00:00-05:00. Next: The storm starts: the grid goes down at 2024-07-07T15:00:00-05:00; The battery reaches the essential level at 2024-07-07T21:00:00-05:00; Power is back (stable) at 2024-07-08T06:40:00-05:00; Next recharge at 2024-07-08T11:00:00-05:00.",
+    "text": "Now 2024-07-07T12:00:00-05:00; the day runs from 2024-07-07T12:00:00-05:00 to 2024-07-08T12:00:00-05:00. Next: The storm starts: the grid goes down at 2024-07-07T15:00:00-05:00; The home steps down to its essential settings at 2024-07-07T21:00:00-05:00; Power is back (stable) at 2024-07-08T06:40:00-05:00; Next recharge at 2024-07-08T11:00:00-05:00.",
     "structuredContent": {
       "now": "2024-07-07T12:00:00-05:00",
       "day": {
@@ -381,7 +381,7 @@
         {
           "kind": "essential_level",
           "at": "2024-07-07T21:00:00-05:00",
-          "label": "The battery reaches the essential level"
+          "label": "The home steps down to its essential settings"
         },
         {
           "kind": "power_back",
@@ -413,7 +413,7 @@
     "tool": "get_home_status",
     "args": {},
     "isError": false,
-    "text": "Battery at 65.2%, comfort level; 1 of 4 rooms served (simulated data). The grid is down: the home runs on the battery and the sun. Rooms: Leo's room served with Leo (grandpa), Second bedroom waiting, Study waiting, Living room waiting. Room ids for tools (do not say them): Leo's room = bedroom-1; Second bedroom = bedroom-2; Study = study; Living room = living.",
+    "text": "Battery at 65.2%, saver level; 1 of 4 rooms served (simulated data). The grid is down: the home runs on the battery and the sun. Rooms: Leo's room served with Leo (grandpa), Second bedroom waiting, Study waiting, Living room waiting. Room ids for tools (do not say them): Leo's room = bedroom-1; Second bedroom = bedroom-2; Study = study; Living room = living.",
     "structuredContent": {
       "homeId": "demo#00000000000000c0",
       "ts": "2024-07-07T20:00:00.000Z",
@@ -422,9 +422,9 @@
       "loadW": 1755,
       "gridW": 0,
       "gridAvailable": false,
-      "level": "comfort",
-      "levelReason": "user_choice",
-      "levelChangedAt": "2024-07-07T17:00:00.000Z",
+      "level": "saver",
+      "levelReason": "storm",
+      "levelChangedAt": "2024-07-07T20:00:00.000Z",
       "controlAvailability": "ok",
       "rooms": [
         {
@@ -478,7 +478,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 78.8 °F, 67 % humidity, occupants: Leo (grandpa). Level essential (reason: storm). Safe for at least 24.0 hours, at least until 3:00 PM tomorrow. Storm mode: active. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout). Context, to say only if someone may be unwell: the emergency number here is 911.",
+    "text": "Safe room Leo's room: 78.8 °F, 67 % humidity, occupants: Leo (grandpa). Level saver (reason: storm). Safe for at least 24.0 hours, at least until 3:00 PM tomorrow. Storm mode: active. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 26,
@@ -486,7 +486,7 @@
       "occupantRoles": [
         "grandpa"
       ],
-      "level": "essential",
+      "level": "saver",
       "levelReason": "storm",
       "safeHours": 24,
       "safeUntil": "2024-07-08T15:00:00-05:00",
@@ -1130,7 +1130,7 @@
     "tool": "get_milestones",
     "args": {},
     "isError": false,
-    "text": "Now 2024-07-07T15:00:00-05:00; the day runs from 2024-07-07T12:00:00-05:00 to 2024-07-08T12:00:00-05:00. Next: The battery reaches the essential level at 2024-07-07T21:00:00-05:00; Power is back (stable) at 2024-07-08T06:40:00-05:00; Next recharge at 2024-07-08T11:00:00-05:00.",
+    "text": "Now 2024-07-07T15:00:00-05:00; the day runs from 2024-07-07T12:00:00-05:00 to 2024-07-08T12:00:00-05:00. Next: The home steps down to its essential settings at 2024-07-07T21:00:00-05:00; Power is back (stable) at 2024-07-08T06:40:00-05:00; Next recharge at 2024-07-08T11:00:00-05:00.",
     "structuredContent": {
       "now": "2024-07-07T15:00:00-05:00",
       "day": {
@@ -1141,7 +1141,7 @@
         {
           "kind": "essential_level",
           "at": "2024-07-07T21:00:00-05:00",
-          "label": "The battery reaches the essential level"
+          "label": "The home steps down to its essential settings"
         },
         {
           "kind": "power_back",
@@ -1173,7 +1173,7 @@
     "tool": "get_home_status",
     "args": {},
     "isError": false,
-    "text": "Battery at 94.8%, comfort level; 1 of 4 rooms served (simulated data). The grid is down: the home runs on the battery and the sun. Rooms: Leo's room served with Leo (grandpa), Second bedroom waiting, Study waiting, Living room waiting. Room ids for tools (do not say them): Leo's room = bedroom-1; Second bedroom = bedroom-2; Study = study; Living room = living.",
+    "text": "Battery at 94.8%, essential level; 1 of 4 rooms served (simulated data). The grid is down: the home runs on the battery and the sun. Rooms: Leo's room served with Leo (grandpa), Second bedroom waiting, Study waiting, Living room waiting. Room ids for tools (do not say them): Leo's room = bedroom-1; Second bedroom = bedroom-2; Study = study; Living room = living.",
     "structuredContent": {
       "homeId": "demo#00000000000000c0",
       "ts": "2024-07-08T02:00:00.000Z",
@@ -1182,9 +1182,9 @@
       "loadW": 1789,
       "gridW": 0,
       "gridAvailable": false,
-      "level": "comfort",
-      "levelReason": "user_choice",
-      "levelChangedAt": "2024-07-07T17:00:00.000Z",
+      "level": "essential",
+      "levelReason": "storm",
+      "levelChangedAt": "2024-07-08T02:00:00.000Z",
       "controlAvailability": "ok",
       "rooms": [
         {

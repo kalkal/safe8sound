@@ -1,9 +1,9 @@
-import { HomeStatusSchema, demoPeopleOf, err, ok, toolError, type HomeId, type HomeProfile, type HomeStatus } from '@cold-reserve/contracts';
+import { HomeStatusSchema, demoPeopleOf, err, ok, toolError, type HomeId, type HomeProfile, type HomeStatus, type PacingState } from '@cold-reserve/contracts';
 import type { Clock, HomeDataSource } from '@cold-reserve/core';
 import { z } from 'zod';
 import type { CapabilityModule } from '../../registry.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
-import { defineTool } from '../../tool.js';
+import { defineTool, type ToolContext } from '../../tool.js';
 import type { StatusDeriver } from './status-deriver.js';
 
 export { interimStatusDeriver, type StatusDeriver } from './status-deriver.js';
@@ -21,6 +21,8 @@ export interface HomeEntry {
 export interface EnergyStatusDeps {
   readonly homes: (homeId: HomeId) => HomeEntry | undefined;
   readonly deriver: StatusDeriver;
+  /** #429: the level of an active storm, the safe room's own; undefined outside a storm (the deriver's level then). */
+  readonly stormLevel?: (ctx: ToolContext) => Promise<PacingState | undefined>;
 }
 
 /** The text of get_home_status; the last live reading as the home's clock time, never an ISO stamp (#177). */
@@ -76,6 +78,7 @@ export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {
           if (!read.ok) return read;
           const snapshot = read.value;
           const derived = deps.deriver.derive({ snapshot, profile: home.profile, readOnly: home.readOnly, levelSince: home.levelSince });
+          const storm = await deps.stormLevel?.(ctx);
           const service = new Map(derived.rooms.map((r) => [r.roomId, r]));
           return ok({
             homeId: ctx.homeId,
@@ -85,7 +88,7 @@ export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {
             loadW: snapshot.loadW,
             gridW: snapshot.gridW,
             gridAvailable: snapshot.gridAvailable,
-            ...derived.pacing,
+            ...(storm ?? derived.pacing),
             controlAvailability: derived.controlAvailability,
             rooms: snapshot.rooms.map((r) => {
               // A room the deriver skipped fails the output schema (a bug, reported as output_schema_violation).

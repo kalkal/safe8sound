@@ -16,7 +16,7 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
   });
 
   it('the empty phone says, in one fixed line, when Ana will hear from it; the line goes with the first message', () => {
-    const line = 'Ana gets a message when a storm is expected, when it starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.';
+    const line = 'Ana gets a message when a storm is expected, when it starts, when the home steps down to its essential settings, when the emergency plan is applied, and when the power is back.';
     const feed = createScriptedPhone();
     render(<PhonePanel feed={feed} timeZone="Europe/Rome" />);
     expect(screen.getByText(line)).toBeTruthy();
@@ -54,7 +54,7 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
     });
     const list = screen.getByRole('list', { name: 'Notifications' });
     expect(list.getAttribute('aria-live')).toBe('polite');
-    expect(within(list).getAllByRole('heading').map((h) => h.textContent)).toEqual(['Power is back at home', 'Switched to Essential', 'Power outage (storm) at home']);
+    expect(within(list).getAllByRole('heading').map((h) => h.textContent)).toEqual(['Power is back at home', 'Essential settings on', 'Power outage (storm) at home']);
   });
 
   describe('replies (queue item 3, #24)', () => {

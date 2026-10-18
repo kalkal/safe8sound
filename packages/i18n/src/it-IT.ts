@@ -156,7 +156,7 @@ export const itIT = {
   'clock.kind.surplus_end': 'finisce il surplus solare',
   'clock.kind.storm_start': 'la rete si spegne',
   'clock.kind.power_back': 'torna la corrente',
-  'clock.kind.essential_level': 'la batteria arriva al livello essenziale',
+  'clock.kind.essential_level': 'la casa passa alle impostazioni essenziali',
   'clock.kind.limit_crossed': 'la stanza rifugio supera il suo limite',
   'clock.kind.last_resort_end': 'finiscono le ore sicure del piano di emergenza',
   'clock.kind.next_recharge': 'la batteria si ricarica',
@@ -173,14 +173,14 @@ export const itIT = {
   'storm.started':
     'Avviso di {product} per {name}: un temporale ha tolto la corrente in casa. {room} è a {temp} e la batteria la tiene al sicuro {untilSafe}. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
   'storm.essential':
-    'Aggiornamento di {product} per {name}: la batteria è arrivata al livello essenziale, per tenere {room} al sicuro {untilSafe}. {room} è a {temp}. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
+    'Aggiornamento di {product} per {name}: la casa è passata alle impostazioni essenziali per tenere {room} al sicuro più a lungo, {untilSafe}. {room} è a {temp}. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
   'storm.powerBack': 'Aggiornamento di {product} per {name}: la corrente è tornata in casa alle {powerBackAt}. {room} è a {temp}. La modalità temporale è finita. {action}',
   'storm.lastResort':
     'Avviso di {product} per {name}: la batteria di casa è quasi scarica. {room} è a {temp} e resta nei suoi limiti fino alle {safeUntil}, poi si scalda. Per favore, vai a controllare.',
   'storm.startedWithin':
     'Avviso di {product} per {name}: un temporale ha tolto la corrente in casa. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
   'storm.essentialWithin':
-    'Aggiornamento di {product} per {name}: la batteria è arrivata al livello essenziale. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
+    'Aggiornamento di {product} per {name}: la casa è passata alle impostazioni essenziali per tenere {room} al sicuro più a lungo. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. {action} Prossimo messaggio: quando cambia il livello o torna la corrente.',
   'storm.lastResortWithin':
     'Avviso di {product} per {name}: la batteria di casa è quasi scarica. {room} è a {temp} e resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. Per favore, vai a controllare.',
   'storm.prepared':
@@ -395,10 +395,10 @@ export const itIT = {
   'phone.title': 'Il telefono di tua figlia (simulato)',
   'phone.onlyInbox': 'Solo il telefono di Ana: i messaggi che {product} manda alla famiglia. Chiedi a {product} nella pagina principale.',
   'phone.empty': 'Ancora nessun messaggio da {product}.',
-  'phone.whenTold': 'Ana riceve un messaggio quando è previsto un temporale, quando inizia, quando la batteria arriva al livello essenziale, quando viene applicato il piano di emergenza e quando torna la corrente.',
+  'phone.whenTold': 'Ana riceve un messaggio quando è previsto un temporale, quando inizia, quando la casa passa alle impostazioni essenziali, quando viene applicato il piano di emergenza e quando torna la corrente.',
   'phone.list': 'Notifiche',
   'phone.storm_started': 'Blackout (temporale) a casa',
-  'phone.essential_level': 'Passato a Essenziale',
+  'phone.essential_level': 'Impostazioni essenziali attive',
   'phone.power_back': 'La corrente è tornata a casa',
   'phone.last_resort_applied': 'Batteria di casa quasi scarica: passa a controllare',
   'phone.storm_prepared': 'Temporale previsto: la casa è pronta',

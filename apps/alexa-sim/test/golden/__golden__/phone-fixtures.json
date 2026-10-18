@@ -17,9 +17,9 @@
       "role": "daughter",
       "channel": "in_app",
       "transition": "essential_level",
-      "text": "Safe-8-Sound update for Ana: the battery reached the essential level, to keep Bedroom safe until 6:40 AM tomorrow. Bedroom is at 26.8 °C. No action is needed now. Next message: when the level changes or power returns."
+      "text": "Safe-8-Sound update for Ana: the home stepped down to its essential settings to keep Bedroom safe longer, until 6:40 AM tomorrow. Bedroom is at 26.8 °C. No action is needed now. Next message: when the level changes or power returns."
     },
-    "it": "Aggiornamento di Safe-8-Sound per Ana: la batteria è arrivata al livello essenziale, per tenere Bedroom al sicuro fino alle 6:40 di domani. Bedroom è a 26.8 °C. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente."
+    "it": "Aggiornamento di Safe-8-Sound per Ana: la casa è passata alle impostazioni essenziali per tenere Bedroom al sicuro più a lungo, fino alle 6:40 di domani. Bedroom è a 26.8 °C. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente."
   },
   {
     "name": "power-back",

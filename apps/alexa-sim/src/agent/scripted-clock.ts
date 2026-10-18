@@ -5,7 +5,7 @@ import { toolErrorResult, type ToolCallResult } from './agent.js';
 
 // The simulated clock on the scripted home (time pack, 12 Oct): the same tools as a sandbox (set_scenario,
 // get_milestones, advance_clock) over the storm night of the script, so the scripted demo and the tests walk the
-// same story as the deployed site: the grid goes down, the battery reaches the essential level, power comes back,
+// same story as the deployed site: the grid goes down, the home steps down to its essential settings, power comes back,
 // and Ana's phone receives each message as the clock passes it. Other scenarios have no moments in the script.
 
 const DAY_FROM = '2026-07-18T12:00:00+02:00';
@@ -14,7 +14,7 @@ const DAY_TO = '2026-07-19T12:00:00+02:00';
 /** The storm night's moments, each with the family message the home sends then (the phone fixtures' own times). */
 const STORM_NIGHT: readonly { kind: MilestoneKind; fixture: PhoneFixture; label: string }[] = [
   { kind: 'storm_start', fixture: 'storm-started', label: 'The storm starts: the grid goes down' },
-  { kind: 'essential_level', fixture: 'essential', label: 'The battery reaches the essential level' },
+  { kind: 'essential_level', fixture: 'essential', label: 'The home steps down to its essential settings' },
   { kind: 'power_back', fixture: 'power-back', label: 'Power is back (stable)' },
 ];
 

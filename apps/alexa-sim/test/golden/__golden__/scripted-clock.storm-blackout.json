@@ -38,7 +38,7 @@
             {
               "kind": "essential_level",
               "at": "2026-07-18T21:10:00+02:00",
-              "label": "The battery reaches the essential level"
+              "label": "The home steps down to its essential settings"
             },
             {
               "kind": "power_back",
@@ -83,7 +83,7 @@
             {
               "kind": "essential_level",
               "at": "2026-07-18T21:10:00+02:00",
-              "label": "The battery reaches the essential level"
+              "label": "The home steps down to its essential settings"
             },
             {
               "kind": "power_back",
@@ -182,7 +182,7 @@
       "role": "daughter",
       "channel": "in_app",
       "transition": "essential_level",
-      "text": "Safe-8-Sound update for Ana: the battery reached the essential level, to keep Bedroom safe until 6:40 AM tomorrow. Bedroom is at 26.8 °C. No action is needed now. Next message: when the level changes or power returns."
+      "text": "Safe-8-Sound update for Ana: the home stepped down to its essential settings to keep Bedroom safe longer, until 6:40 AM tomorrow. Bedroom is at 26.8 °C. No action is needed now. Next message: when the level changes or power returns."
     },
     {
       "at": "2026-07-18T19:42:00+02:00",

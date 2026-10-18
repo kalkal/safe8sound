@@ -11,6 +11,7 @@ import {
   type HomeProfile,
   type Level,
   type LevelReason,
+  type PacingState,
   type Preferences,
   type Result,
   type RoomReading,
@@ -63,9 +64,44 @@ export interface Observed {
   readonly ctx: ToolContext;
 }
 
-/** Level of the status: Essential while the storm is active; otherwise the person's comfort, as the interim deriver says (TODO(#19)). */
-export const levelOf = (session: StormSession | undefined): { level: Level; levelReason: LevelReason } =>
-  session?.phase === 'active' ? { level: 'essential', levelReason: 'storm' } : { level: 'comfort', levelReason: 'user_choice' };
+/**
+ * The level of a storm day (#429), one for the safe room and the home status: Saver while the storm is active, Essential
+ * once the home stepped down to its essential settings (the family is told then), otherwise the person's comfort, as
+ * the interim deriver says (TODO(#19)). The detector's readings keep the same level on both sides, so this decides no
+ * message: the essential one comes from its own event (essentialEvent).
+ */
+export function levelOf(session: StormSession | undefined): { level: Level; levelReason: LevelReason } {
+  if (session?.phase !== 'active') return { level: 'comfort', levelReason: 'user_choice' };
+  const essential = session.notifications.some((n) => n.transition === 'essential_level');
+  return { level: essential ? 'essential' : 'saver', levelReason: 'storm' };
+}
+
+/**
+ * #429: the home's level while a storm is active, for get_home_status, the same as the safe room's (levelOf); undefined
+ * outside a storm. A store that cannot be read leaves the home status its own level, with a warn line.
+ */
+export async function activeStormLevel(deps: StormModeDeps, ctx: ToolContext): Promise<PacingState | undefined> {
+  const latest = await deps.storeFor(ctx.homeId, { correlationId: ctx.correlationId }).getLatestStormSession();
+  if (!latest.ok) {
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'warn',
+      component: 'mcp-server',
+      message: 'storm_level_unreadable',
+      correlationId: ctx.correlationId,
+      code: latest.error.code,
+      category: categoryOf(latest.error.code),
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      details: { event: 'storm_level_unreadable', ...homeDetail(ctx.homeId) },
+    });
+    return undefined;
+  }
+  const session = latest.value;
+  if (session?.phase !== 'active') return undefined;
+  // Since when: the essential step (its family message), else the grid loss.
+  const essentialAt = session.notifications.find((n) => n.transition === 'essential_level')?.at;
+  return { ...levelOf(session), levelChangedAt: essentialAt ?? session.activeAt ?? session.startedAt };
+}
 
 /**
  * Safe hours of #23 on one physics (Q7-A of #24): the guard's hold of the safe room (holdSafeRoom), the same

@@ -30,16 +30,16 @@ test('Power cut → the grid goes down and Ana is told; Skip ahead → Essential
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toBeVisible();
   await expect(page.getByTestId('echo-screen')).toHaveAttribute('data-sky', 'storm');
 
-  await clock.getByRole('button', { name: /^Go to [0-9][0-9]:[0-9][0-9] · the battery reaches the essential level/ }).click();
-  await expect(clock.getByRole('status')).toHaveText('Now: the battery reaches the essential level.');
-  await expect(phone.getByRole('article', { name: 'Switched to Essential' })).toBeVisible();
+  await clock.getByRole('button', { name: /^Go to [0-9][0-9]:[0-9][0-9] · the home steps down to its essential settings/ }).click();
+  await expect(clock.getByRole('status')).toHaveText('Now: the home steps down to its essential settings.');
+  await expect(phone.getByRole('article', { name: 'Essential settings on' })).toBeVisible();
 
   // Every button can be said (idea 4): "Skip ahead" typed or said moves the clock, it is not asked to the assistant.
   await page.getByLabel('Ask a question').fill('Skip ahead');
   await page.getByRole('button', { name: 'Ask' }).click();
   await expect(clock.getByRole('status')).toHaveText('Now: the power is back.');
   const notes = phone.getByRole('list', { name: 'Notifications' }).getByRole('heading');
-  await expect(notes).toHaveText(['Power is back at home', 'Switched to Essential', 'Power outage (storm) at home']);
+  await expect(notes).toHaveText(['Power is back at home', 'Essential settings on', 'Power outage (storm) at home']);
   await expect(clock.getByRole('button', { name: /Skip ahead/ })).toBeDisabled();
 });
 
@@ -97,7 +97,7 @@ test('after the clock moves on, the answer on screen says it is an earlier one, 
   await expect(when).toHaveCount(0);
 
   await clock.getByRole('button', { name: /^Go to/ }).click();
-  await expect(clock.getByRole('status')).toHaveText('Now: the battery reaches the essential level.');
+  await expect(clock.getByRole('status')).toHaveText('Now: the home steps down to its essential settings.');
   // The storm answer stays on screen, but it no longer reads as the home now.
   await expect(when).toHaveText('Earlier answer · 19:42');
   // Inside the answer, as the judge journey reads it, and drawn as a pill in the header band.
@@ -120,7 +120,7 @@ test('Restart the day takes the clock back to the start of the day, and the draw
   await page.getByRole('button', { name: 'Ask', exact: true }).click();
   await expect(clock.locator('time')).toHaveText('19:42');
   await clock.getByRole('button', { name: /^Go to/ }).click();
-  await expect(clock.getByRole('status')).toHaveText('Now: the battery reaches the essential level.');
+  await expect(clock.getByRole('status')).toHaveText('Now: the home steps down to its essential settings.');
   const skipped = await clock.locator('time').textContent();
 
   const badge = demoControlsButton(page);

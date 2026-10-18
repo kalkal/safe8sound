@@ -16,7 +16,7 @@
     {
       "kind": "essential_level",
       "at": "2024-07-07T21:00:00-05:00",
-      "label": "The battery reaches the essential level"
+      "label": "The home steps down to its essential settings"
     },
     {
       "kind": "power_back",

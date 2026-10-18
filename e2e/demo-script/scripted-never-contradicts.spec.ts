@@ -44,8 +44,8 @@ test.describe('the scripted demo never contradicts its clock', { tag: '@outcome:
       return card.innerText();
     };
     const at1942 = await reserve();
-    await clock.getByRole('button', { name: /^Go to [0-9][0-9]:[0-9][0-9] · the battery reaches the essential level/ }).click();
-    await expect(clock.getByRole('status')).toHaveText('Now: the battery reaches the essential level.');
+    await clock.getByRole('button', { name: /^Go to [0-9][0-9]:[0-9][0-9] · the home steps down to its essential settings/ }).click();
+    await expect(clock.getByRole('status')).toHaveText('Now: the home steps down to its essential settings.');
     const at2110 = await reserve();
     await check(page, BUG.reserveFrozen, () => {
       expect(at2110, 'the reserve two hours later').not.toBe(at1942);

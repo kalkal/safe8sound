@@ -1,4 +1,4 @@
-import { GetMilestonesOutputSchema, HOME_HEADER, HomeIdSchema, SafeRoomStatusSchema, type GetMilestonesOutput } from '@cold-reserve/contracts';
+import { GetMilestonesOutputSchema, HOME_HEADER, HomeIdSchema, HomeStatusSchema, SafeRoomStatusSchema, type GetMilestonesOutput } from '@cold-reserve/contracts';
 import { memoryLogger } from '@cold-reserve/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -71,8 +71,14 @@ describe('the storm story of a sandbox (#390)', () => {
     const list = GetMilestonesOutputSchema.parse((await call('get_milestones')).structured);
     expect(list.milestones.map((m) => `${m.kind}@${m.at.slice(11, 16)}`)).toEqual(['storm_start@15:00', 'essential_level@21:00', 'power_back@06:40', 'next_recharge@08:00']);
 
+    // #429: one level for the home and the safe room: Saver from the grid loss, Essential from the essential moment.
+    const levels = async () => [HomeStatusSchema.parse((await call('get_home_status')).structured).level, SafeRoomStatusSchema.parse((await call('get_safe_room_status')).structured).level];
+    expect(await levels()).toEqual(['comfort', 'comfort']);
     expect((await skip()).kind).toBe('storm_start');
+    expect(await levels()).toEqual(['saver', 'saver']);
+    expect((await call('get_home_status')).text).toContain('saver level');
     expect((await skip()).kind).toBe('essential_level');
+    expect(await levels()).toEqual(['essential', 'essential']);
     const night = SafeRoomStatusSchema.parse((await call('get_safe_room_status')).structured);
     expect(night).toMatchObject({ stormPhase: 'active', level: 'essential', gridAvailable: false });
     expect(night.tempC).toBeLessThanOrEqual(25);
@@ -84,7 +90,7 @@ describe('the storm story of a sandbox (#390)', () => {
     expect(forecast).toContain("a storm is expected and the home is ready for a power cut. Leo's room is at 26.0 °C; if the power goes out, the battery keeps it safe at least until 12:00 PM tomorrow.");
     // The storm-start time is never the time it is sent ("until 3:00 PM" at 3:00 PM): at the 24-hour cap it is a horizon.
     expect(started).toMatch(/Leo's room is at 26\.0 °C and the battery keeps it safe at least until 3:00 PM tomorrow\. No action is needed now\./);
-    expect(essential).toMatch(/the battery reached the essential level, to keep Leo's room safe at least until 9:00 PM tomorrow\. Leo's room is at 25\.0 °C\. No action is needed now\./);
+    expect(essential).toMatch(/the home stepped down to its essential settings to keep Leo's room safe longer, at least until 9:00 PM tomorrow\. Leo's room is at 25\.0 °C\. No action is needed now\./);
     // Power back: grandpa's room within his 24 °C night limit, so no action is needed (above it, the family would be asked to check).
     expect(back).toContain("power came back at home at 6:30 AM. Leo's room is at 24.0 °C. Storm mode has ended. No action is needed now.");
     for (const text of [started, essential, back]) expect(tempOf(text ?? '')).toBeLessThanOrEqual(26);

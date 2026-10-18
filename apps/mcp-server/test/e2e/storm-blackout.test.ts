@@ -85,7 +85,8 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       const status = await call('get_safe_room_status');
       expect(JSON.stringify(status)).not.toMatch(/Giulia|phone-/);
       const s = SafeRoomStatusSchema.parse(status.structuredContent);
-      expect(s).toMatchObject({ safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], level: 'essential', levelReason: 'storm', stormPhase: 'active' });
+      // #429: Saver from the grid loss; Essential only from the essential moment.
+      expect(s).toMatchObject({ safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], level: 'saver', levelReason: 'storm', stormPhase: 'active' });
       // #23 acceptance on one physics (Q7-A of #24): the guard's hold of the safe room, pinned as numbers.
       // 15:30 with a full battery: the split pre-cools grandpa's room toward the elderly night limit (24 °C)
       // before 22:00, and the battery holds it through the 24-hour cap.

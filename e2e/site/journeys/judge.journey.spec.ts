@@ -37,7 +37,7 @@ const SLOW = { timeout: 20_000 };
 /** The moment the clock reached, from its status line ("Now: the power is back."). */
 const REACHED: Record<string, { readonly phase?: Phase; readonly note?: keyof typeof NOTE }> = {
   'Now: the grid goes down.': { phase: 'grid-down', note: 'storm_started' },
-  'Now: the battery reaches the essential level.': { note: 'essential_level' },
+  'Now: the home steps down to its essential settings.': { note: 'essential_level' },
   'Now: the power is back.': { phase: 'power-back', note: 'power_back' },
 };
 
@@ -181,7 +181,7 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
   }
 
   test('3. the day went through the storm, the night and the morning, and Ana heard each once', { tag: '@outcome:O6' }, async () => {
-    expect(stops.map((s) => s.status).slice(0, 3)).toEqual(['Now: the grid goes down.', 'Now: the battery reaches the essential level.', 'Now: the power is back.']);
+    expect(stops.map((s) => s.status).slice(0, 3)).toEqual(['Now: the grid goes down.', 'Now: the home steps down to its essential settings.', 'Now: the power is back.']);
     expect(stops.slice(0, 3).map((s) => s.time)).toEqual(['15:00', '21:00', '06:40']);
     await expect(ui.skip).toBeDisabled();
     await expect(ui.notes.getByRole('heading')).toHaveText([NOTE.power_back, NOTE.essential_level, NOTE.storm_started, NOTE.storm_prepared], SLOW);

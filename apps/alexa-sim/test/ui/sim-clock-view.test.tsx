@@ -34,7 +34,7 @@ describe('SimClock', () => {
     const { rerender } = render(<SimClock state={AHEAD} note={{ kind: 'grid_down' }} busy={false} onSkip={vi.fn()} />);
     expect(screen.getByRole('status').textContent).toBe('The simulated grid is now down.');
     rerender(<SimClock state={AHEAD} note={{ kind: 'reached', moment: 'essential_level' }} busy={false} onSkip={vi.fn()} />);
-    expect(screen.getByRole('status').textContent).toBe('Now: the battery reaches the essential level.');
+    expect(screen.getByRole('status').textContent).toBe('Now: the home steps down to its essential settings.');
     rerender(<SimClock state={AHEAD} note={{ kind: 'failed' }} busy={false} onSkip={vi.fn()} />);
     expect(screen.getByRole('status').textContent).toBe("The clock didn't move. Try again.");
     rerender(<SimClock state={AHEAD} note={{ kind: 'limit' }} busy={false} onSkip={vi.fn()} />);

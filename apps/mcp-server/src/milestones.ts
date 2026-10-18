@@ -11,7 +11,7 @@ const LABEL: Readonly<Record<MilestoneKind, string>> = {
   surplus_end: 'The solar surplus ends',
   storm_start: 'The storm starts: the grid goes down',
   power_back: 'Power is back (stable)',
-  essential_level: 'The battery reaches the essential level',
+  essential_level: 'The home steps down to its essential settings',
   limit_crossed: 'The safe room passes its limit',
   last_resort_end: "The last resort's safe hours end",
   next_recharge: 'Next recharge',

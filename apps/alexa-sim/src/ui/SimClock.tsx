@@ -24,7 +24,7 @@ function noteText(state: ClockState, note: ClockNote | undefined, busy: boolean)
 
 export function SimClock({ state, note, busy, onSkip }: { state: ClockState; note?: ClockNote; busy: boolean; onSkip: () => void }) {
   const noteId = useId();
-  // The button says where it goes ("Go to 22:00 · the battery reaches the essential level"); with nothing ahead it keeps
+  // The button says where it goes ("Go to 22:00 · the home steps down to its essential settings"); with nothing ahead it keeps
   // its plain name, disabled, and the line beside it says why.
   const target = state.next === undefined ? undefined : t('clock.skipTo', { time: clockTime(state.next.at), moment: momentText(state.next.kind) });
   return (

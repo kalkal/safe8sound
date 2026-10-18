@@ -46,7 +46,7 @@ describe('what the model reads', () => {
     const s = out.value;
     const text = safeRoomSummary(s);
     expect(text).toContain(`Safe room: ${one(s.tempC)} °C, ${String(s.humidityPct)} % humidity, occupants: Leo (grandpa).`);
-    expect(text).toContain('Level essential (reason: storm).');
+    expect(text).toContain('Level saver (reason: storm).');
     expect(text).toContain(`Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}${s.safeHours >= 24 ? ' tomorrow' : ''}.`);
     expect(text).not.toMatch(/Giulia|phone-/);
     expect(text).toContain('Storm mode: active.');

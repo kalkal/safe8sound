@@ -54,12 +54,12 @@ describe('get_safe_room_status', () => {
     expect((await w.inbox())).toEqual([]);
   });
 
-  it('reports the stored storm: Essential for the storm while it is active', async () => {
+  it('reports the stored storm: Saver for the storm while it is active, before the essential moment (#429)', async () => {
     const w = world(4);
     await startStormMode(w.deps, { mode: 'active' }, w.ctx);
     const before = await w.store.getLatestStormSession();
     const out = await safeRoomStatus(w.deps, w.ctx);
-    expect(out.ok && out.value).toMatchObject({ stormPhase: 'active', level: 'essential', levelReason: 'storm' });
+    expect(out.ok && out.value).toMatchObject({ stormPhase: 'active', level: 'saver', levelReason: 'storm' });
     const after = await w.store.getLatestStormSession();
     expect(after).toEqual(before);
     expect((await w.inbox())).toHaveLength(1);

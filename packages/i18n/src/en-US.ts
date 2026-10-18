@@ -165,7 +165,7 @@ export const enUS = {
   'clock.kind.surplus_end': 'the solar surplus ends',
   'clock.kind.storm_start': 'the grid goes down',
   'clock.kind.power_back': 'the power is back',
-  'clock.kind.essential_level': 'the battery reaches the essential level',
+  'clock.kind.essential_level': 'the home steps down to its essential settings',
   'clock.kind.limit_crossed': 'the safe room passes its limit',
   'clock.kind.last_resort_end': "the emergency plan's safe hours end",
   'clock.kind.next_recharge': 'the battery recharges',
@@ -184,7 +184,7 @@ export const enUS = {
   'storm.started':
     '{product} alert for {name}: a storm cut the power at home. {room} is at {temp} and the battery keeps it safe {untilSafe}. {action} Next message: when the level changes or power returns.',
   'storm.essential':
-    '{product} update for {name}: the battery reached the essential level, to keep {room} safe {untilSafe}. {room} is at {temp}. {action} Next message: when the level changes or power returns.',
+    '{product} update for {name}: the home stepped down to its essential settings to keep {room} safe longer, {untilSafe}. {room} is at {temp}. {action} Next message: when the level changes or power returns.',
   'storm.powerBack': '{product} update for {name}: power came back at home at {powerBackAt}. {room} is at {temp}. Storm mode has ended. {action}',
   // Sent by the server when a last-resort plan is applied (#160): the fixed "battery low, check on them" alert.
   'storm.lastResort':
@@ -193,7 +193,7 @@ export const enUS = {
   'storm.startedWithin':
     '{product} alert for {name}: a storm cut the power at home. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. {action} Next message: when the level changes or power returns.',
   'storm.essentialWithin':
-    '{product} update for {name}: the battery reached the essential level. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. {action} Next message: when the level changes or power returns.',
+    '{product} update for {name}: the home stepped down to its essential settings to keep {room} safe longer. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. {action} Next message: when the level changes or power returns.',
   'storm.lastResortWithin':
     '{product} alert for {name}: the home battery is low. {room} is at {temp} and stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. Please check on them.',
   // #390: a storm is expected and the home is prepared (sent once per storm). The times are what the battery would do if the power goes out.
@@ -440,10 +440,10 @@ export const enUS = {
   'phone.onlyInbox': "Only Ana's phone: the messages {product} sends to the family. Ask {product} on the main page.",
   'phone.empty': 'No messages from {product} yet.',
   // The empty phone says when the family will hear from it (owner decision, 10 Oct).
-  'phone.whenTold': 'Ana gets a message when a storm is expected, when it starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.',
+  'phone.whenTold': 'Ana gets a message when a storm is expected, when it starts, when the home steps down to its essential settings, when the emergency plan is applied, and when the power is back.',
   'phone.list': 'Notifications',
   'phone.storm_started': 'Power outage (storm) at home',
-  'phone.essential_level': 'Switched to Essential',
+  'phone.essential_level': 'Essential settings on',
   'phone.power_back': 'Power is back at home',
   'phone.last_resort_applied': 'Home battery low: please check in',
   'phone.storm_prepared': 'Storm expected: the home is ready',

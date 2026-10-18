@@ -7,12 +7,13 @@ import { loadConfig, type ServerConfig } from './config.js';
 import { createMcpHandler, type Logger, type McpHandler } from './handler.js';
 import type { ComfortPlanWiring } from './comfort-plan-config.js';
 import { atHome } from './modules/comfort-plan/deps.js';
+import type { ToolContext } from './tool.js';
 import { comfortPlanModule } from './modules/comfort-plan/index.js';
 import type { DemoClockDeps } from './modules/demo-clock.js';
 import { demoSettingsModule, type SandboxChoices } from './modules/demo-settings.js';
 import { energyStatusModule, interimStatusDeriver, type HomeEntry } from './modules/energy-status/index.js';
 import { stormModeModule, type ClaimedTransition, type StormModeDeps } from './modules/storm-mode/index.js';
-import { catchUpStorm, runStormDetector } from './modules/storm-mode/observe.js';
+import { activeStormLevel, catchUpStorm, runStormDetector } from './modules/storm-mode/observe.js';
 import { familyReply } from './modules/storm-mode/tools.js';
 import type { PhoneReplyHandler } from './phone-inbox.js';
 import type { StormModeWiring } from './storm-mode-config.js';
@@ -288,7 +289,8 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     maxAdvancesPerDay: sandboxMaxAdvances.value,
   };
   const modules = [
-    energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver }),
+    // #429: one level for the home status and the safe room during a storm.
+    energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver, ...(stormDeps === undefined ? {} : { stormLevel: (ctx: ToolContext) => activeStormLevel(atHome(stormDeps, ctx.homeId), ctx) }) }),
     ...(opts.comfortPlan === undefined ? [] : [comfortPlanModule({ ...opts.comfortPlan, model: params, homes: planningHome, logger: opts.logger })]),
     ...(stormDeps === undefined ? [] : [stormModeModule(stormDeps)]),
     ...(settingsStoreFor === undefined

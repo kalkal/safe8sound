@@ -17,7 +17,7 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await page.goto('/');
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
   await expect(phone.getByText('No messages from Safe-8-Sound yet.')).toBeVisible();
-  const whenTold = phone.getByText('Ana gets a message when a storm is expected, when it starts, when the battery reaches the essential level, when the emergency plan is applied, and when the power is back.');
+  const whenTold = phone.getByText('Ana gets a message when a storm is expected, when it starts, when the home steps down to its essential settings, when the emergency plan is applied, and when the power is back.');
   await expect(whenTold).toBeVisible();
 
   await ask(page, "The power's out");
@@ -47,11 +47,11 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await expectVoiceMatchesCards(page, ['Safe room card']);
 
   await ask(page, 'Switch to essential');
-  await expect(phone.getByRole('article', { name: 'Switched to Essential' })).toBeVisible();
+  await expect(phone.getByRole('article', { name: 'Essential settings on' })).toBeVisible();
 
   await ask(page, 'Is the power back?');
   const notes = phone.getByRole('list', { name: 'Notifications' }).getByRole('heading');
-  await expect(notes).toHaveText(['Power is back at home', 'Switched to Essential', 'Power outage (storm) at home']);
+  await expect(notes).toHaveText(['Power is back at home', 'Essential settings on', 'Power outage (storm) at home']);
   await expect(phone.getByRole('article', { name: 'Power is back at home' })).toContainText('power came back at home at 5:48');
 });
 
