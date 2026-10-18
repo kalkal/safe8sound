@@ -30,7 +30,8 @@ describe('loadInfraConfig (region and stages always from config)', () => {
     const { simApi, warmup, alexa } = loaded.value;
     expect(simApi.limits).toEqual(config.simApi.limits);
     expect(simApi.codeLimits).toEqual(config.simApi.codeLimits);
-    expect(simApi.limits.demo).toMatchObject({ turnsPerCodePerDay: 100, turnsGlobalPerDay: 120 });
+    // #445 (owner, 18 Oct): 300 turns a day for the judges' code, and 20 for the owner's on top.
+    expect(simApi.limits.demo).toMatchObject({ turnsPerCodePerDay: 300, toolCallsPerCodePerDay: 300, turnsGlobalPerDay: 320 });
     expect(simApi.codeLimits.demo['owner']?.turnsPerCodePerDay).toBe(20);
     expect(simApi.speech.enabled).toEqual({ dev: false, demo: true });
     expect(warmup.enabled).toEqual({ dev: false, demo: false });

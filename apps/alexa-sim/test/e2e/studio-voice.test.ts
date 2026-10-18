@@ -8,9 +8,9 @@ import { createRemoteSynthesize, createSpeechTickets } from '../../src/voice/stu
 
 // F8d (#25) end to end on the page side, without Polly: the real fetch to a local stand-in for the sim-api's
 // POST /v1/speech, the real studio-voice speaker, a fake audio element. Fault injection: the stand-in answers
-// 503, hangs, or is down. In every case the reply is still read, by the browser voice, with one notice.
+// 503, hangs, is down, or refuses past the speech cap (429). In every case the reply is still read, by the browser voice, with one notice.
 
-type Mode = 'ok' | 'unavailable' | 'hang';
+type Mode = 'ok' | 'unavailable' | 'hang' | 'quota';
 let mode: Mode = 'ok';
 let server: Server | undefined;
 let base = '';
@@ -25,6 +25,11 @@ beforeAll(async () => {
       if (mode === 'hang') return; // never answers: the speaker's own timeout has to act
       if (mode === 'unavailable') {
         res.writeHead(503, { 'content-type': 'application/problem+json' }).end(JSON.stringify({ code: 'polly_unavailable' }));
+        return;
+      }
+      // Past the code's speech characters for the day (#445): the sim-api refuses with its quota problem.
+      if (mode === 'quota') {
+        res.writeHead(429, { 'content-type': 'application/problem+json' }).end(JSON.stringify({ status: 429, code: 'demo_quota_exceeded', retryAfterMs: 3_600_000 }));
         return;
       }
       res.writeHead(200, { 'content-type': 'audio/mpeg' }).end(Buffer.from([0x49, 0x44, 0x33, 4]));
@@ -103,6 +108,16 @@ describe('studio voice, page side, against a local /v1/speech', () => {
 
   it('reads the reply with the browser voice when the sim-api answers 503, with one notice', async () => {
     mode = 'unavailable';
+    const p = page();
+    p.speaker.speak(REPLY);
+    await eventually(() => {
+      expect(p.browserSaid).toEqual([REPLY]);
+    });
+    expect(p.notices).toEqual(['voice.browserVoice']);
+  });
+
+  it('reads the reply with the browser voice past the speech cap of the day (429), with one notice (#445)', async () => {
+    mode = 'quota';
     const p = page();
     p.speaker.speak(REPLY);
     await eventually(() => {

@@ -99,9 +99,9 @@ describe('sim-api stack (#17)', () => {
     const vars = (Object.values(demo.findResources('AWS::Lambda::Function'))[0] as { Properties: { Environment: { Variables: Record<string, unknown> } } }).Properties.Environment.Variables;
     expect(vars).toMatchObject({
       SIM_DEMO_CODES_PARAMETER: '/cold-reserve/demo/sim-api/demo-codes',
-      SIM_LIMIT_TURNS_PER_CODE: '100',
-      SIM_LIMIT_TURNS_GLOBAL: '120',
-      SIM_LIMIT_TOOL_CALLS_PER_CODE: '100',
+      SIM_LIMIT_TURNS_PER_CODE: '300',
+      SIM_LIMIT_TURNS_GLOBAL: '320',
+      SIM_LIMIT_TOOL_CALLS_PER_CODE: '300',
       SIM_LIMIT_READ_CALLS_PER_CODE: '2000',
       SIM_LIMIT_READ_CALLS_GLOBAL: '2200',
       SIM_LIMIT_DEMO_CALLS_PER_CODE: '500',
@@ -256,14 +256,15 @@ describe('SimApiConfigSchema', () => {
     const demo = (limits: Partial<SimApiConfig['limits']['demo']>, owner: Record<string, number> = { turnsPerCodePerDay: 20, readCallsPerCodePerDay: 200, speechCharsPerCodePerDay: 6000 }) =>
       SimApiConfigSchema.safeParse({ ...base, limits: { ...base.limits, demo: { ...base.limits.demo, ...limits } }, codeLimits: { dev: {}, demo: { owner } } });
     expect(demo({}).success).toBe(true);
-    for (const bad of [{ turnsGlobalPerDay: 119 }, { readCallsGlobalPerDay: 2199 }, { speechCharsGlobalPerDay: 35_999 }]) {
+    // One below the judges' code (300 turns, #445) plus the owner's (20).
+    for (const bad of [{ turnsGlobalPerDay: 319 }, { readCallsGlobalPerDay: 2199 }, { speechCharsGlobalPerDay: 35_999 }]) {
       const r = demo(bad);
       expect(r.success, JSON.stringify(bad)).toBe(false);
       expect(JSON.stringify(r.error?.issues)).toContain(Object.keys(bad)[0]);
     }
     // A listed code without its own turn cap takes the shared one: the global cap must hold two of them.
     expect(demo({}, { toolCallsPerCodePerDay: 5 }).success).toBe(false);
-    expect(demo({ turnsGlobalPerDay: 200, readCallsGlobalPerDay: 4000, speechCharsGlobalPerDay: 60_000 }, { toolCallsPerCodePerDay: 5 }).success).toBe(true);
+    expect(demo({ turnsGlobalPerDay: 600, readCallsGlobalPerDay: 4000, speechCharsGlobalPerDay: 60_000 }, { toolCallsPerCodePerDay: 5 }).success).toBe(true);
   });
 });
 

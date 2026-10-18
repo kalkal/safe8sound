@@ -99,9 +99,9 @@
           "logLinesGlobalPerMinute": 600
         },
         "demo": {
-          "turnsPerCodePerDay": 100,
-          "turnsGlobalPerDay": 120,
-          "toolCallsPerCodePerDay": 100,
+          "turnsPerCodePerDay": 300,
+          "turnsGlobalPerDay": 320,
+          "toolCallsPerCodePerDay": 300,
           "readCallsPerCodePerDay": 2000,
           "readCallsGlobalPerDay": 2200,
           "demoCallsPerCodePerDay": 500,
