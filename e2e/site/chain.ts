@@ -31,12 +31,13 @@ export function chainEnv() {
   const phone = secret('SITE_E2E_PHONE');
   const mcpUrl = `http://127.0.0.1:${String(PORTS.mcp)}/mcp`;
   return {
-    // As deployed: a sandbox's day starts at the scenario's start (no start hour), so the storm lies ahead of a power cut.
+    // As deployed (infra/cdk.json): the daily anchor at real speed, so a fresh sandbox plays the hour of the day in its place
+    // (a new scenario, place or restart plays the day again from its start, no start hour: the storm lies ahead).
     mcp: {
       PORT: String(PORTS.mcp),
       MCP_CLIENTS: `agent:agent@demo#*=${agentMcp},cards:simapi@demo#*=${simMcp},phone:daughter@demo#*=${phone}`,
       MCP_SCENARIO: 'clear-day',
-      MCP_SCENARIO_SPEED: '0',
+      MCP_SCENARIO_ANCHOR: 'daily',
     },
     agent: { PORT: String(PORTS.agent), AGENT_MCP_URL: mcpUrl, AGENT_MCP_TOKEN: agentMcp, AGENT_INVOKE_TOKEN: invoke },
     simApi: {
@@ -50,6 +51,13 @@ export function chainEnv() {
       SIM_MCP_URL: mcpUrl,
       SIM_MCP_TOKEN: simMcp,
       SIM_PHONE_TOKEN: phone,
+      // One demo code for the whole run: the judge's journey alone walks five windows on it, past the per-code quotas.
+      SIM_LIMIT_TURNS_PER_CODE: '200',
+      SIM_LIMIT_TURNS_GLOBAL: '200',
+      SIM_LIMIT_TOOL_CALLS_PER_CODE: '500',
+      SIM_LIMIT_READ_CALLS_PER_CODE: '5000',
+      SIM_LIMIT_READ_CALLS_GLOBAL: '5000',
+      SIM_LIMIT_DEMO_CALLS_PER_CODE: '2000',
       // As on AWS (#243): sim-api serves only what came through the distribution, which adds this secret.
       SIM_ORIGIN_SECRET: originSecret(), // gitleaks:allow (random per test run)
     },

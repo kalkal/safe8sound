@@ -1,5 +1,6 @@
 import { defineConfig } from '@playwright/test';
 import { AWS_SITE_URL, PORTS, SCRIPTED_SITE_URL, SIM_API_URL, chainEnv, originSecret } from './e2e/site/chain.js';
+import { SIZES, projectOf } from './e2e/support/sizes.js';
 
 // The site E2E (K1, #242/#244): the BUILT simulator, as CloudFront serves it, in its own run (`pnpm e2e:site`), so the
 // demo-script suite keeps one dev server. Two builds:
@@ -19,8 +20,24 @@ export default defineConfig({
   retries: CI ? 1 : 0,
   timeout: 30_000,
   reporter: 'list',
-  use: { trace: 'retain-on-failure', ...(CI ? {} : { channel: 'chrome' }) },
-  webServer: [
+  // No trace against a deployed site: a trace keeps the typed demo code and the session token (e2e/support/target.ts).
+  use: { trace: process.env['JOURNEY_BASE_URL'] === undefined ? 'retain-on-failure' : 'off', ...(CI ? {} : { channel: 'chrome' }) },
+  projects: [
+    { name: 'site', testIgnore: 'journeys/**' },
+    // The journeys (e2e/site/journeys, docs/outcomes.md): one project per screen size, each a whole visit in one page,
+    // so never retried; a failing step leaves its screenshot in e2e-results/journeys/<size>/.
+    ...SIZES.map((size) => ({
+      name: projectOf(size),
+      testMatch: 'journeys/**/*.journey.spec.ts',
+      retries: 0,
+      // A step may wait for two reads of Ana's inbox before and after an answer (e2e/support/phone.ts).
+      timeout: 90_000,
+      outputDir: `e2e-results/journeys/${size.id}`,
+      use: { viewport: { width: size.width, height: size.height }, screenshot: 'only-on-failure' as const },
+    })),
+  ],
+  // A deployed site (JOURNEY_BASE_URL, journeys only: e2e/support/target.ts) needs no local server.
+  webServer: process.env['JOURNEY_BASE_URL'] !== undefined ? [] : [
     {
       command: [`${vite} build --outDir dist-e2e --emptyOutDir`, `${headers} dist-e2e`, `${vite} preview --outDir dist-e2e --host 127.0.0.1 --port ${String(PORTS.scriptedSite)} --strictPort`].join(' && '),
       cwd: 'apps/alexa-sim',

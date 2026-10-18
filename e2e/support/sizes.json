@@ -1,0 +1,15 @@
+{
+  "$comment": "The screen sizes every journey walks (outcome O10). One Playwright project per size (journey-<id>, playwright.site.config.ts); tooling/src/outcomes.mjs runs one size at a time; docs/outcomes.md lists the same table. quick: the sizes of a quick run.",
+  "quick": ["1904x870", "375x812"],
+  "sizes": [
+    { "id": "1904x870", "width": 1904, "height": 870, "device": "desktop", "what": "Chrome with the bookmarks bar on a 1920×1080 screen (the owner's)" },
+    { "id": "1366x768", "width": 1366, "height": 768, "device": "desktop", "what": "The most common laptop screen" },
+    { "id": "1440x900", "width": 1440, "height": 900, "device": "desktop", "what": "A 13-15 inch laptop" },
+    { "id": "1920x1080", "width": 1920, "height": 1080, "device": "desktop", "what": "A full HD window" },
+    { "id": "960x480", "width": 960, "height": 480, "device": "echo", "what": "Echo Show 5" },
+    { "id": "1340x800", "width": 1340, "height": 800, "device": "echo", "what": "Echo Show 8 (2025)" },
+    { "id": "1920x1200", "width": 1920, "height": 1200, "device": "echo", "what": "Echo Show 11" },
+    { "id": "1280x800", "width": 1280, "height": 800, "device": "desktop", "what": "The frame of the video" },
+    { "id": "375x812", "width": 375, "height": 812, "device": "phone", "what": "A phone" }
+  ]
+}

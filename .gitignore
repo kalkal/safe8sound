@@ -21,6 +21,8 @@ Thumbs.db
 logs/
 playwright-report/
 test-results/
+# Journey screenshots (pnpm journeys): outside test-results/, which every Playwright run empties.
+e2e-results/
 reports/mutation/
 reports/conformance/
 

@@ -20,10 +20,15 @@
     "heavy": "node tooling/src/heavy.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm lint:css && pnpm depcruise && pnpm --filter @cold-reserve/ui-cards build:card && pnpm test",
     "e2e": "playwright test",
-    "e2e:site": "playwright test -c playwright.site.config.ts",
+    "e2e:site": "playwright test -c playwright.site.config.ts --project site",
     "conformance": "node tooling/src/conformance.mjs",
     "mutation": "node tooling/src/mutation.mjs",
-    "golden": "node tooling/src/golden.mjs"
+    "golden": "node tooling/src/golden.mjs",
+    "journey:judge": "node tooling/src/outcomes.mjs journey judge",
+    "journey:user": "node tooling/src/outcomes.mjs journey user",
+    "journeys": "node tooling/src/outcomes.mjs journeys",
+    "outcome": "node tooling/src/outcomes.mjs outcome",
+    "outcomes": "node tooling/src/outcomes.mjs all"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
