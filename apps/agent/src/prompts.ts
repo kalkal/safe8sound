@@ -5,7 +5,7 @@ import { SYSTEM_PROMPTS } from './prompts.generated.js';
 
 // The system prompt and few-shot dialogues are data, versioned in apps/agent/prompts/ (plan §4).
 // A new version is a new file; the snapshot test shows every change in review.
-export const PROMPT_VERSION = 'v3';
+export const PROMPT_VERSION: keyof typeof SYSTEM_PROMPTS = 'v4';
 
 /** The MCP tools of the plan (§4). Few-shot dialogues may only use these. */
 export const PLAN_TOOLS = [
@@ -41,7 +41,12 @@ function renderDialogue(d: Dialogue): string {
   return [`User: ${d.user}`, ...calls, `Assistant: ${d.assistant}`].join('\n');
 }
 
-export function buildSystemPrompt(): string {
+/** The prompt of a version: the current one by default; an older one only to compare them (the eval script). */
+export function buildSystemPrompt(version: keyof typeof SYSTEM_PROMPTS = PROMPT_VERSION): string {
   const examples = FEW_SHOT.map(renderDialogue).join('\n\n');
-  return `${SYSTEM_PROMPT_TEMPLATE.replaceAll('{product}', PRODUCT_NAME)}\n\nExamples:\n\n${examples}`;
+  return `${SYSTEM_PROMPTS[version].replaceAll('{product}', PRODUCT_NAME)}\n\nExamples:\n\n${examples}`;
 }
+
+/** A prompt version by name, for the eval script (`EVAL_PROMPT_VERSION=v3`); undefined when there is none. */
+export const promptVersionOf = (name: string | undefined): keyof typeof SYSTEM_PROMPTS | undefined =>
+  name !== undefined && Object.hasOwn(SYSTEM_PROMPTS, name) ? (name as keyof typeof SYSTEM_PROMPTS) : undefined;

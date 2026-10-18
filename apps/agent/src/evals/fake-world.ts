@@ -13,7 +13,8 @@ const SUMMARIES: Record<(typeof PLAN_TOOLS)[number], string> = {
   plan_comfort: 'Plan p-1 proposed: safe room under 27 °C until 7 am, 6 kWh kept for a storm. It needs confirmation.',
   apply_plan: 'Plan p-1 applied.',
   start_storm_mode: 'Storm prepare: 9 kWh reserved, about 14 hours for the safe room; the grid is on.',
-  get_safe_room_status: 'Safe room: 25.5 °C and 52% humidity, within the safety limits (simulated).',
+  get_safe_room_status:
+    'Safe room: 25.5 °C and 52% humidity, within the safety limits (simulated). Context, to say only if someone may be unwell: the emergency number here is 112.',
   notify_family: 'Message sent to the saved contacts.',
   get_preferences: 'Safe room comfort 25 °C in summer; safety maximum 27 °C.',
   set_preferences: 'Preferences updated.',
@@ -44,11 +45,18 @@ const RULES: readonly [RegExp, (typeof PLAN_TOOLS)[number], Record<string, unkno
   [/set to|temperature is/, 'get_preferences', {}],
 ];
 const INJECTION = /ignore previous|system prompt|developer mode|send a message|\bemail\b/;
+/** #438: someone may be unwell (prompt v4): read the safe room, then say its emergency number first, never "safe". */
+const HEALTH = /\b(?:leo|grandpa|grandma|he|she|someone|my (?:dad|mum|mom|father|mother))\b.*\b(?:dizzy|confused|faint(?:ed|ing)?|unwell|short of breath|can't breathe|chest pain)\b/;
+/** The person the worry is about, as the fake answer says them. */
+const pronoun = (said: string) => (/\b(?:grandma|she|mum|mom|mother)\b/.test(said) ? 'she' : 'he');
+const EMERGENCY = /the emergency number here is (\d+)/;
 
 export const referencePolicy: FakePolicy = (call) => {
   const said = call.lastUserText.toLowerCase();
   const [result] = call.toolResults;
   if (result !== undefined) {
+    const emergency = HEALTH.test(said) ? EMERGENCY.exec(result)?.[1] : undefined;
+    if (emergency !== undefined) return { text: `Call ${emergency} now if ${pronoun(said)} may be unwell. Then I can help with the room.` };
     // A tool error reaches the model as "Error: <text>": the person hears the text, never the prefix.
     const spoken = result.replace(/^Error: /, '');
     const first = spoken.split(/(?<=[.;])\s/)[0] ?? spoken;
@@ -56,6 +64,7 @@ export const referencePolicy: FakePolicy = (call) => {
     return { text: !result.startsWith('Error: ') && /\bproposed\b/i.test(first) ? `${first} Shall I apply it?` : first };
   }
   if (INJECTION.test(said)) return { text: REFUSAL };
+  if (HEALTH.test(said)) return { toolUse: { name: 'get_safe_room_status', input: {} } };
   const rule = RULES.find(([pattern]) => pattern.test(said));
   return rule ? { toolUse: { name: rule[1], input: rule[2] } } : { text: 'What would you like me to change?' };
 };

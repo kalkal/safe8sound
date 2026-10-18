@@ -74,8 +74,11 @@ export function startSummary(o: StartOutput, room: RoomLabel = noName, capHours?
   return `${state} The safe room${nameOf(room, o.session.safeRoomId)} is covered for ${hoursText(o.safeHours, capHours)}, ${untilWords(o.safeHours, capHours)} ${untilText(o.safeUntil, o.safeUntil, o.safeHours)}. ${family}${devicesText(o)}`;
 }
 
-/** The safe room now, in the unit the sandbox chose (#306); the structured status stays in °C. */
-export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: RoomLabel = noName, capHours?: number): string {
+/**
+ * The safe room now, in the unit the sandbox chose (#306); the structured status stays in °C. `emergencyNumber`: the
+ * number to call at the home's place (#438), given to the model as context it says only when someone may be unwell.
+ */
+export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: RoomLabel = noName, capHours?: number, emergencyNumber?: string): string {
   const humidity = s.humidityPct === undefined ? '' : `, ${String(s.humidityPct)} % humidity`;
   // #271: a fictional name with its role, "Leo (grandpa)", so a name and a role are one person.
   const named = new Map((s.people ?? []).map((p) => [p.role, p.name]));
@@ -102,7 +105,8 @@ export function safeRoomSummary(s: SafeRoomStatus, unit: TempUnit = 'C', room: R
   return (
     head +
     `Safe room${nameOf(room, s.safeRoomId, true)}: ${formatTempFixed(s.tempC, unit)}${humidity}, occupants: ${occupants}.${pastLimit(s, unit)} Level ${s.level} (reason: ${s.levelReason}). ` +
-    `${hours} ${storm}${checkIn} Home link ${s.homeLink}, ${dataText(s.origin)}.`
+    `${hours} ${storm}${checkIn} Home link ${s.homeLink}, ${dataText(s.origin)}.` +
+    (emergencyNumber === undefined ? '' : ` Context, to say only if someone may be unwell: the emergency number here is ${emergencyNumber}.`)
   );
 }
 

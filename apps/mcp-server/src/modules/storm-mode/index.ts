@@ -1,4 +1,5 @@
 import { NotifyFamilyInputSchema, NotifyFamilyOutputSchema, SafeRoomStatusSchema, StartStormModeInputSchema, StartStormModeOutputSchema, type HomeId } from '@cold-reserve/contracts';
+import { emergencyNumberOf } from '@cold-reserve/i18n';
 import { z } from 'zod';
 import type { CapabilityModule } from '../../registry.js';
 import { defineTool } from '../../tool.js';
@@ -39,7 +40,12 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         input: z.strictObject({}),
         output: SafeRoomStatusSchema,
-        summarize: (o, ctx) => safeRoomSummary(o, deps.homes(ctx.homeId)?.units ?? 'C', roomLabel(deps, ctx.homeId), deps.config.capHours),
+        summarize: (o, ctx) => {
+          const home = deps.homes(ctx.homeId);
+          // #438: the number follows the home's place; with no place known none is said (never a default one, #376).
+          const emergency = home?.place === undefined ? undefined : emergencyNumberOf(home.place);
+          return safeRoomSummary(o, home?.units ?? 'C', roomLabel(deps, ctx.homeId), deps.config.capHours, emergency);
+        },
         handler: (_args, ctx) => safeRoomStatus(atHome(deps, ctx.homeId), ctx),
       }),
       defineTool({

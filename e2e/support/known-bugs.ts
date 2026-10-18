@@ -78,9 +78,4 @@ export const BUGS = {
   anchor: 'A fresh session plays the hour of the day in Rome (daily anchor), not the day from its start.',
   /** The user's settings live in the judges' demo drawer: the Echo has no settings page of its own yet (owner, 18 Oct). */
   echoSettings: 'The user settings are not inside the Echo yet (separation of demo controls and settings, 18 Oct).',
-  /**
-   * "Leo feels dizzy" gets the room's temperature: the prompt has no rule for health (owner's choice A, 18 Oct: say
-   * the place's emergency number first), and the fake model sends every sentence with "Leo" to get_safe_room_status.
-   */
-  healthNumber: fakeModel('A health emergency is answered with the room status, never with the emergency number of the place.'),
 } as const;

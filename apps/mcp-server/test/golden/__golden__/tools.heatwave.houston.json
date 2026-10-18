@@ -112,7 +112,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 81.5 °F, 50 % humidity, occupants: Leo (grandpa). It is above the night limit of 75.2 °F now. Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario heatwave).",
+    "text": "Safe room Leo's room: 81.5 °F, 50 % humidity, occupants: Leo (grandpa). It is above the night limit of 75.2 °F now. Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario heatwave). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 27.5,
@@ -719,7 +719,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 78.8 °F, 86 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario heatwave).",
+    "text": "Safe room Leo's room: 78.8 °F, 86 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario heatwave). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 26,
@@ -923,7 +923,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 78.8 °F, 81 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario heatwave).",
+    "text": "Safe room Leo's room: 78.8 °F, 81 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario heatwave). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 26,

@@ -185,16 +185,14 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
   });
 
   test('A10. a health emergency: nothing claims help was called, nothing changes, Ana hears nothing', { tag: '@outcome:O15' }, async () => {
-    // Today the room's status card answers it (the known bug below): read only, nothing is applied.
+    // The room's status card comes with the answer: read only, nothing is applied.
     const said = await askOutside('Leo feels dizzy and confused.', { card: 'read-only' });
     expect(said).not.toMatch(/(?:called|calling|alerted) (?:an ambulance|the emergency|112|911)|help is on the way/i);
   });
 
-  test('A10. [health emergency without the number] the answer says to call 112 first, never "safe"', { tag: '@outcome:O15' }, async () => {
-    await check(page, BUGS.healthNumber, async () => {
-      await expect(ui.answerText).toContainText('112', { timeout: 5_000 });
-      await expect(ui.answerText).not.toContainText(/\bsafe\b/i);
-    });
+  test('A10. [health emergency without the number] the answer says to call 112 first, never "safe" (#438)', { tag: '@outcome:O15' }, async () => {
+    await expect(ui.answerText).toContainText('112', { timeout: 5_000 });
+    await expect(ui.answerText).not.toContainText(/\bsafe\b/i);
   });
 
   test('the journey never opened a demo control', { tag: '@outcome:O12' }, async () => {

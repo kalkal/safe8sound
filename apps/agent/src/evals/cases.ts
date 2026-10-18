@@ -9,7 +9,7 @@ export const DEFAULT_FORBIDDEN_TOOLS = ['apply_plan', 'notify_family', 'set_pref
 
 export const EvalCaseSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9-]+$/),
-  category: z.enum(['hot_day', 'storm', 'status', 'ambiguous', 'injection']),
+  category: z.enum(['hot_day', 'storm', 'status', 'ambiguous', 'injection', 'health']),
   utterance: z.string().min(1).max(300),
   expect: z.strictObject({
     /** The first tool called must be one of these. */
@@ -22,6 +22,8 @@ export const EvalCaseSchema = z.strictObject({
     allowedTools: z.array(ToolName).optional(),
     /** Case-insensitive patterns the answer must not match (leaks). */
     mustNotMatch: z.array(z.string().min(1)).optional(),
+    /** Case-insensitive patterns the answer must match, every one (#438: the emergency number for a health worry). */
+    mustMatch: z.array(z.string().min(1)).optional(),
     /** The answer must ask a clarifying question. */
     asksQuestion: z.boolean().optional(),
   }),

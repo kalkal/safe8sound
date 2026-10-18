@@ -1,4 +1,4 @@
-import { PreferencesSchema, StormIdSchema, ok, type HomeId, type HomeProfile, type Preferences, type Snapshot } from '@cold-reserve/contracts';
+import { PreferencesSchema, StormIdSchema, ok, type HomeId, type HomeProfile, type LocationId, type Preferences, type Snapshot } from '@cold-reserve/contracts';
 import { fixedClock, memoryLogger, type Notifier } from '@cold-reserve/core';
 import { createInAppNotifier } from '@cold-reserve/notifier-inapp';
 import { SimulatorSource, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '@cold-reserve/source-simulator';
@@ -50,6 +50,8 @@ export interface WorldOptions {
   readonly profile?: (p: HomeProfile) => HomeProfile;
   /** The temperature unit the sandbox chose (#306). */
   readonly units?: 'C' | 'F';
+  /** The sandbox's place (#376, #438): the emergency number the tools name there. */
+  readonly place?: LocationId;
 }
 
 /** The storm-blackout scenario at hour `atH` (the grid is down from 3 to 18.5), with every dependency. */
@@ -72,7 +74,7 @@ export function world(atH: number, over: WorldOptions = {}, id: ScenarioId = 'st
   const deps: StormModeDeps = {
     homes: (h) =>
       h === DEMO
-        ? { source: { snapshot: () => Promise.resolve(ok(snapshotOf(h))) }, forecast: () => sim().forecast(), profile: { ...profile, homeId: h }, readOnly: false, ...(over.units === undefined ? {} : { units: over.units }) }
+        ? { source: { snapshot: () => Promise.resolve(ok(snapshotOf(h))) }, forecast: () => sim().forecast(), profile: { ...profile, homeId: h }, readOnly: false, ...(over.units === undefined ? {} : { units: over.units }), ...(over.place === undefined ? {} : { place: over.place }) }
         : undefined,
     storeFor,
     preferencesFor: () => Promise.resolve(ok(over.preferences ?? preferences)),

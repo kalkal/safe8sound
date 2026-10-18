@@ -101,6 +101,25 @@ describe('what the model reads', () => {
     expect(note.ok && note.value.preview).toMatch(/is at \d+\.\d °F/);
   });
 
+  it('#438: get_safe_room_status names the emergency number of the place, as context for a health worry only', async () => {
+    for (const [place, number] of [['houston', '911'], ['turin', '112'], ['reference', '112']] as const) {
+      const w = world(4, { place });
+      const tools = stormModeModule(w.deps).tools;
+      const status = await safeRoomStatus(w.deps, w.ctx);
+      if (!status.ok) throw new Error(status.error.message);
+      const said = tools.find((t) => t.name === 'get_safe_room_status')?.summarize?.(status.value, w.ctx) ?? '';
+      expect(said).toContain(`Context, to say only if someone may be unwell: the emergency number here is ${number}.`);
+    }
+  });
+
+  it('#438: with no place known, no emergency number is said (never a default one, #376)', async () => {
+    const w = world(4);
+    const status = await safeRoomStatus(w.deps, w.ctx);
+    if (!status.ok) throw new Error(status.error.message);
+    const said = stormModeModule(w.deps).tools.find((t) => t.name === 'get_safe_room_status')?.summarize?.(status.value, w.ctx) ?? '';
+    expect(said).not.toMatch(/emergency number|\b(112|911)\b/);
+  });
+
   it('notify_family: sent and skipped roles, and the preview addressed to the role', async () => {
     const w = world(4);
     await startStormMode(w.deps, { mode: 'active' }, w.ctx);

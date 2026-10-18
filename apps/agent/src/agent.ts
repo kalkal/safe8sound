@@ -29,14 +29,14 @@ export interface ColdReserveAgent {
  * turn (a hook cancels the rest), a sliding window of `historyWindowMessages` messages, and an
  * explicit deadline per turn (`turnDeadlineMs`; the MCP client's own default is 60 s).
  */
-export function createAgent(deps: { config: AgentConfig; model: Model; tools: ToolList; log?: (entry: AgentLogEntry) => void }): ColdReserveAgent {
+export function createAgent(deps: { config: AgentConfig; model: Model; tools: ToolList; log?: (entry: AgentLogEntry) => void; promptVersion?: Parameters<typeof buildSystemPrompt>[0] }): ColdReserveAgent {
   const { config, model } = deps;
   model.updateConfig({ ...model.getConfig(), maxTokens: config.maxTokens });
 
   const agent = new Agent({
     model,
     tools: deps.tools,
-    systemPrompt: buildSystemPrompt(),
+    systemPrompt: buildSystemPrompt(deps.promptVersion),
     conversationManager: new SlidingWindowConversationManager({ windowSize: config.historyWindowMessages }),
     printer: false,
     retryStrategy: null,

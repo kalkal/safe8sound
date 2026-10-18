@@ -112,7 +112,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 27.7 °C, 83 % humidity, occupants: Leo (grandpa). It is above the safety maximum of 27.0 °C now. Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario clear-day).",
+    "text": "Safe room Leo's room: 27.7 °C, 83 % humidity, occupants: Leo (grandpa). It is above the safety maximum of 27.0 °C now. Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario clear-day). Context, to say only if someone may be unwell: the emergency number here is 112.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 27.7,

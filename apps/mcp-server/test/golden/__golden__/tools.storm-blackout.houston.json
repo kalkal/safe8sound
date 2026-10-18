@@ -112,7 +112,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 78.8 °F, 58 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout).",
+    "text": "Safe room Leo's room: 78.8 °F, 58 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 26,
@@ -478,7 +478,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 78.8 °F, 67 % humidity, occupants: Leo (grandpa). Level essential (reason: storm). Safe for at least 24.0 hours, at least until 3:00 PM tomorrow. Storm mode: active. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout).",
+    "text": "Safe room Leo's room: 78.8 °F, 67 % humidity, occupants: Leo (grandpa). Level essential (reason: storm). Safe for at least 24.0 hours, at least until 3:00 PM tomorrow. Storm mode: active. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 26,
@@ -1238,7 +1238,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 77.0 °F, 79 % humidity, occupants: Leo (grandpa). Level essential (reason: storm). Safe for at least 24.0 hours, at least until 9:00 PM tomorrow. Storm mode: active. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout).",
+    "text": "Safe room Leo's room: 77.0 °F, 79 % humidity, occupants: Leo (grandpa). Level essential (reason: storm). Safe for at least 24.0 hours, at least until 9:00 PM tomorrow. Storm mode: active. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 25,
@@ -1821,7 +1821,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 75.2 °F, 87 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. Storm mode: ended. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout).",
+    "text": "Safe room Leo's room: 75.2 °F, 87 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. Storm mode: ended. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 24,
@@ -2242,7 +2242,7 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 75.2 °F, 89 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. Storm mode: ended. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout).",
+    "text": "Safe room Leo's room: 75.2 °F, 89 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. Storm mode: ended. Home link ok, simulated data (energy, rooms, weather, scenario storm-blackout). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 24,
