@@ -150,7 +150,7 @@ function ProposedPlan({ plan, timeZone, canAct, onCallTool }: ProposedPlanProps)
   if (dismissed) {
     // Still the plan card, with its title row: in full screen "Back to the conversation" and Escape stay (review of #351).
     return (
-      <CardShell title={t('plan.title')}>
+      <CardShell title={t('plan.title')} origin={isSimulated(plan) ? 'simulated' : 'live'}>
         <p className="notice" role="status" tabIndex={-1} ref={lineRef} data-testid="plan-dismissed">
           {t('plan.dismissed')}
         </p>

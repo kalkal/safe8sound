@@ -44,6 +44,8 @@ for (const { name, question, apply } of [
     // Still the plan card (its title row keeps the way back in full screen), without the plan.
     await expect(plan.getByTestId('plan-dismissed')).toBeVisible();
     await expect(plan.getByTestId('plan-horizon')).toHaveCount(0);
+    // The plan is still known, so the folded card keeps its data badge (#193).
+    await expect(plan.getByTestId('origin-badge')).toHaveText(/SIMULATED/);
     await expect(card.getByRole('region', { name: 'Safety check' })).toHaveCount(0);
     await expect(card.getByRole('button', { name: apply })).toHaveCount(0);
     await expect(card.locator('body')).not.toContainText('Not applied yet');
@@ -54,5 +56,30 @@ for (const { name, question, apply } of [
     expect(methods).not.toContain('tools/call');
     // A last resort alerts the family only once applied: nothing was sent.
     await expect(phone.getByText('No messages from Safe-8-Sound yet.')).toBeVisible();
+  });
+}
+
+// The folded line with its badge fits the frame: no horizontal overflow on a small Echo or a phone (#193).
+for (const [width, height] of [
+  [960, 480],
+  [375, 700],
+] as const) {
+  test(`at ${String(width)} × ${String(height)} the folded plan line and its badge stay inside the frame`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/');
+    await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+    await page.getByRole('button', { name: 'Ask' }).click();
+    const card = page.frameLocator('iframe[title="Plan card"]');
+    const plan = card.getByRole('region', { name: 'Plan' });
+    await plan.getByRole('button', { name: 'Not now' }).click();
+    const badge = plan.getByTestId('origin-badge');
+    await expect(badge).toBeVisible();
+    const box = await plan.boundingBox();
+    const badgeBox = await badge.boundingBox();
+    const frameBox = await page.locator('iframe[title="Plan card"]').boundingBox();
+    expect(badgeBox && box && badgeBox.x + badgeBox.width <= box.x + box.width + 0.5, 'badge inside the card').toBe(true);
+    expect(box && frameBox && box.x + box.width <= frameBox.x + frameBox.width + 0.5, 'card inside the frame').toBe(true);
+    const overflow = await card.locator('body').evaluate((el: { scrollWidth: number; clientWidth: number }) => el.scrollWidth - el.clientWidth);
+    expect(overflow, 'no horizontal overflow in the frame').toBeLessThanOrEqual(0);
   });
 }

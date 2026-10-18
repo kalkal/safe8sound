@@ -59,6 +59,18 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(onCallTool).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['simulated', hotDayPlan],
+    ['live', advisoryPlan],
+  ] as const)('the folded "Not now" line keeps the %s data badge of its plan (#193)', (origin, plan) => {
+    show({ kind: 'plan', data: plan() });
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    const card = screen.getByRole('status').closest('section');
+    const badge = within(card as HTMLElement).getByTestId('origin-badge');
+    expect(badge.getAttribute('data-origin')).toBe(origin);
+    expect(badge.textContent).toContain(origin === 'simulated' ? 'SIMULATED' : 'LIVE');
+  });
+
   it('a last-resort plan is applied by touch in two steps: the first tap asks, with no token (#160)', () => {
     const onCallTool = show({ kind: 'plan', data: lastResortPlan() });
     expect(screen.getByRole('region', { name: 'Safety check', hidden: true })).toBeTruthy();
@@ -146,6 +158,13 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     expect(screen.getByRole('list', { name: 'Set by hand' }).textContent).toContain('Bedroom: dry at 26.5 °C');
     expect(screen.getByRole('button', { name: 'Done: Bedroom: dry at 26.5 °C' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();
+  });
+
+  it('the manual-control card of an applied plan on simulated data says SIMULATED (#193)', () => {
+    const plan = { ...advisoryPlan(), status: 'applied' as const, sourceOrigin: { energy: 'simulated' as const, rooms: 'simulated' as const, weather: 'simulated' as const } };
+    show({ kind: 'applied', data: { plan, alreadyApplied: false, advisoryOnly: true, manualInstructions: [{ roomId: 'bedroom-1', text: 'Bedroom: dry at 26.5 °C' }] } });
+    const manual = screen.getByRole('region', { name: 'Manual control' });
+    expect(within(manual).getByTestId('origin-badge').getAttribute('data-origin')).toBe('simulated');
   });
 
   it('shows the home as a floor plan for get_home_status', () => {
