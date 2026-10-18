@@ -1,8 +1,10 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { acquireHeavyLock } from '../src/heavy-lock.mjs';
+import { HEAVY_HOLDER_ENV, acquireHeavyLock, heldForUs } from '../src/heavy-lock.mjs';
 
 let dir: string;
 let lockPath: string;
@@ -66,5 +68,49 @@ describe('pnpm heavy lock (one heavy step at a time on this PC)', () => {
     if (!result.ok) throw new Error('expected the lock');
     result.release();
     expect(existsSync(lockPath)).toBe(false);
+  });
+});
+
+describe('who holds the lock', () => {
+  it('names the worktree that took it, so a stuck step is stopped by its own session only', () => {
+    alive.add(100).add(200);
+    acquireHeavyLock(lockPath, { ...opts(100), where: 'C:/repo/.worktrees/main-journey' });
+    const busy = acquireHeavyLock(lockPath, opts(200));
+    expect(busy).toMatchObject({ ok: false, holder: { pid: 100, where: 'C:/repo/.worktrees/main-journey' } });
+  });
+});
+
+describe('a heavy step inside a heavy step (18 Oct: `pnpm heavy pnpm journeys` waited on itself)', () => {
+  it('runs at once when the lock is held by the heavy step that started it', () => {
+    alive.add(100);
+    const held = acquireHeavyLock(lockPath, opts(100));
+    expect(held.ok).toBe(true);
+    expect(heldForUs(lockPath, { [HEAVY_HOLDER_ENV]: '100' })).toBe(true);
+  });
+
+  it('waits like any other step when another step holds the lock, when it is free, or when the flag is missing or bad', () => {
+    alive.add(100);
+    expect(heldForUs(lockPath, { [HEAVY_HOLDER_ENV]: '100' })).toBe(false);
+    acquireHeavyLock(lockPath, opts(100));
+    expect(heldForUs(lockPath, { [HEAVY_HOLDER_ENV]: '200' })).toBe(false);
+    expect(heldForUs(lockPath, {})).toBe(false);
+    expect(heldForUs(lockPath, { [HEAVY_HOLDER_ENV]: 'x' })).toBe(false);
+  });
+});
+
+describe('pnpm heavy inside pnpm heavy, as real processes', () => {
+  it('runs the inner command at once, passes its exit code, and leaves no lock behind', () => {
+    const heavy = fileURLToPath(new URL('../src/heavy.mjs', import.meta.url));
+    const inner = join(dir, 'inner.cjs');
+    writeFileSync(inner, 'process.exit(7);');
+    // The lock lives in the OS temp folder: a scratch one here, so the PC's real lock is never touched.
+    const run = spawnSync(process.execPath, [heavy, 'node', heavy, 'node', inner], {
+      env: { ...process.env, TEMP: dir, TMP: dir, HEAVY_MAX_WAIT_MS: '10000' },
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    expect(run.status, run.stderr).toBe(7);
+    expect(run.stderr).not.toContain('waiting for');
+    expect(existsSync(join(dir, 'cold-reserve-heavy.lock'))).toBe(false);
   });
 });

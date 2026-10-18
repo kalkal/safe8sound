@@ -2,8 +2,8 @@
 import { closeSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs';
 
 /**
- * @typedef {{ pid: number, startedAt: number, command: string }} LockHolder
- * @typedef {{ pid: number, now: () => number, isAlive: (pid: number) => boolean, staleMs: number, command: string }} LockOptions
+ * @typedef {{ pid: number, startedAt: number, command: string, where?: string }} LockHolder
+ * @typedef {{ pid: number, now: () => number, isAlive: (pid: number) => boolean, staleMs: number, command: string, where?: string }} LockOptions
  * @typedef {{ ok: true, release: () => void } | { ok: false, holder: LockHolder }} LockResult
  */
 
@@ -21,8 +21,8 @@ function readHolder(lockPath) {
   try {
     const value = /** @type {unknown} */ (JSON.parse(readFileSync(lockPath, 'utf8')));
     if (typeof value === 'object' && value !== null && 'pid' in value && 'startedAt' in value && 'command' in value) {
-      const { pid, startedAt, command } = /** @type {Record<string, unknown>} */ (value);
-      if (typeof pid === 'number' && typeof startedAt === 'number' && typeof command === 'string') return { pid, startedAt, command };
+      const { pid, startedAt, command, where } = /** @type {Record<string, unknown>} */ (value);
+      if (typeof pid === 'number' && typeof startedAt === 'number' && typeof command === 'string') return { pid, startedAt, command, ...(typeof where === 'string' ? { where } : {}) };
     }
     return undefined;
   } catch (error) {
@@ -41,7 +41,8 @@ function tryCreate(lockPath, options) {
   try {
     const fd = openSync(lockPath, 'wx');
     try {
-      writeSync(fd, JSON.stringify({ pid: options.pid, startedAt: options.now(), command: options.command }));
+      // `where`: the worktree that started it, so whoever stops a stuck step stops only its own (18 Oct).
+      writeSync(fd, JSON.stringify({ pid: options.pid, startedAt: options.now(), command: options.command, ...(options.where === undefined ? {} : { where: options.where }) }));
     } finally {
       closeSync(fd);
     }
@@ -86,4 +87,19 @@ export function isProcessAlive(pid) {
     // EPERM: the process exists but belongs to someone else.
     return isErrnoCode(error, 'EPERM');
   }
+}
+
+/** What a heavy step tells the command it runs: the pid that holds the lock for it. */
+export const HEAVY_HOLDER_ENV = 'COLD_RESERVE_HEAVY_HOLDER';
+
+/**
+ * Whether a heavy step runs inside one that already holds the lock for it (`pnpm heavy pnpm journeys`: the journeys
+ * take the lock once per size). It then runs at once, instead of waiting for itself forever. The lock is cooperative:
+ * a step that names the holder's pid is trusted, as every step on this PC is ours.
+ * @param {string} lockPath
+ * @param {Readonly<Record<string, string | undefined>>} env
+ */
+export function heldForUs(lockPath, env) {
+  const pid = Number(env[HEAVY_HOLDER_ENV]);
+  return Number.isInteger(pid) && pid > 0 && readHolder(lockPath)?.pid === pid;
 }
