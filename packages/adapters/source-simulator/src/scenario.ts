@@ -73,6 +73,9 @@ export const ScenarioSchema = z
     if (s.essentialAtH !== undefined && s.essentialAtH >= s.durationH) {
       ctx.addIssue({ code: 'custom', path: ['essentialAtH'], message: `Must be before the end, ${s.durationH} hours` });
     }
+    if (s.playFromH !== undefined && s.playFromH >= s.durationH) {
+      ctx.addIssue({ code: 'custom', path: ['playFromH'], message: `Must be before the end, ${s.durationH} hours` });
+    }
     const windows: [string, readonly { fromH: number; toH: number }[]][] = [
       ['gridOutages', s.gridOutages],
       ['occupancy', s.occupancy],

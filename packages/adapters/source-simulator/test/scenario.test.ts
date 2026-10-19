@@ -72,6 +72,12 @@ describe('parseScenario errors (invalid_config)', () => {
     expect(parseScenario({ ...raw, essentialAtH: raw.durationH - 1 }, profile).ok).toBe(true);
   });
 
+  it('#449: rejects a play-from hour at or past the end of the scenario', () => {
+    const raw = clone(rawScenario('clear-day')) as { playFromH?: number; durationH: number };
+    expectInvalid({ ...raw, playFromH: raw.durationH }, 'playFromH');
+    expect(parseScenario({ ...raw, playFromH: raw.durationH - 1 }, profile).ok).toBe(true);
+  });
+
   it('rejects an initial SOC below the hardware floor', () => {
     const raw = clone(rawScenario('clear-day')) as { initial: { batterySocPct: number } };
     raw.initial.batterySocPct = 5;
