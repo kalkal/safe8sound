@@ -57,6 +57,8 @@ const ConfigSchema = z
     view: z.enum(['full', 'phone']),
     /** The device layout (#432): the Alexa Echo Show unless configured; the AWS build always assigns it. */
     layout: z.enum(LAYOUT_IDS),
+    /** The judges' demo controls (#432): on for the contest; the real home turns them off and keeps only its own controls. */
+    demoControls: z.enum(['true', 'false']).transform((v) => v === 'true'),
   })
   .refine((c) => c.agent === 'scripted' || c.simApiUrl !== undefined, { path: ['simApiUrl'], message: 'The remote agent needs a sim-api URL' })
   .refine((c) => c.turnBudgetMs >= c.agentTimeoutMs, { path: ['turnBudgetMs'], message: 'The turn budget must cover the agent timeout' });
@@ -87,6 +89,7 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>, s
     view: agent === 'scripted' && phone === 'inbox' && params.get('view') === 'phone' ? 'phone' : 'full',
     // Dev only: ?layout= tries another layout without rebuilding; a deployed page keeps its configured one.
     layout: (isDev ? params.get('layout') : null) || env['VITE_LAYOUT'] || DEFAULT_LAYOUT,
+    demoControls: env['VITE_DEMO_CONTROLS'] ?? 'true',
     voice: {
       speech: fakeSpeech ? 'fake' : 'browser',
       lang: env['VITE_VOICE_LANG'] ?? 'en-US',

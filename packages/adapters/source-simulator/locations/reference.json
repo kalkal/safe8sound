@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "reference",
-  "label": "Reference home (central Italy)",
+  "label": "Reference home (Italy)",
   "latRounded": 41.9,
   "lonRounded": 12.5,
   "tz": "Europe/Rome",

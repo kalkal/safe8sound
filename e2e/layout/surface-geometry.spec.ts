@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from '../no-network.js';
 import { BUGS } from '../support/known-bugs.js';
 import { SIZES } from '../support/sizes.js';
-import { demoControlsButton, slot, type SlotName } from '../surface.js';
+import { demoControls, demoControlsButton, slot, type SlotName } from '../surface.js';
 
 // One screen, at every supported size (owner rule; separation of the device layout, step S0). Whatever layout fills
 // the screen, the page never scrolls, the screen's own scroll area never scrolls, the named places of the screen are
@@ -24,7 +24,9 @@ async function oneScreen(page: Page, label: string) {
   expect(viewport.scroll, `${label}: the screen scrolls`).toBeLessThanOrEqual(viewport.client + 1);
   for (const name of SLOTS) await expect(slot(page, name), `${label}: slot ${name}`).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole('group', { name: 'Simulated time' }), `${label}: the clock`).toBeInViewport({ ratio: 1 });
-  await expect(demoControlsButton(page), `${label}: the demo controls`).toBeInViewport({ ratio: 1 });
+  // The judges' demo controls: the column on a wide screen, else the button that opens their sheet.
+  const controls = (await demoControls(page).isVisible()) ? demoControls(page) : demoControlsButton(page);
+  await expect(controls, `${label}: the demo controls`).toBeInViewport({ ratio: 1 });
 }
 
 for (const { id, width, height } of SIZES) {

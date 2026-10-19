@@ -1,7 +1,7 @@
 import { homeInStorm } from '../../packages/ui-cards/src/home-fixtures.js';
 import { expect, test } from '../no-network.js';
 import { openRemote } from '../remote-session.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { openDemoControls } from '../surface.js';
 
 // #268: the example buttons under the question follow the scenario and the home's state. In a storm with the grid
 // down there is no "36 degrees tomorrow" example; the storm examples are answered by the scripted demo.
@@ -14,13 +14,12 @@ test('scripted: choosing the storm scenario swaps the hot-day examples for the s
   await page.goto('/');
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toBeVisible();
 
-  await demoControlsButton(page).click();
-  const drawer = demoControls(page);
+  const drawer = await openDemoControls(page);
   await drawer.getByText('Storm · power outage').click();
   await page.keyboard.press('Escape');
 
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toHaveCount(0);
-  await examples(page).getByRole('button', { name: 'Is Grandpa safe?' }).click();
+  await examples(page).getByRole('button', { name: 'Is Leo safe?' }).click();
   await expect(page.getByLabel('Ask a question')).toHaveValue('How is Grandpa doing in the safe room?');
   await page.getByRole('button', { name: 'Ask' }).click();
   // Its own scene, the safe room (review of #301: a "not" assertion could never fail).
@@ -48,7 +47,7 @@ test('remote: the home read from sim-api decides; grid down shows the storm exam
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Show my home' }).click();
-  await expect(examples(page).getByRole('button', { name: 'Is Grandpa safe?' })).toBeVisible();
+  await expect(examples(page).getByRole('button', { name: 'Is Leo safe?' })).toBeVisible();
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toHaveCount(0);
 });
 

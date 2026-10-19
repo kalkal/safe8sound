@@ -1,8 +1,8 @@
 import { expect, test } from '../no-network.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { demoControls, demoControlsButton, demoControlsSummary, openDemoControls } from '../surface.js';
 
-// Time pack (12 Oct): "Power cut" makes the simulated grid go down before the question reaches the assistant (the badge
-// says Storm, the clock says so), and the simulated clock skips to each next moment, so Ana's phone receives each
+// Time pack (12 Oct): "Power cut" makes the simulated grid go down before the question reaches the assistant (the demo controls
+// say Storm, the clock says so), and the simulated clock skips to each next moment, so Ana's phone receives each
 // message as the home sends it. ScriptedAgent: the script's storm night; the deployed chain is e2e/site/storm-story.
 
 type Page = import('@playwright/test').Page;
@@ -14,8 +14,8 @@ test('Power cut → the grid goes down and Ana is told; Skip ahead → Essential
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/');
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
-  const badge = demoControlsButton(page);
-  await expect(badge).toContainText('Heat wave');
+  const plays = demoControlsSummary(page);
+  await expect(plays).toContainText('Heat wave');
   const clock = clockOf(page);
   await expect(clock).toContainText('SIMULATED');
   // A calm scripted day has no moment ahead: the button says so by being off, and the line says why.
@@ -24,7 +24,7 @@ test('Power cut → the grid goes down and Ana is told; Skip ahead → Essential
 
   await page.getByRole('group', { name: 'Example questions' }).getByRole('button', { name: 'Power cut' }).click();
   await page.getByRole('button', { name: 'Ask' }).click();
-  await expect(badge).toContainText('Storm · power outage');
+  await expect(plays).toContainText('Storm · power outage');
   await expect(clock.getByRole('status')).toHaveText('The simulated grid is now down.');
   await expect(clock.locator('time')).toHaveText('19:42');
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toBeVisible();
@@ -123,15 +123,13 @@ test('Restart the day takes the clock back to the start of the day, and the draw
   await expect(clock.getByRole('status')).toHaveText('Now: the home steps down to its essential settings.');
   const skipped = await clock.locator('time').textContent();
 
-  const badge = demoControlsButton(page);
-  await badge.click();
-  const drawer = demoControls(page);
+  const drawer = await openDemoControls(page);
   await drawer.getByRole('button', { name: 'Restart the day' }).click();
   await drawer.getByRole('button', { name: 'Yes, restart it now' }).click();
   // The clock is read again: back to the start of the day, with its storm ahead.
   await expect(clock.locator('time')).not.toHaveText(skipped ?? '');
   await expect(clock.getByRole('button', { name: /^Go to [0-9][0-9]:[0-9][0-9] · / })).toBeEnabled();
-  await expect(drawer.getByTestId('settings-applied')).toHaveText('Done: the day starts again. Now: Reference home (central Italy) · Storm · power outage');
+  await expect(drawer.getByTestId('demo-controls-summary')).toHaveText('Done: the day starts again. Now: Reference home (Italy) · Storm · power outage');
   // The last play's answers and phone messages describe another day: they go (owner, 18 Oct).
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('answer')).toHaveCount(0);
@@ -144,7 +142,7 @@ test('Restart the day takes the clock back to the start of the day, and the draw
   await expect(phone.getByRole('article')).toHaveCount(0);
 });
 
-test('the drawer is a modal over a dimmed page: a tap on the page closes it and the focus goes back to the badge (owner, 18 Oct)', async ({ page }) => {
+test('below a wide screen the demo controls are a modal sheet over a dimmed page: a tap on the page closes it and the focus goes back to its button (owner, 18 Oct)', async ({ page }) => {
   for (const size of [
     { width: 960, height: 480 },
     { width: 375, height: 812 },
@@ -152,8 +150,8 @@ test('the drawer is a modal over a dimmed page: a tap on the page closes it and 
   ]) {
     await page.setViewportSize(size);
     await page.goto('/');
-    const badge = demoControlsButton(page);
-    await badge.click();
+    const opener = demoControlsButton(page);
+    await opener.click();
     const drawer = demoControls(page);
     await expect(drawer).toBeVisible();
     const scrim = page.getByTestId('settings-scrim');
@@ -161,6 +159,6 @@ test('the drawer is a modal over a dimmed page: a tap on the page closes it and 
     // A spot of the page outside the drawer (a phone's sheet covers the bottom, a wide screen's the right side).
     await scrim.click({ position: { x: 8, y: 8 } });
     await expect(drawer).toHaveCount(0);
-    await expect(badge).toBeFocused();
+    await expect(opener).toBeFocused();
   }
 });

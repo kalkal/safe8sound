@@ -224,6 +224,24 @@
     & h1 {
       flex: 1 1 auto;
     }
+
+    /* The title ("Safe-8-Sound · Simulated Alexa+ add-on", owner 18 Oct) stays one line: where it does not fit it ends
+       in "…" (the heading keeps its whole text), so the header band keeps its height and the screen its room. */
+    & > header {
+      flex: 1 1 auto;
+      min-inline-size: 0;
+
+      /* On a landscape screen the title shares the row and gives way first, so the row never wraps. */
+      @media (width >= 56rem) {
+        flex-basis: 0;
+      }
+    }
+
+    & > header h1 {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
 
   .band-content {
@@ -677,5 +695,37 @@
     block-size: 1px;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+}
+
+/* The judges' demo controls (#432): a column on the left of the device, the phone on its right, only where the window is
+   wide for its height (from 100rem and 2:1, e.g. 1904 × 870): there the window's height limits the screen, so the
+   column costs it nothing. Elsewhere (1920 × 1080 too) they are a sheet behind a button of the top bar and take no
+   room. The same query is WIDE_CONTROLS in demo-controls/DemoControlsPanel.tsx. */
+@layer surfaces {
+  .echo-controls {
+    display: contents;
+  }
+
+  @media (width >= 100rem) and (min-aspect-ratio: 2 / 1) {
+    .echo-stage:has(> .echo-controls > *) {
+      --controls-w: 18rem;
+
+      grid-template-columns: var(--controls-w) auto var(--phone-w);
+    }
+
+    .echo-stage > .echo-controls:has(> *) {
+      display: block;
+      align-self: center;
+    }
+
+    .echo-stage:has(> .echo-controls > *) .echo-screen,
+    .echo-stage:has(> .echo-top):has(> .echo-controls > *) .echo-screen {
+      inline-size: min(
+        calc(100vw - var(--phone-w) - var(--controls-w) - var(--side-room) - var(--space-6)),
+        calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px) - var(--target-min) - var(--space-3)) * 1.6),
+        80rem
+      );
+    }
   }
 }

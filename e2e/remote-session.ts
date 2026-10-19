@@ -29,7 +29,7 @@ export async function routeSandboxTools(page: Page): Promise<void> {
     if (name === 'get_demo_settings') {
       return answer({
         settings: { version: 1, updatedAt: '2026-07-15T14:00:00+02:00', scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' },
-        place: { id: 'reference', label: 'Reference home (central Italy)', tz: 'Europe/Rome' },
+        place: { id: 'reference', label: 'Reference home (Italy)', tz: 'Europe/Rome' },
       });
     }
     if (name === 'get_milestones') {

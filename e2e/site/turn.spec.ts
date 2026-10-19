@@ -1,7 +1,7 @@
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE, SIM_API_URL } from './chain.js';
 import { toCardPage } from '../card-pages.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { demoControlsSummary, openDemoControls, openUserSettings, settingsButton } from '../surface.js';
 
 // K1 (#244 review): the AWS build of the site, its /api through the very CloudFront Function the distribution runs
 // (a stand-in for CloudFront), and a REAL local sim-api configured as on AWS (no allowed origin) in front of the real
@@ -32,28 +32,30 @@ test('#262: "Show my home" reads the sandbox home on demand through /api, read-o
   await expect(home.getByRole('list', { name: 'Rooms' }).getByRole('listitem').first()).toBeVisible();
 });
 
-test('B2: the settings drawer saves to the visitor sandbox through /api; the badge shows what the server reads back', async ({ page }) => {
+test('B2: the demo controls save to the visitor sandbox through /api and show what the server reads back', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Demo code').fill(DEMO_CODE);
   await page.getByRole('button', { name: 'Start' }).click();
-  // Each demo session plays its own sandbox: the badge comes from its get_demo_settings.
-  const badge = demoControlsButton(page);
-  await expect(badge).toContainText('Reference home (central Italy)', { timeout: 20_000 });
+  // Each demo session plays its own sandbox: what the controls say comes from its get_demo_settings.
+  const plays = demoControlsSummary(page);
+  await expect(plays).toContainText('Reference home (Italy)', { timeout: 20_000 });
 
-  await badge.click();
-  const drawer = demoControls(page);
+  const drawer = await openDemoControls(page);
   await drawer.getByText('Storm · power outage').click();
-  // set_scenario, then get_demo_settings: the badge and the checked radio are what is stored.
-  await expect(badge).toContainText('Storm · power outage', { timeout: 20_000 });
+  // set_scenario, then get_demo_settings: what the controls say and the checked radio are what is stored.
+  await expect(plays).toContainText('Storm · power outage', { timeout: 20_000 });
   await expect(drawer.getByRole('radio', { name: /Storm/ })).toBeChecked();
   await expect(page.getByTestId('echo-screen')).toHaveAttribute('data-sky', 'storm');
-  // Turin and Houston ship with #280: a new place is saved too, and the badge names it as the server does.
+  // Turin and Houston ship with #280: a new place is saved too, and the controls name it as the server does.
   await drawer.getByText('Houston, Texas').click();
-  await expect(badge).toContainText('Houston, Texas', { timeout: 20_000 });
-  await drawer.getByRole('radiogroup', { name: 'Temperature units' }).getByText('°F').click();
-  await expect(drawer.getByRole('radio', { name: '°F' })).toBeChecked({ timeout: 20_000 });
+  await expect(plays).toContainText('Houston, Texas', { timeout: 20_000 });
   await page.keyboard.press('Escape');
-  await expect(badge).toBeFocused();
+  // The units are the person's own setting: saved to the sandbox too (Houston already set them to °F).
+  const settings = await openUserSettings(page);
+  await settings.getByRole('radiogroup', { name: 'Temperature units' }).getByText('°C').click();
+  await expect(settings.getByRole('radio', { name: '°C' })).toBeChecked({ timeout: 20_000 });
+  await page.keyboard.press('Escape');
+  await expect(settingsButton(page)).toBeFocused();
 });
 
 test('the privacy line about the access logs is readable at phone width, before the code is entered (#244)', async ({ page }) => {

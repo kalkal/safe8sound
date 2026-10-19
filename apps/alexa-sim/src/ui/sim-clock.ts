@@ -24,6 +24,8 @@ export interface ClockState {
   /** Local ISO time in the home's zone, with its offset. */
   readonly now: string;
   readonly next?: Milestone;
+  /** Every moment ahead the sandbox listed with this time (the judges' timeline keeps them, #432). */
+  readonly upcoming?: readonly Milestone[];
 }
 
 /** "HH:MM" of a local ISO time: the home's own wall time, whatever the viewer's zone. */
@@ -124,7 +126,7 @@ async function milestones(agent: Agent, planId: string | undefined, context: Ask
 
 const stateOf = (list: GetMilestonesOutput): ClockState => {
   const [next] = list.milestones;
-  return next === undefined ? { now: list.now } : { now: list.now, next };
+  return next === undefined ? { now: list.now, upcoming: list.milestones } : { now: list.now, next, upcoming: list.milestones };
 };
 
 /** The simulated time now and the next moment. */
@@ -179,6 +181,8 @@ export async function cutThePower(
     /** Whether the family already heard of this storm (Ana's phone shows storm_started). */
     readonly familyTold: boolean;
     readonly saveStorm: (change: { scenarioId: 'storm-blackout' } | { restart: true }) => Promise<boolean>;
+    /** The plan on screen: the clock read after the cut lists its moments too, as every other read does. */
+    readonly planId?: string | undefined;
   },
   context: AskContext,
   logEvent: Log = defaultLog,
@@ -209,6 +213,6 @@ export async function cutThePower(
   const moved = await call(agent, 'advance_clock', { kind: storm.kind, at: storm.at }, (v) => AdvanceClockOutputSchema.safeParse(v), context, logEvent);
   if (!moved.ok) return moved;
   logEvent({ level: 'info', code: 'power_cut_simulated', correlationId: context.correlationId, details: { kind: storm.kind } });
-  const after = await readClock(agent, undefined, context, logEvent);
+  const after = await readClock(agent, o.planId, context, logEvent);
   return ok({ state: after.ok ? after.value : { now: moved.value.now }, changed: true });
 }

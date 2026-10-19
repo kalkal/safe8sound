@@ -1,6 +1,6 @@
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE } from './chain.js';
-import { demoControlsButton } from '../surface.js';
+import { demoControlsSummary } from '../surface.js';
 
 // Time pack (12 Oct), as on the deployed site: the AWS build, the remote agent through /api, the real local sim-api,
 // agent (fake model) and MCP server, a visitor sandbox on a calm day. The bug this catches: "Power cut" with the grid
@@ -20,8 +20,8 @@ test('Power cut → the simulated grid goes down and Ana is told; Skip ahead to 
   await page.goto('/');
   await page.getByLabel('Demo code').fill(DEMO_CODE);
   await page.getByRole('button', { name: 'Start' }).click();
-  const badge = demoControlsButton(page);
-  await expect(badge).toContainText('Clear day', { timeout: 20_000 });
+  const plays = demoControlsSummary(page);
+  await expect(plays).toContainText('Clear day', { timeout: 20_000 });
   const clock = page.getByRole('group', { name: 'Simulated time' });
   await expect(clock).toContainText('SIMULATED', { timeout: 20_000 });
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
@@ -29,8 +29,8 @@ test('Power cut → the simulated grid goes down and Ana is told; Skip ahead to 
 
   await page.getByRole('group', { name: 'Example questions' }).getByRole('button', { name: 'Power cut' }).click();
   await page.getByRole('button', { name: 'Ask' }).click();
-  // Before the assistant answers, the sandbox plays the storm at its storm start: the badge and the clock say so.
-  await expect(badge).toContainText('Storm · power outage', { timeout: 20_000 });
+  // Before the assistant answers, the sandbox plays the storm at its storm start: the demo controls and the clock say so.
+  await expect(plays).toContainText('Storm · power outage', { timeout: 20_000 });
   await expect(clock.getByRole('status')).toHaveText('The simulated grid is now down.', { timeout: 20_000 });
   await expect(clock.locator('time')).toHaveText('15:00');
   // The fake model reads the home: the grid is down (the real model was told "the grid is still up" before the fix).

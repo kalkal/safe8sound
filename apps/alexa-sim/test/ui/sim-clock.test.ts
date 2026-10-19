@@ -146,7 +146,7 @@ describe('readClock and skipAhead', () => {
         );
       },
     };
-    expect(await readClock(agent, PLAN, ctx, () => undefined)).toEqual({ ok: true, value: { now: '2026-07-18T12:00:00+02:00' } });
+    expect(await readClock(agent, PLAN, ctx, () => undefined)).toEqual({ ok: true, value: { now: '2026-07-18T12:00:00+02:00', upcoming: [] } });
     expect(seen).toEqual([{ planId: PLAN }, {}]);
   });
 

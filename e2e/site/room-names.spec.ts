@@ -1,7 +1,7 @@
 import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE } from './chain.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { demoControlsSummary, openUserSettings } from '../surface.js';
 
 // #422: a sandbox names its rooms as the home profile does, "Leo's room", on the home card and in the settings drawer,
 // as the voice and the safe room card do. Same chain as the site: the AWS build, the real local sim-api, agent (fake
@@ -15,8 +15,7 @@ test("the home card and the settings drawer name the safe room Leo's room, never
   await page.goto('/');
   await page.getByLabel('Demo code').fill(DEMO_CODE);
   await page.getByRole('button', { name: 'Start' }).click();
-  const badge = demoControlsButton(page);
-  await expect(badge).toContainText('Clear day', { timeout: 20_000 });
+  await expect(demoControlsSummary(page)).toContainText('Clear day', { timeout: 20_000 });
 
   await page.getByRole('button', { name: 'Show my home' }).click();
   const home = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]');
@@ -29,8 +28,7 @@ test("the home card and the settings drawer name the safe room Leo's room, never
   await expect(rooms).not.toContainText('Bedroom 1');
   await page.keyboard.press('Escape');
 
-  await badge.click();
-  const safeRoom = demoControls(page).getByRole('radiogroup', { name: 'Safe room' });
+  const safeRoom = (await openUserSettings(page)).getByRole('radiogroup', { name: 'Safe room' });
   await expect(safeRoom.getByRole('radio', { name: /Leo's room/ })).toBeChecked({ timeout: 20_000 });
   await expect(safeRoom).not.toContainText('Bedroom 1');
 });

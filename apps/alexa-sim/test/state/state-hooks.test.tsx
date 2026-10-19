@@ -232,6 +232,29 @@ describe('useSimClock', () => {
     expect(result.current.note).toBeUndefined();
   });
 
+  it("keeps the day's stops for the judges' timeline: a stop passed by a skip stays; a new play of the day starts again", async () => {
+    const agent = sandbox();
+    const { result, rerender } = renderHook(({ playthrough }) => useSimClock({ agent, enabled: true, afterMove: vi.fn(), ...base, playthrough }), {
+      initialProps: { playthrough: 0 },
+    });
+    await waitFor(() => {
+      expect(result.current.stops.length).toBeGreaterThan(1);
+    });
+    const [first] = result.current.stops;
+    act(() => {
+      result.current.skip();
+    });
+    await waitFor(() => {
+      expect(result.current.note?.kind).toBe('reached');
+    });
+    expect(result.current.stops[0]).toEqual(first);
+    rerender({ playthrough: 1 });
+    expect(result.current.stops).toEqual([]);
+    await waitFor(() => {
+      expect(result.current.stops.length).toBeGreaterThan(0);
+    });
+  });
+
   it('a read started before a skip never draws over the clock the skip left', async () => {
     const real = sandbox();
     let first: ReturnType<typeof held> | undefined;

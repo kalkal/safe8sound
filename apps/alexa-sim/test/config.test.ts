@@ -16,6 +16,7 @@ describe('simulator config', () => {
         demo: false,
         view: 'full',
         layout: 'alexa-echo-show',
+        demoControls: true,
         voice: {
           speech: 'browser',
           lang: 'en-US',
@@ -70,6 +71,12 @@ describe('simulator config', () => {
     expect(parseConfig({}, '?layout=plain', false)).toMatchObject({ ok: true, value: { layout: 'alexa-echo-show' } });
     expect(parseConfig({}, '?layout=', true)).toMatchObject({ ok: true, value: { layout: 'alexa-echo-show' } });
     expect(parseConfig({ VITE_LAYOUT: 'google-nest-hub' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+
+  it("#432: the judges' demo controls are on unless VITE_DEMO_CONTROLS=false (the real home keeps only its own controls)", () => {
+    expect(parseConfig({}, '', false)).toMatchObject({ ok: true, value: { demoControls: true } });
+    expect(parseConfig({ VITE_DEMO_CONTROLS: 'false' }, '', false)).toMatchObject({ ok: true, value: { demoControls: false } });
+    expect(parseConfig({ VITE_DEMO_CONTROLS: 'maybe' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
   it('reads the remote agent settings from the environment', () => {

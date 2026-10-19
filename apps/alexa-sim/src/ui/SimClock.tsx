@@ -22,7 +22,8 @@ function noteText(state: ClockState, note: ClockNote | undefined, busy: boolean)
   return state.next === undefined ? t('clock.nothingNext') : t('clock.next', { moment: momentText(state.next.kind), time: clockTime(state.next.at) });
 }
 
-export function SimClock({ state, note, busy, onSkip }: { state: ClockState; note?: ClockNote; busy: boolean; onSkip: () => void }) {
+/** `summary`: what the last jump changed, where the judges' panel that says it is a closed sheet (owner, 19 Oct, J = a). */
+export function SimClock({ state, note, busy, onSkip, summary }: { state: ClockState; note?: ClockNote; busy: boolean; onSkip: () => void; summary?: string | undefined }) {
   const noteId = useId();
   // The button says where it goes ("Go to 22:00 · the home steps down to its essential settings"); with nothing ahead it keeps
   // its plain name, disabled, and the line beside it says why.
@@ -37,8 +38,15 @@ export function SimClock({ state, note, busy, onSkip }: { state: ClockState; not
         <span className="sim-dock-words">{target ?? t('clock.skip')}</span>
         {busy ? <Spinner /> : <span aria-hidden="true"> ››</span>}
       </button>
-      <span id={noteId} className="sim-dock-note" role="status">
-        {noteText(state, note, busy)}
+      <span className="sim-dock-lines">
+        <span id={noteId} className="sim-dock-note" role="status">
+          {noteText(state, note, busy)}
+        </span>
+        {summary !== undefined && (
+          <span className="sim-dock-summary" data-testid="clock-jump-summary">
+            {summary}
+          </span>
+        )}
       </span>
     </div>
   );

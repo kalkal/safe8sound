@@ -132,7 +132,7 @@
     },
     {
       "id": "safe-room",
-      "patterns": ["how is grandpa", "how s grandpa", "is grandpa safe", "safe room"],
+      "patterns": ["how is grandpa", "how s grandpa", "is grandpa safe", "is leo safe", "how is leo", "leo sta bene", "safe room"],
       "text": "Grandpa is in his bedroom at 26.8 degrees. The battery keeps it comfortable at least until 6:40.",
       "withStatus": false,
       "cards": [{ "tool": "get_safe_room_status", "fixture": "safe-room-storm" }]

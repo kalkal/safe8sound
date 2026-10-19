@@ -1,75 +1,21 @@
-import { formatTemp, type GetPreferencesOutput, type LocationId, type SetScenarioInput, type TempUnit } from '@cold-reserve/contracts';
-import { useEffect, useId, useRef, useState } from 'react';
+import { formatTemp, type GetPreferencesOutput, type SetScenarioInput, type TempUnit } from '@cold-reserve/contracts';
+import { useId, useRef, useState } from 'react';
 import { LOCALES, isLocale, type Locale } from '@cold-reserve/i18n';
 import { roomLabel } from '@cold-reserve/ui-cards';
-import { makeRestInert } from '../host/inert.js';
-import { HOUSEHOLDS, PLACES, SCENARIOS, badgeText, skyOfScenario, type DemoSettingsView } from './demo-settings.js';
+import { useModal } from './use-modal.js';
+import { useSettingChange } from './use-setting-change.js';
+import type { DemoSettingsView } from './demo-settings.js';
 import { chooseSafeRoom, limitsView, mergeChange, moveLimit, withDraft, type LimitChange, type LimitId, type LimitRefusal, type LimitRow, type LimitSave } from './limits.js';
+import { ChipGroup } from './ChipGroup.js';
 import { t } from './text.js';
 import './limits.css';
 
-// B1 (additions plan): the scenario badge, outside the 16:10 screen, opens the judge's settings drawer: a modal
-// dialog at the side on a wide screen, a sheet from the bottom on a phone. Each setting is one radio group of 56 px
-// rows (the shared Chip), the choice written with a mark, never by colour alone; a place that has not shipped says so.
-// Restart takes two taps. Escape closes it and the focus goes back to the badge.
+// The person's own settings (B1, #402; the judges' demo controls moved to their own panel in #432): "Settings" above
+// the Echo opens a modal drawer, at the side on a wide screen, a sheet from the bottom on a phone. The language, the
+// safe room, the temperatures and limits and the units; each choice is one radio group of 56 px rows (ChipGroup), the
+// choice written with a mark, never by colour alone. Escape closes it and the focus goes back to its button. In step
+// S5 these move into the Echo's own Settings page.
 
-interface ChipOption {
-  value: string;
-  label: string;
-  /** Written under the label, e.g. "Not available yet". */
-  hint?: string;
-  disabled?: boolean;
-  /** A sample of the scenario's sky (decoration). */
-  sky?: string;
-}
-
-function ChipGroup({
-  label,
-  name,
-  options,
-  value,
-  onPick,
-  pending,
-}: {
-  label: string;
-  name: string;
-  options: readonly ChipOption[];
-  value: string;
-  onPick: (value: string) => void;
-  /** The choice just tapped, while it is saved (owner, 18 Oct): shown as chosen at once, saying it is being saved. */
-  pending?: string | undefined;
-}) {
-  const labelId = useId();
-  const chosen = pending ?? value;
-  return (
-    <fieldset className="chip-group" role="radiogroup" aria-labelledby={labelId}>
-      <legend id={labelId}>{label}</legend>
-      {options.map((o) => (
-        <label key={o.value} className="chip-row" data-checked={o.value === chosen} data-disabled={o.disabled === true}>
-          <input
-            type="radio"
-            name={name}
-            value={o.value}
-            checked={o.value === chosen}
-            disabled={o.disabled === true}
-            onChange={() => {
-              onPick(o.value);
-            }}
-          />
-          {o.sky !== undefined && <span className="chip-sky" data-layer={o.sky} aria-hidden="true" />}
-          <span className="chip-text">
-            <span>{o.label}</span>
-            {o.hint !== undefined && <span className="chip-hint">{o.hint}</span>}
-            {o.value === pending && <span className="chip-hint">{t('settings.saving')}</span>}
-          </span>
-          <span className="chip-mark" aria-hidden="true">
-            {o.value === chosen ? '✓' : ''}
-          </span>
-        </label>
-      ))}
-    </fieldset>
-  );
-}
 
 /** One temperature of the section: its name and rule, then "lower", the value and "raise" in 48 px buttons. */
 function LimitStepper({ name, hint, value, onMove }: { name: string; hint: string; value: string; onMove: (direction: 'up' | 'down') => void }) {
@@ -126,11 +72,9 @@ function refusalText(id: LimitId, refusal: LimitRefusal, units: TempUnit): strin
   }
 }
 
-export interface DemoSettingsControlProps {
+export interface SettingsControlProps {
   /** The sandbox's settings; undefined when there are none (not a sandbox, or not read yet): language only (#284). */
   settings: DemoSettingsView | undefined;
-  /** The places this server can play now; the others say "Not available yet". */
-  availablePlaces: readonly LocationId[];
   /** Sends one change; resolves true when it was saved. */
   onChange: (change: SetScenarioInput) => Promise<boolean>;
   /** #263: the page's language, a setting of this viewer only (never sent to the sandbox). */
@@ -142,11 +86,10 @@ export interface DemoSettingsControlProps {
   onLimit?: ((change: LimitChange) => Promise<LimitSave>) | undefined;
 }
 
-export function DemoSettingsControl({ settings, availablePlaces, onChange, locale, onLocale, limits, onLimit }: DemoSettingsControlProps) {
+export function SettingsControl({ settings, onChange, locale, onLocale, limits, onLimit }: SettingsControlProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [confirmRestart, setConfirmRestart] = useState(false);
   // #402: why a move in the limits section was not made, said in words under its rows.
   const [refusal, setRefusal] = useState<{ id: LimitId; why: LimitRefusal } | undefined>(undefined);
   const limitsTitleId = useId();
@@ -158,62 +101,16 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
   const layerRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  const { send, pendingOf, appliedText, failed: changeFailed, forget } = useSettingChange(onChange, settings);
   const close = () => {
     setOpen(false);
-    setConfirmRestart(false);
     setRefusal(undefined);
-    setApplied(undefined);
+    forget();
     // The draft stays: reopening the drawer shows it again with "Not saved yet", so nothing is lost by closing.
   };
-  // Back to the badge once the page is no longer inert (the inert effect's cleanup runs first).
-  const wasOpen = useRef(false);
-  useEffect(() => {
-    if (!open && wasOpen.current) badgeRef.current?.focus();
-    wasOpen.current = open;
-  }, [open]);
-  // A modal dialog: the rest of the page is inert while it shows; the focus starts inside it.
-  useEffect(() => {
-    if (!open || drawerRef.current === null) return undefined;
-    drawerRef.current.focus();
-    const restoreRest = makeRestInert(layerRef.current ?? drawerRef.current);
-    // Escape closes it wherever the focus is, even after the tapped button went away (Restart → its confirmation).
-    const onEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') close();
-    };
-    window.addEventListener('keydown', onEscape);
-    return () => {
-      window.removeEventListener('keydown', onEscape);
-      restoreRest();
-    };
-  }, [open]);
-  // The second tap of Restart is where the first one was: the focus moves to it.
-  const confirmRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (confirmRestart) confirmRef.current?.focus();
-  }, [confirmRestart]);
+  // A modal dialog: the rest of the page inert, Escape closes it, the focus goes back to the badge.
+  useModal({ open, close, dialog: drawerRef, layer: layerRef, opener: badgeRef });
 
-  // A choice of the demo (scenario, place, household, units, restart) says what happened (owner, 18 Oct): the tapped row
-  // is chosen at once with "Saving…", then a line at the top says what the demo plays now, or that it was not saved.
-  const [pick, setPick] = useState<{ name: string; value: string } | undefined>(undefined);
-  const [sending, setSending] = useState(false);
-  const [applied, setApplied] = useState<'saved' | 'restarted' | 'failed' | undefined>(undefined);
-  const send = (change: SetScenarioInput, picked?: { name: string; value: string }) => {
-    setPick(picked);
-    setSending(true);
-    setApplied(undefined);
-    void onChange(change).then((saved) => {
-      setSending(false);
-      setPick(undefined);
-      setApplied(saved ? (change.restart === true ? 'restarted' : 'saved') : 'failed');
-    });
-  };
-  const pendingOf = (name: string) => (pick?.name === name ? pick.value : undefined);
-  const appliedText =
-    sending ? t('settings.saving')
-    : applied === 'failed' ? t('settings.failed')
-    : applied !== undefined && settings !== undefined
-      ? t(applied === 'restarted' ? 'settings.restarted' : 'settings.applied', { place: t(`settings.place.${settings.locationId}`), scenario: t(`settings.scenario.${settings.scenarioId}`) })
-      : '';
 
   const units: TempUnit = settings?.units ?? 'C';
   // What the section shows: the saved preferences with the draft on them.
@@ -263,26 +160,14 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
       <button
         ref={badgeRef}
         type="button"
-        className="scenario-badge"
+        className="chip-button settings-open"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => {
           setOpen(true);
         }}
       >
-        <span aria-hidden="true">≈ </span>
-        {settings === undefined ? (
-          t('settings.open')
-        ) : (
-          <>
-            {/* The whole badge names the button; a narrow top row shows the scenario alone (app.css), so the row
-                stays one target high beside the language icon. */}
-            <span className="badge-long">{badgeText(settings)}</span>
-            <span className="badge-short" aria-hidden="true">
-              {t(`settings.scenario.${settings.scenarioId}`)}
-            </span>
-          </>
-        )}
+        {t('settings.open')}
         <span aria-hidden="true"> ▾</span>
       </button>
       {open && (
@@ -291,15 +176,13 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
           <div className="settings-scrim" aria-hidden="true" data-testid="settings-scrim" onClick={close} />
         <div ref={drawerRef} className="settings-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
           <div className="settings-head">
-            <h2 id={titleId}>{t(settings === undefined ? 'settings.open' : 'settings.title')}</h2>
+            <h2 id={titleId}>{t('settings.open')}</h2>
             <button type="button" className="link-button" onClick={close}>
               {t('settings.close')}
             </button>
           </div>
-          {/* Without demo settings there is no demo to change: plain "Settings", no demo intro (review of #290). */}
-          {settings !== undefined && <p className="muted">{t('settings.intro')}</p>}
           {settings !== undefined && (
-            <p className="notice settings-applied" role="status" data-testid="settings-applied" data-failed={applied === 'failed'}>
+            <p className="notice settings-applied" role="status" data-testid="settings-applied" data-failed={changeFailed}>
               {appliedText}
             </p>
           )}
@@ -321,39 +204,6 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
           {/* Without demo settings (not a sandbox, or not read yet) only the language can be chosen (#284). */}
           {settings !== undefined && (
           <>
-          <ChipGroup
-            label={t('settings.scenario')}
-            name="scenario"
-            value={settings.scenarioId}
-            pending={pendingOf('scenario')}
-            options={SCENARIOS.map((id) => ({ value: id, label: t(`settings.scenario.${id}`), sky: skyOfScenario(id) }))}
-            onPick={(v) => {
-              send({ scenarioId: v as (typeof SCENARIOS)[number] }, { name: 'scenario', value: v });
-            }}
-          />
-          <ChipGroup
-            label={t('settings.place')}
-            name="place"
-            value={settings.locationId}
-            pending={pendingOf('place')}
-            options={PLACES.map((id) => {
-              const available = availablePlaces.includes(id);
-              return { value: id, label: t(`settings.place.${id}`), disabled: !available, ...(available ? {} : { hint: t('settings.notYet') }) };
-            })}
-            onPick={(v) => {
-              send({ locationId: v as LocationId }, { name: 'place', value: v });
-            }}
-          />
-          <ChipGroup
-            label={t('settings.household')}
-            name="household"
-            value={settings.household}
-            pending={pendingOf('household')}
-            options={HOUSEHOLDS.map((h) => ({ value: h, label: t(`settings.household.${h}`) }))}
-            onPick={(v) => {
-              send({ household: v as (typeof HOUSEHOLDS)[number] }, { name: 'household', value: v });
-            }}
-          />
           {/* #402: every temperature and limit in one section (it was the units here and the card's setpoints). */}
           <section className="limits" aria-labelledby={limitsTitleId}>
             <h3 id={limitsTitleId}>{t('settings.limits.title')}</h3>
@@ -418,34 +268,6 @@ export function DemoSettingsControl({ settings, availablePlaces, onChange, local
               {refusal === undefined ? '' : refusalText(refusal.id, refusal.why, units)}
             </p>
           </section>
-          <div className="settings-restart">
-            {confirmRestart ? (
-              <>
-                <p>{t('settings.restartAsk')}</p>
-                <button
-                  ref={confirmRef}
-                  type="button"
-                  className="button"
-                  onClick={() => {
-                    setConfirmRestart(false);
-                    send({ restart: true });
-                  }}
-                >
-                  {t('settings.restartConfirm')}
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="chip-button"
-                onClick={() => {
-                  setConfirmRestart(true);
-                }}
-              >
-                {t('settings.restart')}
-              </button>
-            )}
-          </div>
           </>
           )}
           <p className="notice" role="status">

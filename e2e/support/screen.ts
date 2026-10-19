@@ -1,13 +1,13 @@
 import type { Page } from '@playwright/test';
 import { CATALOGS, PRODUCT_NAME } from '../../packages/i18n/src/index.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { demoControls, demoControlsSummary } from '../surface.js';
 
 /** The page's English texts: the journeys read the same catalog the page shows. */
 export const EN = CATALOGS['en-US'];
 
 // What the journeys read on the page, in one place. The user's journey takes `userScreen` only: the product (the Echo,
 // its answers and cards, Ana's phone), never a demo control. The judge's journey takes `judgeScreen`: the same, plus
-// the demo controls (the scenario badge, its drawer, the simulated clock).
+// the demo controls (what the demo plays, the demo controls panel, the simulated clock).
 
 /** The product: the Echo screen, its answers, Ana's phone. */
 export function userScreen(page: Page) {
@@ -37,7 +37,9 @@ export function judgeScreen(page: Page) {
   const clock = page.getByRole('group', { name: 'Simulated time' });
   return {
     ...userScreen(page),
-    badge: demoControlsButton(page),
+    /** What the demo plays (#432): on the "Demo controls" button below a wide screen (a tap opens the sheet), in the panel on it. */
+    badge: demoControlsSummary(page),
+    /** The judges' demo controls: a column on a wide screen, a modal sheet below it. */
     drawer: demoControls(page),
     clock,
     time: clock.locator('time'),

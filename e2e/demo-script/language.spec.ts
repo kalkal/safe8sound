@@ -1,5 +1,5 @@
 import { expect, test } from '../no-network.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { openUserSettings } from '../surface.js';
 
 // #263: the language switch. English by default; Italiano in the settings drawer changes the page and the cards
 // (through hostContext.locale) at once, and the choice is remembered on this browser. The scripted answers stay in
@@ -7,10 +7,9 @@ import { demoControls, demoControlsButton } from '../surface.js';
 
 test('Italiano changes the page and the cards, and is remembered after a reload', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Safe-8-Sound · Alexa+ simulator');
-  await demoControlsButton(page).click();
-  await demoControls(page).getByText('Italiano').click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Safe-8-Sound · simulatore Alexa+');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Safe-8-Sound · Simulated Alexa+ add-on');
+  await (await openUserSettings(page)).getByText('Italiano').click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Safe-8-Sound · componente aggiuntivo Alexa+ simulato');
   await expect(page.locator('html')).toHaveAttribute('lang', 'it');
   await page.keyboard.press('Escape');
 
@@ -21,9 +20,8 @@ test('Italiano changes the page and the cards, and is remembered after a reload'
   await expect(card.getByRole('button', { name: 'Applica il piano' })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Safe-8-Sound · simulatore Alexa+');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Safe-8-Sound · componente aggiuntivo Alexa+ simulato');
   // Back to English for the other tests of this browser context (each test has its own, but be explicit).
-  await demoControlsButton(page).click();
-  await demoControls(page, 'it-IT').getByText('English').click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Safe-8-Sound · Alexa+ simulator');
+  await (await openUserSettings(page, 'it-IT')).getByText('English').click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Safe-8-Sound · Simulated Alexa+ add-on');
 });

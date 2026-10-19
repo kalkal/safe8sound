@@ -87,7 +87,7 @@
       flex-wrap: wrap;
     }
 
-    .echo-top > .scenario-badge {
+    .echo-top > .demo-controls-open {
       overflow: hidden;
       min-inline-size: 0;
       text-overflow: ellipsis;
@@ -136,7 +136,7 @@
     }
   }
 
-  .scenario-badge {
+  .demo-controls-open {
     min-block-size: var(--target-min);
     padding-inline: var(--space-4);
     border: var(--border-thin) dashed var(--status-neutral);
@@ -149,7 +149,7 @@
     cursor: pointer;
   }
 
-  .echo-top > .scenario-badge {
+  .echo-top > .demo-controls-open {
     flex: 0 1 auto;
     min-inline-size: 0;
     overflow: hidden;
@@ -281,6 +281,16 @@
     white-space: nowrap;
   }
 
+  /* The status line and, where the judges' panel is a sheet, what the last jump changed (#432, owner J = a). On a phone
+     the row has no room: the status stays for screen readers and the summary is in the sheet. */
+  .sim-dock-lines {
+    display: contents;
+  }
+
+  .sim-dock-summary {
+    display: none;
+  }
+
   /* A small Echo and a phone: one compact 48 px row (the time and the button, whose words shorten with an ellipsis).
      It takes back the top row's padding and rests on 20 px of the screen's bottom padding (empty), so the screen keeps
      its height and the cubes and the big time stay in the first view. */
@@ -336,8 +346,28 @@
       font-size: var(--font-size-lead);
     }
 
-    .sim-dock-note {
+    .sim-dock-lines {
+      display: grid;
       grid-area: note;
+      align-content: center;
+      gap: var(--space-1);
+      min-inline-size: 0;
+    }
+
+    /* The summary says all the status says and more: where it shows, the status line is kept for screen readers only,
+       and the summary takes at most two lines, so the bar keeps its height (a small Echo included). */
+    .sim-dock-summary {
+      display: -webkit-box;
+      overflow: hidden;
+      color: var(--text-primary);
+      font-size: var(--font-size-min);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.25;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .sim-dock-note {
       position: static;
       inline-size: auto;
       block-size: auto;
@@ -348,6 +378,15 @@
       font-size: var(--font-size-min);
       line-height: 1.25;
       white-space: normal;
+    }
+
+    .sim-dock-lines:has(> .sim-dock-summary) > .sim-dock-note {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 

@@ -1,0 +1,126 @@
+/* The judges' demo controls (#432): a column beside the Echo on a wide screen, the settings sheet below it (its
+   position comes from .settings-drawer in controls.css). Reads only semantic tokens. */
+@layer reset, tokens, base, components, surfaces, overrides;
+
+@layer surfaces {
+  .demo-controls {
+    display: grid;
+    align-content: start;
+    gap: var(--space-3);
+    color: var(--text-primary);
+
+    & h2 {
+      margin: 0;
+      font-size: var(--font-size-lead);
+    }
+
+    & p {
+      margin: 0;
+    }
+  }
+
+  /* The column: on the card surface, the window's height at most; its own content scrolls, never the page. */
+  section.demo-controls {
+    box-sizing: border-box;
+    max-block-size: calc(100dvh - var(--space-6) * 3 - var(--target-min));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+  }
+
+  .demo-controls-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  /* Compact choices in the panel: the rows wrap side by side, each still one 48 px target with its mark and ✓. */
+  .demo-controls .chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+
+    & legend {
+      flex-basis: 100%;
+    }
+  }
+
+  .demo-controls .chip-row {
+    flex: 1 1 auto;
+    min-block-size: var(--target-min);
+    padding-inline: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .demo-controls .chip-sky {
+    inline-size: var(--space-6);
+  }
+
+  /* The top bar's button (styled like the scenario badge it replaces, dashed: a simulation): on a phone it takes the
+     room the other two leave, never a row of its own; what does not fit ends in "…" (its name keeps the whole text). */
+  @media (width < 48rem) {
+    .echo-top > .demo-controls-open {
+      flex: 1 1 0;
+    }
+  }
+
+  /* With the language note in the row (Italian), the button gives the note its room first. */
+  @media (width < 80rem) {
+    .echo-top:has(> .language-top-note) > .demo-controls-open {
+      flex: 1 1 0;
+    }
+  }
+
+  /* The person's own Settings button beside it never shrinks. */
+  .settings-open {
+    flex: none;
+  }
+
+  /* What the demo plays now, in words, under the title. */
+  .demo-controls-summary {
+    font-weight: var(--font-weight-bold);
+  }
+
+  .demo-timeline {
+    display: grid;
+    gap: var(--space-2);
+
+    & h3 {
+      margin: 0;
+      font-size: var(--font-size-body);
+    }
+
+    & ol {
+      display: grid;
+      gap: var(--space-1);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    & li {
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius-pill);
+      color: var(--text-secondary);
+    }
+
+    /* The current stop: marked by its frame and weight, never by colour alone (and named "now" for screen readers). */
+    & li[data-state='current'] {
+      outline: var(--border-thin) solid var(--accent);
+      background: var(--surface-card-raised);
+      color: var(--text-primary);
+      font-weight: var(--font-weight-bold);
+    }
+
+    & time {
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .demo-timeline-next {
+    font-weight: var(--font-weight-bold);
+  }
+}

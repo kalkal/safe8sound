@@ -23,7 +23,7 @@
     "tool": "get_demo_settings",
     "args": {},
     "isError": false,
-    "text": "Scenario clear-day in Reference home (central Italy) (Europe/Rome), temperatures in °C, at home: older-man; settings version 1.",
+    "text": "Scenario clear-day in Reference home (Italy) (Europe/Rome), temperatures in °C, at home: older-man; settings version 1.",
     "structuredContent": {
       "settings": {
         "version": 1,
@@ -35,7 +35,7 @@
       },
       "place": {
         "id": "reference",
-        "label": "Reference home (central Italy)",
+        "label": "Reference home (Italy)",
         "tz": "Europe/Rome"
       }
     }

@@ -10,6 +10,7 @@ import { EN, NOTE, judgeScreen } from '../../support/screen.js';
 import { enterCode, openSiteSession } from '../../support/site-session.js';
 import { sizeOfProject, type Size } from '../../support/sizes.js';
 import { SITE_URL, expectFakeModelSays } from '../../support/target.js';
+import { openUserSettings } from '../../surface.js';
 
 // The judge's journey (owner, 18 Oct; outcomes O12 judge-drives-demo and O9 never-contradicts): the site walked the way
 // a judge walks it, in ONE visit, with the state checked for consistency at every step. It runs once per screen size
@@ -111,15 +112,22 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
     await ui.drawer.getByText(EN['settings.scenario.storm-blackout']).click();
     await expect(ui.badge).toContainText(EN['settings.scenario.storm-blackout'], SLOW);
     await expect(ui.drawer.getByRole('radio', { name: /Storm/ })).toBeChecked(SLOW);
-    // A new place starts in its own unit (owner, 9 Oct): Houston in °F.
-    await expect(ui.drawer.getByRole('radio', { name: '°F' })).toBeChecked(SLOW);
   });
 
   test('1. [drawer not modal] a tap outside the open drawer closes it', async () => {
+    // On a wide screen the demo controls are a column beside the Echo (#432): nothing to close.
+    if (await page.getByRole('region', { name: EN['demoControls.title'] }).isVisible()) return;
     // The top left corner: the dimmed page behind the drawer, never the drawer itself (on a desktop it opens on the
     // right; on a phone it is a sheet over the lower 85 % of the screen, #431).
     await page.mouse.click(4, Math.round(size.height * 0.05));
     await expect(ui.drawer).toBeHidden(QUICK);
+  });
+
+  test('1. a new place starts in its own unit (owner, 9 Oct): Houston in °F, in the own settings of the person', async () => {
+    const settings = await openUserSettings(page);
+    await expect(settings.getByRole('radio', { name: '°F' })).toBeChecked(SLOW);
+    await page.keyboard.press('Escape');
+    await expect(settings).toBeHidden(QUICK);
   });
 
   test('2. the clock is at the storm day start, 12:00 in Houston, with the phone empty', async () => {

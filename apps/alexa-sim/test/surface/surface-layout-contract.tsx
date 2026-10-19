@@ -8,6 +8,7 @@ import type { LayoutId, SurfaceLayout } from '../../src/surface/contract.js';
 
 const slots = {
   screen: <button type="button">Ask</button>,
+  topBar: <button type="button">Settings</button>,
   demoControls: <button type="button">Demo controls</button>,
   clock: <div role="group" aria-label="Simulated time" />,
   companion: <section aria-label="Phone">phone</section>,
@@ -24,10 +25,10 @@ export function describeSurfaceLayoutContract(id: LayoutId, Layout: SurfaceLayou
       const viewport = screen.getByTestId('screen-viewport');
       expect(within(main).getByRole('button', { name: 'Ask' })).toBeTruthy();
       expect(viewport.contains(main)).toBe(true);
-      for (const outside of [screen.getByRole('button', { name: 'Demo controls' }), screen.getByRole('group', { name: 'Simulated time' }), screen.getByRole('region', { name: 'Phone' })]) {
+      for (const outside of [screen.getByRole('button', { name: 'Settings' }), screen.getByRole('button', { name: 'Demo controls' }), screen.getByRole('group', { name: 'Simulated time' }), screen.getByRole('region', { name: 'Phone' })]) {
         expect(viewport.contains(outside)).toBe(false);
       }
-      expect(screen.getAllByRole('button')).toHaveLength(2);
+      expect(screen.getAllByRole('button')).toHaveLength(3);
       expect(screen.getByTestId('slot-background').dataset['slot']).toBe('background');
     });
 

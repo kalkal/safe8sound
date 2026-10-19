@@ -1,6 +1,6 @@
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE } from './chain.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { demoControlsSummary, openDemoControls } from '../surface.js';
 
 // Times are on the home's own clock: a Houston sandbox shows Houston's times (America/Chicago) on Ana's phone and in
 // the cards, whatever the browser's zone (here Tokyo) and whatever zone the page was built with (Europe/Rome). The bug
@@ -15,12 +15,11 @@ test("Houston: the power cut at 15:00 reaches Ana's phone at 15:00, and the safe
   await page.goto('/');
   await page.getByLabel('Demo code').fill(DEMO_CODE);
   await page.getByRole('button', { name: 'Start' }).click();
-  const badge = demoControlsButton(page);
-  await expect(badge).toContainText('Clear day', { timeout: 20_000 });
-  await badge.click();
-  await demoControls(page).getByText('Houston, Texas').click();
+  const plays = demoControlsSummary(page);
+  await expect(plays).toContainText('Clear day', { timeout: 20_000 });
+  await (await openDemoControls(page)).getByText('Houston, Texas').click();
   await page.keyboard.press('Escape');
-  await expect(badge).toContainText('Houston', { timeout: 20_000 });
+  await expect(plays).toContainText('Houston', { timeout: 20_000 });
 
   await page.getByRole('group', { name: 'Example questions' }).getByRole('button', { name: 'Power cut' }).click();
   await page.getByRole('button', { name: 'Ask' }).click();

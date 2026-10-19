@@ -13,15 +13,15 @@ describe('demo settings', () => {
   it('#284: the badge names the place in the page language at render time, not in the language it was read in', () => {
     setLocale('it-IT');
     try {
-      expect(badgeText(scriptedDemoSettings())).toBe('SCENARIO · Casa di riferimento (Italia centrale) · Ondata di calore');
+      expect(badgeText(scriptedDemoSettings())).toBe('SCENARIO · Casa di riferimento (Italia) · Ondata di calore');
     } finally {
       setLocale('en-US');
     }
   });
 
   it('the badge names the place and the scenario; in the storm it says the power is out', () => {
-    expect(badgeText(scriptedDemoSettings())).toBe('SCENARIO · Reference home (central Italy) · Heat wave');
-    expect(badgeText({ ...scriptedDemoSettings(), scenarioId: 'storm-blackout' })).toBe('SCENARIO · Reference home (central Italy) · Storm · power outage');
+    expect(badgeText(scriptedDemoSettings())).toBe('SCENARIO · Reference home (Italy) · Heat wave');
+    expect(badgeText({ ...scriptedDemoSettings(), scenarioId: 'storm-blackout' })).toBe('SCENARIO · Reference home (Italy) · Storm · power outage');
   });
 
   it('a choice changes only what was chosen; a restart changes nothing but the day', () => {
@@ -57,7 +57,7 @@ describe('demo settings', () => {
 describe('remote demo settings (B2): read and saved through the card tool route', () => {
   const ctx = { correlationId: 'c1' };
   const settings = { version: 3, updatedAt: '2026-10-05T10:00:00Z', scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' } as const;
-  const place = { id: 'reference', label: 'Reference home (central Italy)', tz: 'Europe/Rome' } as const;
+  const place = { id: 'reference', label: 'Reference home (Italy)', tz: 'Europe/Rome' } as const;
   const reply = (structuredContent: unknown, isError = false) => ({ ...(isError ? { isError: true } : {}), content: [{ type: 'text', text: 'x' }], structuredContent });
   const agentAnswering = (answers: Record<string, unknown>) => {
     const calls: Array<[string, Record<string, unknown>]> = [];

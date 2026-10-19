@@ -7,8 +7,8 @@ import { expect, test } from '../no-network.js';
 test('scene 1: "What\'s my battery level?" → SOC with the SIMULATED badge', async ({ page }) => {
   await page.goto('/');
   // The static <title> in index.html is a placeholder: this checks the one set from the i18n product name.
-  await expect(page).toHaveTitle(`${PRODUCT_NAME} · Alexa+ simulator`);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${PRODUCT_NAME} · Alexa+ simulator`);
+  await expect(page).toHaveTitle(`${PRODUCT_NAME} · Simulated Alexa+ add-on`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${PRODUCT_NAME} · Simulated Alexa+ add-on`);
 
   await page.getByLabel('Ask a question').fill("What's my battery level?");
   await page.getByRole('button', { name: 'Ask' }).click();

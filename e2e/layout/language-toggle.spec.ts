@@ -1,12 +1,12 @@
 import { expect, test } from '../no-network.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { demoControlsButton, openDemoControls } from '../surface.js';
 
 // The language icon at the top (owner, 10 Oct): English by default; one quiet button offers Italiano and changes the
 // page at once, remembered like the drawer's Language row. In view, at least 44 px, and the Echo screen never
 // scrolls, on the Echo sizes and the phone. ScriptedAgent only.
 
-const TITLE_EN = 'Safe-8-Sound · Alexa+ simulator';
-const TITLE_IT = 'Safe-8-Sound · simulatore Alexa+';
+const TITLE_EN = 'Safe-8-Sound · Simulated Alexa+ add-on';
+const TITLE_IT = 'Safe-8-Sound · componente aggiuntivo Alexa+ simulato';
 
 test('English by default; the language icon switches to Italian, is remembered, and switches back', async ({ page }) => {
   await page.goto('/');
@@ -55,10 +55,10 @@ for (const { width, height, italian, storm } of CASES) {
       });
     }
     await page.goto('/');
-    const badge = demoControlsButton(page);
+    // The button that opens the judges' demo controls shares the top row (it says what the demo plays, like the badge did).
+    const badge = demoControlsButton(page, italian ? 'it-IT' : 'en-US');
     if (storm) {
-      await badge.click();
-      await demoControls(page, italian ? 'it-IT' : 'en-US').getByText(italian ? 'Temporale · blackout' : 'Storm · power outage').click();
+      await (await openDemoControls(page, italian ? 'it-IT' : 'en-US')).getByText(italian ? 'Temporale · blackout' : 'Storm · power outage').click();
       await page.keyboard.press('Escape');
     }
     const toggle = page.getByRole('button', { name: italian ? 'Lingua: English' : 'Language: Italiano' });

@@ -30,7 +30,10 @@ import { SimClock } from './ui/SimClock.js';
 import { clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
 import { isAppliedPlan } from './ui/steps.js';
 import { SHIPPED_PLACES, skyOfScenario } from './ui/demo-settings.js';
-import { DemoSettingsControl } from './ui/SettingsDrawer.js';
+import { SettingsControl } from './ui/SettingsDrawer.js';
+import { DemoControlsOpener, DemoControlsPanel, WIDE_CONTROLS, jumpText, useDemoControlsSheet } from './demo-controls/DemoControlsPanel.js';
+import { messagesBetween } from './demo-controls/timeline.js';
+import { useMediaQuery } from './ui/use-media-query.js';
 import { LanguageToggle, nextLocale } from './ui/LanguageToggle.js';
 import { readLocale } from './ui/locale-setting.js';
 import { ErrorBoundary } from './ui/ErrorBoundary.js';
@@ -230,7 +233,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const gridDown = isGridDown(homeState);
   // The simulated clock (state/use-sim-clock), for every visitor of a sandbox (or the scripted home).
   const hasSandbox = demoSettings !== undefined;
-  const { clock, busy: clockBusy, note: clockNote, skip: onSkip, cutPower, clearNote } = useSimClock({ agent, enabled: hasSandbox, scenario: demoSettings?.scenarioId, planId, playthrough, afterMove: readWhatFollows });
+  const { clock, busy: clockBusy, note: clockNote, stops, skip: onSkip, cutPower, clearNote } = useSimClock({ agent, enabled: hasSandbox, scenario: demoSettings?.scenarioId, planId, playthrough, afterMove: readWhatFollows });
   // "Power cut" (time pack, 12 Oct): before the question reaches the agent, the simulated grid goes down (the storm
   // scenario, at its storm start), so the assistant answers a real outage and storm mode starts. The latest settings
   // are read through a ref: the turn may start before this render's settings are drawn.
@@ -259,15 +262,40 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [clearNote, onSettingsChange],
   );
-  // The simulated clock sits under the Echo frame, big (#391): the top bar's pill was not noticed.
-  const clockDock = hasSandbox && clock !== undefined ? <SimClock state={clock} busy={clockBusy} onSkip={onSkip} {...(clockNote === undefined ? {} : { note: clockNote })} /> : undefined;
-  const settingsControl = (
+  // The judges' demo controls (#432): a column beside the Echo on a wide screen, a sheet behind a button below it;
+  // removable by config (the real home keeps only its own controls). The simulated clock and its jump stay under the
+  // Echo, big (#391), so the time is always in view.
+  const demoShown = config.demoControls && hasSandbox;
+  const wide = useMediaQuery(WIDE_CONTROLS);
+  const sheet = useDemoControlsSheet();
+  // A window that grows into the column while the sheet is open: the column shows, the sheet closes.
+  const closeSheet = sheet.setOpen;
+  useEffect(() => {
+    if (wide) closeSheet(false);
+  }, [wide, closeSheet]);
+  // After each jump the panel says what changed, with the messages Ana got on the way: those sent after the time the
+  // jump left and up to the time it reached (brief 3b; a later answer's message is never counted as the jump's).
+  // Re-render when Ana's phone changes, so the summary counts what has arrived.
+  useSyncExternalStore(phone.subscribe, () => phone.messages().length);
+  const jumpFrom = useRef<string | undefined>(undefined);
+  const onJump = useCallback(() => {
+    jumpFrom.current = clock?.now;
+    onSkip();
+  }, [clock?.now, onSkip]);
+  const lastJump =
+    clockNote?.kind === 'reached' && clock !== undefined ? { at: clock.now, kind: clockNote.moment, told: messagesBetween(phone.messages(), jumpFrom.current, clock.now) } : undefined;
+  const clockDock = demoShown && clock !== undefined ? <SimClock state={clock} busy={clockBusy} onSkip={onJump} {...(clockNote === undefined ? {} : { note: clockNote })} summary={!wide && lastJump !== undefined ? jumpText(lastJump) : undefined} /> : undefined;
+  const topBar = (
     <>
-      <DemoSettingsControl settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} locale={locale} onLocale={onLocale} limits={limits} onLimit={onLimit} />
-      {/* The language icon at the top (owner, 10 Oct), at the end of the row, quiet beside the badge. */}
+      <DemoControlsOpener sheet={sheet} settings={demoSettings} hidden={!demoShown || wide} />
+      <SettingsControl settings={demoSettings} onChange={onDrawerChange} locale={locale} onLocale={onLocale} limits={limits} onLimit={onLimit} />
+      {/* The language icon at the top (owner, 10 Oct), at the end of the row. */}
       <LanguageToggle locale={locale} onLocale={onLocale} />
     </>
   );
+  const demoControls = demoShown ? (
+    <DemoControlsPanel sheet={sheet} wide={wide} settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} stops={stops} now={clock?.now} lastJump={lastJump} />
+  ) : undefined;
   // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
   const phonePanel = (
     <ErrorBoundary>
@@ -280,7 +308,8 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     <Layout
       state={{ sky }}
       slots={{
-        demoControls: settingsControl,
+        topBar,
+        ...(demoControls === undefined ? {} : { demoControls }),
         companion: phonePanel,
         ...(clockDock === undefined ? {} : { clock: clockDock }),
         screen: (
@@ -296,8 +325,8 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                 examples={examples}
                 commands={[
                   // The clock's button, said or typed (idea 4), while it has a moment to skip to: what is written on it can be said ("Go to 21:10").
-                  ...(hasSandbox && clock?.next !== undefined && !clockBusy
-                    ? [{ id: 'clock_skip', phrases: [t('clock.skip'), t('clock.skipUtterance'), t('clock.skipToShort', { time: clockTime(clock.next.at) }), t('clock.skipTo', { time: clockTime(clock.next.at), moment: t(`clock.kind.${clock.next.kind}`) })], run: onSkip }]
+                  ...(demoShown && clock?.next !== undefined && !clockBusy
+                    ? [{ id: 'clock_skip', phrases: [t('clock.skip'), t('clock.skipUtterance'), t('clock.skipToShort', { time: clockTime(clock.next.at) }), t('clock.skipTo', { time: clockTime(clock.next.at), moment: t(`clock.kind.${clock.next.kind}`) })], run: onJump }]
                     : []),
                   { id: 'home_show', phrases: [t('home.show')], run: homePanel.open },
                   { id: 'home_hide', phrases: [t('home.hide')], run: homePanel.close },

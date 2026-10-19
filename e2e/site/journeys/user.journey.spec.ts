@@ -6,8 +6,7 @@ import { expectInOneScreen } from '../../support/fit.js';
 import { expectPhoneInHomeUnits } from '../../support/invariants.js';
 import { BUGS, check } from '../../support/known-bugs.js';
 import { phoneReads } from '../../support/phone.js';
-import { NOTE, userScreen } from '../../support/screen.js';
-import { demoControls } from '../../surface.js';
+import { EN, NOTE, userScreen } from '../../support/screen.js';
 import { enterCode, openSiteSession } from '../../support/site-session.js';
 import { sizeOfProject, type Size } from '../../support/sizes.js';
 import { worldOf } from '../../support/world.js';
@@ -196,6 +195,7 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
   });
 
   test('the journey never opened a demo control', { tag: '@outcome:O12' }, async () => {
-    await expect(demoControls(page)).toHaveCount(0);
+    // A wide screen always shows the column beside the Echo (#432); what must never happen is opening their sheet.
+    await expect(page.getByRole('dialog', { name: EN['demoControls.title'] })).toHaveCount(0);
   });
 });

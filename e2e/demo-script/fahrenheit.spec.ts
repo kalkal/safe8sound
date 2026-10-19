@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { demoControlsSummary, openDemoControls, openUserSettings } from '../surface.js';
 
 // °F everywhere (owner decision, 9 Oct): the judge picks °F in the settings drawer and every card follows: the home
 // floor plan and the safe room in the storm (the plan card is covered by its unit tests); a card already on screen
@@ -13,20 +13,23 @@ const ask = async (page: Page, question: string) => {
 };
 
 const pickUnits = async (page: Page, unit: '°C' | '°F') => {
-  await demoControlsButton(page).click();
-  const drawer = demoControls(page);
+  const drawer = await openUserSettings(page);
   await drawer.getByRole('radiogroup', { name: 'Temperature units' }).getByText(unit).click();
   await page.keyboard.press('Escape');
 };
 
 test('Houston starts in °F: choosing the place switches the unit, and the judge can switch back', async ({ page }) => {
   await page.goto('/');
-  await demoControlsButton(page).click();
-  const drawer = demoControls(page);
-  const units = drawer.getByRole('radiogroup', { name: 'Temperature units' });
-  await expect(units.getByRole('radio', { name: '°C' })).toBeChecked();
-  await drawer.getByText('Houston, Texas').click();
-  await expect(units.getByRole('radio', { name: '°F' })).toBeChecked();
+  // The place is a demo control; the unit is the person's own setting, which the place sets first (Houston: °F).
+  let settings = await openUserSettings(page);
+  await expect(settings.getByRole('radiogroup', { name: 'Temperature units' }).getByRole('radio', { name: '°C' })).toBeChecked();
+  await page.keyboard.press('Escape');
+  const panel = await openDemoControls(page);
+  await panel.getByText('Houston, Texas').click();
+  await expect(demoControlsSummary(page)).toContainText('Houston, Texas');
+  await page.keyboard.press('Escape');
+  settings = await openUserSettings(page);
+  await expect(settings.getByRole('radiogroup', { name: 'Temperature units' }).getByRole('radio', { name: '°F' })).toBeChecked();
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Show my home' }).click();
   const homeCard = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]');

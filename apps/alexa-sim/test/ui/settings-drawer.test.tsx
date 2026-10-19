@@ -2,110 +2,50 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setLocale } from '@cold-reserve/i18n';
-import { useState } from 'react';
 import { SCRIPT_FIXTURES } from '../../src/agent/script-fixtures.js';
-import { applyChange, scriptedDemoSettings } from '../../src/ui/demo-settings.js';
+import { scriptedDemoSettings } from '../../src/ui/demo-settings.js';
 import type { LimitChange } from '../../src/ui/limits.js';
-import { DemoSettingsControl } from '../../src/ui/SettingsDrawer.js';
+import { SettingsControl } from '../../src/ui/SettingsDrawer.js';
 import type { LimitSave } from '../../src/ui/limits.js';
 
-// B1 (additions plan): the scenario badge opens the judge's settings drawer. Radio groups with the choice written,
-// not only coloured; places not shipped yet say so; Escape closes and the focus goes back to the badge.
+// The person's own settings (B1, #402; the judges' controls moved to their own panel, #432): "Settings" opens the
+// drawer. Radio groups with the choice written, not only coloured; Escape closes and the focus goes back to the button.
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLocale('en-US');
+});
 
 const setup = () => {
   const onChange = vi.fn(() => Promise.resolve(true));
   const onLocale = vi.fn();
-  render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={onChange} locale="en-US" onLocale={onLocale} />);
-  return { onChange, onLocale, badge: screen.getByRole('button', { name: /SCENARIO/ }) };
+  render(<SettingsControl settings={scriptedDemoSettings()} onChange={onChange} locale="en-US" onLocale={onLocale} />);
+  return { onChange, onLocale, badge: screen.getByRole('button', { name: 'Settings' }) };
 };
 
-describe('DemoSettingsControl', () => {
-  it('the badge says the place and the scenario, and opens the drawer as a dialog', () => {
+describe('SettingsControl', () => {
+  it('"Settings" opens the own settings of the person as a dialog: no demo control in it', () => {
     const { badge } = setup();
-    expect(badge.textContent).toContain('SCENARIO · Reference home (central Italy) · Heat wave');
     expect(badge.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(badge);
-    expect(badge.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('dialog', { name: 'Demo settings' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy();
+    for (const name of ['Language', 'Temperature units']) expect(screen.getByRole('radiogroup', { name })).toBeTruthy();
+    for (const name of ['Scenario', 'Weather', 'Place', 'Who is at home']) expect(screen.queryByRole('radiogroup', { name })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Restart the day' })).toBeNull();
   });
 
-  it('on a phone the badge can show the scenario alone; its name keeps the place and the scenario', () => {
-    const { badge } = setup();
-    expect(badge.querySelector('.badge-short')?.textContent).toBe('Heat wave');
-    expect(badge.querySelector('.badge-short')?.getAttribute('aria-hidden')).toBe('true');
-    expect(badge.querySelector('.badge-long')?.textContent).toBe('SCENARIO · Reference home (central Italy) · Heat wave');
-  });
-
-  it('each setting is a radio group with the current choice checked', () => {
-    const { badge } = setup();
-    fireEvent.click(badge);
-    const scenario = screen.getByRole('radiogroup', { name: 'Scenario' });
-    expect(within(scenario).getByRole('radio', { name: /Heat wave/ })).toHaveProperty('checked', true);
-    for (const name of ['Place', 'Temperature units', 'Who is at home']) expect(screen.getByRole('radiogroup', { name })).toBeTruthy();
-  });
-
-  it('the tapped choice shows at once, marked as being saved, until the save ends (owner, 18 Oct)', () => {
-    const onChange = vi.fn(() => new Promise<boolean>(() => undefined));
-    render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={onChange} locale="en-US" onLocale={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
-    fireEvent.click(screen.getByRole('radio', { name: /Storm/ }));
-    const scenario = screen.getByRole('radiogroup', { name: 'Scenario' });
-    expect(within(scenario).getByRole('radio', { name: /Storm/ })).toHaveProperty('checked', true);
-    expect(within(scenario).getByRole('radio', { name: /Heat wave/ })).toHaveProperty('checked', false);
-    expect(within(scenario).getByRole('radio', { name: /Storm/ }).closest('label')?.textContent).toContain('Saving…');
-  });
-
-  it('once saved, a line at the top says what the demo plays now', async () => {
-    function Saved() {
-      const [settings, setSettings] = useState(scriptedDemoSettings());
-      return (
-        <DemoSettingsControl
-          settings={settings}
-          availablePlaces={['reference']}
-          onChange={(change) => {
-            setSettings((s) => applyChange(s, change));
-            return Promise.resolve(true);
-          }}
-          locale="en-US"
-          onLocale={vi.fn()}
-        />
-      );
-    }
-    render(<Saved />);
-    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
-    fireEvent.click(screen.getByRole('radio', { name: /Storm/ }));
-    await waitFor(() => {
-      expect(screen.getByTestId('settings-applied').textContent).toBe('Saved. Now: Reference home (central Italy) · Storm · power outage');
-    });
-    expect(screen.getByRole('radio', { name: /Storm/ }).closest('label')?.getAttribute('data-checked')).toBe('true');
-  });
-
-  it('a failed save puts the choice back and says so', async () => {
-    const onChange = vi.fn(() => Promise.resolve(false));
-    render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={onChange} locale="en-US" onLocale={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
-    fireEvent.click(screen.getByRole('radio', { name: /Storm/ }));
+  it('a unit is chosen at once, saved, and the drawer says so; a failed save says so too', async () => {
+    let finish: (saved: boolean) => void = () => undefined;
+    const onChange = vi.fn(() => new Promise<boolean>((resolve) => (finish = resolve)));
+    render(<SettingsControl settings={scriptedDemoSettings()} onChange={onChange} locale="en-US" onLocale={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('radio', { name: /°F/ }));
+    expect(onChange).toHaveBeenCalledWith({ units: 'F' });
+    expect(screen.getByRole('radio', { name: /°F/ }).closest('label')?.textContent).toContain('Saving…');
+    finish(false);
     await waitFor(() => {
       expect(screen.getByTestId('settings-applied').textContent).toBe("That change wasn't saved. Try again.");
     });
-    expect(screen.getByRole('radio', { name: /Heat wave/ })).toHaveProperty('checked', true);
-  });
-
-  it('choosing a scenario sends only that change', () => {
-    const { badge, onChange } = setup();
-    fireEvent.click(badge);
-    fireEvent.click(screen.getByRole('radio', { name: /Storm/ }));
-    expect(onChange).toHaveBeenCalledWith({ scenarioId: 'storm-blackout' });
-  });
-
-  it('a place that has not shipped yet is disabled and says so', () => {
-    const { badge } = setup();
-    fireEvent.click(badge);
-    const houston = screen.getByRole('radio', { name: /Houston, Texas/ });
-    expect(houston).toHaveProperty('disabled', true);
-    expect(screen.getByRole('radiogroup', { name: 'Place' }).textContent).toContain('Not available yet');
   });
 
   it('#263: the language is a row of its own, English by default; choosing Italiano changes only the page', () => {
@@ -121,8 +61,8 @@ describe('DemoSettingsControl', () => {
   it('#263: with Italian chosen, the drawer says honestly that the answers are still in English', () => {
     const onLocale = vi.fn();
     setLocale('it-IT');
-    render(<DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={() => Promise.resolve(true)} locale="it-IT" onLocale={onLocale} />);
-    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    render(<SettingsControl settings={scriptedDemoSettings()} onChange={() => Promise.resolve(true)} locale="it-IT" onLocale={onLocale} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Impostazioni' }));
     expect(screen.getByTestId('language-note').textContent).toBe('Alexa risponde ancora in inglese: per ora l’italiano vale per le scritte della pagina e delle card.');
     setLocale('en-US');
   });
@@ -135,7 +75,7 @@ describe('DemoSettingsControl', () => {
 
   it('#284: without demo settings (not a sandbox, or not read yet) the badge still opens the Language row, and only it', () => {
     const onLocale = vi.fn();
-    render(<DemoSettingsControl settings={undefined} availablePlaces={['reference']} onChange={() => Promise.resolve(true)} locale="en-US" onLocale={onLocale} />);
+    render(<SettingsControl settings={undefined} onChange={() => Promise.resolve(true)} locale="en-US" onLocale={onLocale} />);
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(screen.getByRole('radiogroup', { name: 'Language' })).toBeTruthy();
     expect(screen.queryByRole('radiogroup', { name: 'Scenario' })).toBeNull();
@@ -145,19 +85,10 @@ describe('DemoSettingsControl', () => {
     expect(screen.queryByText('Change what this demo plays. Only your own demo home changes.')).toBeNull();
   });
 
-  it('restart needs two taps', () => {
-    const { badge, onChange } = setup();
-    fireEvent.click(badge);
-    fireEvent.click(screen.getByRole('button', { name: 'Restart the day' }));
-    expect(onChange).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, restart it now' }));
-    expect(onChange).toHaveBeenCalledWith({ restart: true });
-  });
-
   it('Escape closes the drawer and the focus goes back to the badge', () => {
     const { badge } = setup();
     fireEvent.click(badge);
-    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Demo settings' }), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Settings' }), { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(badge);
   });
@@ -184,9 +115,9 @@ describe('Temperatures and limits section', () => {
     const onLimit = vi.fn<(change: LimitChange) => Promise<LimitSave>>(() => Promise.resolve('saved'));
     const onChange = vi.fn(() => Promise.resolve(true));
     render(
-      <DemoSettingsControl settings={{ ...scriptedDemoSettings(), units }} availablePlaces={['reference']} onChange={onChange} locale="en-US" onLocale={vi.fn()} limits={view} onLimit={onLimit} />,
+      <SettingsControl settings={{ ...scriptedDemoSettings(), units }} onChange={onChange} locale="en-US" onLocale={vi.fn()} limits={view} onLimit={onLimit} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     return { onLimit, onChange, section: screen.getByRole('region', { name: 'Temperatures and limits' }) };
   };
 
@@ -196,16 +127,16 @@ describe('Temperatures and limits section', () => {
     expect(within(section).getByRole('group', { name: 'Comfort temperature' }).querySelector('output')?.textContent).toBe('25 °C');
     expect(within(section).getByRole('radiogroup', { name: 'Temperature units' })).toBeTruthy();
     expect(section.textContent).toContain('Adult, 22:00–07:00: at most 26 °C');
-    expect(section.textContent).toContain('With an older person: at most 24 °C');
+    expect(section.textContent).toContain('With an older or frail person: at most 24 °C');
     expect(section.textContent).toContain('CIBSE TM59');
   });
 
   it('#422: names the safe room choices by the names get_preferences gives, by their readable id otherwise', () => {
     const rooms = view.preferences.roomPriority.map((id) => ({ id, name: id === 'bedroom-1' ? "Leo's room" : 'Room ' + id }));
     render(
-      <DemoSettingsControl settings={scriptedDemoSettings()} availablePlaces={['reference']} onChange={vi.fn(() => Promise.resolve(true))} locale="en-US" onLocale={vi.fn()} limits={{ ...view, rooms }} onLimit={vi.fn<(change: LimitChange) => Promise<LimitSave>>(() => Promise.resolve('saved'))} />,
+      <SettingsControl settings={scriptedDemoSettings()} onChange={vi.fn(() => Promise.resolve(true))} locale="en-US" onLocale={vi.fn()} limits={{ ...view, rooms }} onLimit={vi.fn<(change: LimitChange) => Promise<LimitSave>>(() => Promise.resolve('saved'))} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     const safeRoom = screen.getByRole('radiogroup', { name: 'Safe room' });
     expect(within(safeRoom).getByRole('radio', { name: /Leo's room/ })).toHaveProperty('checked', true);
     expect(safeRoom.textContent).not.toContain('Bedroom 1');
@@ -242,7 +173,7 @@ describe('Temperatures and limits section', () => {
     fireEvent.click(within(section).getByRole('button', { name: 'Lower: Comfort temperature' }));
     expect(screen.getByText('Not saved yet: press Save.')).toBeTruthy();
     fireEvent.keyDown(window, { key: 'Escape' });
-    fireEvent.click(screen.getByRole('button', { name: /SCENARIO/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(screen.getByText('Not saved yet: press Save.')).toBeTruthy();
     expect(screen.getByRole('group', { name: 'Comfort temperature' }).querySelector('output')?.textContent).toBe('24.5 °C');
   });
@@ -262,7 +193,7 @@ describe('Temperatures and limits section', () => {
 
   it('a step against the rule sends nothing and says why; Save with no change sends nothing', () => {
     const { section, onLimit } = open();
-    fireEvent.click(within(section).getByRole('button', { name: 'Raise: Cap with an older person' }));
+    fireEvent.click(within(section).getByRole('button', { name: 'Raise: Cap with an older or frail person' }));
     expect(screen.getByTestId('limit-refusal').textContent).toContain('can only be made stricter');
     fireEvent.click(within(section).getByRole('button', { name: 'Save' }));
     expect(onLimit).not.toHaveBeenCalled();

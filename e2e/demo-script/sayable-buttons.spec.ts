@@ -59,7 +59,7 @@ test('typed labels: Previous / Next answer, Show / Hide my home, Light / Dark th
 test('labels that ask Alexa: the safe-room chip and the plan card button, said as shown, get their answer', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');
-  await type(page, 'Is Grandpa safe?');
+  await type(page, 'Is Leo safe?');
   await expect(page.locator('iframe[title="Safe room card"]')).toBeVisible();
   await type(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
   await expect(page.locator('iframe[title="Plan card"]')).toBeVisible();

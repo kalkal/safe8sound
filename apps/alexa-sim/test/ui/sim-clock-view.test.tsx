@@ -30,6 +30,19 @@ describe('SimClock', () => {
     expect(onSkip).toHaveBeenCalledOnce();
   });
 
+  it("where the judges' panel is a sheet, the bar also says what the last jump changed; its status line stays as it was", () => {
+    render(<SimClock state={AHEAD} note={{ kind: 'reached', moment: 'storm_start' }} busy={false} onSkip={vi.fn()} summary="15:00 — the grid goes down · Ana got a message" />);
+    const clock = screen.getByRole('group', { name: 'Simulated time' });
+    expect(within(clock).getByRole('status').textContent).toBe('Now: the grid goes down.');
+    expect(within(clock).getByTestId('clock-jump-summary').textContent).toBe('15:00 — the grid goes down · Ana got a message');
+    expect(within(clock).getAllByRole('button')).toHaveLength(1);
+  });
+
+  it('without a summary there is no such line', () => {
+    render(<SimClock state={AHEAD} busy={false} onSkip={vi.fn()} />);
+    expect(screen.queryByTestId('clock-jump-summary')).toBeNull();
+  });
+
   it('what just happened wins over what comes next: the grid down, a moment reached, a failed move', () => {
     const { rerender } = render(<SimClock state={AHEAD} note={{ kind: 'grid_down' }} busy={false} onSkip={vi.fn()} />);
     expect(screen.getByRole('status').textContent).toBe('The simulated grid is now down.');

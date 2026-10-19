@@ -9,6 +9,7 @@ import './layout.css';
 export const PlainLayout: SurfaceLayout = ({ slots, state }) => (
   <div className="plain-stage" data-layout="plain" data-sky={state.sky}>
     <div data-slot="background" data-testid={SLOT_TEST_IDS.background} />
+    {slots.topBar !== undefined && <div className="plain-top">{slots.topBar}</div>}
     {slots.demoControls !== undefined && <div className="plain-controls">{slots.demoControls}</div>}
     <div className="plain-viewport" data-testid={SLOT_TEST_IDS.viewport}>
       <main className="surface">{slots.screen}</main>

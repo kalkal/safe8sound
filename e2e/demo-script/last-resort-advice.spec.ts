@@ -3,7 +3,7 @@ import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 import { openRemote } from '../remote-session.js';
 import { expectScreenSettled } from '../screen-settled.js';
-import { demoControls, demoControlsButton } from '../surface.js';
+import { openDemoControls } from '../surface.js';
 
 // The last-resort story (owner decisions of 1 and 12 Oct, #364, #376): the big time is until when the safe room stays
 // within its limits, the battery time below it; the card's own page lists what to do without power, the signs of heat
@@ -15,8 +15,7 @@ const ask = async (page: Page, question: string) => {
 };
 
 const pickPlace = async (page: Page, place: string) => {
-  await demoControlsButton(page).click();
-  await demoControls(page).getByText(place).click();
+  await (await openDemoControls(page)).getByText(place).click();
   await page.keyboard.press('Escape');
 };
 
