@@ -1,0 +1,163 @@
+/* The parts of the screen every layout shows (#432): the card tabs, the answer pager, Back and the steps, the home
+   panel, the cold reserve clock, and the text kept for screen readers. Moved as is from the Echo layout's CSS, loaded
+   right after it as before. Reads only semantic tokens from @cold-reserve/design-tokens. */
+@layer reset, tokens, base, components, surfaces, overrides;
+
+@layer surfaces {
+  .card-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+
+    & [aria-selected="true"] {
+      border-color: var(--accent);
+      background: var(--surface-card);
+      font-weight: var(--font-weight-medium);
+    }
+  }
+
+  /* In the header band, at its end. */
+  .answer-pager {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-inline-start: auto;
+  }
+
+  .answer-pager-where {
+    color: var(--text-secondary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+  }
+
+  /* An answer given before the clock last moved (owner, 18 Oct), before the pager at the header band's end: marked
+     like the SIMULATED badge, so an older answer never reads as the home now. */
+  .answer-when {
+    margin: 0 0 0 auto;
+    padding: var(--space-1) var(--space-3);
+    border: var(--border-thin) dashed var(--status-neutral);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+    white-space: nowrap;
+  }
+
+  .answer-when + .answer-pager {
+    margin-inline-start: 0;
+  }
+
+  /* A small Echo and a phone have no row to spare: the cubes stay in the first screen (owner rule, 11 Oct). There the
+     pill is not drawn; the answer still says it for screen readers. How to show it on these screens is an open question. */
+  @media (width < 64rem) {
+    .answer-when {
+      display: none;
+    }
+  }
+
+  /* "Back" always there and the path of the steps (idea 5): Back at the start of the header band, then one dot per
+     step, the current one longer and named in words. */
+  .back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding-inline-start: var(--space-3);
+  }
+
+  .back-arrow {
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .step-dots {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .step-dot {
+    inline-size: 0.625rem;
+    block-size: 0.625rem;
+    border: var(--border-thin) solid var(--text-secondary);
+    border-radius: var(--radius-pill);
+  }
+
+  .step[aria-current="step"] .step-dot {
+    inline-size: 1.5rem;
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+
+  .step-name {
+    color: var(--text-secondary);
+    font-family: var(--font-data);
+    font-size: var(--font-size-min);
+    text-transform: uppercase;
+  }
+
+  .home-panel-body {
+    justify-self: stretch;
+  }
+
+  /* The cold reserve clock on the idle screen (owner, 11 Oct): the same 56 px ice cubes as the cards (signature
+     element 2), one per hour of the reserve; in the storm the cube of the hour being used empties once, slowly. */
+  .reserve-clock {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--space-2) var(--space-3);
+
+    & h2 {
+      margin: 0;
+      color: var(--text-secondary);
+      font-family: var(--font-data);
+      font-size: var(--font-size-min);
+      font-weight: inherit;
+      text-transform: uppercase;
+    }
+  }
+
+  .reserve-hours {
+    margin: 0;
+    font-size: var(--font-size-hero-min);
+    font-weight: var(--font-weight-bold);
+    line-height: 1;
+  }
+
+  /* The cubes themselves are CubeRow's (@cold-reserve/ui-cards/cubes.css): here only their place, under the hours. */
+  .reserve-clock .cubes {
+    grid-column: 1 / -1;
+  }
+
+  /* On a phone the idle band is short, under the intro: the clock keeps its rows as on an Echo (one, or two above
+     CUBES_PER_ROW), the cubes narrower, so all of them stay in the first view. */
+  @media (width < 48rem) {
+    .reserve-clock .cubes {
+      grid-template-columns: repeat(var(--cubes-per-row), minmax(0, var(--cube-size)));
+    }
+  }
+
+  .visually-hidden {
+    position: absolute;
+    overflow: hidden;
+    inline-size: 1px;
+    block-size: 1px;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

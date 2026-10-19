@@ -3,6 +3,8 @@ import '@cold-reserve/ui-cards/cubes.css';
 import './app.css';
 // The layouts' own styles load between app.css and controls.css, where they always were in the cascade (#432).
 import { LAYOUTS } from './surface/registry.js';
+// The parts of the screen every layout shows, right after the layouts' own styles, where they always were.
+import './ui/screen-parts.css';
 import './controls.css';
 import { ok, type ErrorEnvelope, type HomeStatus, type Result, type ScenarioId, type SetScenarioInput } from '@cold-reserve/contracts';
 import { setLocale } from '@cold-reserve/i18n';
