@@ -49,7 +49,9 @@ describe('buildTokens (Style Dictionary 5, DTCG 2025.10)', () => {
       expect(stops.length, sky).toBe(3);
       for (const [, light, dark] of stops) expect(light, sky).toBe(dark);
     }
-    for (const name of ['sky-veil', 'sky-sun', 'sky-glow', 'sky-cloud', 'frame-bezel']) {
+    // #432 S3: what sits on the sky (tiles, the scrim, their words, the drawn avatars) never changes with the theme either.
+    const onTheSky = ['surface-tile', 'surface-scrim', 'text-on-sky', 'avatar-disc', 'avatar-skin', 'avatar-line', 'avatar-hair-grey', 'avatar-hair-brown', 'avatar-clothes-mustard', 'avatar-clothes-violet'];
+    for (const name of ['sky-veil', 'sky-sun', 'sky-glow', 'sky-cloud', 'frame-bezel', ...onTheSky]) {
       const line = root.split('\n').find((l) => l.includes(`--${name}: `)) ?? '';
       const [, light, dark] = /light-dark\((oklch\([^)]*\)), (oklch\([^)]*\))\);/.exec(line) ?? [];
       expect(light, name).toBeDefined();

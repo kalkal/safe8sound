@@ -1,0 +1,40 @@
+/* The drawn avatars (avatars.tsx): every color is a token, the same in both themes like the sky they sit on. The
+   outlines (glasses, eyes, smile) are strokes that scale with the drawing. */
+@layer components {
+  .avatar {
+    display: block;
+    flex: none;
+  }
+
+  .avatar-disc {
+    fill: var(--avatar-disc);
+  }
+
+  .avatar-skin {
+    fill: var(--avatar-skin);
+  }
+
+  .avatar-line {
+    fill: none;
+    stroke: var(--avatar-line);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  [data-avatar='older-man'] .avatar-hair {
+    fill: var(--avatar-hair-grey);
+  }
+
+  [data-avatar='older-man'] .avatar-clothes {
+    fill: var(--avatar-clothes-mustard);
+  }
+
+  [data-avatar='adult-woman'] .avatar-hair {
+    fill: var(--avatar-hair-brown);
+  }
+
+  [data-avatar='adult-woman'] .avatar-clothes {
+    fill: var(--avatar-clothes-violet);
+  }
+}

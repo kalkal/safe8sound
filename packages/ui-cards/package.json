@@ -8,6 +8,8 @@
     ".": "./src/index.ts",
     "./card-kinds": "./src/app/card-kinds.ts",
     "./icons": "./src/icons.tsx",
+    "./avatars": "./src/avatars.tsx",
+    "./avatars.css": "./src/avatars.css",
     "./cards.css": "./src/cards.css",
     "./cubes.css": "./src/cubes.css",
     "./card-app.js": "./dist/card-app.js"

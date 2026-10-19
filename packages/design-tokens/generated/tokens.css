@@ -18,6 +18,7 @@
     --font-size-lead: 20px;
     --font-size-hero-min: 52px;
     --font-size-hero-max: 84px;
+    --font-size-clock: 48px;
     --font-body: Roboto, system-ui, sans-serif;
     --font-data: "Roboto Mono", ui-monospace, monospace;
     --font-weight-regular: 400;
@@ -50,6 +51,16 @@
     --sky-sun: light-dark(oklch(0.9184 0.1103 91.43 / 0.65), oklch(0.9184 0.1103 91.43 / 0.65));
     --sky-glow: light-dark(oklch(0.8091 0.1259 55.14 / 0.55), oklch(0.8091 0.1259 55.14 / 0.55));
     --sky-cloud: light-dark(oklch(0.6821 0.0544 293.58 / 0.4), oklch(0.6821 0.0544 293.58 / 0.4));
+    --surface-tile: light-dark(oklch(0.1808 0.0699 265.39 / 0.6), oklch(0.1808 0.0699 265.39 / 0.6));
+    --surface-scrim: light-dark(oklch(0.1808 0.0699 265.39 / 0.6), oklch(0.1808 0.0699 265.39 / 0.6));
+    --text-on-sky: light-dark(oklch(1.0000 0.0000 0.00), oklch(1.0000 0.0000 0.00));
+    --avatar-disc: light-dark(oklch(0.4783 0.0815 195.90), oklch(0.4783 0.0815 195.90));
+    --avatar-skin: light-dark(oklch(0.8576 0.0711 63.86), oklch(0.8576 0.0711 63.86));
+    --avatar-line: light-dark(oklch(0.2076 0.0135 258.37), oklch(0.2076 0.0135 258.37));
+    --avatar-hair-grey: light-dark(oklch(0.9684 0.0042 236.50), oklch(0.9684 0.0042 236.50));
+    --avatar-hair-brown: light-dark(oklch(0.5078 0.1080 73.30), oklch(0.5078 0.1080 73.30));
+    --avatar-clothes-mustard: light-dark(oklch(0.8615 0.1423 82.66), oklch(0.8615 0.1423 82.66));
+    --avatar-clothes-violet: light-dark(oklch(0.7752 0.1261 293.03), oklch(0.7752 0.1261 293.03));
     --frame-bezel: light-dark(oklch(0.1702 0.0240 268.48), oklch(0.1702 0.0240 268.48));
     --receipt-paper: light-dark(oklch(0.9642 0.0152 90.23), oklch(0.9642 0.0152 90.23));
     --receipt-ink: light-dark(oklch(0.2076 0.0135 258.37), oklch(0.2076 0.0135 258.37));
