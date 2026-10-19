@@ -1,6 +1,7 @@
-import type { ErrorEnvelope, Forecast, HomeId, HomeProfile, LocationId, Preferences, Result, TempUnit } from '@cold-reserve/contracts';
+import type { ErrorEnvelope, Forecast, HomeId, HomeProfile, LocationId, PacingState, Preferences, Result, TempUnit } from '@cold-reserve/contracts';
 import type { Clock, HomeDataSource, Logger, Notifier, SimParams, StateStoreFactory, StoreScope } from '@cold-reserve/core';
 import type { GuardConfig } from '@cold-reserve/guard';
+import type { ToolContext } from '../../tool.js';
 import type { ComfortPlanConfig } from './config.js';
 
 /** What the module needs of a home. Built by the composition root. */
@@ -47,4 +48,9 @@ export interface ComfortPlanDeps {
   readonly logger: Logger;
   /** The family phone (#24): the alert when a last resort is applied (#160). */
   readonly notifier: Notifier;
+  /**
+   * #444: the level the home is at while a storm is active (the one get_home_status and the safe room say); undefined
+   * outside a storm. Absent: the level the person chose, comfort.
+   */
+  readonly stormLevel?: (ctx: ToolContext) => Promise<PacingState | undefined>;
 }

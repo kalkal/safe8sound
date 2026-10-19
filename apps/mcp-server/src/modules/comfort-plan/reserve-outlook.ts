@@ -7,14 +7,16 @@ import type { ComfortPlanDeps } from './deps.js';
 import { loadInputs } from './plan-comfort.js';
 
 // get_reserve_outlook: the reserve counted in hours for the ice-cube card (semantics agreed in #21).
-// The reserve and its floor are the guard's own (reserveOf). The level is the one get_home_status shows:
-// until the level is persisted (LEVEL#CURRENT), no plan moves it, so it is the comfort the person chose.
+// The reserve and its floor are the guard's own (reserveOf). The level is the one get_home_status shows: during a storm
+// the storm's own (saver from the grid loss, essential from the essential moment, #444); otherwise, until the level is
+// persisted (LEVEL#CURRENT) no plan moves it, so it is the comfort the person chose.
 
-const CURRENT_LEVEL: Level = 'comfort';
+const CHOSEN_LEVEL: Level = 'comfort';
 
 export async function reserveOutlook(deps: ComfortPlanDeps, _input: Record<string, never>, ctx: ToolContext): Promise<Result<ReserveOutlook, ErrorEnvelope>> {
   const loaded = await loadInputs(deps, ctx);
   if (!loaded.ok) return loaded;
+  const level: Level = (await deps.stormLevel?.(ctx))?.level ?? CHOSEN_LEVEL;
   const { snapshot, forecast, profile } = loaded.value;
   const reserve = reserveOf({ snapshot, forecast, profile, model: deps.model, config: deps.guard });
   const loads = { ...deps.config.outlook.levelLoadW, essential: deps.guard.reserve.essentialLoadW };
@@ -24,9 +26,9 @@ export async function reserveOutlook(deps: ComfortPlanDeps, _input: Record<strin
     gridAvailable: snapshot.gridAvailable,
     reserveFloorSocPct: reserve.reserveFloorSocPct,
     reserveWh: reserve.reserveWh,
-    currentLoadW: loads[CURRENT_LEVEL],
+    currentLoadW: loads[level],
     essentialLoadW: loads.essential,
   });
   // In the home's time zone, as every other time the person hears (#160).
-  return ok({ level: CURRENT_LEVEL, ...hours, gridAvailable: snapshot.gridAvailable, origin: snapshot.origin, ts: localIso(Date.parse(snapshot.ts), profile.location.tz) });
+  return ok({ level, ...hours, gridAvailable: snapshot.gridAvailable, origin: snapshot.origin, ts: localIso(Date.parse(snapshot.ts), profile.location.tz) });
 }

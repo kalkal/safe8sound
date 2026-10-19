@@ -301,7 +301,18 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
   const modules = [
     // #429: one level for the home status and the safe room during a storm.
     energyStatusModule({ homes: homeFor, deriver: interimStatusDeriver, ...(stormDeps === undefined ? {} : { stormLevel: (ctx: ToolContext) => activeStormLevel(atHome(stormDeps, ctx.homeId), ctx) }) }),
-    ...(opts.comfortPlan === undefined ? [] : [comfortPlanModule({ ...opts.comfortPlan, model: params, homes: planningHome, logger: opts.logger })]),
+    // #444: the reserve outlook says the level the home is at in a storm, as the home status does.
+    ...(opts.comfortPlan === undefined
+      ? []
+      : [
+          comfortPlanModule({
+            ...opts.comfortPlan,
+            model: params,
+            homes: planningHome,
+            logger: opts.logger,
+            ...(stormDeps === undefined ? {} : { stormLevel: (ctx: ToolContext) => activeStormLevel(atHome(stormDeps, ctx.homeId), ctx) }),
+          }),
+        ]),
     ...(stormDeps === undefined ? [] : [stormModeModule(stormDeps)]),
     ...(settingsStoreFor === undefined
       ? []

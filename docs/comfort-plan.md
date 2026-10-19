@@ -91,7 +91,7 @@ The reserve counted in hours for the ice-cube card, with the semantics agreed in
 - **Same energy basis.** `hoursAtCurrentLevel` and `hoursAtEssential` count the same energy. On grid that is only what comfort may spend, above the guard's reserve floor; off grid it is everything down to the hardware floor.
 - **The reserve alone.** `reserveHoursAtEssential` is the storm reserve after the losses, over the essential load. On grid it can exceed the spendable hours, so there is no invariant between them.
 - **Level loads.** They come from `config/comfort-plan.json` (`outlook.levelLoadW`, an assumption to calibrate). Essential is the guard's `reserve.essentialLoadW`.
-- **Level.** It is `comfort` until the level is persisted, the same as `get_home_status`.
+- **Level.** During an active storm it is the storm's level (saver from the grid loss, then essential, #444); otherwise `comfort` until the level is persisted, the same as `get_home_status`.
 
 ## Wiring
 - **Composition.** `comfortPlanWiring` (`apps/mcp-server/src/comfort-plan-config.ts`) loads the shipped configs (comfort plan and guard), reads the saved or default preferences, and makes fresh plan ids. `createApp` registers the module over the same homes as `get_home_status`.

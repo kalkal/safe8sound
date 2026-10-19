@@ -3,6 +3,7 @@ import { reserveOutlookHours } from '@cold-reserve/core';
 import { reserveOf } from '@cold-reserve/guard';
 import { describe, expect, it } from 'vitest';
 import { comfortPlanModule } from '../../src/modules/comfort-plan/index.js';
+import type { ComfortPlanDeps } from '../../src/modules/comfort-plan/deps.js';
 import { reserveOutlook } from '../../src/modules/comfort-plan/reserve-outlook.js';
 import { REAL, world } from './support.js';
 import { localIso } from '@cold-reserve/core';
@@ -36,6 +37,25 @@ describe('get_reserve_outlook (the ice cubes)', () => {
     expect(r.ok && r.value.hoursAtEssential).toBeGreaterThan(20);
     // The card switches to the storm theme from this, as it does for a plan (approved in #21).
     expect(r.ok && r.value.gridAvailable).toBe(false);
+  });
+
+  it('says the level the home is at during a storm, and counts its hours at that level (#444)', async () => {
+    const w = world('storm-blackout', 3);
+    const read = (stormLevel?: ComfortPlanDeps['stormLevel']) => reserveOutlook({ ...w.deps, ...(stormLevel === undefined ? {} : { stormLevel }) }, {}, w.ctx);
+    const storm = (level: 'saver' | 'essential') => () => Promise.resolve({ level, levelReason: 'storm' as const, levelChangedAt: '2026-07-17T03:00:00+02:00' });
+    const calm = await read();
+    const saver = await read(storm('saver'));
+    const essential = await read(storm('essential'));
+    if (!calm.ok || !saver.ok || !essential.ok) throw new Error('outlook failed');
+    expect(calm.value.level).toBe('comfort');
+    expect(saver.value.level).toBe('saver');
+    expect(essential.value.level).toBe('essential');
+    // A lighter level lasts longer on the same battery; at essential the two counts are one.
+    expect(saver.value.hoursAtCurrentLevel).toBeGreaterThan(calm.value.hoursAtCurrentLevel);
+    expect(essential.value.hoursAtCurrentLevel).toBe(essential.value.hoursAtEssential);
+    // No storm (the reader says none): the level the person chose, as before.
+    const none = await read(() => Promise.resolve(undefined));
+    expect(none.ok && none.value.level).toBe('comfort');
   });
 
   it('a battery at its hardware floor has nothing left, the storm reserve included (#273)', async () => {
