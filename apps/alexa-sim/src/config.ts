@@ -26,6 +26,8 @@ const VoiceConfigSchema = z.strictObject({
   voiceName: z.string().min(1).optional(),
   speakReplies: z.enum(['true', 'false']).transform((v) => v === 'true'),
   listenTimeoutMs: ms,
+  /** Follow Up (#432 S6): after a spoken answer to a spoken question, the mic listens again this long. Our choice. */
+  followUpMs: ms,
   speakStartTimeoutMs: ms,
   /** The studio voice (Polly, F8d #25) gives up after this; the browser voice then reads the reply. */
   studioVoiceTimeoutMs: ms,
@@ -59,6 +61,14 @@ const ConfigSchema = z
     layout: z.enum(LAYOUT_IDS),
     /** The judges' demo controls (#432): on for the contest; the real home turns them off and keeps only its own controls. */
     demoControls: z.enum(['true', 'false']).transform((v) => v === 'true'),
+    /**
+     * #432 S6: an answer leaves the screen this long after the last touch, question or spoken word, and the idle screen
+     * comes back (never while a card waits for a choice, at full screen, or with a panel open). Our choice: Amazon
+     * publishes no value for the Echo Show (owner, 18 Oct: one minute).
+     */
+    idleReturnMs: ms,
+    /** K (owner, 19 Oct): how long the notice of a new message to Ana stays under the top bar. */
+    phonePeekMs: ms,
   })
   .refine((c) => c.agent === 'scripted' || c.simApiUrl !== undefined, { path: ['simApiUrl'], message: 'The remote agent needs a sim-api URL' })
   .refine((c) => c.turnBudgetMs >= c.agentTimeoutMs, { path: ['turnBudgetMs'], message: 'The turn budget must cover the agent timeout' });
@@ -90,12 +100,15 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>, s
     // Dev only: ?layout= tries another layout without rebuilding; a deployed page keeps its configured one.
     layout: (isDev ? params.get('layout') : null) || env['VITE_LAYOUT'] || DEFAULT_LAYOUT,
     demoControls: env['VITE_DEMO_CONTROLS'] ?? 'true',
+    idleReturnMs: env['VITE_IDLE_RETURN_MS'] ?? 60_000,
+    phonePeekMs: env['VITE_PHONE_PEEK_MS'] ?? 8_000,
     voice: {
       speech: fakeSpeech ? 'fake' : 'browser',
       lang: env['VITE_VOICE_LANG'] ?? 'en-US',
       voiceName: env['VITE_VOICE_NAME'],
       speakReplies: env['VITE_SPEAK_REPLIES'] ?? 'true',
       listenTimeoutMs: env['VITE_LISTEN_TIMEOUT_MS'] ?? 8_000,
+      followUpMs: env['VITE_FOLLOW_UP_MS'] ?? 8_000,
       // A network voice offline hangs silently: give up on audio after 2 s (spike S5), plus 1 s when the
       // studio voice may come first and fall back (F8d, #25).
       speakStartTimeoutMs: env['VITE_SPEAK_START_TIMEOUT_MS'] ?? 3_000,

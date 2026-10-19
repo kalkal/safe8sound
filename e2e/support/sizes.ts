@@ -16,6 +16,9 @@ export interface Size {
 
 export const SIZES: readonly Size[] = data.sizes as readonly Size[];
 
+/** The usable windows of common laptop screens (#432 S6): one screen at each, checked by the geometry spec only. */
+export const LAPTOP_WINDOWS: readonly Size[] = data.laptopWindows as readonly Size[];
+
 /** The journey project of a size. */
 export const projectOf = (size: Size): string => `journey-${size.id}`;
 

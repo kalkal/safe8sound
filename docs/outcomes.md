@@ -55,6 +55,8 @@ One screen, no page scroll, at every size. The one list is `e2e/support/sizes.js
 | 1280×800 | The frame of the video |
 | 375×812 | A phone |
 
+The geometry spec also checks the usable windows of common laptop screens once the browser has taken its bars (`laptopWindows` in the same file, #432 S6): 1280×590, 1366×640 (the minimum to guarantee), 1536×735 and 1920×950.
+
 ## The outcomes
 
 | Id | Name | Acceptance checks |

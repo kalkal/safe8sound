@@ -113,9 +113,13 @@ test('at 960 × 480 on a hot day the simulated clock dock leaves the voice line 
   await page.getByRole('group', { name: 'Example questions' }).getByRole('button', { name: 'A hot day' }).click();
   await page.getByRole('button', { name: 'Ask', exact: true }).click();
   await expect(page.frameLocator('iframe[title="Plan card"]').locator('.hero-value')).toBeVisible();
+  // The line sits under the question bar, beside the dock (#432 S6): whole in the window and never over the dock.
   const line = await page.getByText(/^Your voice and the answers read aloud/).boundingBox();
   const dock = await page.getByRole('group', { name: 'Simulated time' }).boundingBox();
-  expect((line?.y ?? 0) + (line?.height ?? 0), 'the voice line ends above the dock').toBeLessThanOrEqual(dock?.y ?? 0);
+  if (line === null || dock === null) throw new Error('the voice line or the dock is missing');
+  expect(line.y + line.height, 'the voice line ends in the window').toBeLessThanOrEqual(480);
+  const apart = line.y >= dock.y + dock.height || line.x >= dock.x + dock.width || line.x + line.width <= dock.x;
+  expect(apart, 'the voice line is not over the dock').toBe(true);
 });
 
 // #398 (owner, 15 Oct): on a phone under a card the answer's first two lines stay visible; a touch opens the whole text.

@@ -17,12 +17,15 @@ describe('simulator config', () => {
         view: 'full',
         layout: 'alexa-echo-show',
         demoControls: true,
+        idleReturnMs: 60_000,
+        phonePeekMs: 8_000,
         voice: {
           speech: 'browser',
           lang: 'en-US',
           voiceName: undefined,
           speakReplies: true,
           listenTimeoutMs: 8_000,
+          followUpMs: 8_000,
           speakStartTimeoutMs: 3_000,
           studioVoiceTimeoutMs: 1_500,
           speakTimeoutBaseMs: 4_000,
@@ -77,6 +80,13 @@ describe('simulator config', () => {
     expect(parseConfig({}, '', false)).toMatchObject({ ok: true, value: { demoControls: true } });
     expect(parseConfig({ VITE_DEMO_CONTROLS: 'false' }, '', false)).toMatchObject({ ok: true, value: { demoControls: false } });
     expect(parseConfig({ VITE_DEMO_CONTROLS: 'maybe' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
+  });
+
+  // #432 S6: our own choices, not Amazon's (no official value for the Echo Show; owner, 18 Oct): back to the idle screen
+  // a minute after an answer, and Follow Up listening for 8 s after a spoken one. One place each, set by the build.
+  it('#432: the return to the idle screen (60 s) and the Follow Up listening (8 s) come from the environment', () => {
+    expect(parseConfig({ VITE_IDLE_RETURN_MS: '5000', VITE_FOLLOW_UP_MS: '3000', VITE_PHONE_PEEK_MS: '2000' }, '', false)).toMatchObject({ ok: true, value: { idleReturnMs: 5000, phonePeekMs: 2000, voice: { followUpMs: 3000 } } });
+    expect(parseConfig({ VITE_IDLE_RETURN_MS: '0' }, '', false)).toMatchObject({ ok: false, error: { code: 'invalid_config' } });
   });
 
   it('reads the remote agent settings from the environment', () => {

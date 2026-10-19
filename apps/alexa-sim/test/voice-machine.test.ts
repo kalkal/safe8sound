@@ -12,6 +12,7 @@ const VOICE: VoiceSettings = {
   micAvailable: true,
   speakReplies: true,
   listenTimeoutMs: 1_000,
+  followUpMs: 50,
   speakStartTimeoutMs: 1_000,
   speakTimeoutBaseMs: 1_000,
   speakTimeoutPerCharMs: 0,
@@ -253,5 +254,68 @@ describe('voice: failures are logged and notices do not outlive their turn (#133
     actor.send({ type: 'MIC_PRESSED' });
     actor.send({ type: 'RECOGNITION_FAILED', code: 'audio_capture_failed' });
     expect(actor.getSnapshot().context.micAvailable).toBe(false);
+  });
+});
+
+// Follow Up (#432 S6; owner 19 Oct, a): after a spoken answer to a SPOKEN question the mic listens again for a while
+// (config.voice.followUpMs, 8 s: our choice, Amazon gives no number), as Alexa+ does without the wake word. Never after
+// a typed question: a judge who types never sees the mic start by itself.
+describe('voice: Follow Up', () => {
+  async function spokenAnswer(voice: Partial<VoiceSettings> = {}) {
+    const run = start(answer('Your battery is at 78%.'), voice);
+    run.actor.send({ type: 'MIC_PRESSED' });
+    run.actor.send(heard('battery'));
+    await settle();
+    run.actor.send({ type: 'SPEAKING_STARTED' });
+    run.actor.send({ type: 'SPEAKING_ENDED' });
+    return run;
+  }
+
+  it('after a spoken question and its spoken answer, the mic listens again, then stops quietly', async () => {
+    const { actor, effects } = await spokenAnswer();
+    expect(topState(actor.getSnapshot())).toBe('followUp');
+    expect(effects.startRecognition).toHaveBeenCalledTimes(2);
+    await wait(80);
+    expect(topState(actor.getSnapshot())).toBe('showingAnswer');
+    expect(effects.stopRecognition).toHaveBeenCalledTimes(2);
+    expect(effects.logVoiceFailure).not.toHaveBeenCalled();
+    expect(actor.getSnapshot().context.voiceError).toBeNull();
+  });
+
+  it('what is said during Follow Up is the next question', async () => {
+    const { actor } = await spokenAnswer();
+    actor.send(heard('how long will it last', 'v2'));
+    expect(topState(actor.getSnapshot())).toBe('thinking');
+    expect(actor.getSnapshot().context.question).toBe('how long will it last');
+  });
+
+  it('silence or a failed recognition ends Follow Up without a voice notice', async () => {
+    const one = await spokenAnswer();
+    one.actor.send({ type: 'RECOGNITION_ENDED' });
+    expect(topState(one.actor.getSnapshot())).toBe('showingAnswer');
+    expect(one.actor.getSnapshot().context.voiceError).toBeNull();
+    const two = await spokenAnswer();
+    two.actor.send({ type: 'RECOGNITION_FAILED', code: 'no_speech' });
+    expect(topState(two.actor.getSnapshot())).toBe('showingAnswer');
+    expect(two.effects.logVoiceFailure).not.toHaveBeenCalled();
+  });
+
+  it('never after a typed question', async () => {
+    const { actor, effects } = start(answer('Your battery is at 78%.'));
+    actor.send({ type: 'TEXT_SUBMITTED', text: 'battery', turnId: 't1' });
+    await settle();
+    actor.send({ type: 'SPEAKING_STARTED' });
+    actor.send({ type: 'SPEAKING_ENDED' });
+    expect(topState(actor.getSnapshot())).toBe('showingAnswer');
+    expect(effects.startRecognition).not.toHaveBeenCalled();
+  });
+
+  it('Cancel or a tap on the mic ends it at once', async () => {
+    const one = await spokenAnswer();
+    one.actor.send({ type: 'CANCEL' });
+    expect(topState(one.actor.getSnapshot())).toBe('showingAnswer');
+    const two = await spokenAnswer();
+    two.actor.send({ type: 'MIC_PRESSED' });
+    expect(topState(two.actor.getSnapshot())).toBe('showingAnswer');
   });
 });

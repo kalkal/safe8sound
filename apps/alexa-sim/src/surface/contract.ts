@@ -21,6 +21,8 @@ export interface SurfaceSlots {
   readonly demoControls?: ReactNode;
   /** The simulated clock, outside the screen. */
   readonly clock?: ReactNode;
+  /** #432 S6 (owner I = a): beside the clock, the judges' bar to type a question, Ask and Speak; never on the screen. */
+  readonly askBar?: ReactNode;
   /** Beside the device: the family member's phone. */
   readonly companion?: ReactNode;
 }
@@ -29,7 +31,12 @@ export interface SurfaceSlots {
 export interface SurfaceState {
   /** The weather of the moment, for the background. */
   readonly sky: Sky;
+  /** What the screen shows: the idle screen, a turn on its way, or an answer (or a page such as the home). */
+  readonly screen: ScreenState;
 }
+
+export const SCREEN_STATES = ['idle', 'busy', 'answer'] as const;
+export type ScreenState = (typeof SCREEN_STATES)[number];
 
 export type SurfaceLayout = ComponentType<{ slots: SurfaceSlots; state: SurfaceState }>;
 

@@ -254,6 +254,36 @@ describe('POST /v1/tools/call: card actions, the MCP token stays here', () => {
     expect(called).toHaveLength(1);
   });
 
+  // #432 S6 (additive contract change approved by MAIN 19/10): the idle tile "Leo's room · safe until" reads the
+  // safe room at each jump of the clock, for the home in the token only, on the read count, never apply_plan's.
+  it('#432: forwards the idle tile read of get_safe_room_status for the home in the token, never one from the body', async () => {
+    const { send, session, called } = setup();
+    const res = await send('/v1/tools/call', { token: await session(), body: { name: 'get_safe_room_status', arguments: {} } });
+    expect(res.status).toBe(200);
+    expect(called).toEqual([{ home: 'demo#01aaaaaaaaaaaaaa', name: 'get_safe_room_status' }]);
+    await problem(await send('/v1/tools/call', { token: await session(), body: { name: 'get_safe_room_status', arguments: { homeId: 'home' } } }), 400, 'invalid_input');
+    expect(called).toHaveLength(1);
+  });
+
+  it('#432: get_safe_room_status without a valid session token is refused and reads nothing', async () => {
+    const { send, called } = setup();
+    const body = { name: 'get_safe_room_status', arguments: {} };
+    await problem(await send('/v1/tools/call', { body }), 401, 'missing_token');
+    const forged = signToken({ sub: 'judges', home: 'demo#01aaaaaaaaaaaaaa' as HomeId, jti: 'x', iat: NOW / 1000, exp: NOW / 1000 + 3600 }, { kid: 'k1', material: Buffer.alloc(32, 9) });
+    await problem(await send('/v1/tools/call', { token: forged, body }), 401, 'invalid_signature');
+    expect(called).toHaveLength(0);
+  });
+
+  it('#432: get_safe_room_status counts on the reads, so apply_plan stays available', async () => {
+    const { send, session, called } = setup({ SIM_LIMIT_TOOL_CALLS_PER_CODE: '1', SIM_LIMIT_READ_CALLS_PER_CODE: '1' });
+    const token = await session();
+    const read = { token, body: { name: 'get_safe_room_status', arguments: {} } };
+    expect((await send('/v1/tools/call', read)).status).toBe(200);
+    await problem(await send('/v1/tools/call', read), 429, 'demo_quota_exceeded');
+    expect((await send('/v1/tools/call', { token, body: { name: 'apply_plan', arguments: { planId: 'plan-0001' } } })).status).toBe(200);
+    expect(called.map((c) => c.name)).toEqual(['get_safe_room_status', 'apply_plan']);
+  });
+
   it('B2: forwards the settings drawer (get_demo_settings, set_scenario) for the home in the token', async () => {
     const { send, session, called } = setup();
     const token = await session();

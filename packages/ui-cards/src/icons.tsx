@@ -87,3 +87,46 @@ export function BackChevron() {
 export function LanguagesOutline() {
   return <path d="m5 8 6 6 M4 14l6-6 2-3 M2 5h12 M7 2h1 M22 22l-5-10-5 10 M14 18h6" />;
 }
+
+/** Lucide "menu": the Echo screen's menu, top left (#432 S6). */
+export function MenuOutline() {
+  return <path d="M4 5h16 M4 12h16 M4 19h16" />;
+}
+
+/** Lucide "bell": the Echo screen's notifications, top left, with `MessageDot` when one is new (#432 S6). */
+export function BellOutline() {
+  return <path d="M10.268 21a2 2 0 0 0 3.464 0 M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />;
+}
+
+/** Lucide "mic": the microphone, the one control on the Echo screen. */
+export function MicOutline() {
+  return (
+    <>
+      <path d="M12 19v3 M19 10v2a7 7 0 0 1-14 0v-2" />
+      <rect x="9" y="2" width="6" height="13" rx="3" />
+    </>
+  );
+}
+
+/** The weather beside the Echo's clock, one Lucide outline per sky (#432 S6, owner D1 = a: the sky says the weather). */
+export function WeatherOutline({ sky }: { sky: 'mild' | 'hot' | 'dusk' | 'storm' }) {
+  switch (sky) {
+    case 'mild':
+      // Lucide "sun".
+      return (
+        <>
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M6.34 17.66l-1.41 1.41 M19.07 4.93l-1.41 1.41" />
+        </>
+      );
+    case 'hot':
+      // Lucide "thermometer-sun".
+      return <path d="M12 2v2 M12 8a4 4 0 0 0-1.645 7.647 M2 12h2 M20 14.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0z M4.93 4.93l1.41 1.41 M6.34 17.66l-1.41 1.41" />;
+    case 'dusk':
+      // Lucide "sunset".
+      return <path d="M12 10V2 M4.93 10.93l1.41 1.41 M2 18h2 M20 18h2 M19.07 10.93l-1.41 1.41 M22 22H2 M16 6l-4 4-4-4 M16 18a4 4 0 0 0-8 0" />;
+    case 'storm':
+      // Lucide "cloud-lightning".
+      return <path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973 M13 12l-3 5h4l-3 5" />;
+  }
+}

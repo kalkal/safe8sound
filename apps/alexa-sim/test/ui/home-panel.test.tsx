@@ -85,6 +85,29 @@ describe('HomePanel', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Show my home' }));
   });
 
+  // #432 S6: the button lives in the screen's menu, which is closed while the home shows; the focus then goes where
+  // the caller says (the menu button), never lost on the page.
+  it('Escape gives the focus to the fallback when the button is not on the page (a closed menu)', () => {
+    const fallback = vi.fn();
+    function InMenu() {
+      const { button, view, open } = useHomePanel({ status: homeCalm(), renderCard: frame, onFocusLost: fallback });
+      return (
+        <>
+          <button type="button" onClick={open}>
+            open
+          </button>
+          {view === null && button}
+          {view}
+        </>
+      );
+    }
+    render(<InMenu />);
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    fireEvent.keyDown(screen.getByRole('region', { name: 'My home' }), { key: 'Escape' });
+    expect(screen.queryByTestId('home-card')).toBeNull();
+    expect(fallback).toHaveBeenCalledTimes(1);
+  });
+
   it('without a home to show yet, says how to get it instead of an empty panel', () => {
     render(<HomePanel status={undefined} renderCard={frame} />);
     fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));

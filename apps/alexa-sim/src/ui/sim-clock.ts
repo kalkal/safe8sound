@@ -64,6 +64,9 @@ const POWER_CUT = [
   new RegExp(String.raw`^(?:c'è |abbiamo )?(?:un )?black ?out(?: a casa| adesso| ora)?[.!]*$`, 'u'),
 ];
 
+/** What the judges' "Power cut" says for the person (H, owner 19 Oct): the words the example used to put in the field. */
+export const POWER_CUT_QUESTION = "The power's out";
+
 export function isPowerCut(text: string): boolean {
   const said = text.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim();
   if (said.includes('?') || NOT_NOW.test(said)) return false;

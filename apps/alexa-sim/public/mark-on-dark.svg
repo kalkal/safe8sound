@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 30 140 140" role="img" aria-label="Safe-8-Sound">
+  <defs>
+    <mask id="s">
+      <rect x="0" y="0" width="180" height="200" fill="#fff"/>
+      <path d="M93 107 a3 3 0 1 1 6 -2 C99 97 80 96 80 108 C80 120 100 116 100 130 C100 143 81 142 81 134 a3 3 0 1 1 6 2" fill="none" stroke="#000" stroke-width="6.5" stroke-linecap="round"/>
+    </mask>
+  </defs>
+  <circle cx="90" cy="88" r="48" fill="#2a9fb8"/>
+  <path fill="#f6f1e7" mask="url(#s)" d="M60 60 L72 60 L72 69 L84 69 L84 60 L96 60 L96 69 L108 69 L108 60 L120 60 L120 83 L111 90 L113 158 L67 158 L69 90 L60 83 Z"/>
+  <path stroke="#f6f1e7" d="M24 158 L156 158" stroke-width="6" stroke-linecap="round"/>
+</svg>

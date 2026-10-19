@@ -8,11 +8,13 @@ test('the family phone answers during the storm, by touch, on a 375 px phone', a
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/');
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
-  // Nothing to answer before a message arrives.
+  // Nothing to answer before a message arrives (the sheet is closed: nothing at all).
   await expect(phone.getByRole('button', { name: "I'm on my way" })).toHaveCount(0);
 
   await page.getByLabel('Ask a question').fill("The power's out");
   await page.getByRole('button', { name: 'Ask' }).click();
+  // Ana's phone is a sheet on a phone (#432): its notice says a message came; it opens from there.
+  await page.getByRole('button', { name: "Open Ana's phone" }).click();
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toBeVisible();
   // The storm's cards above the phone grow to their content first: a tap before that could land elsewhere (#246).
   await expectScreenSettled(page);

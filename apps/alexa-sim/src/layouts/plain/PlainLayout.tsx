@@ -15,6 +15,7 @@ export const PlainLayout: SurfaceLayout = ({ slots, state }) => (
       <main className="surface">{slots.screen}</main>
     </div>
     {slots.clock}
+    {slots.askBar}
     {slots.companion}
   </div>
 );

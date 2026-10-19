@@ -1,7 +1,7 @@
 import { homeInStorm } from '../../packages/ui-cards/src/home-fixtures.js';
 import { expect, test } from '../no-network.js';
 import { openRemote } from '../remote-session.js';
-import { openDemoControls } from '../surface.js';
+import { openDemoControls, showMyHome } from '../surface.js';
 
 // #268: the example buttons under the question follow the scenario and the home's state. In a storm with the grid
 // down there is no "36 degrees tomorrow" example; the storm examples are answered by the scripted demo.
@@ -46,7 +46,7 @@ test('remote: the home read from sim-api decides; grid down shows the storm exam
   await openRemote(page);
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Show my home' }).click();
+  await showMyHome(page);
   await expect(examples(page).getByRole('button', { name: 'Is Leo safe?' })).toBeVisible();
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toHaveCount(0);
 });
@@ -63,7 +63,7 @@ test('remote: the home opened before the demo code asks for it, then shows the h
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isError: true, content: [{ type: 'text', text: 'No settings.' }] }) });
   });
   await page.goto('/?agent=remote');
-  await page.getByRole('button', { name: 'Show my home' }).click();
+  await showMyHome(page);
   const homeView = page.getByRole('region', { name: 'My home' });
   await expect(homeView).toContainText('Enter the demo code to see your home.');
   await expect(homeView.getByRole('alert')).toHaveCount(0);

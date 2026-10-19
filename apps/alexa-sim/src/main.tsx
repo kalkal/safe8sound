@@ -1,5 +1,6 @@
 import '@cold-reserve/design-tokens/tokens.css';
 import '@cold-reserve/ui-cards/cubes.css';
+import '@cold-reserve/ui-cards/avatars.css';
 import './app.css';
 // The layouts' own styles load between app.css and controls.css, where they always were in the cascade (#432).
 import { LAYOUTS } from './surface/registry.js';
@@ -23,13 +24,14 @@ import { createRemoteLogSink } from './remote-log.js';
 import { createInboxPhone } from './phone/inbox-phone.js';
 import { createScriptedPhone, type PhoneFeed } from './phone/phone-feed.js';
 import { PhonePanel } from './phone/PhonePanel.js';
+import { PHONE_BESIDE, PhoneOpener, PhonePeek, PhoneSheet, usePhoneSheet } from './phone/PhoneSheet.js';
 import { CardFrame } from './host/CardFrame.js';
 import { examplesFor, isGridDown } from './ui/ExampleQuestions.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
 import { useHomePanel } from './ui/HomePanel.js';
 import { ReserveClock } from './ui/ReserveClock.js';
 import { SimClock } from './ui/SimClock.js';
-import { clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
+import { POWER_CUT_QUESTION, clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
 import { isAppliedPlan } from './ui/steps.js';
 import { SHIPPED_PLACES, skyOfScenario } from './ui/demo-settings.js';
 import { SettingsControl } from './ui/SettingsDrawer.js';
@@ -44,7 +46,10 @@ import { t } from './ui/text.js';
 import { useDemoSettings } from './state/use-demo-settings.js';
 import { useLocaleSetting } from './state/use-locale-setting.js';
 import { usePreferences } from './state/use-preferences.js';
-import { useReserve } from './state/use-reserve.js';
+import { useReserve, useSafeRoom } from './state/use-reserve.js';
+import { IdleTiles, ScreenTop, greetingOf, useNotices } from './idle/IdleScreen.js';
+import { IconFrame, WeatherOutline } from '@cold-reserve/ui-cards/icons';
+import type { ScreenState } from './surface/contract.js';
 import { useSimClock } from './state/use-sim-clock.js';
 import type { StudioVoice } from './voice/use-voice.js';
 import { createRemoteSynthesize, createSpeechTickets } from './voice/studio-voice.js';
@@ -158,7 +163,12 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     });
   }, [agent, homeMode, session]);
   // Three bands (owner, 10 Oct): the home button in the header band, the home in the content band.
-  const homePanel = useHomePanel({ status: home, renderCard: (status) => <HomeCard status={status} />, load: needsCode ? 'locked' : homeLoad, onOpen: loadHome, onRetry: loadHome });
+  // #432 S6: its button sits in the screen's menu; when the home closes with Escape the focus goes back to the menu.
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const focusMenu = useCallback(() => {
+    menuRef.current?.focus();
+  }, []);
+  const homePanel = useHomePanel({ status: home, renderCard: (status) => <HomeCard status={status} />, load: needsCode ? 'locked' : homeLoad, onOpen: loadHome, onRetry: loadHome, onFocusLost: focusMenu });
   // The home opened before the code (its note asks for it): once the code is accepted it is read at once.
   const homeOpenRef = useRef(false);
   homeOpenRef.current = homePanel.view !== null;
@@ -255,7 +265,14 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [cutPower, onSettingsChange],
   );
-  const reserve = useReserve({ agent, enabled: scripted || sessionToken !== undefined, scenarioId: demoSettings?.scenarioId, gridDown, now: clock?.now });
+  const idleReading = { agent, enabled: scripted || sessionToken !== undefined, scenarioId: demoSettings?.scenarioId, gridDown, now: clock?.now };
+  const reserve = useReserve(idleReading);
+  // Leo's room on the idle screen (#432 S6, owner D2 = b): the server's "safe until", read again at every jump.
+  const safeRoom = useSafeRoom(idleReading);
+  // The bell of the Echo screen: Ana's messages not seen yet (the same feed as her phone, no reading more).
+  const notices = useNotices(phone);
+  // What the screen shows, for the layout: the sky is dimmed only behind an answer.
+  const [screenState, setScreenState] = useState<ScreenState>('idle');
   // A change from the drawer starts another day (or place): what the clock said about the old one goes.
   const onDrawerChange = useCallback(
     (change: SetScenarioInput) => {
@@ -264,9 +281,9 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [clearNote, onSettingsChange],
   );
-  // The judges' demo controls (#432): a column beside the Echo on a wide screen, a sheet behind a button below it;
-  // removable by config (the real home keeps only its own controls). The simulated clock and its jump stay under the
-  // Echo, big (#391), so the time is always in view.
+  // The judges' demo controls (#432): a column beside the Echo in a window twice as wide as it is tall (owner, 19 Oct:
+  // 1920 × 950), a sheet behind the dashed button of the top bar elsewhere; removable by config (the real home keeps only
+  // its own controls). The simulated clock and its jump stay under the Echo, big (#391), so the time is always in view.
   const demoShown = config.demoControls && hasSandbox;
   const wide = useMediaQuery(WIDE_CONTROLS);
   const sheet = useDemoControlsSheet();
@@ -277,8 +294,9 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   }, [wide, closeSheet]);
   // After each jump the panel says what changed, with the messages Ana got on the way: those sent after the time the
   // jump left and up to the time it reached (brief 3b; a later answer's message is never counted as the jump's).
-  // Re-render when Ana's phone changes, so the summary counts what has arrived.
-  useSyncExternalStore(phone.subscribe, () => phone.messages().length);
+  // Ana's messages: the jump summary counts them, and a new one opens her phone below the side-by-side width.
+  const phoneMessages = useSyncExternalStore(phone.subscribe, phone.messages);
+  const phoneCount = phoneMessages.length;
   const jumpFrom = useRef<string | undefined>(undefined);
   const onJump = useCallback(() => {
     jumpFrom.current = clock?.now;
@@ -287,16 +305,49 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const lastJump =
     clockNote?.kind === 'reached' && clock !== undefined ? { at: clock.now, kind: clockNote.moment, told: messagesBetween(phone.messages(), jumpFrom.current, clock.now) } : undefined;
   const clockDock = demoShown && clock !== undefined ? <SimClock state={clock} busy={clockBusy} onSkip={onJump} {...(clockNote === undefined ? {} : { note: clockNote })} summary={!wide && lastJump !== undefined ? jumpText(lastJump) : undefined} /> : undefined;
+  // Ana's phone (#432, owner J = a): beside the Echo where it fits, else a sheet that also opens on a new message.
+  const phoneBeside = useMediaQuery(PHONE_BESIDE);
+  const phoneSheet = usePhoneSheet({ beside: phoneBeside, messages: phoneMessages, peekMs: config.phonePeekMs });
+  // The title sits above the device, always in view (contest rule: "Simulated Alexa+ add-on" in plain words); the
+  // screen itself has no app title, like the real Echo Show (#432 S6). The theme switch waits there for the settings
+  // page (S5).
+  const themeToggle = (
+    <button
+      type="button"
+      className="link-button theme-toggle"
+      aria-pressed={theme === 'light'}
+      onClick={() => {
+        setTheme(theme === 'light' ? 'dark' : 'light');
+      }}
+    >
+      {/* On a phone the sun alone, its name for screen readers (controls.css). */}
+      <IconFrame className="theme-icon">
+        <WeatherOutline sky="mild" />
+      </IconFrame>
+      <span className="theme-label">{t('theme.toggle')}</span>
+    </button>
+  );
+  // The judges' bar under the Echo, where the conversation draws its question field (#432 S6).
+  const [askHost, setAskHost] = useState<HTMLDivElement | null>(null);
+  // H (owner, 19 Oct): "Power cut" in the demo controls asks for the person; prepareTurn then cuts the grid first.
+  const askRef = useRef<((question: string) => void) | null>(null);
+  const onPowerCut = useCallback(() => {
+    askRef.current?.(POWER_CUT_QUESTION);
+  }, []);
   const topBar = (
     <>
+      <Title />
       <DemoControlsOpener sheet={sheet} settings={demoSettings} hidden={!demoShown || wide} />
+      <PhoneOpener sheet={phoneSheet} beside={phoneBeside} count={phoneCount} />
+      <PhonePeek sheet={phoneSheet} timeZone={homeTimeZone} />
       <SettingsControl settings={demoSettings} onChange={onDrawerChange} locale={locale} onLocale={onLocale} limits={limits} onLimit={onLimit} />
+      {themeToggle}
       {/* The language icon at the top (owner, 10 Oct), at the end of the row. */}
       <LanguageToggle locale={locale} onLocale={onLocale} />
     </>
   );
   const demoControls = demoShown ? (
-    <DemoControlsPanel sheet={sheet} wide={wide} settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} stops={stops} now={clock?.now} lastJump={lastJump} />
+    <DemoControlsPanel sheet={sheet} wide={wide} settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} stops={stops} now={clock?.now} lastJump={lastJump} onPowerCut={onPowerCut} />
   ) : undefined;
   // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
   const phonePanel = (
@@ -308,12 +359,18 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const Layout = LAYOUTS[config.layout];
   return (
     <Layout
-      state={{ sky }}
+      state={{ sky, screen: screenState }}
       slots={{
         topBar,
         ...(demoControls === undefined ? {} : { demoControls }),
-        companion: phonePanel,
+        companion: (
+          <PhoneSheet sheet={phoneSheet} beside={phoneBeside}>
+            {phonePanel}
+          </PhoneSheet>
+        ),
         ...(clockDock === undefined ? {} : { clock: clockDock }),
+        // The judges' question bar under the Echo (#432 S6, owner I = a): the conversation draws its field here.
+        askBar: <div className="ask-bar-host" ref={setAskHost} />,
         screen: (
           <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', place: demoSettings?.locationId, onCardAction }}>
             <QueryClientProvider client={queryClient}>
@@ -342,29 +399,27 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                       setTheme('dark');
                     } },
                 ]}
-                head={
-                  <>
-                    <Title />
-                    {homePanel.button}
-                    <button
-                      type="button"
-                      className="link-button theme-toggle"
-                      aria-pressed={theme === 'light'}
-                      onClick={() => {
-                        setTheme(theme === 'light' ? 'dark' : 'light');
-                      }}
-                    >
-                      {t('theme.toggle')}
-                    </button>
-                  </>
-                }
+                head={<ScreenTop now={clock?.now} sky={sky} unseen={notices.unseen} onSeen={notices.markSeen} menu={homePanel.button} menuRef={menuRef} />}
                 homeView={homePanel.view}
                 onCloseHome={homePanel.close}
                 appliedTurns={appliedTurns}
                 prepareTurn={prepareTurn}
                 {...(hasSandbox && clock !== undefined ? { simNow: clock.now } : {})}
                 playthrough={playthrough}
-                {...(reserve === undefined ? {} : { idle: <ReserveClock outlook={reserve} storm={gridDown} /> })}
+                idle={
+                  <IdleTiles
+                    room={safeRoom}
+                    reserve={reserve === undefined ? undefined : <ReserveClock outlook={reserve} storm={gridDown} />}
+                    next={demoShown ? clock?.next : undefined}
+                    notice={notices.newest}
+                    timeZone={homeTimeZone}
+                  />
+                }
+                idleReturnMs={config.idleReturnMs}
+                onScreen={setScreenState}
+                actionsHost={askHost}
+                askRef={askRef}
+                greeting={greetingOf(clock?.now, safeRoom)}
                 {...(session === undefined ? {} : { session })}
                 {...(studioVoice === undefined ? {} : { studioVoice })}
               />
@@ -385,6 +440,8 @@ function HomeCard({ status }: { status: HomeStatus }) {
 function Title() {
   return (
     <header>
+      {/* The project's mark (owner, 19 Oct), beside the name that says it, so decoration for screen readers. */}
+      <img className="title-mark" src="/mark-on-dark.svg" alt="" width="24" height="24" />
       <h1>{t('sim.title')}</h1>
     </header>
   );

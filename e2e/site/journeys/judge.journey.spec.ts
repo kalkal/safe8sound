@@ -10,7 +10,7 @@ import { EN, NOTE, judgeScreen } from '../../support/screen.js';
 import { enterCode, openSiteSession } from '../../support/site-session.js';
 import { sizeOfProject, type Size } from '../../support/sizes.js';
 import { SITE_URL, expectFakeModelSays } from '../../support/target.js';
-import { openUserSettings } from '../../surface.js';
+import { openUserSettings, readPhone, showMyHome } from '../../surface.js';
 
 // The judge's journey (owner, 18 Oct; outcomes O12 judge-drives-demo and O9 never-contradicts): the site walked the way
 // a judge walks it, in ONE visit, with the state checked for consistency at every step. It runs once per screen size
@@ -86,7 +86,7 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
     await expect(ui.badge).toContainText(EN['settings.place.reference'], SLOW);
     await expect(ui.badge).toContainText(EN['settings.scenario.clear-day']);
     await expect(ui.time).toHaveText(/^\d{2}:\d{2}$/, SLOW);
-    await expect(ui.emptyPhone).toBeVisible();
+    await readPhone(page, () => expect(ui.emptyPhone).toBeVisible());
   });
 
   test('1. [scenario anchor daily] a fresh session starts the day at 12:00, whatever the hour', async () => {
@@ -134,7 +134,7 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
   test('2. the clock is at the storm day start, 12:00 in Houston, with the phone empty', async () => {
     await expect(ui.time).toHaveText('12:00', SLOW);
     await expect(ui.skip).toContainText('Go to 15:00', SLOW);
-    await expect(ui.notes).toHaveCount(0, SLOW);
+    await readPhone(page, () => expect(ui.notes).toHaveCount(0, SLOW));
   });
 
   test('2. [clock bar cut off] at the day start the clock bar is whole on screen, with no page scroll', { tag: '@outcome:O10' }, async () => {
@@ -145,10 +145,12 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
     await ask(page, "A storm is coming tonight. Get Leo's room ready.");
     // The fake model prepares storm mode: the reserve locked until the grid goes down, the family told.
     await expectFakeModelSays(ui.answerText, 'Storm mode is prepared');
-    const note = ui.phone.getByRole('article', { name: NOTE.storm_prepared });
-    await expect(note).toBeVisible(SLOW);
-    await expect(note).toContainText(`${PRODUCT_NAME} · 12:00`);
-    await expectPhoneInHomeUnits(ui.notes, 'F');
+    await readPhone(page, async () => {
+      const note = ui.phone.getByRole('article', { name: NOTE.storm_prepared });
+      await expect(note).toBeVisible(SLOW);
+      await expect(note).toContainText(`${PRODUCT_NAME} · 12:00`);
+      await expectPhoneInHomeUnits(ui.notes, 'F');
+    });
     // Asking moves nothing: the clock is still at the day's start.
     await expect(ui.time).toHaveText('12:00');
   });
@@ -169,12 +171,14 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
       phase = reached?.phase ?? phase;
       stops.push({ status, time, phase });
       if (probing) console.log(`PROBE stop ${String(stop)}: ${time} ${status}`);
-      if (reached?.note !== undefined) {
-        const note = ui.phone.getByRole('article', { name: NOTE[reached.note] });
-        await expect(note).toBeVisible(SLOW);
-        await expect(note).toContainText(`${PRODUCT_NAME} · ${time}`);
-      }
-      await expectPhoneInHomeUnits(ui.notes, 'F');
+      await readPhone(page, async () => {
+        if (reached?.note !== undefined) {
+          const note = ui.phone.getByRole('article', { name: NOTE[reached.note] });
+          await expect(note).toBeVisible(SLOW);
+          await expect(note).toContainText(`${PRODUCT_NAME} · ${time}`);
+        }
+        await expectPhoneInHomeUnits(ui.notes, 'F');
+      });
     });
 
     test(`3. stop ${String(stop)}: [clock bar cut off] the clock bar is whole on screen, with no page scroll`, { tag: '@outcome:O10' }, async () => {
@@ -193,18 +197,21 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
     expect(stops.map((s) => s.status).slice(0, 3)).toEqual(['Now: the grid goes down.', 'Now: the home steps down to its essential settings.', 'Now: the power is back.']);
     expect(stops.slice(0, 3).map((s) => s.time)).toEqual(['15:00', '21:00', '06:40']);
     await expect(ui.skip).toBeDisabled();
-    await expect(ui.notes.getByRole('heading')).toHaveText([NOTE.power_back, NOTE.essential_level, NOTE.storm_started, NOTE.storm_prepared], SLOW);
+    await readPhone(page, () => expect(ui.notes.getByRole('heading')).toHaveText([NOTE.power_back, NOTE.essential_level, NOTE.storm_started, NOTE.storm_prepared], SLOW));
   });
 
   test('4. [storm restarted after power back] a question about the storm starts no storm and tells Ana nothing more', { tag: ['@outcome:O6', '@outcome:O15'] }, async () => {
     // The clock runs at real speed: "did not move" is its status line, which changes only when the day jumps.
     const status = (await ui.status.textContent()) ?? '';
-    const headings = await ui.notes.getByRole('heading').allTextContents();
+    let headings: string[] = [];
+    await readPhone(page, async () => {
+      headings = await ui.notes.getByRole('heading').allTextContents();
+    });
     await ask(page, 'Is the storm over?');
     await check(page, BUGS.stormAgain, async () => {
       // Two reads of Ana's inbox after the answer: whatever the turn sent has reached the phone.
       await phoneReads(page);
-      await expect(ui.notes.getByRole('heading')).toHaveText(headings);
+      await readPhone(page, () => expect(ui.notes.getByRole('heading')).toHaveText(headings));
       await expect(ui.status).toHaveText(status);
       await expect(ui.answerText).not.toContainText(/storm mode is (?:prepared|active)/i);
     });
@@ -217,9 +224,8 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
   });
 
   test('5. ["can\'t reach your home" after code entry] the home asked for before the code shows once the code is in', async () => {
-    // A judge taps "Show my home" before entering the code: there is no home to read yet.
-    const show = page.getByRole('button', { name: 'Show my home' });
-    if (await show.isVisible()) await show.click();
+    // A judge taps "Show my home" (in the screen's menu, #432 S6) before entering the code: there is no home to read yet.
+    await showMyHome(page);
     await enterCode(page);
     await expect(ui.badge).toContainText(EN['settings.place.reference'], SLOW);
     // #431: the home is read as soon as the code is accepted, never the failed read from before.
@@ -231,7 +237,7 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
 
   test('5. the new session plays the default place, its phone empty, no answer on screen', async () => {
     await expect(ui.badge).toContainText(EN['settings.scenario.clear-day'], SLOW);
-    await expect(ui.emptyPhone).toBeVisible(SLOW);
+    await readPhone(page, () => expect(ui.emptyPhone).toBeVisible(SLOW));
     await expect(page.getByTestId('answer')).toHaveCount(0);
   });
 
@@ -243,7 +249,7 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
     await expect(ui.time).toHaveText('12:00', SLOW);
     await ui.skip.click();
     await expect(ui.time).toHaveText('15:00', SLOW);
-    await expect(ui.phone.getByRole('article', { name: NOTE.storm_started })).toBeVisible(SLOW);
+    await readPhone(page, () => expect(ui.phone.getByRole('article', { name: NOTE.storm_started })).toBeVisible(SLOW));
   });
 
   test('5. [restart day no-op] Restart the day takes the clock back to the day start', async () => {
@@ -256,13 +262,15 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
 
   test("5. Restart the day empties Ana's phone", { tag: '@outcome:O6' }, async () => {
     // A restart is a new playthrough (#234): its inbox starts empty.
-    await expect(ui.emptyPhone).toBeVisible(SLOW);
+    await readPhone(page, () => expect(ui.emptyPhone).toBeVisible(SLOW));
   });
 
   test('5. [missing 12:00 message] in the replayed day, preparing the storm tells Ana again at 12:00', { tag: '@outcome:O6' }, async () => {
     await ask(page, "A storm is coming tonight. Get Leo's room ready.");
-    const note = ui.phone.getByRole('article', { name: NOTE.storm_prepared });
-    await expect(note).toBeVisible(SLOW);
-    await expect(note).toContainText(`${PRODUCT_NAME} · 12:00`);
+    await readPhone(page, async () => {
+      const note = ui.phone.getByRole('article', { name: NOTE.storm_prepared });
+      await expect(note).toBeVisible(SLOW);
+      await expect(note).toContainText(`${PRODUCT_NAME} · 12:00`);
+    });
   });
 });

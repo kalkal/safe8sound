@@ -2,7 +2,8 @@ import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import { getLocale } from '@cold-reserve/i18n';
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMachine } from '@xstate/react';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject, type SyntheticEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { fromPromise } from 'xstate';
 import type { Agent, AgentAnswer, DemoSession } from '../agent/index.js';
 import type { AskContext } from '../agent/agent.js';
@@ -14,8 +15,9 @@ import { useSlowTurn } from './slow-turn.js';
 import { privacyNotice, voiceNotice } from '../voice/voice-notice.js';
 import { pagerSayable, runScreenCommand, type ScreenCommand } from './screen-commands.js';
 import { AnswerCard } from './AnswerCard.js';
+import { otherKinds, shownCard } from './ToolCards.js';
+import type { CardKind } from '@cold-reserve/ui-cards';
 import { addAnswer, answerMoment, backToStart, currentAnswer, emptyHistory, historyPosition, stepAnswer } from './answer-history.js';
-import { StepNav } from './StepNav.js';
 import { backAction, stepOf } from './steps.js';
 import { AnswerPager } from './AnswerPager.js';
 import { DemoCodeGate } from './DemoCodeGate.js';
@@ -23,6 +25,9 @@ import { DemoOverlay } from './DemoOverlay.js';
 import { ExampleQuestions, type ExampleQuestion } from './ExampleQuestions.js';
 import { Spinner } from './Spinner.js';
 import { t } from './text.js';
+import { useIdleReturn } from './idle-return.js';
+import { VoiceBar, voiceBarState } from './VoiceBar.js';
+import type { ScreenState } from '../surface/contract.js';
 
 type TurnResult = Result<AgentAnswer, ErrorEnvelope>;
 const turnKey = (turnId: string | null) => ['turn', turnId] as const;
@@ -66,6 +71,19 @@ export interface ConversationProps {
   simNow?: string;
   /** Counts the plays of the simulated day: a new one clears the answers of the last. */
   playthrough?: number;
+  /**
+   * #432 S6: the idle screen comes back this long after an answer (or the home) was last touched, once the voice is
+   * done and no plan waits for its choice (config.idleReturnMs). Absent: the answer stays until Back.
+   */
+  idleReturnMs?: number;
+  /** What the screen shows (idle, a turn on its way, an answer): the layout dims the sky behind an answer. */
+  onScreen?: (screen: ScreenState) => void;
+  /** #432 S6: where the judges' bar is drawn, outside the device (the question field, Ask, Speak, the answers' pager). */
+  actionsHost?: Element | null;
+  /** H (owner, 19 Oct): set to a function that asks a question as if the person had said it ("Power cut" in the panel). */
+  askRef?: RefObject<((question: string) => void) | null>;
+  /** The first line of the idle screen (a greeting); without it, what to ask. */
+  greeting?: ReactNode;
 }
 
 export function Conversation({
@@ -87,6 +105,11 @@ export function Conversation({
   prepareTurn,
   simNow,
   playthrough = 0,
+  idleReturnMs,
+  onScreen,
+  actionsHost,
+  askRef,
+  greeting,
 }: ConversationProps) {
   // Read when a turn starts: the machine is built once, the frame may hand a new function at each render.
   const prepareRef = useRef(prepareTurn);
@@ -154,6 +177,9 @@ export function Conversation({
   const privacy = privacyNotice({ micAvailable, speakReplies, studioVoice: voice.studioVoice });
   const notice = voiceNotice(snapshot.context);
   const listening = snapshot.matches('listening');
+  // Follow Up (#432 S6): the mic listens again after a spoken answer; the answer stays on screen meanwhile.
+  const followUp = snapshot.matches('followUp');
+  const micOpen = listening || followUp;
   const speaking = snapshot.matches('speaking');
   // Read by the reset of a new play: only a reading voice is stopped, never a turn on its way ("Power cut" restarts the day).
   const speakingRef = useRef(speaking);
@@ -163,17 +189,15 @@ export function Conversation({
   useEffect(() => {
     if (answer !== undefined) onAnswer?.(answer);
   }, [answer, onAnswer]);
-  // One answer at a time (owner's choice, 10 Oct): every answered turn is kept, with its question, for Previous / Next.
+  // One answer at a time (owner's choice, 10 Oct): every answered turn is kept for Previous / Next.
   const [history, setHistory] = useState(emptyHistory);
-  const questions = useRef(new Map<string, string>());
   // The simulated time of each answer (owner, 18 Oct): once the clock moves on, an older answer says it is earlier.
   const answeredAt = useRef(new Map<string, string>());
   useEffect(() => {
     if (answer === undefined || turnId === null) return;
-    if (question !== null) questions.current.set(turnId, question);
     if (simNowRef.current !== undefined && !answeredAt.current.has(turnId)) answeredAt.current.set(turnId, simNowRef.current);
     setHistory((previous) => addAnswer(previous, turnId));
-  }, [answer, turnId, question]);
+  }, [answer, turnId]);
   // A new play of the day (Restart, a new scenario or place): the answers of the last one describe another day, so
   // they go and the first screen comes back (owner, 18 Oct).
   const lastPlay = useRef(playthrough);
@@ -182,7 +206,6 @@ export function Conversation({
     lastPlay.current = playthrough;
     // The voice stops reading an answer of the last play.
     if (speakingRef.current) sendRef.current({ type: 'CANCEL' });
-    questions.current.clear();
     answeredAt.current.clear();
     setHistory(emptyHistory);
   }, [playthrough]);
@@ -190,12 +213,15 @@ export function Conversation({
   const moment = shownTurn === undefined ? undefined : answerMoment(answeredAt.current.get(shownTurn), simNow);
   const shown = useQuery<TurnResult>({ queryKey: turnKey(shownTurn ?? null), queryFn: skipToken });
   const position = historyPosition(history);
+  // One card per answer (owner, 19 Oct, B): the card asked for on screen ("Show the plan"), for the answer it was asked on.
+  const [cardAsked, setCardAsked] = useState<{ turnId: string; kind: CardKind } | undefined>(undefined);
+  const cardShown = cardAsked !== undefined && cardAsked.turnId === shownTurn ? cardAsked.kind : undefined;
+  // Previous / Next: every answer comes back on its main card.
+  useEffect(() => {
+    setCardAsked(undefined);
+  }, [shownTurn]);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  // Back disabled under the keyboard focus (review of #350): the focus goes to the question field.
-  const focusQuestion = useCallback(() => {
-    inputRef.current?.focus();
-  }, []);
   // Listen reads the answer again, outside the machine: the mic waits until it is over.
   const [replaying, setReplaying] = useState(false);
   const micRef = useRef<HTMLButtonElement>(null);
@@ -226,6 +252,17 @@ export function Conversation({
     if (!runCommand(draft, turnId)) send({ type: 'TEXT_SUBMITTED', text: draft, turnId });
     setDraft('');
   };
+  // H (owner, 19 Oct): the judges' "Power cut" asks for the person, inside the judge's tap (so the voice may answer).
+  useEffect(() => {
+    if (askRef === undefined) return undefined;
+    askRef.current = (question: string) => {
+      voice.unlock();
+      send({ type: 'TEXT_SUBMITTED', text: question, turnId: crypto.randomUUID() });
+    };
+    return () => {
+      askRef.current = null;
+    };
+  }, [askRef, voice, send]);
   const thinking = snapshot.matches('thinking');
   // A turn on its way (or failed): the content band shows it, not an older answer.
   const busy = thinking || listening || snapshot.matches('failed');
@@ -237,9 +274,12 @@ export function Conversation({
   };
   // "Back" always there and the path of the steps (idea 5).
   const homeOpen = homeView !== undefined && homeView !== null;
+  // The step is what is on screen: the card shown, not the answer's other cards behind "Show the plan" (review of #458:
+  // a storm answer's hidden plan kept the idle screen from coming back).
+  const cardOnScreen = busy || shown.data?.ok !== true ? undefined : shownCard(shown.data.value.cards ?? [], cardShown);
   const where = stepOf({
     homeOpen: homeShown,
-    cards: busy || shown.data?.ok !== true ? undefined : shown.data.value.cards,
+    cards: cardOnScreen === undefined ? undefined : [cardOnScreen],
     applied: shownTurn !== undefined && appliedTurns?.has(shownTurn) === true,
   });
   const back = backAction({ thinking, failed: snapshot.matches('failed'), homeOpen, answerIndex: history.index });
@@ -274,39 +314,161 @@ export function Conversation({
         ]
       : []),
     ...(goBack === undefined ? [] : [{ id: 'back', phrases: [t('nav.back'), t('nav.backUtterance')], run: goBack }]),
+    // The other cards of the answer on screen, said or typed ("Show the plan"); the home has its own panel ("Show my home").
+    ...(busy || homeShown || shownTurn === undefined || shown.data?.ok !== true
+      ? []
+      : otherKinds(shown.data.value.cards ?? [], cardShown)
+          .filter((kind) => kind !== 'home')
+          .map((kind) => ({
+            id: `card_${kind}`,
+            phrases: [t(`cardShow.${kind}`)],
+            run: () => {
+              setCardAsked({ turnId: shownTurn, kind });
+            },
+          }))),
     ...commands,
   ];
   // A cold start can take most of the browser's wait (#270): after a while the screen says so, honestly.
   const slowTurn = useSlowTurn(thinking);
+  // What the screen shows, for the layout (#432 S6): the sky is the whole screen at rest, dimmed behind the rest.
+  const screenState: ScreenState = firstScreen ? 'idle' : busy ? 'busy' : 'answer';
+  useEffect(() => {
+    onScreen?.(screenState);
+  }, [onScreen, screenState]);
+  // Back to the idle screen a while after the answer (or the home) was last touched (#432 S6): never while the voice
+  // reads it, nor while a plan waits for "Apply plan" or "Not now" (its step is the plan, not yet confirmed).
+  useIdleReturn({
+    active: idleReturnMs !== undefined && (homeShown || (!busy && shownTurn !== undefined)) && !speaking && !followUp && !replaying && where !== 'plan',
+    delayMs: idleReturnMs ?? 0,
+    onReturn: () => {
+      if (homeOpen) onCloseHome?.();
+      setHistory(backToStart);
+    },
+  });
 
+  // The judges' bar under the Echo (#432 S6, owner I = a): where an answer is among the others, whether it is from
+  // an earlier time, the examples, the question field, Ask and Speak. A real Echo Show has none of them on its screen,
+  // so they are drawn outside the device, in the host the page gives (actionsHost); without one, under the screen.
+  const actions = (
+    <>
+      {(!busy && !homeShown && ((moment?.earlier === true && shown.data?.ok === true) || position !== undefined)) && (
+        <div className="ask-bar-where">
+          {/* An answer given before the clock last moved says so, with its simulated time (the answer carries the same
+              words for screen readers, AnswerCard). */}
+          {moment?.earlier === true && shown.data?.ok === true && (
+            <p className="answer-when" aria-hidden="true">
+              {t('answers.earlier', { time: moment.time })}
+            </p>
+          )}
+          {position !== undefined && (
+            <AnswerPager
+              position={position}
+              onStep={(delta) => {
+                setHistory((previous) => stepAnswer(previous, delta));
+              }}
+            />
+          )}
+        </div>
+      )}
+        {session !== undefined && token === undefined ? (
+          <DemoCodeGate session={session} />
+        ) : (
+        <form className="ask band-actions" data-slot="actions" data-testid="slot-actions" onSubmit={onSubmit}>
+          {/* The label is said, not shown (the placeholder and Ask show it); the hint is the field's description. */}
+          <label htmlFor="question" className="visually-hidden">
+            {t('chat.label')}
+          </label>
+          <p id="question-hint" className="visually-hidden">
+            {t('chat.hint')}
+          </p>
+          <div className="try-row">
+            <span className="try-saying" aria-hidden="true">
+              {t('examples.trySaying')}
+            </span>
+            <ExampleQuestions
+            {...(examples === undefined ? {} : { examples })}
+            onPick={(question) => {
+              // Only fills the field: the person reads it and presses Ask (never sent by itself).
+              setDraft(question);
+              inputRef.current?.focus();
+            }}
+            />
+          </div>
+          <div className="ask-row">
+            <input
+              id="question"
+              ref={inputRef}
+              name="question"
+              autoComplete="off"
+              aria-describedby="question-hint"
+              placeholder={t('chat.placeholder')}
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+              }}
+            />
+            <button type="submit" className="button button-quiet" aria-busy={thinking} disabled={thinking}>
+              {t('chat.send')}
+            </button>
+            {/* Three bands: stopping the voice is an action in this row, in the place of Speak (disabled while the answer
+                is read anyway), so it never pushes the card out of the band nor squeezes the field. */}
+            {speakReplies && speaking && (
+              <button
+                ref={stopSpeakingRef}
+                type="button"
+                className="button button-quiet voice-button"
+                aria-label={t('voice.stopSpeaking')}
+                onClick={() => {
+                  sendAndRefocus({ type: 'CANCEL' });
+                }}
+              >
+                {t('voice.stopSpeakingShort')}
+              </button>
+            )}
+            {micAvailable && !speaking && (
+              <button
+                ref={micRef}
+                type="button"
+                className="button button-quiet voice-button"
+                aria-pressed={micOpen}
+                aria-busy={thinking}
+                disabled={thinking || speaking || replaying}
+                onClick={() => {
+                  voice.unlock();
+                  send(micOpen ? { type: 'CANCEL' } : { type: 'MIC_PRESSED' });
+                }}
+              >
+                {t(micOpen ? 'voice.stop' : 'voice.speak')}
+              </button>
+            )}
+          </div>
+        </form>
+        )}
+    </>
+  );
+  // Under the bar, small: the voice notices, and for the judges why one card shows (owner, 19 Oct, B).
+  const severalCards = !busy && !homeShown && shown.data?.ok === true && (shown.data.value.cards?.length ?? 0) > 1;
+  const notes = (
+    <div className="ask-bar-notes">
+      {severalCards && <p className="notice ask-bar-one-card">{t('demoControls.oneCard')}</p>}
+      {voice.browserVoiceNotice && speakReplies && (
+        <p className="notice" role="status">
+          {t('voice.browserVoice')}
+        </p>
+      )}
+      {privacy !== null && <p className="notice privacy-notice">{t(privacy)}</p>}
+    </div>
+  );
   return (
     <div className="bands">
       <div className="band-head" data-slot="head" data-testid="slot-head">
-        <StepNav step={where} onBack={goBack} onFocusLost={focusQuestion} />
         {head}
-        {/* An answer given before the clock last moved says so, with its simulated time; an answer of now needs no
-            label (the clock under the screen says the time). The pill in the header band is what the eye sees, on a row
-            the header already has; the answer itself carries the same words for screen readers (AnswerCard). */}
-        {!busy && !homeShown && moment?.earlier === true && shown.data?.ok === true && (
-          <p className="answer-when" aria-hidden="true">
-            {t('answers.earlier', { time: moment.time })}
-          </p>
-        )}
-        {/* Where we are among the answers: in the header band, so the content band is the answer's alone. */}
-        {!busy && !homeShown && position !== undefined && (
-          <AnswerPager
-            position={position}
-            onStep={(delta) => {
-              setHistory((previous) => stepAnswer(previous, delta));
-            }}
-          />
-        )}
       </div>
       <section className="conversation band-content" data-slot="content" data-testid="slot-content">
-        {/* While a turn runs, its question; otherwise the question of the answer on screen. */}
-        {busy && question !== null && !listening && <p className="bubble">{question}</p>}
-        {!busy && !homeShown && shownTurn !== undefined && questions.current.has(shownTurn) && <p className="bubble">{questions.current.get(shownTurn)}</p>}
-        {listening && (
+        {/* The person's own words are never written on the screen (#432 S6): a real Echo Show shows Alexa's answer
+            (captions), not what was said (Amazon Help "Turn On Captioning"). */}
+        {/* Listening, Follow Up included: the bar's light in words for screen readers (VoiceBar). */}
+        {micOpen && (
           <p className="thinking" role="status">
             {t('voice.listening')}
           </p>
@@ -355,13 +517,13 @@ export function Conversation({
         <div aria-live="polite">
           {!busy && !homeShown && shown.data?.ok === true && shownTurn !== undefined && (
             // One answer, one state: Previous / Next never carry a tab or a frame from another answer.
-            <AnswerCard key={shownTurn} answer={shown.data.value} timeZone={timeZone} turnId={shownTurn} {...(moment?.earlier === true ? { earlierAt: moment.time } : {})} />
+            <AnswerCard key={shownTurn} answer={shown.data.value} timeZone={timeZone} turnId={shownTurn} show={cardShown} {...(moment?.earlier === true ? { earlierAt: moment.time } : {})} />
           )}
         </div>
         {homeShown && homeView}
         {firstScreen && (
-          <p id="question-hint" className="welcome" data-testid="welcome-hint">
-            {t('chat.hint')}
+          <p className="welcome" data-testid="welcome-hint">
+            {greeting ?? t('chat.hint')}
           </p>
         )}
         {firstScreen && idle}
@@ -383,90 +545,23 @@ export function Conversation({
           </div>
         )}
       </section>
-      {session !== undefined && token === undefined ? (
-        <DemoCodeGate session={session} />
+      {actionsHost === undefined || actionsHost === null ? (
+        <>
+          {actions}
+          {notes}
+        </>
       ) : (
-      <form className="ask band-actions" data-slot="actions" data-testid="slot-actions" onSubmit={onSubmit}>
-        {/* Three bands: the label is said, not shown (the placeholder and Ask show it); the hint is the first
-            screen's content, and once answers come it stays only as the field's description. */}
-        <label htmlFor="question" className="visually-hidden">
-          {t('chat.label')}
-        </label>
-        {!firstScreen && (
-          <p id="question-hint" className="visually-hidden">
-            {t('chat.hint')}
-          </p>
-        )}
-        <div className="try-row">
-          <span className="try-saying" aria-hidden="true">
-            {t('examples.trySaying')}
-          </span>
-          <ExampleQuestions
-          {...(examples === undefined ? {} : { examples })}
-          onPick={(question) => {
-            // Only fills the field: the person reads it and presses Ask (never sent by itself).
-            setDraft(question);
-            inputRef.current?.focus();
-          }}
-          />
-        </div>
-        <div className="ask-row">
-          <input
-            id="question"
-            ref={inputRef}
-            name="question"
-            autoComplete="off"
-            aria-describedby="question-hint"
-            placeholder={t('chat.placeholder')}
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-            }}
-          />
-          <button type="submit" className="button button-quiet" aria-busy={thinking} disabled={thinking}>
-            {t('chat.send')}
-          </button>
-          {/* Three bands: stopping the voice is an action in this row, in the place of Speak (disabled while the answer
-              is read anyway), so it never pushes the card out of the band nor squeezes the field. */}
-          {speakReplies && speaking && (
-            <button
-              ref={stopSpeakingRef}
-              type="button"
-              className="button button-quiet voice-button"
-              aria-label={t('voice.stopSpeaking')}
-              onClick={() => {
-                sendAndRefocus({ type: 'CANCEL' });
-              }}
-            >
-              {t('voice.stopSpeakingShort')}
-            </button>
-          )}
-          {micAvailable && !speaking && (
-            <button
-              ref={micRef}
-              type="button"
-              className="button button-quiet voice-button"
-              aria-pressed={listening}
-              aria-busy={thinking}
-              disabled={thinking || speaking || replaying}
-              onClick={() => {
-                voice.unlock();
-                send(listening ? { type: 'CANCEL' } : { type: 'MIC_PRESSED' });
-              }}
-            >
-              {t(listening ? 'voice.stop' : 'voice.speak')}
-            </button>
-          )}
-        </div>
-        {voice.browserVoiceNotice && speakReplies && (
-          <p className="notice" role="status">
-            {t('voice.browserVoice')}
-          </p>
-        )}
-        {privacy !== null && <p className="notice privacy-notice">{t(privacy)}</p>}
-      </form>
+        createPortal(
+          <>
+            <div className="ask-bar">{actions}</div>
+            {notes}
+          </>,
+          actionsHost,
+        )
       )}
-      {demo && <DemoOverlay said={question !== null && !snapshot.matches('idle') && !listening ? question : null} speaking={speaking} />}
+      {/* Listening, thinking, ready: the light at the bottom of the screen, always (#432 S6). */}
+      <VoiceBar state={voiceBarState({ listening, thinking, speaking, followUp })} />
+      {demo && <DemoOverlay said={question !== null && !snapshot.matches('idle') && !listening ? question : null} />}
     </div>
   );
 }

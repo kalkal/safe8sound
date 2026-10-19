@@ -17,11 +17,13 @@ for (const width of [375, 800]) {
       await expect(card.getByTestId('refused-proposal')).toBeVisible();
       await expect(card.locator('html')).toHaveAttribute('data-card-theme', `pawnio-${theme}`);
 
-      // The frame is as wide as the answer gives it: its host's width, never a narrow column.
+      // The frame is as wide as the answer gives it: its host's width, never a narrow column of the Echo's screen (at
+      // 800 px Ana's phone stands beside the Echo, owner 19 Oct: the screen is narrower than the window).
       const frameBox = await frameElement.boundingBox();
       const hostBox = await page.locator('.card-frame-host').last().boundingBox();
+      const screenBox = await page.getByTestId('echo-screen').boundingBox();
       expect(frameBox?.width).toBe(hostBox?.width);
-      expect(frameBox?.width ?? 0).toBeGreaterThan(width * 0.75);
+      expect(frameBox?.width ?? 0).toBeGreaterThan((screenBox?.width ?? width) * 0.75);
 
       // Inside the frame: the plan card takes the frame's width (less the body margin) and nothing overflows.
       // String expressions: the e2e tsconfig has no DOM types.

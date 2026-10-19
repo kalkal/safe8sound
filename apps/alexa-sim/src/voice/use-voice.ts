@@ -107,6 +107,7 @@ export function useVoice(config: VoiceConfig, send: (event: ConversationEvent) =
       micAvailable: adapters.recognizer !== null,
       speakReplies: config.speakReplies && adapters.speaker !== null,
       listenTimeoutMs: config.listenTimeoutMs,
+      followUpMs: config.followUpMs,
       speakStartTimeoutMs: config.speakStartTimeoutMs,
       speakTimeoutBaseMs: config.speakTimeoutBaseMs,
       speakTimeoutPerCharMs: config.speakTimeoutPerCharMs,

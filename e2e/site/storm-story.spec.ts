@@ -1,6 +1,6 @@
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE } from './chain.js';
-import { demoControlsSummary } from '../surface.js';
+import { demoControlsSummary, openDemoControls } from '../surface.js';
 
 // Time pack (12 Oct), as on the deployed site: the AWS build, the remote agent through /api, the real local sim-api,
 // agent (fake model) and MCP server, a visitor sandbox on a calm day. The bug this catches: "Power cut" with the grid
@@ -15,7 +15,6 @@ test.use({ baseURL: AWS_SITE_URL });
 
 test('Power cut → the simulated grid goes down and Ana is told; Skip ahead to the end of the storm → power is back', async ({ page }) => {
   test.setTimeout(90_000);
-  // The desktop shows all three examples (a short Echo shows two).
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/');
   await page.getByLabel('Demo code').fill(DEMO_CODE);
@@ -27,8 +26,8 @@ test('Power cut → the simulated grid goes down and Ana is told; Skip ahead to 
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
   await expect(phone.getByText('No messages from Safe-8-Sound yet.')).toBeVisible();
 
-  await page.getByRole('group', { name: 'Example questions' }).getByRole('button', { name: 'Power cut' }).click();
-  await page.getByRole('button', { name: 'Ask' }).click();
+  // "Power cut" is a judges' command (owner H = a, #432 S6): one tap in the demo controls asks "The power's out" for Leo.
+  await (await openDemoControls(page)).getByRole('button', { name: 'Power cut' }).click();
   // Before the assistant answers, the sandbox plays the storm at its storm start: the demo controls and the clock say so.
   await expect(plays).toContainText('Storm · power outage', { timeout: 20_000 });
   await expect(clock.getByRole('status')).toHaveText('The simulated grid is now down.', { timeout: 20_000 });

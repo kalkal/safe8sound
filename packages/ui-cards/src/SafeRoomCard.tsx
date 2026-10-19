@@ -14,6 +14,23 @@ export function roomLabel(id: string): string {
   return words.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
 }
 
+/** True when the room is past the limit in force now (#271: 24 °C at night with an older person). */
+function pastLimitOf(status: SafeRoomStatus): boolean {
+  const limit = status.limitNow;
+  return limit !== undefined && (limit.kind === 'minimum' ? status.tempC < limit.limitC : status.tempC > limit.limitC);
+}
+
+/**
+ * The safe room's headline time and what it means, for the card's big time and for every other place that shows it
+ * (the Echo's idle tile): one rule, one place (review of #458). "within": the battery runs out first and the room then
+ * holds its limits until about this time (#364); "held": the room is past its limit now and the battery holds it until
+ * this time (#271); "safe": comfortable at least until this time.
+ */
+export function safeRoomHeadline(status: SafeRoomStatus): { until: string; kind: 'safe' | 'within' | 'held' } {
+  if (status.withinLimits !== undefined) return { until: status.withinLimits.until, kind: 'within' };
+  return { until: status.safeUntil, kind: pastLimitOf(status) ? 'held' : 'safe' };
+}
+
 /**
  * The safe room in a storm (plan §11.2 p.3, p.4, p.13): hours of comfort as an estimate ("at least
  * until"), who is in it, the measured air and the level with its reason. Storm mode is recognised by
@@ -33,8 +50,7 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
       : t('safeRoom.nobody');
   // #271: past the limit in force now (24 °C at night with an older person) the card says so on its own line.
   const limit = status.limitNow;
-  const pastLimit = limit !== undefined && (limit.kind === 'minimum' ? status.tempC < limit.limitC : status.tempC > limit.limitC);
-  const overLimit = limit !== undefined && pastLimit ? t(`safeRoom.past.${limit.kind}`, { temp: formatTempFixed(limit.limitC, getTempUnit()) }) : undefined;
+  const overLimit = limit !== undefined && pastLimitOf(status) ? t(`safeRoom.past.${limit.kind}`, { temp: formatTempFixed(limit.limitC, getTempUnit()) }) : undefined;
   // #342: the older-person limit only outside the heating season; when heating, a neutral eyebrow. It always labels the big time.
   // #271: over the limit the room is not comfortable: the time is when the battery hold (back inside the limit after
   // the grace period) stops keeping it, said plainly.
@@ -73,7 +89,7 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
           {/* The big time and the cubes: one row on a short screen (data-fit-tight), so both stay at full size. */}
           <div className="hero-row">
             <p className="hero-value" data-testid="safe-until">
-              {clockOf(within?.until ?? status.safeUntil)}
+              {clockOf(safeRoomHeadline(status).until)}
             </p>
             {/* The signature element right under the big time, so it is in the first view on every screen (owner, 1 and 11 Oct). */}
             <CubeRow hours={status.safeHours} storm={inStorm} />

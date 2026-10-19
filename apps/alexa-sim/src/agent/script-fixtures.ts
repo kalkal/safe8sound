@@ -19,6 +19,9 @@ const withDemoRoomNames = (plan: Plan): Plan =>
           return name === undefined ? r : { ...r, name };
         }) } };
 
+/** The calm safe room of the demo home as its profile names it (#432 S6: the idle tile says "Leo's room", never "Bedroom 1"). */
+export const demoSafeRoom = () => ({ ...safeRoomCalm(), safeRoomName: DEMO_ROOM_NAMES['bedroom-1'] ?? 'bedroom-1', people: [{ role: 'grandpa', name: 'Leo' }] });
+
 /** The scripted home's last-resort confirmation (#160): a fixed, fake token, the shape the server returns. */
 export const SCRIPTED_LAST_RESORT_TOKEN = `lr_${'scripted'.repeat(3)}`;
 

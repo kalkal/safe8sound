@@ -17,6 +17,10 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: BASE_URL,
+    // A supported size (e2e/support/sizes.json: a 13-15 inch laptop) where Ana's phone stands beside the Echo (#432,
+    // PHONE_BESIDE): a spec that sets no size reads the phone as the story shows it. Narrower sizes open the phone
+    // through e2e/surface.ts (openPhone).
+    viewport: { width: 1440, height: 900 },
     trace: 'retain-on-failure',
     ...(CI ? {} : { channel: 'chrome' }),
   },

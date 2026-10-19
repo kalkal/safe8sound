@@ -15,7 +15,10 @@ import './demo-controls.css';
 // says what the demo plays now. On a wide screen a column beside the Echo; below it a modal sheet behind one button.
 // The big "Go to …" button stays on the clock bar under the Echo, so the time and its jump are always in view.
 
-/** Where the demo controls are a column beside the Echo, not a sheet (the Echo layout's CSS uses the same query). */
+/**
+ * Where the demo controls are a column beside the Echo, not a sheet (owner, 19 Oct: a window at least twice as wide as
+ * it is tall, from 1600 px: 1920 × 950, 1904 × 870). The Echo layout's CSS uses the same query.
+ */
 export const WIDE_CONTROLS = '(width >= 100rem) and (min-aspect-ratio: 2 / 1)';
 
 /** Whether the sheet is open, and the button that opens it (the focus goes back to it). */
@@ -68,9 +71,11 @@ export interface DemoControlsPanelProps {
   now: string | undefined;
   /** The last jump of the clock: where it went and how many messages Ana got on the way (brief 3b). */
   lastJump?: { at: string; kind: MilestoneKind; told: number } | undefined;
+  /** H (owner, 19 Oct): one tap cuts the simulated grid and says "The power's out" for the person; absent, no button. */
+  onPowerCut?: (() => void) | undefined;
 }
 
-export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onChange, stops, now, lastJump }: DemoControlsPanelProps) {
+export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onChange, stops, now, lastJump, onPowerCut }: DemoControlsPanelProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
@@ -116,6 +121,24 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
           send({ scenarioId: v as (typeof SCENARIOS)[number] }, { name: 'scenario', value: v });
         }}
       />
+      {/* Owner, 19 Oct: why the Echo's screen changes colour, said to the judges here, never inside the screen. */}
+      <p className="muted demo-sky-note">{t('demoControls.skyNote')}</p>
+      <p className="muted demo-sky-note">{t('demoControls.oneCard')}</p>
+      {onPowerCut !== undefined && (
+        <div className="demo-power-cut">
+          <button
+            type="button"
+            className="chip-button"
+            onClick={() => {
+              if (!wide) close();
+              onPowerCut();
+            }}
+          >
+            {t('demoControls.powerCut')}
+          </button>
+          <p className="muted">{t('demoControls.powerCutHint')}</p>
+        </div>
+      )}
       {line !== undefined && <DayTimeline line={line} />}
       {/* What the last jump changed, said once it is done; the clock bar keeps its own short status. */}
       <p className="demo-jump" aria-live="polite" data-testid="demo-controls-jump">

@@ -30,7 +30,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/?voice=fake');
 });
 
-test('ask by voice → the answer is shown and read aloud, then the mic is free again', async ({ page }) => {
+test('ask by voice → the answer is shown and read aloud, Follow Up listens again, then the mic is free again', async ({ page }) => {
   await page.getByRole('button', { name: 'Speak', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Listening…' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stop listening' })).toHaveAttribute('aria-pressed', 'true');
@@ -48,6 +48,9 @@ test('ask by voice → the answer is shown and read aloud, then the mic is free 
     d.startAudio();
     d.finishAudio();
   });
+  // Follow Up (owner, 19 Oct, a): the question was spoken, so the mic listens again by itself; a tap stops it.
+  await expect(page.getByRole('button', { name: 'Stop listening' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Stop listening' }).click();
   await expect(page.getByRole('button', { name: 'Speak', exact: true })).toBeEnabled();
   await expect(page.getByTestId('battery-soc')).toHaveText('78%');
 });

@@ -1,6 +1,6 @@
 import { GetPreferencesOutputSchema, SafetyThresholdsSchema, SetPreferencesInputSchema, SetPreferencesOutputSchema, effectiveHeatSafety, toolError, type ConfigChange, type GetPreferencesOutput, type PublicPreferences } from '@cold-reserve/contracts';
 import { toolErrorResult, type ToolCallResult } from './agent.js';
-import { SCRIPT_FIXTURES, SCRIPTED_LAST_RESORT_TOKEN } from './script-fixtures.js';
+import { SCRIPT_FIXTURES, SCRIPTED_LAST_RESORT_TOKEN, demoSafeRoom } from './script-fixtures.js';
 
 // Card actions on the scripted home: the same shapes the MCP tools return, from the script fixtures.
 
@@ -109,6 +109,8 @@ export function scriptedToolCall(name: string, args: Record<string, unknown>, at
     const reserve = SCRIPT_FIXTURES['reserve-outlook']();
     return success(reserve.result, 'Cold reserve.');
   }
+  // The idle screen's tile "Leo's room · safe until …" (#432 S6): read-only, the calm room of the scripted home.
+  if (name === 'get_safe_room_status') return success(demoSafeRoom(), 'Safe room.');
   if (name === 'set_preferences') return setPreferences(args, at, preferences);
   if (name === 'get_preferences') return getPreferences(preferences);
   return toolErrorResult(toolError('invalid_input', `The simulator does not run ${name}.`));

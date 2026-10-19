@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../no-network.js';
+import { homeButton, showCard, showMyHome } from '../surface.js';
 
 // Three fixed bands (owner, 10 Oct): header (title, theme, home) / one content / actions (examples, question,
 // Ask, Speak). The Echo screen never scrolls: the header and the question box are always on screen, on every
@@ -56,24 +57,26 @@ test('landscape screen: with the longer storm examples the question field keeps 
 });
 
 test('Previous / Next shows each answer as it was: a storm answer comes back on its first card', async ({ page }) => {
-  // Two answers that both have several cards: without its own state per answer the second answer's tab would leak back.
+  // Two answers that both have several cards (owner, 19 Oct, B: one on screen): the plan asked for on the second
+  // answer never leaks into the first, and each comes back on its safe room.
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');
-  const tabs = page.getByRole('tablist', { name: 'Cards of this answer' });
   const answers = page.getByRole('navigation', { name: 'Answers' });
+  const room = page.locator('iframe[title="Safe room card"]');
   await page.getByLabel('Ask a question').fill("The power's out");
   await page.getByRole('button', { name: 'Ask', exact: true }).click();
-  await expect(tabs.getByRole('tab', { name: 'Safe room' })).toHaveAttribute('aria-selected', 'true');
+  await expect(room).toBeVisible();
   await page.getByLabel('Ask a question').fill("The power's out");
   await page.getByRole('button', { name: 'Ask', exact: true }).click();
   await expect(answers.getByRole('button', { name: 'Previous answer' })).toBeEnabled();
-  await tabs.getByRole('tab', { name: 'Home' }).click();
-  await expect(tabs.getByRole('tab', { name: 'Home' })).toHaveAttribute('aria-selected', 'true');
+  await showCard(page, 'Show the plan', 'Plan card');
+  await expect(page.locator('iframe[title="Plan card"]')).toBeVisible();
+  await expect(room).toBeHidden();
   await answers.getByRole('button', { name: 'Previous answer' }).click();
-  await expect(tabs.getByRole('tab', { name: 'Safe room' })).toHaveAttribute('aria-selected', 'true');
+  await expect(room).toBeVisible();
   await expect(page.frameLocator('iframe[title="Safe room card"]').getByTestId('safe-until')).toBeVisible();
   await answers.getByRole('button', { name: 'Next answer' }).click();
-  await expect(tabs.getByRole('tab', { name: 'Safe room' })).toHaveAttribute('aria-selected', 'true');
+  await expect(room).toBeVisible();
 });
 
 for (const [width, height] of SIZES) {
@@ -107,22 +110,21 @@ for (const [width, height] of SIZES) {
     await expect(answers).toContainText('Answer 2 of 2');
 
     // The home opens in the content band, in place of the answer; the question stays on screen.
-    await page.getByRole('button', { name: 'Show my home' }).click();
+    await showMyHome(page);
     await expect(page.getByRole('region', { name: 'My home' })).toBeVisible();
     await expect(answer).toHaveCount(0);
     await bandsOnScreen(page);
-    await page.getByRole('button', { name: 'Hide my home' }).click();
+    await (await homeButton(page)).click();
     await expect(answer).toHaveCount(1);
 
-    // The storm answer has three cards: one at a time, by tab, each fitting the band.
+    // The storm answer has three cards: one on screen (the safe room), the plan when asked for, each fitting the band.
     await page.getByLabel('Ask a question').fill("The power's out");
     await page.getByRole('button', { name: 'Ask', exact: true }).click();
-    const tabs = page.getByRole('tablist', { name: 'Cards of this answer' });
-    await expect(tabs.getByRole('tab')).toHaveText(['Safe room', 'Plan', 'Home']);
+    await expect(page.locator('iframe[title="Safe room card"]')).toBeVisible();
+    await expect(page.getByRole('tablist')).toHaveCount(0);
     await bandsOnScreen(page);
-    for (const name of ['Plan', 'Home']) {
-      await tabs.getByRole('tab', { name }).click();
-      await bandsOnScreen(page);
-    }
+    await showCard(page, 'Show the plan', 'Plan card');
+    await expect(page.locator('iframe[title="Plan card"]')).toBeVisible();
+    await bandsOnScreen(page);
   });
 }

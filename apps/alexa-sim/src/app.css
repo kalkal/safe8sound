@@ -167,14 +167,6 @@
     gap: var(--space-4);
   }
 
-  .bubble {
-    justify-self: end;
-    margin: 0;
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-card);
-    background: var(--surface-card-raised);
-  }
-
   .thinking,
   .failure p {
     margin: 0;
@@ -396,8 +388,7 @@
   }
 }
 
-/* Demo mode for recording the video (?demo=1): the caption of what the person said, and the light bar an
-   Echo Show lights at its bottom edge while Alexa speaks. The page keeps room for both. */
+/* Demo mode for recording the video (?demo=1): the caption of what the person said. The page keeps room for it. */
 @layer components {
   :root[data-demo] .surface {
     padding-block-end: calc(var(--target-min) * 3);
@@ -418,18 +409,69 @@
     text-align: center;
   }
 
-  .demo-light-bar {
-    position: fixed;
+}
+
+/* The light at the bottom of the screen (#432 S6; Amazon Help "Indicators for Alexa+"): a small fixed light when ready
+   to listen again, a pulse while listening, a wave from left to right while thinking, nothing while the answer is
+   spoken. The real one's place and behaviour, our colour and shape (owner Q2, 18 Oct): the accent, a rounded bar.
+   With reduced motion it stays still (overrides layer). */
+@layer components {
+  .voice-bar {
+    position: absolute;
     inset-inline: 0;
-    inset-block-end: 0;
-    z-index: 10;
+    inset-block-end: var(--space-1);
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .voice-bar-light {
+    inline-size: 0;
     block-size: var(--space-2);
+    border-radius: var(--radius-pill);
     background: var(--accent);
     opacity: 0;
-    transition: opacity var(--duration-fast) ease-out;
+    transition:
+      inline-size var(--duration-fast) ease-out,
+      opacity var(--duration-fast) ease-out;
+  }
 
-    &[data-lit="true"] {
-      opacity: 1;
+  .voice-bar[data-state="ready"] .voice-bar-light {
+    inline-size: 8%;
+    opacity: 1;
+  }
+
+  .voice-bar[data-state="listening"] .voice-bar-light {
+    inline-size: 45%;
+    opacity: 1;
+    animation: voice-pulse 1.2s ease-in-out infinite alternate;
+  }
+
+  .voice-bar[data-state="thinking"] .voice-bar-light {
+    inline-size: 25%;
+    opacity: 1;
+    animation: voice-wave 1.2s ease-in-out infinite;
+  }
+
+  @keyframes voice-pulse {
+    from {
+      transform: scaleX(0.6);
+    }
+
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  @keyframes voice-wave {
+    from {
+      transform: translateX(-200%);
+    }
+
+    to {
+      transform: translateX(200%);
     }
   }
 }

@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
-import { demoControlsSummary, openDemoControls, openUserSettings } from '../surface.js';
+import { demoControlsSummary, openDemoControls, openUserSettings, showMyHome } from '../surface.js';
 
 // °F everywhere (owner decision, 9 Oct): the judge picks °F in the settings drawer and every card follows: the home
 // floor plan and the safe room in the storm (the plan card is covered by its unit tests); a card already on screen
@@ -31,7 +31,7 @@ test('Houston starts in °F: choosing the place switches the unit, and the judge
   settings = await openUserSettings(page);
   await expect(settings.getByRole('radiogroup', { name: 'Temperature units' }).getByRole('radio', { name: '°F' })).toBeChecked();
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Show my home' }).click();
+  await showMyHome(page);
   const homeCard = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]');
   // The rooms are the home card's page 2 (pages instead of scrolling, owner 10 Oct).
   await toCardPage(homeCard, 2);
@@ -47,7 +47,7 @@ test('°F in the drawer: the floor plan and the safe room follow, and a card on 
   await page.goto('/');
   await pickUnits(page, '°F');
 
-  await page.getByRole('button', { name: 'Show my home' }).click();
+  await showMyHome(page);
   const home = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]');
   await toCardPage(home, 2);
   const rooms = home.getByRole('list', { name: 'Rooms' });

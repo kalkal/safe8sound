@@ -4,7 +4,7 @@ import { createScriptedClock } from '../../src/agent/scripted-clock.js';
 import type { CardSlot } from '../../src/agent/wire.js';
 import type { LogEvent } from '../../src/log.js';
 import { createScriptedPhone } from '../../src/phone/phone-feed.js';
-import { clockTime, cutThePower, isPowerCut, planIdOf, readClock, skipAhead } from '../../src/ui/sim-clock.js';
+import { POWER_CUT_QUESTION, clockTime, cutThePower, isPowerCut, planIdOf, readClock, skipAhead } from '../../src/ui/sim-clock.js';
 
 // The simulated clock (owner decision, 10 Oct; time pack, 12 Oct): the page's side of get_milestones / advance_clock /
 // set_scenario. The sandbox's rules (never backwards, the family told once) are the server's and tested there (#317);
@@ -42,6 +42,11 @@ const answering = (reply: ToolCallResult | Error): Agent => ({
 const refused = (code: string): ToolCallResult => ({ isError: true, content: [{ type: 'text', text: 'Refused.' }], structuredContent: { code, message: 'Refused.' } });
 
 describe('isPowerCut', () => {
+  // H (owner, 19 Oct): the judges' "Power cut" says this for the person, so it must start the cut.
+  it("the question the judges' Power cut asks is a power cut", () => {
+    expect(isPowerCut(POWER_CUT_QUESTION)).toBe(true);
+  });
+
   it('hears that the power is out now, said, typed or tapped, in English and Italian', () => {
     for (const said of [
       "The power's out",

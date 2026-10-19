@@ -1,21 +1,22 @@
 import { expect, test } from '../no-network.js';
 
 // Demo mode for recording the video (?demo=1): a circle where each tap lands, on the page and inside the cards,
-// the question as a "You said" caption, and the light bar while Alexa speaks. Off by default. ScriptedAgent only.
+// and the question as a "You said" caption. Off by default. ScriptedAgent only. The light bar at the bottom of the screen
+// is always there (#432 S6): it pulses while listening and is off while the answer is spoken, as on the real Echo Show.
 
 type VoiceWindow = { __voiceTest?: { say: (w: string) => boolean; startAudio: () => void; finishAudio: () => void } };
 
 // Reduced motion keeps each mark still for its whole time on screen, so the checks below do not race a fade.
 test.use({ reducedMotion: 'reduce' });
 
-test('off by default: no tap marks, no caption, no light bar', async ({ page }) => {
+test('off by default: no tap marks, no caption; the light bar rests off after the answer', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Ask a question').fill("What's my battery level?");
   await page.getByRole('button', { name: 'Ask' }).click();
   await expect(page.getByTestId('battery-soc')).toHaveText('78%');
   await expect(page.locator('.demo-tap')).toHaveCount(0);
   await expect(page.getByTestId('demo-caption')).toHaveCount(0);
-  await expect(page.getByTestId('demo-light-bar')).toHaveCount(0);
+  await expect(page.getByTestId('voice-bar')).toHaveAttribute('data-state', 'off');
 });
 
 test('a tap on the page and a tap inside a card each leave a mark; the question is captioned', async ({ page }) => {
@@ -55,21 +56,24 @@ test('a tap on the page and a tap inside a card each leave a mark; the question 
   await expect(card.locator('.demo-tap')).toHaveCount(0);
 });
 
-test('the light bar is lit while Alexa speaks, and off again when she is done', async ({ page }) => {
+test('the light bar pulses while listening, is off while the answer is spoken, then rests as Follow Up listens again', async ({ page }) => {
   await page.goto('/?demo=1&voice=fake');
   await page.getByRole('button', { name: 'Speak', exact: true }).click();
+  const bar = page.getByTestId('voice-bar');
+  await expect(bar).toHaveAttribute('data-state', 'listening');
   await page.waitForFunction(() => (globalThis as VoiceWindow).__voiceTest !== undefined);
   await page.evaluate(() => (globalThis as VoiceWindow).__voiceTest?.say("What's my battery level?"));
   await expect(page.getByTestId('demo-caption')).toHaveText('You said: “What\'s my battery level?”');
-  const bar = page.getByTestId('demo-light-bar');
   await page.evaluate(() => {
     (globalThis as VoiceWindow).__voiceTest?.startAudio();
   });
-  await expect(bar).toHaveAttribute('data-lit', 'true');
+  await expect(bar).toHaveAttribute('data-state', 'off');
   await page.evaluate(() => {
     (globalThis as VoiceWindow).__voiceTest?.finishAudio();
   });
-  await expect(bar).toHaveAttribute('data-lit', 'false');
+  // Follow Up (owner, 19 Oct, a): the question was spoken, so the mic listens again; the small fixed light says so.
+  await expect(bar).toHaveAttribute('data-state', 'ready');
+  await expect(page.getByRole('button', { name: 'Stop listening' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('at 375 px nothing scrolls sideways and the caption fits the screen', async ({ page }) => {

@@ -1,7 +1,7 @@
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE, SIM_API_URL } from './chain.js';
 import { toCardPage } from '../card-pages.js';
-import { demoControlsSummary, openDemoControls, openUserSettings, settingsButton } from '../surface.js';
+import { demoControlsSummary, openDemoControls, openUserSettings, settingsButton, showMyHome } from '../surface.js';
 
 // K1 (#244 review): the AWS build of the site, its /api through the very CloudFront Function the distribution runs
 // (a stand-in for CloudFront), and a REAL local sim-api configured as on AWS (no allowed origin) in front of the real
@@ -23,7 +23,7 @@ test('#262: "Show my home" reads the sandbox home on demand through /api, read-o
   await page.goto('/');
   await page.getByLabel('Demo code').fill(DEMO_CODE);
   await page.getByRole('button', { name: 'Start' }).click();
-  await page.getByRole('button', { name: 'Show my home' }).click();
+  await showMyHome(page);
   const home = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]').getByRole('region', { name: 'The home right now' });
   await expect(home.getByTestId('origin-badge')).toContainText('SIMULATED', { timeout: 20_000 });
   await expect(home.getByRole('list', { name: 'Energy' })).toContainText(/Battery \d+%/);

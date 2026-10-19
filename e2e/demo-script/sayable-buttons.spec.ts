@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import type { FakeVoiceDriver } from '../../apps/alexa-sim/src/voice/fake-voice.js';
 import { expect, test } from '../no-network.js';
+import { homeButton } from '../surface.js';
 
 // Every button sayable (owner, idea 4): a button's label, said or typed as the whole question, does what tapping the
 // button does, here on the screen. A longer question that only contains a label still goes to Alexa.
@@ -33,10 +34,10 @@ test('typed labels: Previous / Next answer, Show / Hide my home, Light / Dark th
   // The home button: the home opens in the content band and the button says so; then it closes.
   await type(page, 'Show my home');
   await expect(page.getByRole('region', { name: 'My home' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Hide my home' })).toHaveAttribute('aria-expanded', 'true');
+  await expect(await homeButton(page)).toHaveAttribute('aria-expanded', 'true');
   await type(page, 'hide my home please');
   await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Show my home' })).toHaveAttribute('aria-expanded', 'false');
+  await expect(await homeButton(page)).toHaveAttribute('aria-expanded', 'false');
 
   // The theme button, and the way back said aloud.
   const toggle = page.getByRole('button', { name: 'Light theme' });

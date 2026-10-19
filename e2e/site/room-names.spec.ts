@@ -1,7 +1,7 @@
 import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE } from './chain.js';
-import { demoControlsSummary, openUserSettings } from '../surface.js';
+import { demoControlsSummary, openUserSettings, showMyHome } from '../surface.js';
 
 // #422: a sandbox names its rooms as the home profile does, "Leo's room", on the home card and in the settings drawer,
 // as the voice and the safe room card do. Same chain as the site: the AWS build, the real local sim-api, agent (fake
@@ -17,7 +17,7 @@ test("the home card and the settings drawer name the safe room Leo's room, never
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(demoControlsSummary(page)).toContainText('Clear day', { timeout: 20_000 });
 
-  await page.getByRole('button', { name: 'Show my home' }).click();
+  await showMyHome(page);
   const home = page.getByRole('region', { name: 'My home' }).frameLocator('iframe[title="Home card"]');
   const region = home.getByRole('region', { name: 'The home right now' });
   await expect(region).toBeVisible({ timeout: 20_000 });

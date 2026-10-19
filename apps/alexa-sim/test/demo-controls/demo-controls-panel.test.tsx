@@ -18,9 +18,20 @@ const stops: Milestone[] = [
   { kind: 'power_back', at: at('23:40'), label: 'x' },
 ];
 
-function Wide(props: { onChange?: (c: unknown) => Promise<boolean> }) {
+function Wide(props: { onChange?: (c: unknown) => Promise<boolean>; onPowerCut?: () => void }) {
   const sheet = useDemoControlsSheet();
-  return <DemoControlsPanel sheet={sheet} wide settings={scriptedDemoSettings()} availablePlaces={['reference', 'turin', 'houston']} onChange={props.onChange ?? vi.fn(() => Promise.resolve(true))} stops={stops} now={at('15:20')} />;
+  return (
+    <DemoControlsPanel
+      sheet={sheet}
+      wide
+      settings={scriptedDemoSettings()}
+      availablePlaces={['reference', 'turin', 'houston']}
+      onChange={props.onChange ?? vi.fn(() => Promise.resolve(true))}
+      stops={stops}
+      now={at('15:20')}
+      {...(props.onPowerCut === undefined ? {} : { onPowerCut: props.onPowerCut })}
+    />
+  );
 }
 
 function Narrow() {
@@ -42,6 +53,28 @@ describe('DemoControlsPanel', () => {
     expect(within(panel).getByRole('radio', { name: /Heat wave/ })).toHaveProperty('checked', true);
     expect(within(panel).getAllByRole('radio', { name: /Clear day|Heat wave|Storm/ })).toHaveLength(3);
     expect(within(panel).getByTestId('demo-controls-summary').textContent).toContain('Heat wave');
+  });
+
+  // Owner, 19 Oct: the judges learn why the Echo's screen changes colour, here and never inside the screen.
+  it('under the weather, one line says the screen sky follows it', () => {
+    render(<Wide />);
+    expect(screen.getByText("The screen's sky follows the simulated weather: clear, heat wave, storm.")).toBeTruthy();
+    // Owner, 19 Oct (B): why one card per answer, and how to see the others.
+    expect(screen.getByText('Like a real Echo Show, Alexa shows one card per answer. Ask “Show the plan” or “Show my home” to see the others.')).toBeTruthy();
+  });
+
+  // H (owner, 19 Oct): one tap cuts the simulated grid and says "The power's out" for the person.
+  it('"Power cut" is one tap that hands the cut to the page, said in words under it', () => {
+    const onPowerCut = vi.fn();
+    render(<Wide onPowerCut={onPowerCut} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Power cut' }));
+    expect(onPowerCut).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Cuts the simulated grid and says “The power\'s out” for Leo.')).toBeTruthy();
+  });
+
+  it('without a way to cut the power (not a sandbox turn), no "Power cut" button', () => {
+    render(<Wide />);
+    expect(screen.queryByRole('button', { name: 'Power cut' })).toBeNull();
   });
 
   it('the timeline names every stop with its time, marks the current one and names the next', () => {

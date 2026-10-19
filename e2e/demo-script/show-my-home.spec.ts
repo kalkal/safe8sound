@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
+import { homeButton, menuButton, showMyHome } from '../surface.js';
 
 // "Show my home" (#204): behind one button the floor plan with the rooms, their temperatures, the battery, the solar
 // and the grid, all SIMULATED. It follows the scene: a plan applied, the storm. Keyboard: Escape closes it.
@@ -19,7 +20,7 @@ for (const width of [375, 1280]) {
     await page.goto('/');
     // The screen stays clean: only the button.
     await expect(page.locator('iframe[title="Home card"]')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Show my home' }).click();
+    await showMyHome(page);
 
     const home = homeCard(page);
     const region = home.getByRole('region', { name: 'The home right now' });
@@ -34,22 +35,22 @@ for (const width of [375, 1280]) {
     await ask(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
     await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
     await page.frameLocator('iframe[title="Plan card"]').getByRole('button', { name: 'Apply plan' }).click();
-    await page.getByRole('button', { name: 'Show my home' }).click();
+    await showMyHome(page);
     await toCardPage(homeCard(page), 2);
     await expect(homeCard(page).getByRole('listitem', { name: 'Bedroom 2' })).toContainText('Served');
 
     // The storm: the grid is down, the other rooms wait for the level.
     await ask(page, "The power's out");
-    await page.getByRole('button', { name: 'Show my home' }).click();
+    await showMyHome(page);
     await expect(homeCard(page).getByRole('list', { name: 'Energy' })).toContainText('Grid down');
     await toCardPage(homeCard(page), 2);
     await expect(homeCard(page).getByRole('listitem', { name: 'Living' })).toContainText('Waiting: the level cools fewer rooms right now');
 
     expect(await page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(width);
 
-    // Escape closes it and the focus goes back to the button.
-    await page.getByRole('button', { name: 'Hide my home' }).press('Escape');
+    // Escape closes it and the focus goes back to the menu that holds its button (#432 S6).
+    await (await homeButton(page)).press('Escape');
     await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Show my home' })).toBeFocused();
+    await expect(menuButton(page)).toBeFocused();
   });
 }

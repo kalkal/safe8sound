@@ -45,7 +45,8 @@
      card surface like the badge (the bezel is dark in both themes), one line, never bright. */
   .language-top-note {
     overflow: hidden;
-    flex: 0 1 auto;
+    /* Never squeezed: the title and the demo button give way first. */
+    flex: 0 0 auto;
     min-inline-size: 0;
     margin: 0 0 0 auto;
     padding: var(--space-1) var(--space-3);
@@ -132,11 +133,17 @@
     }
 
     .echo-stage:has(> .echo-top > .language-top-note) .echo-screen {
-      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-1) - var(--space-4) - var(--space-1) - var(--dock-h, 0px) - var(--space-4));
+      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-1) - var(--space-4) - var(--space-1) - var(--dock-h, 0px) - var(--space-4) - var(--title-line, 0px));
     }
   }
 
   .demo-controls-open {
+    /* Gives way with an ellipsis after the title, so the language note and the buttons keep their words. */
+    flex: 0 5 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     min-block-size: var(--target-min);
     padding-inline: var(--space-4);
     border: var(--border-thin) dashed var(--status-neutral);
@@ -291,13 +298,13 @@
     display: none;
   }
 
-  /* A small Echo and a phone: one compact 48 px row (the time and the button, whose words shorten with an ellipsis).
-     It takes back the top row's padding and rests on 20 px of the screen's bottom padding (empty), so the screen keeps
-     its height and the cubes and the big time stay in the first view. */
-  @media (width < 64rem) {
+  /* A phone: one compact 48 px row (the time and the button, whose words shorten with an ellipsis). It takes back the
+     top row's padding and rests on 20 px of the screen's bottom padding (empty), so the screen keeps its height and the
+     cubes and the big time stay in the first view. From a small Echo up the layout gives it its row (layout.css). */
+  @media (width < 48rem) {
     .echo-stage:has(.sim-dock) {
       --dock-btn: 3rem;
-      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-4) - var(--space-1));
+      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-4) - var(--space-1) + var(--ask-h, 0px));
     }
 
     .echo-column {
@@ -315,23 +322,11 @@
     }
   }
 
-  /* A short landscape Echo (960 × 480) has no gap above the screen, and its dock rests on 24 px of the screen's bottom padding. */
-  @media (width >= 56rem) and (width < 64rem) and (height < 40rem) {
-    .echo-stage:has(.sim-dock) {
-      row-gap: 0;
-      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-6) - var(--space-2));
-    }
-
-    .sim-dock {
-      margin-block-start: calc(var(--space-6) * -1);
-    }
-  }
-
   /* A phone gives back 16 px of the gap above the screen. */
   @media (width < 48rem) {
     .echo-stage:has(.sim-dock) {
       row-gap: var(--space-2);
-      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-4) - var(--space-1) - var(--space-4));
+      --dock-h: calc(var(--dock-btn) - var(--space-3) - var(--space-4) - var(--space-1) - var(--space-4) + var(--ask-h, 0px));
     }
   }
 
@@ -393,22 +388,6 @@
   @media (width >= 48rem) and (height < 40rem) {
     .sim-dock-skip {
       font-size: var(--font-size-body);
-    }
-  }
-
-  /* A laptop-sized window and up: the chrome gives the dock its room, the screen keeps its size. */
-  @media (width >= 64rem) {
-    .echo-column {
-      justify-items: center;
-    }
-
-    .echo-stage:has(.sim-dock) {
-      --dock-h: 0px;
-      padding: var(--space-1) var(--space-6);
-    }
-
-    .echo-stage:has(.sim-dock) .echo-device {
-      padding: var(--space-3);
     }
   }
 
@@ -561,6 +540,374 @@
       max-block-size: none;
       border-radius: 0;
     }
+  }
+}
+
+/* The row under the device (#432 S6, owner I = a and the layout mockups of 19 Oct): the simulated clock with its jump,
+   and the judges' question bar (the examples, the field, Ask and Speak, which a real Echo Show never has on its
+   screen), with a line of notes under the bar: the voice notices and, when an answer has more cards, how to see them.
+   From a small Echo up it is one row under the device and the phone, its height (--under-h, layout.css) taken from the
+   window before the device is scaled; on a phone the clock, then the bar (two or three rows, --ask-h) under the device. */
+@layer surfaces {
+  .echo-under {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    min-inline-size: 0;
+    /* As wide as the row and never wider: what it holds gives way, it never widens the page. */
+    contain: inline-size;
+  }
+
+  /* The theme switch: its words from a small Echo up, the sun alone on a phone. */
+  .theme-icon {
+    display: none;
+    inline-size: 1.5em;
+    block-size: 1.5em;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  @media (width < 48rem) {
+    .echo-top .theme-icon {
+      display: block;
+    }
+  }
+
+  .ask-bar-host {
+    display: grid;
+    gap: var(--space-1);
+    min-inline-size: 0;
+    container-type: inline-size;
+  }
+
+  .ask-bar-host:empty {
+    display: none;
+  }
+
+  /* One 48 px row and its padding, a fixed height: the page never scrolls by a rounding. */
+  .ask-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    box-sizing: border-box;
+    block-size: calc(var(--target-min) + var(--space-2));
+    padding: var(--space-1) var(--space-3);
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+  }
+
+  .ask-bar-where {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .ask-bar .ask {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: var(--space-2);
+    min-inline-size: 0;
+  }
+
+  .ask-bar .try-row {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    min-inline-size: 0;
+  }
+
+  .ask-bar .try-saying {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* The examples keep their words and slide sideways in their own box, the last one in view fading at its edge (an
+     ellipsis on each left "I…", "H…" on a laptop): the field keeps room to type. */
+  .ask-bar .examples {
+    flex-wrap: nowrap;
+    min-inline-size: 0;
+    padding-inline-end: var(--space-6);
+    overflow-x: auto;
+    scrollbar-width: none;
+    mask: linear-gradient(to right, currentcolor calc(100% - var(--space-6)), transparent);
+
+    & .chip-button {
+      flex: none;
+      white-space: nowrap;
+    }
+  }
+
+  /* The field keeps room to type (with Ask and Speak beside it): 480 px, or 70 % of a narrow bar. */
+  .ask-bar .ask-row {
+    flex: 1 0 min(30rem, 70%);
+    flex-wrap: nowrap;
+    min-inline-size: 0;
+
+    /* As high as Ask and Speak (one 48 px row): its border inside the height, never 4 px more. */
+    & input {
+      box-sizing: border-box;
+      flex: 1 1 auto;
+      min-inline-size: 0;
+    }
+  }
+
+  /* A narrow bar (a small Echo with the phone beside it, mockup s6-layout-v2): the examples without their label,
+     which stays for screen readers. */
+  @container (width < 40rem) {
+    /* The field before the examples: 80 % of the row, Ask and Speak a little tighter (Speak keeps one width for Stop). */
+    .ask-bar .ask-row {
+      flex-basis: min(30rem, 80%);
+
+      & .button {
+        padding-inline: var(--space-3);
+      }
+    }
+
+    .ask-bar .voice-button {
+      min-inline-size: 5.5rem;
+    }
+
+    .ask-bar .try-saying {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  /* One small line under the bar: each note keeps one line and gives way with an ellipsis. */
+  .ask-bar-notes {
+    display: flex;
+    gap: var(--space-4);
+    min-inline-size: 0;
+    overflow: hidden;
+    /* On the bezel, dark in both themes. */
+    color: var(--text-on-sky);
+    font-size: var(--font-size-min);
+    line-height: 1.4;
+
+    & .notice {
+      color: inherit;
+      flex: 0 1 auto;
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    & .ask-bar-one-card {
+      flex-shrink: 0;
+      font-weight: var(--font-weight-medium);
+    }
+  }
+
+  /* From a small Echo up: the clock and the bar side by side, the notes under the bar. */
+  @media (width >= 48rem) {
+    .echo-stage:has(.sim-dock) {
+      --dock-btn: calc(var(--target-min) + var(--space-2));
+    }
+
+    .echo-under {
+      grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+      align-items: start;
+    }
+
+    .echo-under > .sim-dock {
+      box-sizing: border-box;
+      block-size: calc(var(--target-min) + var(--space-2));
+    }
+  }
+
+  /* On a small Echo (under 1100 px, the phone column beside it) the row is narrower: the clock's lines (what happened,
+     and what the last jump changed) stay for screen readers; the jump's summary is also in the demo controls. */
+  @media (width >= 48rem) and (width < 68.75rem) {
+    .echo-under .sim-dock {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas: "time button";
+    }
+
+    .echo-under .sim-dock-lines {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  /* A phone: the bar's rows (where the answer is, once there are answers; the examples sliding sideways; the field,
+     Ask and Speak), the notes kept for screen readers. The title takes one small line of its own above the buttons of the
+     top bar (the contest asks for it in view), and the theme switch waits for the settings page (it can still be said). */
+  @media (width < 48rem) {
+    .echo-stage:has(.ask-bar) {
+      --ask-h: calc(var(--target-min) * 3 + var(--space-2) * 4 + var(--font-size-min) * 1.3 + var(--space-1) + var(--border-thin) * 2);
+    }
+
+    .ask-bar,
+    .ask-bar .ask {
+      flex-wrap: wrap;
+    }
+
+    .ask-bar {
+      block-size: auto;
+    }
+
+    .ask-bar-where,
+    .ask-bar .try-row,
+    .ask-bar .ask-row {
+      flex: 1 1 100%;
+    }
+
+    .ask-bar .try-saying,
+    .ask-bar-notes {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .echo-top {
+      row-gap: var(--space-1);
+    }
+
+    /* The rows keep their own heights; what is left over stays under the bar, never inside the top bar. */
+    .echo-stage {
+      align-content: start;
+    }
+
+    /* The title's own line (#432 S6) is not in the screen's height budget (layout.css) beyond its first 12 px: the screen
+       gives up the rest, so a three-row bar keeps the field whole in the window (#458 journeys: 16 px below the fold)
+       and the cubes stay whole under the big time (#398). */
+    .echo-stage {
+      --title-line: var(--space-3);
+    }
+
+    .echo-top > header {
+      flex-basis: 100%;
+      block-size: calc(var(--target-min) / 2);
+
+      & h1 {
+        font-size: var(--font-size-min);
+        line-height: 1.3;
+      }
+    }
+
+    .echo-top > :not(header, .demo-controls-open) {
+      flex: none;
+    }
+
+    /* Five buttons on one row, each a whole target, the row never wrapping under the screen. The row breaks on the
+       widest each button may be (3 targets + 6.5rem + 5.25rem + the gaps fit 351 px), so the longer Italian words give
+       way with an ellipsis rather than push the language icon onto a second line; the demo controls take what is left. */
+    .echo-top {
+      column-gap: var(--space-1);
+    }
+
+    .echo-top > button {
+      min-inline-size: var(--target-min);
+      padding-inline: var(--space-1);
+    }
+
+    .echo-top > :is(.theme-toggle, .language-toggle) {
+      justify-content: center;
+      inline-size: var(--target-min);
+      padding-inline: 0;
+    }
+
+    .echo-top > :is(.phone-open, .settings-open) {
+      flex: 0 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .echo-top > .phone-open {
+      max-inline-size: 6.5rem;
+    }
+
+    .echo-top > .settings-open {
+      max-inline-size: 5.25rem;
+    }
+
+    .echo-top > .demo-controls-open {
+      flex: 1 5 0;
+      min-inline-size: var(--target-min);
+    }
+
+    .echo-top .theme-label {
+      position: absolute;
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  /* K (owner, 19 Oct): the notice of a new message to Ana, under the top bar, above the page, never modal. */
+  .phone-peek-live {
+    /* Out of the top bar's row (no gap of its own): the notice inside it is fixed under the bar. */
+    position: absolute;
+  }
+
+  .phone-peek {
+    position: fixed;
+    inset-block-start: calc(var(--target-min) + var(--space-3));
+    inset-inline: var(--space-3);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    max-inline-size: 34rem;
+    margin-inline: auto;
+    padding: var(--space-2) var(--space-3);
+    border: var(--border-thin) solid var(--accent);
+    border-radius: var(--radius-card);
+    background: var(--surface-card-raised);
+    color: var(--text-primary);
+
+    & p {
+      flex: 1 1 auto;
+      margin: 0;
+    }
+  }
+
+  /* On a phone the top bar is two lines (the title, then the buttons): the notice comes under both, never over a button. */
+  @media (width < 48rem) {
+    .phone-peek {
+      inset-block-start: calc(var(--target-min) * 2 + var(--space-1));
+    }
+  }
+
+  .phone-peek-avatar {
+    inline-size: 2.5rem;
+    block-size: 2.5rem;
+  }
+
+  .demo-power-cut {
+    display: grid;
+    gap: var(--space-1);
+    justify-items: start;
+
+    & p {
+      margin: 0;
+    }
+  }
+
+  .demo-sky-note {
+    margin: 0;
+    font-size: var(--font-size-min);
   }
 }
 

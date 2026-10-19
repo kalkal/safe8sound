@@ -1,4 +1,4 @@
-import { homeClock } from '@cold-reserve/ui-cards';
+import { homeClock, type CardKind } from '@cold-reserve/ui-cards';
 import { useState } from 'react';
 import type { AgentAnswer } from '../agent/index.js';
 import { OriginBadge } from './OriginBadge.js';
@@ -6,6 +6,8 @@ import { t } from './text.js';
 import { ToolCards } from './ToolCards.js';
 
 export interface AnswerCardProps {
+  /** The card asked for on screen ("Show the plan"); otherwise the answer's main card (owner, 19 Oct, B). */
+  show?: CardKind | undefined;
   answer: AgentAnswer;
   timeZone: string;
   /** Set when the answer was given before the simulated clock last moved: its "HH:MM" (owner, 18 Oct). */
@@ -14,7 +16,7 @@ export interface AnswerCardProps {
   turnId: string;
 }
 
-export function AnswerCard({ answer, timeZone, turnId, earlierAt }: AnswerCardProps) {
+export function AnswerCard({ answer, timeZone, turnId, earlierAt, show }: AnswerCardProps) {
   const { status } = answer;
   // An empty list of cards is no card: the words then keep the screen (never an empty Echo screen after an answer).
   const cards = answer.cards !== undefined && answer.cards.length > 0 ? answer.cards : undefined;
@@ -65,7 +67,7 @@ export function AnswerCard({ answer, timeZone, turnId, earlierAt }: AnswerCardPr
           </div>
         </dl>
       )}
-      {cards !== undefined && <ToolCards cards={cards} turnId={turnId} />}
+      {cards !== undefined && <ToolCards cards={cards} turnId={turnId} show={show} />}
     </article>
   );
 }

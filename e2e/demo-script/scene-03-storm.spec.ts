@@ -1,6 +1,7 @@
 import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 import { expectVoiceMatchesCards } from '../voice-screen.js';
+import { homeButton, showCard, showMyHome } from '../surface.js';
 
 // Demo script, scene 3 (F8c, #24): the storm. The power goes out: the safe-room card and the night (the
 // storm-themed plan card) answer inside ui:// frames, and the daughter's phone gets the Mileti-style
@@ -27,12 +28,10 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await expect(card.getByTestId('safe-until')).toHaveText('06:40');
   await expect(card.getByRole('alert')).toContainText('Storm mode · the grid is down');
   await expect(safeRoom.locator('html')).toHaveClass(/theme-storm/);
-  // One card at a time (pages instead of scrolling, owner 10 Oct): a tab per card of the answer.
-  const tabs = page.getByRole('tablist', { name: 'Cards of this answer' });
-  await tabs.getByRole('tab', { name: 'Plan' }).click();
-  await expect(page.frameLocator('iframe[title="Plan card"]').getByRole('region', { name: 'Plan' })).toBeVisible();
+  // One card per answer (owner, 19 Oct, B): the safe room first; the plan when asked for.
+  await expect((await showCard(page, 'Show the plan', 'Plan card')).getByRole('region', { name: 'Plan' })).toBeVisible();
   // The thermal floor plan (G8): the safe room served, the other rooms waiting, with the reason in words.
-  await tabs.getByRole('tab', { name: 'Home' }).click();
+  await showMyHome(page);
   const homeFrame = page.frameLocator('iframe[title="Home card"]');
   const home = homeFrame.getByRole('region', { name: 'The home right now' });
   await expect(home.getByText('Grid down: the battery feeds the safe room only.')).toBeVisible();
@@ -41,6 +40,8 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await expect(home.getByRole('listitem', { name: 'Living' })).toContainText('Waiting: the level cools fewer rooms right now');
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toContainText('keeps it safe until');
   await expect(whenTold).toHaveCount(0);
+  // The home closes (from the menu, #432 S6) and the answer is back on its safe room.
+  await (await homeButton(page)).click();
   await expectVoiceMatchesCards(page, ['Safe room card']);
 
   await ask(page, 'How is grandpa?');

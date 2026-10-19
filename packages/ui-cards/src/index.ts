@@ -24,7 +24,7 @@ export { PlanCard, type PlanCardProps } from './PlanCard.js';
 export { PreferencesCard, type PreferencesCardProps } from './PreferencesCard.js';
 export { FloorPlanCard } from './FloorPlanCard.js';
 export { ManualControlCard, type ManualReason } from './ManualControlCard.js';
-export { SafeRoomCard, roomLabel } from './SafeRoomCard.js';
+export { SafeRoomCard, roomLabel, safeRoomHeadline } from './SafeRoomCard.js';
 export { priorityBroken, withSafeRoom } from './safe-room.js';
 export { DEMO_CONTEXT_KEY, TAP_COUNT_ATTRIBUTE, TAP_MARK_MS, installTapMarks, isDemoContext } from './demo-taps.js';
 export { UNITS_CONTEXT_KEY, getTempUnit, setTempUnit, unitOfContext } from './temp-unit.js';

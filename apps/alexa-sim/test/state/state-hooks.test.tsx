@@ -10,7 +10,7 @@ import { createScriptedPhone } from '../../src/phone/phone-feed.js';
 import { useDemoSettings } from '../../src/state/use-demo-settings.js';
 import { useLocaleSetting } from '../../src/state/use-locale-setting.js';
 import { usePreferences } from '../../src/state/use-preferences.js';
-import { useReserve } from '../../src/state/use-reserve.js';
+import { useReserve, useSafeRoom } from '../../src/state/use-reserve.js';
 import { useSimClock } from '../../src/state/use-sim-clock.js';
 import { fakeAgent, held, reply } from './fake-agent.js';
 
@@ -187,6 +187,39 @@ describe('useReserve', () => {
     expect(result.current).toBeUndefined();
     await waitFor(() => {
       expect(fake.count('get_reserve_outlook')).toBe(2);
+    });
+    expect(result.current).toBeUndefined();
+  });
+});
+
+describe('useSafeRoom', () => {
+  // Owner, D2 = b (18 Oct): the idle tile "Leo's room · safe until …" reads the server again at every jump of the
+  // clock, and only then: one reading per move, none for a re-render (the judges' daily quota counts each one).
+  it('reads once when it may, then exactly once per move of the clock; a failed reading hides the tile', async () => {
+    const room = SCRIPT_FIXTURES['safe-room-calm']();
+    if (room.tool !== 'get_safe_room_status') throw new Error('fixture');
+    const fake = fakeAgent({ get_safe_room_status: reply(room.result) });
+    const { result, rerender } = renderHook(({ enabled, now }) => useSafeRoom({ agent: fake.agent, enabled, scenarioId: 'heatwave', gridDown: false, now }), {
+      initialProps: { enabled: false, now: '2026-07-17T12:00:00' },
+    });
+    expect(fake.count('get_safe_room_status')).toBe(0);
+    rerender({ enabled: true, now: '2026-07-17T12:00:00' });
+    await waitFor(() => {
+      expect(result.current?.safeUntil).toBe(room.result.safeUntil);
+    });
+    rerender({ enabled: true, now: '2026-07-17T12:00:00' });
+    expect(fake.count('get_safe_room_status')).toBe(1);
+    for (const [i, now] of ['2026-07-17T15:00:00', '2026-07-17T21:00:00', '2026-07-18T06:40:00'].entries()) {
+      rerender({ enabled: true, now });
+      await waitFor(() => {
+        expect(fake.count('get_safe_room_status')).toBe(i + 2);
+      });
+    }
+    fake.answers['get_safe_room_status'] = refused('invalid_input');
+    rerender({ enabled: true, now: '2026-07-18T11:00:00' });
+    expect(result.current).toBeUndefined();
+    await waitFor(() => {
+      expect(fake.count('get_safe_room_status')).toBe(5);
     });
     expect(result.current).toBeUndefined();
   });

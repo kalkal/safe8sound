@@ -21,8 +21,8 @@ test("Houston: the power cut at 15:00 reaches Ana's phone at 15:00, and the safe
   await page.keyboard.press('Escape');
   await expect(plays).toContainText('Houston', { timeout: 20_000 });
 
-  await page.getByRole('group', { name: 'Example questions' }).getByRole('button', { name: 'Power cut' }).click();
-  await page.getByRole('button', { name: 'Ask' }).click();
+  // "Power cut" is a judges' command (owner H = a, #432 S6): one tap in the demo controls asks "The power's out" for Leo.
+  await (await openDemoControls(page)).getByRole('button', { name: 'Power cut' }).click();
   const clock = page.getByRole('group', { name: 'Simulated time' });
   await expect(clock.locator('time')).toHaveText('15:00', { timeout: 20_000 });
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });

@@ -1,6 +1,6 @@
 /* The Alexa Echo Show layout (#432): the device frame, its sky and the three bands on its screen. Moved as is from
    app.css, in the same cascade layer and the same place in the cascade (main.tsx loads app.css, then this layout,
-   then controls.css). Reads only semantic tokens from @cold-reserve/design-tokens. */
+   then ui/screen-parts.css, then controls.css). Reads only semantic tokens from @cold-reserve/design-tokens. */
 @layer reset, tokens, base, components, surfaces, overrides;
 
 /* The Echo Show frame (design analysis G1, G2; plan §11.1): the page is the screen of a device whose wallpaper is
@@ -23,6 +23,10 @@
     /* clip, not hidden: a hidden box is still scrolled by scrollIntoView, which would move the sky with it. */
     overflow: clip;
     isolation: isolate;
+    /* The sky is the whole screen, the same in both themes (#432 S6): the screen's own words and buttons take the dark
+       scheme over it, like the real Echo Show's home; the cards keep the theme chosen. */
+    color-scheme: dark;
+    color: var(--text-on-sky);
   }
 
   /* Three bands (owner, 10 Oct): on a phone and on a small Echo (960 × 480) the screen is the window's height, below
@@ -32,7 +36,8 @@
   }
 
   .echo-stage:has(> .echo-top) .echo-screen {
-    block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-6) - var(--dock-h, 0px));
+    /* --title-line: the title's own line above the buttons on a phone (controls.css). */
+    block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-6) - var(--dock-h, 0px) - var(--title-line, 0px));
   }
 
   .echo-scroll {
@@ -56,8 +61,6 @@
     /* One row, the screen's height: the bands share it. */
     grid-template-rows: minmax(0, 1fr);
     padding: var(--space-4);
-    border-radius: var(--radius-card);
-    background: var(--surface-card);
   }
 
   .sky,
@@ -69,13 +72,19 @@
   .sky {
     z-index: -1;
 
-    /* The veil keeps the sky calm behind the cards (mockup B+, rev. 1: 0.55). */
+    /* The sky at rest is bright and whole, as on the real Echo Show; behind an answer or a turn on its way it is
+       dimmed (the scrim, 0.6 like the APL background overlay), so the answer's words read on any sky (#432 S6). */
     &::after {
       position: absolute;
       inset: 0;
-      background: var(--sky-veil);
+      background: var(--surface-scrim);
       content: "";
+      transition: opacity var(--duration-fast) ease-out;
     }
+  }
+
+  .echo-screen[data-screen="idle"] .sky::after {
+    opacity: 0;
   }
 
   .sky-layer {
@@ -115,30 +124,66 @@
     }
   }
 
-  /* The device: from a laptop screen up, a bezel around a 16:10 screen that fits the window. */
-  @media (width >= 64rem) {
+  /* From a small Echo or a laptop up (#432 S6, owner 19 Oct, layout mockups): the device drawn as a device, a bezel
+     around a 16:10 screen (the Alexa+ add-on canvas, 768 × 480) as large as the window allows and never re-proportioned;
+     Ana's phone in a column beside it where it fits (PHONE_BESIDE); the top bar above both, and under both one row
+     with the simulated clock and the judges' question bar, with its notes under it. Everything in one window, no
+     page scroll, from a 1280 × 590 laptop window (a 1280 × 720 screen less the browser) up. */
+  @media (width >= 48rem) {
     .echo-stage {
-      place-items: center;
+      --stage-pad: var(--space-2);
+      --bezel: clamp(0.625rem, 1.6dvh, 1.25rem);
+      --phone-w: 0px;
+      --phone-gap: 0px;
+      /* The bar under the device and the line of notes under it (controls.css). */
+      --under-h: calc(var(--target-min) + var(--space-2) + var(--font-size-min) * 1.4 + var(--space-1));
+      --screen-w: min(
+        calc((100dvh - var(--stage-pad) * 2 - var(--target-min) - var(--under-h) - var(--space-2) * 2 - var(--bezel) * 2) * 1.6),
+        calc(100vw - var(--stage-pad) * 2 - var(--phone-w) - var(--phone-gap) - var(--bezel) * 2),
+        80rem
+      );
+
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "top"
+        "device"
+        "under";
       align-content: center;
-      padding: var(--space-6);
+      justify-content: center;
+      gap: var(--space-2) var(--space-3);
+      block-size: 100dvh;
+      min-block-size: 0;
+      padding: var(--stage-pad);
+    }
+
+    /* The top bar and the row under the device take the width the device and the phone give, never more. */
+    .echo-stage > .echo-top {
+      grid-area: top;
+      padding: 0;
+      contain: inline-size;
+    }
+
+    .echo-stage > .echo-column {
+      grid-area: device;
+      justify-items: center;
+    }
+
+    .echo-stage > .echo-under {
+      grid-area: under;
     }
 
     .echo-device {
-      padding: calc(var(--space-6) + var(--space-2));
+      padding: var(--bezel);
       border: var(--border-thin) solid var(--surface-card-line);
       border-radius: calc(var(--radius-card) * 2);
       background: var(--frame-bezel);
     }
 
-    .echo-stage > .phone {
-      margin: 0;
-    }
-
-    .echo-screen {
+    .echo-screen,
+    .echo-stage:has(> .echo-top) .echo-screen {
       /* A containing block for fixed children: a card at full screen covers the screen, not the window. */
       transform: translateZ(0);
-      /* 16:10 like the Echo Show 15, as large as the window allows. */
-      inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px)) * 1.6), 80rem);
+      inline-size: var(--screen-w);
       block-size: auto;
       aspect-ratio: 16 / 10;
       /* Keeps the 16:10 box whatever the content: the content scrolls inside it. */
@@ -146,59 +191,42 @@
       border-radius: var(--radius-card);
     }
 
-    /* With the scenario badge above the device, its row comes out of the screen's height (B1). */
-    .echo-stage:has(> .echo-top) .echo-screen {
-      inline-size: min(calc(100vw - var(--space-6) * 6), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px) - var(--target-min) - var(--space-3)) * 1.6), 80rem);
-      block-size: auto;
+    /* The screen's own parts scale with it, as on a smaller or larger Echo (EchoShowLayout: --screen-zoom, the screen's
+       width over the width its content is drawn for): the top row, the greeting, the tiles, the answer's words. The
+       cards are not zoomed: a zoomed frame moves where a tap lands inside it, and each card fits itself to the room it
+       is given (pages instead of scrolling), at its own readable size. */
+    .echo-scroll {
+      padding: calc(var(--space-6) * var(--screen-zoom, 1));
     }
 
-    .echo-scroll {
-      padding: var(--space-6);
+    .echo-screen :is(.band-head, .welcome, .idle-tiles, .answer-words, .thinking, .notice, .failure) {
+      zoom: var(--screen-zoom, 1);
     }
   }
 
-  /* Wide enough for the phone too: it stands beside the device. Everything on one screen, no page scroll, from a
-     1366 px laptop up (owner, 18 Oct): the phone is narrower there, and its messages scroll inside it, never the page.
-     At 1280 px the phone stays under the Echo: beside it the screen got too small for the cards (open question). */
-  @media (width >= 85rem) {
+  /* Ana's phone beside the device from a small Echo up (PHONE_BESIDE in phone/PhoneSheet.tsx: 768 px, owner 19 Oct,
+     mockups s6-layout-v2; on a phone it is a sheet with a notice): a column as tall as
+     the device, its messages scrolling inside it, never the page. */
+  @media (width >= 48rem) {
     .echo-stage {
-      --phone-w: 18rem;
-      /* The room the chrome takes beside the screen: the stage padding, the gap to the phone, the bezel (102 px without
-         the clock dock, 86 px with it). Below 1600 px they are tighter, so a 1366 px laptop keeps the screen it had. */
-      --side-room: calc(var(--space-6) * 4 + var(--space-2));
+      --phone-w: clamp(12rem, 21vw, 22rem);
+      --phone-gap: var(--space-3);
 
-      grid-template-columns: auto var(--phone-w);
-      column-gap: var(--space-3);
-      padding-inline: var(--space-3);
-      justify-content: center;
+      grid-template-columns: minmax(0, 1fr) var(--phone-w);
+      grid-template-areas:
+        "top top"
+        "device phone"
+        "under under";
     }
 
     .echo-stage > .phone {
-      align-self: center;
+      grid-area: phone;
+      align-self: stretch;
       box-sizing: border-box;
-      /* The window less the stage's padding, the top row and its gap: the phone never makes the page taller. */
-      max-block-size: calc(100dvh - var(--space-6) * 3 - var(--target-min));
+      margin: 0;
+      max-block-size: calc(var(--screen-w) / 1.6 + var(--bezel) * 2);
       overflow-y: auto;
       overscroll-behavior: contain;
-    }
-
-    .echo-screen {
-      inline-size: min(calc(100vw - var(--phone-w) - var(--side-room)), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px)) * 1.6), 80rem);
-    }
-
-    .echo-stage:has(> .echo-top) .echo-screen {
-      inline-size: min(calc(100vw - var(--phone-w) - var(--side-room)), calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px) - var(--target-min) - var(--space-3)) * 1.6), 80rem);
-    }
-  }
-
-  /* A wide screen: the phone at its full width and more room around the device, as before. */
-  @media (width >= 100rem) {
-    .echo-stage {
-      --phone-w: 24rem;
-      --side-room: calc(var(--space-6) * 8);
-
-      column-gap: var(--space-6);
-      padding-inline: var(--space-6);
     }
   }
 }
@@ -255,33 +283,74 @@
     font-size: var(--font-size-lead);
   }
 
+  /* The row above the device sits on the bezel, dark in both themes: its links and buttons take the dark scheme. */
+  .echo-top {
+    color-scheme: dark;
+  }
+
+  /* The title above the device (#432 S6): one quiet line on the bezel, ending in "…" where it does not fit; the heading
+     keeps its whole text. The contest asks for "Simulated Alexa+ add-on" in plain words: it is always in view. */
+  .echo-top > header {
+    /* The title gives way first (an ellipsis), so the buttons and the language note keep their words. */
+    display: flex;
+    flex: 0 10 auto;
+    align-items: center;
+    gap: var(--space-2);
+    min-inline-size: 0;
+
+    & .title-mark {
+      flex: none;
+      inline-size: 1.5em;
+      block-size: 1.5em;
+    }
+
+    & h1 {
+      overflow: hidden;
+      margin: 0;
+      color: var(--text-on-sky);
+      font-size: var(--font-size-body);
+      font-weight: var(--font-weight-medium);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .echo-top .theme-toggle {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* At rest the first line is large, on a tile like the rest (#432 S6): the real home opens with one big sentence. */
+  .echo-screen .welcome {
+    justify-self: start;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--surface-tile);
+    font-size: calc(var(--font-size-lead) * 1.6);
+    font-weight: var(--font-weight-medium);
+  }
+
+  /* The answer sits on the dimmed sky: no box of its own, its words as large captions (#432 S6). */
+  .echo-screen .answer {
+    border: 0;
+    background: none;
+  }
+
+  .echo-screen .answer-text {
+    font-size: calc(var(--font-size-lead) * 1.4);
+    line-height: 1.25;
+  }
+
   /* A short landscape Echo (960 × 480): the reserve clock is the idle screen's one element; the hint stays for screen
      readers (the field's description) and "Try saying:" with the examples says what to ask. */
   @media (width >= 56rem) and (height < 40rem) {
     /* Every pixel of height goes to the content band: tighter gaps and margins than the roomier screens. */
-    .echo-stage {
-      row-gap: var(--space-2);
-    }
-
-    .echo-stage:has(> .echo-top) .echo-screen {
-      block-size: calc(100dvh - var(--target-min) - var(--space-3) - var(--space-2) - var(--dock-h, 0px));
-    }
-
     .echo-screen .surface {
       padding: var(--space-3);
     }
 
     .bands {
       gap: var(--space-2);
-    }
-
-    .echo-screen .welcome {
-      position: absolute;
-      overflow: hidden;
-      inline-size: 1px;
-      block-size: 1px;
-      clip-path: inset(50%);
-      white-space: nowrap;
     }
   }
 
@@ -294,15 +363,9 @@
       background: none;
     }
 
-    /* Two examples on one row: a third one pushed the actions band to two rows. */
-    .echo-screen .examples > :nth-child(n + 3) {
-      display: none;
-    }
-
-    /* The question and the answer's words are spoken: on a short screen they stay for screen readers only, and the
-       card (or the battery fact) owns the content band. An answer with neither keeps its words on screen: the screen
-       is never empty after an answer (storm prepared, "Not now"). */
-    .echo-screen .bubble,
+    /* The answer's words are spoken: on a short screen they stay for screen readers only, and the card (or the
+       battery fact) owns the content band. An answer with neither keeps its words on screen: the screen is never empty
+       after an answer (storm prepared, "Not now"). */
     .echo-screen .answer:has(> .tool-cards, > .facts) .answer-words {
       position: absolute;
       overflow: hidden;
@@ -329,14 +392,6 @@
     font-size: var(--font-size-min);
   }
 
-  /* A short landscape Echo (960 × 480): the simulated clock's dock rests on the screen's bottom padding, right under this
-     line; one tight line keeps its last pixels clear of the dock (#398). */
-  @media (width >= 56rem) and (height < 40rem) {
-    .echo-screen .privacy-notice {
-      line-height: 1.2;
-    }
-  }
-
   .answer-words {
     position: relative;
   }
@@ -354,15 +409,6 @@
       padding: 0;
       border: 0;
       background: none;
-    }
-
-    .echo-screen .band-content:has(.answer > .tool-cards) .bubble {
-      position: absolute;
-      overflow: hidden;
-      inline-size: 1px;
-      block-size: 1px;
-      clip-path: inset(50%);
-      white-space: nowrap;
     }
 
     /* Alexa's answer stays in view in two lines (an ellipsis ends them); a touch anywhere on it opens the whole text, which is
@@ -409,31 +455,6 @@
       }
     }
 
-    /* The examples on one row that slides sideways inside its own box (the page never scrolls): two show, the third
-       peeks out, and each keeps its words. "Try saying:" is dropped (the examples say it, and it is aria-hidden) and the title is a line smaller, so the
-       card keeps their height. */
-    .echo-screen .bands:has(.answer > .tool-cards) .band-actions .examples {
-      flex-wrap: nowrap;
-      min-inline-size: 0;
-      overflow-x: auto;
-      scrollbar-width: none;
-
-      & .chip-button {
-        flex: none;
-        white-space: nowrap;
-      }
-    }
-
-    /* The question's field, Ask and Stop on one row (the field keeps what they leave): a Stop row of its own took the card's height. */
-    .echo-screen .bands:has(.answer > .tool-cards) .ask input {
-      flex-basis: 5rem;
-    }
-
-    .echo-screen .bands:has(.answer > .tool-cards) .voice-button {
-      min-inline-size: 0;
-      padding-inline: var(--space-3);
-    }
-
     .echo-screen .answer:has(> .tool-cards) {
       gap: var(--space-1);
     }
@@ -449,60 +470,10 @@
     .echo-screen .bands:has(.answer > .tool-cards) .band-head {
       gap: var(--space-1) var(--space-3);
     }
-
-    .echo-screen .bands:has(.answer > .tool-cards) .band-head h1 {
-      font-size: var(--font-size-body);
-      line-height: 1.2;
-    }
-
-    .echo-screen .bands:has(.answer > .tool-cards) .privacy-notice {
-      line-height: 1.2;
-    }
-
-    .echo-screen .bands:has(.answer > .tool-cards) .try-saying {
-      position: absolute;
-      overflow: hidden;
-      inline-size: 1px;
-      block-size: 1px;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
   }
 
-  /* A landscape Echo screen: what to say and the question side by side, so the content band keeps the height. */
+  /* A landscape Echo screen. */
   @media (width >= 56rem) {
-    .echo-screen .band-actions {
-      /* The examples take what they need; the question row (field, Ask, Speak) keeps room to type: long examples end with an ellipsis. */
-      grid-template-columns: minmax(0, max-content) minmax(28rem, 1fr);
-      align-items: center;
-      column-gap: var(--space-4);
-
-      & > :not(.try-row, .ask-row) {
-        grid-column: 1 / -1;
-      }
-
-      /* One line, in every language (#385): a wrapped "Try saying" row made the actions band taller, so the card above
-         was cut shorter and its sticky button row covered the big time. A long example gives way with an ellipsis. */
-      & .try-row,
-      & .examples {
-        flex-wrap: nowrap;
-        min-inline-size: 0;
-      }
-
-      & .try-saying {
-        flex: none;
-        white-space: nowrap;
-      }
-
-      & .examples .chip-button {
-        min-inline-size: 0;
-        padding-inline: var(--space-3);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-    }
-
     /* An answer with cards (owner, 12 Oct: the plan shrank to a thumbnail under the battery and the tabs): the height
        goes to the card. One giant number per view, and the card brings its own: the battery is one line, and the card
        tabs share its row. */
@@ -541,10 +512,10 @@
   }
 }
 
-/* The judges' demo controls (#432): a column on the left of the device, the phone on its right, only where the window is
-   wide for its height (from 100rem and 2:1, e.g. 1904 × 870): there the window's height limits the screen, so the
-   column costs it nothing. Elsewhere (1920 × 1080 too) they are a sheet behind a button of the top bar and take no
-   room. The same query is WIDE_CONTROLS in demo-controls/DemoControlsPanel.tsx. */
+/* The judges' demo controls as a column on the left of the device, in a window at least twice as wide as it is tall
+   (owner, 19 Oct: 1920 × 950; WIDE_CONTROLS in demo-controls/DemoControlsPanel.tsx is the same query): the weather,
+   Power cut and the day always in view; the device takes what the column leaves. Elsewhere they are a sheet behind the
+   dashed button of the top bar. */
 @layer surfaces {
   .echo-controls {
     display: contents;
@@ -552,23 +523,34 @@
 
   @media (width >= 100rem) and (min-aspect-ratio: 2 / 1) {
     .echo-stage:has(> .echo-controls > *) {
-      --controls-w: 18rem;
-
-      grid-template-columns: var(--controls-w) auto var(--phone-w);
-    }
-
-    .echo-stage > .echo-controls:has(> *) {
-      display: block;
-      align-self: center;
-    }
-
-    .echo-stage:has(> .echo-controls > *) .echo-screen,
-    .echo-stage:has(> .echo-top):has(> .echo-controls > *) .echo-screen {
-      inline-size: min(
-        calc(100vw - var(--phone-w) - var(--controls-w) - var(--side-room) - var(--space-6)),
-        calc((100dvh - var(--space-6) * 5 - var(--dock-h, 0px) - var(--target-min) - var(--space-3)) * 1.6),
+      --controls-w: 17rem;
+      --screen-w: min(
+        calc((100dvh - var(--stage-pad) * 2 - var(--target-min) - var(--under-h) - var(--space-2) * 2 - var(--bezel) * 2) * 1.6),
+        calc(100vw - var(--stage-pad) * 2 - var(--controls-w) - var(--phone-w) - var(--phone-gap) * 2 - var(--bezel) * 2),
         80rem
       );
+
+      grid-template-columns: var(--controls-w) minmax(0, 1fr) var(--phone-w);
+      grid-template-areas:
+        "top top top"
+        "controls device phone"
+        "under under under";
+    }
+
+    /* As tall as the device: the panel scrolls inside itself, never the page. */
+    .echo-stage > .echo-controls:has(> *) {
+      display: grid;
+      grid-area: controls;
+      align-self: stretch;
+      min-block-size: 0;
+      max-block-size: calc(var(--screen-w) / 1.6 + var(--bezel) * 2);
+
+      & > * {
+        box-sizing: border-box;
+        min-block-size: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
     }
   }
 }

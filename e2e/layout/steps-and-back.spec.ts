@@ -1,10 +1,12 @@
 import type { Page } from '@playwright/test';
 import type { FakeVoiceDriver } from '../../apps/alexa-sim/src/voice/fake-voice.js';
 import { expect, test } from '../no-network.js';
+import { menuButton, showMyHome } from '../surface.js';
 
-// "Back" always there and the path of the steps (idea 5, after Alexa's backstack): Conversation → Home → Plan →
-// Confirm in the header band, the current step named; Back (tapped, typed or said: "Back", "Go back") returns to the
-// screen before, down to the first screen, and is never asked to Alexa.
+// Back (idea 5, after Alexa's backstack), said or typed, never drawn: a real Echo Show has no Back button nor steps on
+// its home screen, so ours has none either (#432 S6, owner C, 19 Oct). "Back", "Go back", "Alexa, back." and
+// "Torna indietro" return to the screen before (the home closes, the answer before, then the first screen), and are
+// never asked to Alexa; the idle screen also comes back by itself a minute after an answer (echo-at-rest.spec).
 
 const ask = async (page: Page, words: string) => {
   await page.getByLabel('Ask a question').fill(words);
@@ -13,86 +15,56 @@ const ask = async (page: Page, words: string) => {
 
 const HOT_DAY = "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.";
 
-const steps = (page: Page) => page.getByRole('list', { name: 'Steps' });
-const expectStep = async (page: Page, name: string) => {
-  await expect(steps(page).locator('[aria-current="step"]')).toHaveText(name);
-};
-
-test('tapped: the step follows the screen, and Back walks back to the first screen', async ({ page }) => {
+test('no Back button and no steps on the screen, at rest or with an answer', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');
-  const back = page.getByRole('button', { name: 'Back', exact: true });
-  const answers = page.getByRole('navigation', { name: 'Answers' });
-
-  // The first screen: the conversation, and nowhere to go back to (Back stays on screen).
-  await expectStep(page, 'Conversation');
-  await expect(back).toBeDisabled();
-
-  // The home over the first screen: Back closes it.
-  await page.getByRole('button', { name: 'Show my home' }).click();
-  await expectStep(page, 'Home');
-  await back.click();
-  await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
-  await expectStep(page, 'Conversation');
-  await expect(back).toBeDisabled();
-
-  // A plan, then applied from its card: Plan, then Confirm.
+  const screen = page.getByTestId('echo-screen');
+  await expect(menuButton(screen)).toBeVisible();
+  await expect(screen.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('list', { name: 'Steps' })).toHaveCount(0);
   await ask(page, HOT_DAY);
-  await expectStep(page, 'Plan');
-  const card = page.frameLocator('iframe[title="Plan card"]');
-  await card.getByRole('region', { name: 'Plan' }).getByRole('button', { name: 'Apply plan' }).click();
-  await expect(card.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
-  await expectStep(page, 'Confirm');
+  await expect(page.frameLocator('iframe[title="Plan card"]').getByRole('button', { name: 'Apply plan' })).toBeVisible();
+  await expect(screen.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
+});
 
-  // Another question: back to the conversation; Back shows the applied plan again, then the first screen.
+test('typed: "Back", "Go back" and "Alexa, back." walk back to the first screen, and are never asked to Alexa', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/');
+  const answers = page.getByRole('navigation', { name: 'Answers' });
+  // The home over the first screen: Back closes it.
+  await showMyHome(page);
+  await ask(page, 'Back');
+  await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
+  await expect(page.getByTestId('welcome-hint')).toBeVisible();
+
+  await ask(page, HOT_DAY);
   await ask(page, 'Battery level');
   await expect(answers).toContainText('Answer 2 of 2');
-  await expectStep(page, 'Conversation');
-  await back.click();
+  await ask(page, 'Show my home');
+  await expect(page.getByRole('region', { name: 'My home' })).toBeVisible();
+  await ask(page, 'Go back');
+  await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
+  await expect(answers).toContainText('Answer 2 of 2');
+  await ask(page, 'Go back');
   await expect(answers).toContainText('Answer 1 of 2');
-  await expectStep(page, 'Confirm');
-  await back.click();
-  await expect(page.getByTestId('answer')).toHaveCount(0);
-  await expect(answers).toHaveCount(0);
+  await ask(page, 'Alexa, back.');
   await expect(page.getByTestId('welcome-hint')).toBeVisible();
-  await expectStep(page, 'Conversation');
-  await expect(back).toBeDisabled();
-
-  // A new question after that: it is the third answer, the earlier ones kept.
+  // None was a question: two answers only, so the next one is the third.
   await ask(page, 'Battery level');
   await expect(answers).toContainText('Answer 3 of 3');
 });
 
-test('typed: "Go back" and "Alexa, back." do what Back does, and are never asked to Alexa', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/');
-  await ask(page, HOT_DAY);
-  await expectStep(page, 'Plan');
-  await ask(page, 'Show my home');
-  await expectStep(page, 'Home');
-  await ask(page, 'Go back');
-  await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
-  await expectStep(page, 'Plan');
-  await ask(page, 'Alexa, back.');
-  await expect(page.getByTestId('welcome-hint')).toBeVisible();
-  await expectStep(page, 'Conversation');
-  // Neither was a question: one answer only, so the next one is the second.
-  await ask(page, 'Battery level');
-  await expect(page.getByRole('navigation', { name: 'Answers' })).toContainText('Answer 2 of 2');
-});
-
-test('Italian: the button and the steps in Italian, and "Torna indietro" goes back', async ({ page }) => {
+test('Italian: "Torna indietro" closes the home', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.addInitScript(() => {
     localStorage.setItem('cold-reserve.locale', 'it-IT');
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Mostra la mia casa' }).click();
-  await expect(page.getByRole('list', { name: 'Tappe' }).locator('[aria-current="step"]')).toHaveText('Casa');
+  await showMyHome(page, 'it-IT');
+  await expect(page.getByRole('region', { name: 'La mia casa' })).toBeVisible();
   await page.getByLabel('Fai una domanda').fill('Torna indietro');
   await page.getByLabel('Fai una domanda').press('Enter');
-  await expect(page.getByRole('list', { name: 'Tappe' }).locator('[aria-current="step"]')).toHaveText('Conversazione');
-  await expect(page.getByRole('button', { name: 'Indietro', exact: true })).toBeDisabled();
+  await expect(page.getByRole('region', { name: 'La mia casa' })).toHaveCount(0);
 });
 
 type VoiceWindow = { __voiceTest?: FakeVoiceDriver };
@@ -113,7 +85,7 @@ const driver = async <T>(page: Page, step: 'spoken' | 'finish' | { say: string }
   }, step) as Promise<T>;
 };
 
-test('said aloud: "Go back" is Back while listening, no turn is sent; Back stops the voice reading (review of #350)', async ({ page }) => {
+test('said aloud: "Go back" is Back while listening, no turn is sent; it stops the voice reading (review of #350)', async ({ page }) => {
   await page.goto('/?voice=fake');
   const answers = page.getByRole('navigation', { name: 'Answers' });
   await ask(page, 'Battery level');
@@ -122,9 +94,9 @@ test('said aloud: "Go back" is Back while listening, no turn is sent; Back stops
   await ask(page, 'A hot day');
   await expect(answers).toContainText('Answer 2 of 2');
 
-  // The second answer is being read: Back shows the first one and the voice stops.
+  // The second answer is being read: "Back" typed shows the first one and the voice stops.
   await expect(page.getByRole('button', { name: 'Stop speaking' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await ask(page, 'Back');
   await expect(answers).toContainText('Answer 1 of 2');
   await expect(page.getByRole('button', { name: 'Stop speaking' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Speak', exact: true })).toBeEnabled();

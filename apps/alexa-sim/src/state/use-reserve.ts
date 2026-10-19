@@ -1,27 +1,46 @@
-import type { ReserveOutlook, ScenarioId } from '@cold-reserve/contracts';
+import type { ErrorEnvelope, ReserveOutlook, Result, SafeRoomStatus, ScenarioId } from '@cold-reserve/contracts';
 import { useEffect, useState } from 'react';
-import type { Agent } from '../agent/agent.js';
-import { fetchReserve } from '../ui/reserve.js';
+import type { Agent, AskContext } from '../agent/agent.js';
+import { fetchReserve, fetchSafeRoom } from '../ui/reserve.js';
+
+interface IdleReadingInput {
+  agent: Agent;
+  enabled: boolean;
+  scenarioId: ScenarioId | undefined;
+  gridDown: boolean;
+  /** The simulated time: each move of the clock reads again (one reading per jump, never polled). */
+  now: string | undefined;
+}
 
 /**
- * The cold reserve of the idle screen (owner, 11 Oct): read when `enabled`, again when the scenario, the grid or the
- * simulated time changes, never polled. A new reading drops the old hours first (never a calm day's hours beside a
- * melting cube), and a reply that comes after the next change is dropped; a failed read leaves none, quietly
- * (fetchReserve logs it).
+ * One reading of the idle screen: read when `enabled`, again when the scenario, the grid or the simulated time
+ * changes, never polled. A new reading drops the old value first (never a calm day's hours beside a melting cube), and
+ * a reply that comes after the next change is dropped; a failed read leaves none, quietly (the fetch logs it). `read`
+ * is a module function, the same at every render.
  */
-export function useReserve(o: { agent: Agent; enabled: boolean; scenarioId: ScenarioId | undefined; gridDown: boolean; now: string | undefined }): ReserveOutlook | undefined {
+function useIdleReading<T>(read: (agent: Agent, context: AskContext) => Promise<Result<T, ErrorEnvelope>>, o: IdleReadingInput): T | undefined {
   const { agent, enabled, scenarioId, gridDown, now } = o;
-  const [reserve, setReserve] = useState<ReserveOutlook | undefined>(undefined);
+  const [value, setValue] = useState<T | undefined>(undefined);
   useEffect(() => {
-    setReserve(undefined);
+    setValue(undefined);
     if (!enabled) return undefined;
     let current = true;
-    void fetchReserve(agent, { correlationId: crypto.randomUUID() }).then((read) => {
-      if (current && read.ok) setReserve(read.value);
+    void read(agent, { correlationId: crypto.randomUUID() }).then((result) => {
+      if (current && result.ok) setValue(result.value);
     });
     return () => {
       current = false;
     };
-  }, [agent, enabled, scenarioId, gridDown, now]);
-  return reserve;
+  }, [read, agent, enabled, scenarioId, gridDown, now]);
+  return value;
+}
+
+/** The cold reserve of the idle screen (owner, 11 Oct): its hours and ice cubes. */
+export function useReserve(o: IdleReadingInput): ReserveOutlook | undefined {
+  return useIdleReading(fetchReserve, o);
+}
+
+/** Leo's room on the idle screen (#432 S6, owner D2 = b): the time it stays safe until, read again at every jump. */
+export function useSafeRoom(o: IdleReadingInput): SafeRoomStatus | undefined {
+  return useIdleReading(fetchSafeRoom, o);
 }

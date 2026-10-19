@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MIN_FIT_SCALE, fitCramped, fitOverhang, fitScale } from '../src/fit.js';
+import { COMPACT_BELOW_PX, MIN_FIT_SCALE, TIGHT_BELOW_PX, fitCramped, fitFrame, fitOverhang, fitScale } from '../src/fit.js';
 
 // No scrolling anywhere on the Echo screen (owner, 10 Oct): the host gives the card its height (MCP Apps
 // containerDimensions.maxHeight); a page taller than that is scaled down inside the card, a page that fits never is.
@@ -61,5 +61,22 @@ describe('fitCramped', () => {
     expect(fitCramped(800, undefined)).toBe(false);
     expect(fitCramped(0, 400)).toBe(false);
     expect(fitCramped(800, 0)).toBe(false);
+  });
+});
+
+describe('fitFrame', () => {
+  it('a laptop-sized frame is neither tight nor compact', () => {
+    expect(fitFrame(TIGHT_BELOW_PX)).toEqual({ tight: false, compact: false });
+  });
+
+  it('a small Echo is tight; with the phone beside it (960 × 480, a 208 px frame) also compact', () => {
+    expect(fitFrame(300)).toEqual({ tight: true, compact: false });
+    expect(fitFrame(208)).toEqual({ tight: true, compact: true });
+    expect(fitFrame(COMPACT_BELOW_PX - 1).compact).toBe(true);
+  });
+
+  it('no height (full screen, a plain page, nothing measured) is neither', () => {
+    expect(fitFrame(undefined)).toEqual({ tight: false, compact: false });
+    expect(fitFrame(0)).toEqual({ tight: false, compact: false });
   });
 });

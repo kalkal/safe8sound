@@ -22,7 +22,7 @@ const slots = {
 
 function drawn(id: (typeof LAYOUT_IDS)[number]) {
   const Layout = LAYOUTS[id];
-  render(<Layout slots={slots} state={{ sky: 'storm' }} />);
+  render(<Layout slots={slots} state={{ sky: 'storm', screen: 'idle' }} />);
   const result = { buttons: screen.getAllByRole('button').map((b) => b.textContent), main: screen.getByRole('main').textContent, phone: screen.getByRole('region', { name: 'Phone' }).textContent };
   cleanup();
   return result;

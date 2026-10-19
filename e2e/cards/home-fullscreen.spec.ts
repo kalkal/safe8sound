@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { homeButton, showMyHome } from '../surface.js';
 
 // Owner, 10 Oct: on a large screen (1920 × 1080, 1366 × 768) the home's own "Full screen" showed only the home, and
 // the way back was a bare "Back" nobody saw as one. Now it says where it goes, Escape works too, and the
@@ -11,7 +12,7 @@ for (const [width, height] of [
   test(`home full screen at ${String(width)} × ${String(height)}: an obvious way back to the conversation`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto('/');
-    await page.getByRole('button', { name: 'Show my home' }).click();
+    await showMyHome(page);
     const region = page.getByRole('region', { name: 'My home' });
     const frame = region.locator('iframe[title="Home card"]');
     const card = frame.contentFrame();
@@ -35,13 +36,13 @@ for (const [width, height] of [
     expect(backBox.y + backBox.height).toBeLessThan(height);
     expect(backBox.height).toBeGreaterThanOrEqual(48);
     await back.click();
-    // Back inline: "Hide my home" is on screen, and it brings the question box back on screen (fitting everything in one
-    // screen is the next item, the three-band layout).
-    const hideButton = page.getByRole('button', { name: 'Hide my home' });
+    // Back inline: "Hide my home" (in the screen's menu, #432 S6) is on screen, and it brings the question box back.
+    const hideButton = await homeButton(page);
+    await expect(hideButton).toHaveText('Hide my home');
     await expect(hideButton).toBeInViewport();
     await hideButton.click();
     await expect(page.getByLabel('Ask a question')).toBeInViewport();
-    await page.getByRole('button', { name: 'Show my home' }).click();
+    await showMyHome(page);
 
     // Escape goes back too.
     await expand.click();
@@ -54,7 +55,7 @@ for (const [width, height] of [
 
 test('the keyboard focus ring on "Full screen" is drawn inside the button, never clipped by the frame', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Show my home' }).click();
+  await showMyHome(page);
   const card = page.locator('iframe[title="Home card"]').contentFrame();
   const expand = card.getByRole('button', { name: 'Full screen' });
   await expect(expand).toBeVisible();

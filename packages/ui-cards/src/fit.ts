@@ -28,3 +28,21 @@ export function fitOverhang(height: number, scale: number): number {
 export function fitCramped(natural: number, maxHeight: number | undefined): boolean {
   return known(natural, maxHeight) && natural * MIN_FIT_SCALE > maxHeight;
 }
+
+/** Below this height the giant numbers drop to their smallest size (--font-size-hero-min). */
+export const TIGHT_BELOW_PX = 420;
+
+/**
+ * Below this height (a small Echo with Ana's phone beside it, 960 × 480, owner 19 Oct, mockup s6-layout-v2) the card is
+ * compact: its first page alone, the other pages behind "Full screen", the chrome as small as its targets allow.
+ */
+export const COMPACT_BELOW_PX = 260;
+
+/**
+ * How short the frame is: tight (a small Echo, a card under tabs: the giant numbers at their smallest size before any
+ * scaling), compact (also the first page alone). Without a height (full screen, a plain page) neither.
+ */
+export function fitFrame(maxHeight: number | undefined): { tight: boolean; compact: boolean } {
+  if (maxHeight === undefined || maxHeight <= 0) return { tight: false, compact: false };
+  return { tight: maxHeight < TIGHT_BELOW_PX, compact: maxHeight < COMPACT_BELOW_PX };
+}

@@ -14,6 +14,7 @@ const CONFIG: VoiceConfig = {
   lang: 'en-US',
   speakReplies: true,
   listenTimeoutMs: 1000,
+  followUpMs: 8000,
   speakStartTimeoutMs: 3000,
   studioVoiceTimeoutMs: 1500,
   speakTimeoutBaseMs: 1000,

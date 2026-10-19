@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 30 140 140" role="img" aria-label="Safe-8-Sound">
+  <!-- Favicon (owner 19/10, choice B): tower and sun only, no S (unreadable at tab size); the S stays on the 32 px PNG, the touch icon and the cover. Transparent background; on a dark tab the tower and the horizon turn light (#f6f1e7). -->
+  <style>
+    .ink { fill: #1a1a1a; }
+    .line { stroke: #1a1a1a; }
+    @media (prefers-color-scheme: dark) {
+      .ink { fill: #f6f1e7; }
+      .line { stroke: #f6f1e7; }
+    }
+  </style>
+  <circle cx="90" cy="88" r="48" fill="#2a9fb8"/>
+  <path class="ink" d="M60 60 L72 60 L72 69 L84 69 L84 60 L96 60 L96 69 L108 69 L108 60 L120 60 L120 83 L111 90 L113 158 L67 158 L69 90 L60 83 Z"/>
+  <path class="line" d="M24 158 L156 158" stroke-width="6" stroke-linecap="round"/>
+</svg>

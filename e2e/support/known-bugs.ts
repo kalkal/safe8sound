@@ -37,12 +37,8 @@ export async function check(page: Page, bug: string | undefined, body: () => Pro
 /** Whether the run is a probe (JOURNEY_PROBE=1): steps print extra facts only then. */
 export const probing = PROBE;
 
-/**
- * The sizes below the side-by-side width, where Ana's phone panel is stacked under the Echo and the page scrolls to
- * reach it (measured 18 Oct: 960×480 → 669 px, 375×812 → 1072, 1340×800 → 966, 1280×800 → 987). The phone becomes a
- * sheet opened by a button in step S4 (#432), which turns these green.
- */
-const PHONE_BELOW_THE_ECHO: ReadonlySet<string> = new Set(['960x480', '1340x800', '1280x800', '375x812']);
+/** The sizes where the page is known to be taller than the window: none since #432 S4b (Ana's phone is a sheet there). */
+const TALLER_THAN_THE_WINDOW: ReadonlySet<string> = new Set<string>();
 
 /**
  * A bug of the fake model's answers: marked on the local chain only. Against a deployed site the real model answers,
@@ -59,10 +55,10 @@ const fakeModel = (bug: string): string | undefined => (FAKE_MODEL ? bug : undef
 export const BUGS = {
   /**
    * The page is taller than the window, so the clock bar sits below the fold or the page scrolls (owner's screenshot at
-   * 06:40). #431 fixed it where the phone stands beside the Echo; it stays where the phone is stacked under it.
+   * 06:40). #431 fixed it where the phone stands beside the Echo; #432 (S4b) where it was stacked under it: there it is
+   * a sheet now. No size is known to fail; the check stays so a regression shows as one.
    */
-  oneScreen: (size: { readonly id: string }): string | undefined =>
-    PHONE_BELOW_THE_ECHO.has(size.id) ? "Ana's phone is stacked under the Echo at this size, so the page scrolls: fixed in S4 (#432)." : undefined,
+  oneScreen: (size: { readonly id: string }): string | undefined => (TALLER_THAN_THE_WINDOW.has(size.id) ? 'The page is taller than the window at this size.' : undefined),
   /**
    * "Is the storm over?" after the power is back prepares storm mode again and Ana gets one more message. Two bugs: the
    * fake model sends every sentence with "storm" to start_storm_mode (apps/agent/src/evals/fake-world.ts), and the

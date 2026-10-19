@@ -3,6 +3,7 @@ import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 import { openRemote, routeSandboxTools } from '../remote-session.js';
 import { expectScreenSettled } from '../screen-settled.js';
+import { showCard } from '../surface.js';
 
 // Owner, 12 Oct (dev site, 1920 × 1080): under "I can keep Grandpa's room under 27 degrees…", with the battery and the
 // Preferences / Plan tabs above it, the plan's safety check was a 0.4-scale thumbnail in a large empty frame, and the
@@ -43,8 +44,21 @@ async function pageCount(card: FrameLocator): Promise<number> {
   return Number(where.split(' of ')[1]);
 }
 
-/** Every page of the card: readable, and on the large screens never cut. */
+/**
+ * Every page of the card: readable, and on the large screens never cut. A compact frame (a small Echo with Ana's phone
+ * beside it, owner 19 Oct) shows its first page alone, whole at the readable scale; every page is then one tap away, on
+ * the full screen, and walked there.
+ */
 async function expectEveryPageReadable(page: Page, card: FrameLocator, large: boolean): Promise<void> {
+  if ((await card.locator('html').getAttribute('data-fit-compact')) !== null) {
+    await expectScreenSettled(page);
+    const { scale } = await fitOf(card);
+    expect(scale, 'compact first page scale').toBeGreaterThanOrEqual(0.8);
+    await card.getByRole('button', { name: 'Full screen' }).click();
+    await expectEveryPageReadable(page, card, large);
+    await card.getByRole('button', { name: 'Back to the conversation' }).click();
+    return;
+  }
   const count = await pageCount(card);
   for (let n = 1; n <= count; n++) {
     await toCardPage(card, n);
@@ -69,7 +83,7 @@ function inside(inner: { x: number; y: number; width: number; height: number } |
 test("at 960 × 480 the plan under the owner's answer keeps its buttons whole and in view, and Tab on them is seen (#371)", async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 480 });
   await askAsTheOwnerDid(page);
-  await page.getByRole('tab', { name: 'Plan' }).click();
+  await showCard(page, 'Show the plan', 'Plan card');
   const card = page.frameLocator('iframe[title="Plan card"]');
   const apply = card.getByRole('button', { name: 'Apply plan' });
   const notNow = card.getByRole('button', { name: 'Not now' });
@@ -99,11 +113,11 @@ for (const [width, height, large] of [
     test.setTimeout(60_000);
     await page.setViewportSize({ width, height });
     await askAsTheOwnerDid(page);
-    for (const [tab, title] of [
-      ['Plan', 'Plan card'],
-      ['Preferences', 'Preferences card'],
+    for (const [words, title] of [
+      ['Show the plan', 'Plan card'],
+      ['Show my preferences', 'Preferences card'],
     ] as const) {
-      await page.getByRole('tab', { name: tab }).click();
+      await showCard(page, words, title);
       const card = page.frameLocator(`iframe[title="${title}"]`);
       await expect(card.locator('section.card').first()).toBeVisible();
       await expectEveryPageReadable(page, card, large);
@@ -134,7 +148,7 @@ for (const italian of [false, true]) {
       });
     }
     await askAsTheOwnerDid(page, italian);
-    await page.getByRole('tab', { name: italian ? 'Piano' : 'Plan' }).click();
+    await showCard(page, italian ? 'Mostra il piano' : 'Show the plan', italian ? 'Scheda del piano' : 'Plan card');
     const card = page.frameLocator(`iframe[title="${italian ? 'Scheda del piano' : 'Plan card'}"]`);
     const time = card.getByTestId('plan-horizon');
     await expect(time).toBeVisible();

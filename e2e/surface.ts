@@ -35,3 +35,51 @@ export async function openUserSettings(page: Page, locale: Locale = 'en-US'): Pr
   await settingsButton(page, locale).click();
   return userSettings(page, locale);
 }
+
+/**
+ * The screen's menu (#432 S6), top left like the real Echo Show's: its list holds "Show my home" (the settings join it
+ * with S5). `homeButton` opens the menu if it is closed and returns the button ("Show my home" or "Hide my home").
+ */
+export const menuButton = (root: Root, locale: Locale = 'en-US'): Locator => root.getByRole('button', { name: CATALOGS[locale]['screen.menu'], exact: true });
+export async function homeButton(page: Page, locale: Locale = 'en-US'): Promise<Locator> {
+  const button = page.getByRole('button', { name: new RegExp(`^(${CATALOGS[locale]['home.show']}|${CATALOGS[locale]['home.hide']})$`) });
+  if (!(await button.isVisible())) await menuButton(page, locale).click();
+  return button;
+}
+/**
+ * Ana's phone (#432, owner J = a): beside the Echo where it fits, else a sheet behind the "Ana's phone" button of the
+ * top bar. `openPhone` shows it if it is not in view and returns it.
+ */
+export const phoneRegion = (page: Page, locale: Locale = 'en-US'): Locator => page.getByRole('region', { name: CATALOGS[locale]['phone.title'] });
+export async function openPhone(page: Page, locale: Locale = 'en-US'): Promise<Locator> {
+  const phone = phoneRegion(page, locale);
+  if (!(await phone.isVisible())) await page.getByRole('button', { name: new RegExp(`^${CATALOGS[locale]['phone.open']}`) }).click();
+  return phone;
+}
+
+/** Reads Ana's phone as a person does where it is a sheet (a phone): opens it, reads, closes it again (Escape). */
+export async function readPhone(page: Page, read: () => Promise<void>): Promise<void> {
+  const sheet = !(await phoneRegion(page).isVisible());
+  await openPhone(page);
+  await read();
+  if (sheet) await page.keyboard.press('Escape');
+}
+
+/**
+ * One card per answer (owner, 19 Oct, B): the answer opens on its main card; another one of its cards comes on screen
+ * when its words are typed ("Show the plan"). Typed only when that card is not on screen already (otherwise the words
+ * would be a question to the assistant). Returns the card's frame.
+ */
+export async function showCard(page: Page, words: string, frameTitle: string) {
+  const frame = page.locator(`iframe[title="${frameTitle}"]`);
+  if (!(await frame.isVisible())) {
+    await page.getByLabel(CATALOGS['en-US']['chat.label']).or(page.getByLabel(CATALOGS['it-IT']['chat.label'])).fill(words);
+    await page.getByRole('button', { name: /^(Ask|Chiedi)$/ }).click();
+  }
+  return page.frameLocator(`iframe[title="${frameTitle}"]`);
+}
+
+/** "Show my home" from the menu. */
+export async function showMyHome(page: Page, locale: Locale = 'en-US'): Promise<void> {
+  await (await homeButton(page, locale)).click();
+}

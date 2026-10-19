@@ -179,6 +179,66 @@
     }
   }
 
+  /* A compact frame (data-fit-compact, set by Fit: a small Echo with Ana's phone beside it, owner 19 Oct): the first
+     page alone (the others behind "Full screen", where the pages come back), the title on one line ending in "…", the
+     big time and its label on one row with the cubes whole under it (#398), and the plan's time above its buttons
+     (#385). Targets keep their size. */
+  :root[data-fit-compact]:not([data-fullscreen]) {
+    & .card-head {
+      flex-wrap: nowrap;
+      gap: var(--space-2);
+
+      & h2 {
+        overflow: hidden;
+        min-inline-size: 0;
+        font-size: var(--font-size-body);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    & .card-head > .page-nav {
+      display: none;
+    }
+
+    & .card,
+    & .card-page {
+      gap: var(--space-1);
+    }
+
+    & .hero-value {
+      font-size: calc(var(--font-size-hero-min) * 0.8);
+    }
+
+    & .cubes {
+      --cube-size: 24px;
+    }
+
+    /* The ordinary plan: the time and its confidence; the reason of the confidence is on the full screen. */
+    & .plan-hero:has(> .chip) > .muted {
+      display: none;
+    }
+
+    /* "Valid until" and the buttons on one row, the words giving way with an ellipsis: a second row of buttons (Italian)
+       made the page taller than the frame and its sticky row covered the big time (#385). */
+    & .plan-actions {
+      flex-wrap: nowrap;
+      gap: var(--space-2);
+
+      & p {
+        flex: 1 1 auto;
+        overflow: hidden;
+        min-inline-size: 0;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      & button {
+        flex: none;
+      }
+    }
+  }
+
   /* A phone's narrow frame (#398; owner rule: the ice cubes always in the first screen, under the big number): the card's
      chrome takes as little height as it can, so the label, the big time and the cubes reach the first view; the cubes
      are smaller in proportion (owner, 14 Oct), still whole and recognisable. */

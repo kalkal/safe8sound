@@ -124,6 +124,9 @@ export const ToolCallRequestSchema = z.discriminatedUnion('name', [
   z.strictObject({ name: z.literal('advance_clock'), arguments: AdvanceClockInputSchema }),
   // #327 (additive, approved in #327): the idle screen's ice cubes read the reserve hours, read-only, home from the token.
   z.strictObject({ name: z.literal('get_reserve_outlook'), arguments: ReserveOutlookInputSchema }),
+  // #432 S6 (additive, approved by MAIN 19/10): the idle tile "Leo's room · safe until" reads the safe room at each jump
+  // of the clock, read-only, home from the token.
+  z.strictObject({ name: z.literal('get_safe_room_status'), arguments: z.strictObject({}) }),
 ]);
 export type ToolCallRequest = z.infer<typeof ToolCallRequestSchema>;
 
@@ -142,6 +145,7 @@ export const CARD_TOOL_ACCESS: Readonly<Record<ToolCallRequest['name'], 'read' |
   get_milestones: 'read',
   advance_clock: 'write',
   get_reserve_outlook: 'read',
+  get_safe_room_status: 'read',
 };
 
 /** The MCP CallToolResult a card receives: tool errors are values (isError + the error envelope). */

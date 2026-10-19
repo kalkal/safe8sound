@@ -25,6 +25,8 @@ export interface VoiceSettings {
   /** Read each answer aloud (the Echo Show surface). */
   speakReplies: boolean;
   listenTimeoutMs: number;
+  /** Follow Up (#432 S6): after a spoken answer to a spoken question, listen again this long (0: never). */
+  followUpMs: number;
   /** No audio within this time → the answer stays on screen, silent. */
   speakStartTimeoutMs: number;
   /** Safety net for engines that never end: base + per character of the reply. */
@@ -37,6 +39,7 @@ const NO_VOICE: VoiceSettings = {
   micAvailable: false,
   speakReplies: false,
   listenTimeoutMs: 0,
+  followUpMs: 0,
   speakStartTimeoutMs: 0,
   speakTimeoutBaseMs: 0,
   speakTimeoutPerCharMs: 0,
@@ -72,6 +75,8 @@ export interface ConversationContext extends VoiceSettings {
   /** Consecutive failed voice attempts: one reprompt, then text (plan §11.2 p.10). */
   voiceFailures: number;
   suggestText: boolean;
+  /** The question was said, not typed: only then does Follow Up listen again after the answer. */
+  spokenQuestion: boolean;
 }
 
 export type ConversationEvent =
@@ -111,8 +116,8 @@ export const conversationMachine = setup({
     newQuestion: assign(({ event }) => {
       // A new question clears the last voice notice; the failure count (and the text suggestion) stays.
       const fresh = { error: null, retried: false, canRetry: false, speech: null, voiceError: null };
-      if (event.type === 'TEXT_SUBMITTED') return { ...fresh, question: event.text.trim(), turnId: event.turnId };
-      if (event.type === 'SPEECH_RECOGNISED') return { ...fresh, question: event.transcript.trim(), turnId: event.turnId };
+      if (event.type === 'TEXT_SUBMITTED') return { ...fresh, question: event.text.trim(), turnId: event.turnId, spokenQuestion: false };
+      if (event.type === 'SPEECH_RECOGNISED') return { ...fresh, question: event.transcript.trim(), turnId: event.turnId, spokenQuestion: true };
       return {};
     }),
     fail: assign(({ context }, error: ErrorEnvelope) => ({ error, canRetry: error.retryable && !context.retried })),
@@ -147,10 +152,12 @@ export const conversationMachine = setup({
     hasTranscript: ({ event }) => event.type === 'SPEECH_RECOGNISED' && event.transcript.trim().length > 0,
     micAvailable: ({ context }) => context.micAvailable,
     canRetry: ({ context }) => context.canRetry,
+    followUp: ({ context }) => context.spokenQuestion && context.micAvailable && context.followUpMs > 0,
   },
   delays: {
     replyTimeout: ({ context }) => context.replyTimeoutMs,
     listenTimeout: ({ context }) => context.listenTimeoutMs,
+    followUpTimeout: ({ context }) => context.followUpMs,
     speakStartTimeout: ({ context }) => context.speakStartTimeoutMs,
     speakTimeout: ({ context }) => context.speakTimeoutBaseMs + context.speakTimeoutPerCharMs * (context.speech?.length ?? 0),
   },
@@ -171,6 +178,7 @@ export const conversationMachine = setup({
       voiceError: null,
       voiceFailures: 0,
       suggestText: !voice.micAvailable,
+      spokenQuestion: false,
     };
   },
   states: {
@@ -266,7 +274,10 @@ export const conversationMachine = setup({
         audible: {},
       },
       on: {
-        SPEAKING_ENDED: { target: 'showingAnswer', actions: 'voiceTurnDone' },
+        SPEAKING_ENDED: [
+          { guard: 'followUp', target: 'followUp', actions: 'voiceTurnDone' },
+          { target: 'showingAnswer', actions: 'voiceTurnDone' },
+        ],
         SPEAKING_FAILED: {
           target: 'showingAnswer',
           actions: [
@@ -276,6 +287,23 @@ export const conversationMachine = setup({
         },
         TEXT_SUBMITTED: { guard: 'hasText', target: 'thinking', actions: 'newQuestion' },
         CANCEL: 'showingAnswer',
+      },
+    },
+    // Follow Up (#432 S6; Amazon Help "How Follow Up Mode Works on Alexa+"): after a spoken answer to a spoken question
+    // the mic listens again without the wake word, for followUpMs (8 s, our choice: Amazon gives no number). Silence,
+    // a failed recognition, Cancel or a tap on the mic end it quietly: it was never asked for, so no voice notice.
+    followUp: {
+      entry: 'startRecognition',
+      exit: 'stopRecognition',
+      after: { followUpTimeout: 'showingAnswer' },
+      on: {
+        SPEECH_RECOGNISED: { guard: 'hasTranscript', target: 'thinking', actions: 'newQuestion' },
+        RECOGNITION_ENDED: 'showingAnswer',
+        RECOGNITION_FAILED: 'showingAnswer',
+        TEXT_SUBMITTED: { guard: 'hasText', target: 'thinking', actions: 'newQuestion' },
+        MIC_PRESSED: 'showingAnswer',
+        CANCEL: 'showingAnswer',
+        DISMISS: 'idle',
       },
     },
     showingAnswer: {
@@ -300,7 +328,7 @@ export const conversationMachine = setup({
   },
 });
 
-export type TopState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'showingAnswer' | 'failed';
+export type TopState = 'idle' | 'listening' | 'followUp' | 'thinking' | 'speaking' | 'showingAnswer' | 'failed';
 
 /** The top-level state name (`speaking` has substates). */
 export function topState(snapshot: { value: unknown }): TopState {

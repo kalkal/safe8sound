@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SafeRoomStatusSchema, celsius } from '@cold-reserve/contracts';
+import { CARD_TOOL_ACCESS, SafeRoomStatusSchema, celsius } from '@cold-reserve/contracts';
 import { notifySummary, safeRoomSummary, startSummary } from '../../src/modules/storm-mode/summaries.js';
 import { stormModeModule } from '../../src/modules/storm-mode/index.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
@@ -51,6 +51,12 @@ describe('what the model reads', () => {
     expect(text).not.toMatch(/Giulia|phone-/);
     expect(text).toContain('Storm mode: active.');
     expect(text).toContain('simulated data (');
+  });
+
+  // #432 S6: the Echo's idle tile reads get_safe_room_status as a card call; the call map says read, as the tool does.
+  it('get_safe_room_status is read-only, as the card call map says', () => {
+    const tool = stormModeModule(world(4).deps).tools.find((t) => t.name === 'get_safe_room_status');
+    expect(tool?.annotations.readOnlyHint).toBe(CARD_TOOL_ACCESS.get_safe_room_status === 'read');
   });
 
   it('the storm tools say the safe room by its name, never its id (#192)', async () => {

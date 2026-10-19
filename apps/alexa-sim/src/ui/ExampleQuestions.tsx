@@ -7,7 +7,8 @@ import { t } from './text.js';
 export const EXAMPLE_QUESTIONS = [
   { label: 'examples.battery', question: "What's my battery level?" },
   { label: 'examples.hotDay', question: "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable." },
-  { label: 'examples.powerCut', question: "The power's out" },
+  // H (owner, 19 Oct): "Power cut" is a judges' command now (Demo controls), not an example the person would say.
+  { label: 'examples.safeRoom', question: 'How is Grandpa doing in the safe room?' },
 ] as const;
 
 /** With the grid down (#268): what matters during a storm, never a hot-day plan. */
@@ -16,6 +17,8 @@ export const STORM_EXAMPLE_QUESTIONS = [
   // Never "battery" here: the scripted demo would answer the battery level (review of #301).
   { label: 'examples.howLong', question: 'How long will the cold reserve last?' },
   { label: 'examples.powerBack', question: 'Is the power back?' },
+  // One card per answer (owner, 19 Oct, B): the plan behind the safe room, said or tapped.
+  { label: 'examples.showPlan', question: 'Show the plan' },
 ] as const;
 
 export type ExampleQuestion = (typeof EXAMPLE_QUESTIONS)[number] | (typeof STORM_EXAMPLE_QUESTIONS)[number];

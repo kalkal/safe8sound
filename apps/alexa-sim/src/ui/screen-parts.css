@@ -56,60 +56,6 @@
     }
   }
 
-  /* "Back" always there and the path of the steps (idea 5): Back at the start of the header band, then one dot per
-     step, the current one longer and named in words. */
-  .back-button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    padding-inline-start: var(--space-3);
-  }
-
-  .back-arrow {
-    inline-size: 1.25em;
-    block-size: 1.25em;
-    fill: none;
-    stroke: currentcolor;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .step-dots {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .step {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-  }
-
-  .step-dot {
-    inline-size: 0.625rem;
-    block-size: 0.625rem;
-    border: var(--border-thin) solid var(--text-secondary);
-    border-radius: var(--radius-pill);
-  }
-
-  .step[aria-current="step"] .step-dot {
-    inline-size: 1.5rem;
-    border-color: var(--accent);
-    background: var(--accent);
-  }
-
-  .step-name {
-    color: var(--text-secondary);
-    font-family: var(--font-data);
-    font-size: var(--font-size-min);
-    text-transform: uppercase;
-  }
-
   .home-panel-body {
     justify-self: stretch;
   }
@@ -159,5 +105,202 @@
     block-size: 1px;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+}
+
+/* The realistic Echo screen (#432 S6): the top row of the Alexa+ home (the menu and the bell first, the time and the
+   weather last) and the translucent tiles at rest. Words sit on a tile (surface-tile) or on the dimmed sky
+   (surface-scrim), never on the bare sky: the contrast test of the tokens checks text-on-sky on both, over every sky. */
+@layer surfaces {
+  /* The top row is zoomed with the screen (layout.css, --screen-zoom): on a small Echo it shrinks, its buttons must not.
+     Each one stays a whole target on the page, whatever the zoom (review of #458: 24 px at 960 × 480). */
+  .screen-icons {
+    --target-on-page: max(var(--target-min), calc(var(--target-min) / var(--screen-zoom, 1)));
+
+    display: flex;
+    order: -1;
+    gap: var(--space-2);
+  }
+
+  .screen-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: var(--target-on-page);
+    block-size: var(--target-on-page);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--surface-tile);
+    color: var(--text-on-sky);
+    cursor: pointer;
+
+    &[aria-expanded="true"] {
+      outline: calc(var(--border-thin) * 2) solid var(--accent);
+    }
+  }
+
+  .screen-icon-svg,
+  .screen-weather-svg {
+    inline-size: 1.5em;
+    block-size: 1.5em;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .screen-icon-dot {
+    fill: var(--accent);
+    stroke: var(--surface-card);
+  }
+
+  .screen-menu {
+    position: relative;
+  }
+
+  .screen-menu-list {
+    position: absolute;
+    inset-block-start: calc(100% + var(--space-2));
+    inset-inline-start: 0;
+    z-index: 5;
+    display: grid;
+    gap: var(--space-2);
+    min-inline-size: max-content;
+    padding: var(--space-2);
+    border-radius: var(--radius-card);
+    background: var(--surface-card-raised);
+
+    & button {
+      min-block-size: var(--target-on-page);
+    }
+  }
+
+  .screen-clock {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: 0 0 0 auto;
+    padding: var(--space-1) var(--space-4);
+    border-radius: var(--radius-pill);
+    background: var(--surface-tile);
+    color: var(--text-on-sky);
+  }
+
+  .screen-time {
+    font-size: var(--font-size-clock);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+  }
+
+  /* The profile picture of the real home, top right (#432 S6): Leo. */
+  .screen-profile {
+    inline-size: calc(var(--font-size-clock) * 0.9);
+    block-size: calc(var(--font-size-clock) * 0.9);
+  }
+
+  .screen-weather {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-lead);
+  }
+
+  /* The tiles at rest, each a translucent box over the sky: on a phone one under the other; on a landscape screen
+     Leo's room and the next moment side by side, the cold reserve on a whole row under them (its cubes keep 56 px,
+     owner 2 Oct), a new message to Ana above all. */
+  .idle-tiles {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  /* A phone: the cubes first, so they stay in the first view (owner rule, 11 Oct); the other tiles under them. */
+  @media (width < 48rem) {
+    .idle-tiles > .idle-reserve {
+      order: -1;
+    }
+  }
+
+  @media (width >= 48rem) {
+    .idle-tiles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .idle-tiles > .idle-reserve,
+    .idle-tiles > .idle-notice {
+      grid-column: 1 / -1;
+    }
+
+    .idle-tiles > .idle-reserve {
+      order: 1;
+    }
+  }
+
+  /* A short landscape Echo (960 × 480): Leo's room and the next moment on the left, the reserve on the right. */
+  @media (width >= 48rem) and (height < 40rem) {
+    .idle-tiles {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+      grid-auto-flow: row dense;
+    }
+
+    .idle-tiles > .idle-room,
+    .idle-tiles > .idle-next {
+      grid-column: 1;
+    }
+
+    .idle-tiles > .idle-reserve {
+      grid-column: 2;
+      grid-row: span 2;
+    }
+  }
+
+  .idle-tile {
+    display: grid;
+    align-content: center;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--surface-tile);
+    color: var(--text-on-sky);
+    backdrop-filter: blur(12px);
+
+    & p {
+      margin: 0;
+    }
+  }
+
+  .idle-tile-label {
+    font-size: var(--font-size-lead);
+  }
+
+  .idle-tile-big,
+  .idle-tile-text {
+    font-size: calc(var(--font-size-lead) * 1.25);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.2;
+  }
+
+  .idle-room {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .idle-avatar {
+    inline-size: 4.5rem;
+    block-size: 4.5rem;
+  }
+
+  /* A new message to Ana: the first tile, marked with the storm colour while it is unseen (our addition). */
+  .idle-notice {
+    display: flex;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    align-items: baseline;
+    gap: 0 var(--space-3);
+    padding-block: var(--space-2);
+    border-inline-start: calc(var(--border-thin) * 6) solid var(--accent);
   }
 }

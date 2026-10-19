@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CARD_TOOL_ACCESS,
   GuardRefusalSchema,
   ProblemDetailsSchema,
   SessionReplySchema,
@@ -81,6 +82,13 @@ describe('card tool calls: POST /v1/tools/call', () => {
     expect(ToolCallRequestSchema.safeParse({ name: 'get_reserve_outlook', arguments: {} }).success).toBe(true);
     // The home comes from the token, never from the request.
     expect(ToolCallRequestSchema.safeParse({ name: 'get_reserve_outlook', arguments: { homeId: 'home' } }).success).toBe(false);
+  });
+
+  it('#432 (additive, approved by MAIN 19/10): the idle tile reads get_safe_room_status, with no arguments, read-only', () => {
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_safe_room_status', arguments: {} }).success).toBe(true);
+    // The home comes from the token, never from the request.
+    expect(ToolCallRequestSchema.safeParse({ name: 'get_safe_room_status', arguments: { homeId: 'home' } }).success).toBe(false);
+    expect(CARD_TOOL_ACCESS['get_safe_room_status']).toBe('read');
   });
 
   it('B2 (additive): the settings drawer reads get_demo_settings and saves with set_scenario', () => {

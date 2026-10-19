@@ -2,7 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { celsius } from '@cold-reserve/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
-import { SafeRoomCard, clockOf, roomLabel } from '../src/SafeRoomCard.js';
+import { SafeRoomCard, safeRoomHeadline, clockOf, roomLabel } from '../src/SafeRoomCard.js';
 import { safeRoomBatteryFirst, safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
 import { setTempUnit } from '../src/temp-unit.js';
 
@@ -183,5 +183,14 @@ describe('SafeRoomCard when the battery runs out first (#364)', () => {
     expect(screen.getByText('Comfortable at least until')).toBeTruthy();
     expect(screen.getByTestId('safe-until').textContent).toBe('06:40');
     expect(screen.queryByTestId('battery-until')).toBeNull();
+  });
+});
+
+describe('safeRoomHeadline', () => {
+  it('is the time and the meaning of the big time, for every place that shows it (review of #458)', () => {
+    const calm = safeRoomCalm();
+    expect(safeRoomHeadline(calm)).toEqual({ until: calm.safeUntil, kind: 'safe' });
+    expect(safeRoomHeadline({ ...calm, withinLimits: { until: '2026-07-18T06:00:00+02:00' } })).toEqual({ until: '2026-07-18T06:00:00+02:00', kind: 'within' });
+    expect(safeRoomHeadline({ ...calm, tempC: celsius(27), limitNow: { limitC: celsius(24), kind: 'night' } })).toEqual({ until: calm.safeUntil, kind: 'held' });
   });
 });

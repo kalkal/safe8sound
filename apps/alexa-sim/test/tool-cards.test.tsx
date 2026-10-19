@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { ReserveOutlookSchema, ok, type Result } from '@cold-reserve/contracts';
 import { exampleReserveOutlook } from '@cold-reserve/contracts/fixtures';
-import { hotDayPlan, type CardKind } from '@cold-reserve/ui-cards';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { hotDayPlan, safeRoomInStorm, type CardKind } from '@cold-reserve/ui-cards';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Agent } from '../src/agent/agent.js';
 import type { CardSlot } from '../src/agent/wire.js';
 import { CardHostProvider } from '../src/host/card-host.js';
-import { ToolCards } from '../src/ui/ToolCards.js';
+import { ToolCards, otherKinds } from '../src/ui/ToolCards.js';
 
 afterEach(cleanup);
 
@@ -32,23 +32,43 @@ describe('ToolCards: each tool result in its own sandboxed ui:// frame', () => {
     expect(frames.every((f) => f.getAttribute('sandbox') === 'allow-scripts')).toBe(true);
   });
 
-  it('pages instead of scrolling (owner, 10 Oct): one card at a time, a tab per card named by what it shows; the others stay loaded', () => {
+  // Owner, 19 Oct (B, supersedes the tabs of 10 Oct): one card per answer, the most important one (the safe room when
+  // the answer has it); the others stay loaded, hidden, and come on screen when asked ("Show the plan"), never by tabs.
+  it('one card on screen, the safe room first, no tabs; the others stay loaded and hidden', () => {
     show([
       { tool: 'plan_comfort', result: hotDayPlan() },
+      { tool: 'get_safe_room_status', result: safeRoomInStorm() },
       { tool: 'get_reserve_outlook', result: ReserveOutlookSchema.parse(exampleReserveOutlook()) },
     ]);
-    const tabs = screen.getByRole('tablist', { name: 'Cards of this answer' });
-    expect(screen.getAllByRole('tab').map((t) => [t.textContent, t.getAttribute('aria-selected')])).toEqual([
-      ['Plan', 'true'],
-      ['Cold reserve', 'false'],
-    ]);
-    expect(tabs).toBeTruthy();
-    const panelOf = (title: string) => screen.getByTitle(title).closest('[role="tabpanel"]') as HTMLElement;
-    expect(panelOf('Plan card').hidden).toBe(false);
-    expect(panelOf('Cold reserve card').hidden).toBe(true);
-    fireEvent.click(screen.getByRole('tab', { name: 'Cold reserve' }));
-    expect(panelOf('Plan card').hidden).toBe(true);
-    expect(panelOf('Cold reserve card').hidden).toBe(false);
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.queryByRole('tab')).toBeNull();
+    const hidden = (title: string) => (screen.getByTitle(title).closest('[data-card-slot]') as HTMLElement).hidden;
+    expect(hidden('Safe room card')).toBe(false);
+    expect(hidden('Plan card')).toBe(true);
+    expect(hidden('Cold reserve card')).toBe(true);
+  });
+
+  it('without the safe room, the first card; a card asked for by its kind replaces it', () => {
+    const cards: CardSlot[] = [
+      { tool: 'plan_comfort', result: hotDayPlan() },
+      { tool: 'get_reserve_outlook', result: ReserveOutlookSchema.parse(exampleReserveOutlook()) },
+    ];
+    const { rerender } = show(cards);
+    const hidden = (title: string) => (screen.getByTitle(title).closest('[data-card-slot]') as HTMLElement).hidden;
+    expect(hidden('Plan card')).toBe(false);
+    rerender(
+      <CardHostProvider value={{ agent, documentFor, theme: 'dark', timeZone: 'Europe/Rome' }}>
+        <ToolCards cards={cards} turnId="turn-1" show="reserve" />
+      </CardHostProvider>,
+    );
+    expect(hidden('Plan card')).toBe(true);
+    expect(hidden('Cold reserve card')).toBe(false);
+  });
+
+  it('names what else the answer holds, for "Show the plan" and the like', () => {
+    expect(otherKinds([{ tool: 'get_safe_room_status', result: safeRoomInStorm() }, { tool: 'plan_comfort', result: hotDayPlan() }], undefined)).toEqual(['plan']);
+    expect(otherKinds([{ tool: 'get_safe_room_status', result: safeRoomInStorm() }, { tool: 'plan_comfort', result: hotDayPlan() }], 'plan')).toEqual(['storm']);
+    expect(otherKinds([{ tool: 'plan_comfort', result: hotDayPlan() }], undefined)).toEqual([]);
   });
 
   it('a single card has no tabs', () => {

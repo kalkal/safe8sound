@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { fitCramped, fitOverhang, fitScale } from '../fit.js';
-
-/** Below this height the giant numbers drop to their smallest size (--font-size-hero-min). */
-const TIGHT_BELOW_PX = 420;
+import { fitCramped, fitFrame, fitOverhang, fitScale } from '../fit.js';
 
 /**
  * The card inside the height its host gives it (MCP Apps containerDimensions.maxHeight): a page that does not fit is
@@ -31,11 +28,11 @@ export function Fit({ maxHeight, onCramped, children }: { maxHeight: number | un
   }, []);
   const scale = fitScale(natural, maxHeight);
   const cramped = fitCramped(natural, maxHeight);
-  // A short frame (a small Echo, a card under tabs): the giant numbers at their smallest size before any scaling.
-  const tight = maxHeight !== undefined && maxHeight < TIGHT_BELOW_PX;
+  const { tight, compact } = fitFrame(maxHeight);
   useEffect(() => {
     document.documentElement.toggleAttribute('data-fit-tight', tight);
-  }, [tight]);
+    document.documentElement.toggleAttribute('data-fit-compact', compact);
+  }, [tight, compact]);
   const onCrampedRef = useRef(onCramped);
   onCrampedRef.current = onCramped;
   useEffect(() => {

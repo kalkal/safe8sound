@@ -12,6 +12,7 @@ import { sizeOfProject, type Size } from '../../support/sizes.js';
 import { worldOf } from '../../support/world.js';
 import { expectVoiceMatchesCards } from '../../voice-screen.js';
 import { SITE_URL, expectFakeModelSays } from '../../support/target.js';
+import { readPhone } from '../../surface.js';
 
 // The user's journey (owner, 18 Oct: "the tests must simulate a judge and a user, without mixing them"): the person at
 // home uses the product only, the Echo screen, its answers and cards, and Ana's phone; never a demo control (the
@@ -59,7 +60,10 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
   async function askOutside(question: string, opts: { readonly card?: 'none' | 'read-only' } = {}): Promise<string> {
     // Two reads of Ana's inbox first: a message from the step before (a known bug) lands before the count.
     await phoneReads(page);
-    const notes = await ui.notes.getByRole('heading').allTextContents();
+    let notes: string[] = [];
+    await readPhone(page, async () => {
+      notes = await ui.notes.getByRole('heading').allTextContents();
+    });
     const before = await world.moment();
     const frames = await page.locator('iframe').count();
     const plans = await page.locator('iframe[title="Plan card"]').count();
@@ -71,7 +75,7 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
     expect(await page.locator('iframe[title="Plan card"]').count(), 'no new plan').toBe(plans);
     // Two reads of the inbox after the answer: whatever the turn sent has reached the phone.
     await phoneReads(page);
-    await expect(ui.notes.getByRole('heading')).toHaveText(notes);
+    await readPhone(page, () => expect(ui.notes.getByRole('heading')).toHaveText(notes));
     await world.expectNoJump(before);
     return said;
   }
@@ -80,7 +84,7 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
     await page.goto('/');
     await enterCode(page);
     await expect(ui.echo).toBeVisible(SLOW);
-    await expect(ui.emptyPhone).toBeVisible(SLOW);
+    await readPhone(page, () => expect(ui.emptyPhone).toBeVisible(SLOW));
     await expect(page.getByTestId('answer')).toHaveCount(0);
   });
 
@@ -129,22 +133,26 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
     expect(await world.time()).toBe('12:00');
     await ask(page, "A storm is coming tonight. Get Leo's room ready.");
     await expectFakeModelSays(ui.answerText, 'Storm mode is prepared');
-    const note = ui.phone.getByRole('article', { name: NOTE.storm_prepared });
-    await expect(note).toHaveCount(1, SLOW);
-    await expect(note).toContainText(`${PRODUCT_NAME} · 12:00`);
-    await expectPhoneInHomeUnits(ui.notes, 'C');
+    await readPhone(page, async () => {
+      const note = ui.phone.getByRole('article', { name: NOTE.storm_prepared });
+      await expect(note).toHaveCount(1, SLOW);
+      await expect(note).toContainText(`${PRODUCT_NAME} · 12:00`);
+      await expectPhoneInHomeUnits(ui.notes, 'C');
+    });
   });
 
   test('A6. the grid goes down at 15:00: Ana told at 15:00, Leo safe until a time', { tag: ['@outcome:O5', '@outcome:O6'] }, async () => {
     expect(await world.advanceTo('storm_start')).toBe('15:00');
-    const note = ui.phone.getByRole('article', { name: NOTE.storm_started });
-    await expect(note).toBeVisible(SLOW);
-    await expect(note).toContainText(`${PRODUCT_NAME} · 15:00`);
+    await readPhone(page, async () => {
+      const note = ui.phone.getByRole('article', { name: NOTE.storm_started });
+      await expect(note).toBeVisible(SLOW);
+      await expect(note).toContainText(`${PRODUCT_NAME} · 15:00`);
+    });
     await ask(page, 'How is Leo?');
     // The safe room card says until when Leo's room stays within its limits (the fake model says one sentence only).
     const card = page.locator('iframe[title="Safe room card"]').last().contentFrame();
     await expect(card.getByText(/at least until/i).first()).toBeVisible(SLOW);
-    await expectPhoneInHomeUnits(ui.notes, 'C');
+    await readPhone(page, () => expectPhoneInHomeUnits(ui.notes, 'C'));
   });
 
   test('A6. [one screen] the Echo and its question box still fit one screen', { tag: '@outcome:O10' }, async () => {
@@ -154,8 +162,10 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
   test('A8. the night and the morning: Ana told at 21:00 and at 06:40, once each', { tag: '@outcome:O6' }, async () => {
     expect(await world.advanceTo('essential_level')).toBe('21:00');
     expect(await world.advanceTo('power_back')).toBe('06:40');
-    await expect(ui.notes.getByRole('heading')).toHaveText([NOTE.power_back, NOTE.essential_level, NOTE.storm_started, NOTE.storm_prepared], SLOW);
-    await expectPhoneInHomeUnits(ui.notes, 'C');
+    await readPhone(page, async () => {
+      await expect(ui.notes.getByRole('heading')).toHaveText([NOTE.power_back, NOTE.essential_level, NOTE.storm_started, NOTE.storm_prepared], SLOW);
+      await expectPhoneInHomeUnits(ui.notes, 'C');
+    });
   });
 
   test('A8. [storm restarted after power back] "Is the storm over?" starts nothing and tells Ana nothing', { tag: ['@outcome:O6', '@outcome:O15'] }, async () => {

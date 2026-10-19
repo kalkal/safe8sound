@@ -81,8 +81,10 @@ for (const { width, height, italian, storm } of CASES) {
     // page never scrolls sideways (the family phone below the device is a separate surface).
     expect((await badge.boundingBox())?.height).toBeLessThanOrEqual(48);
     await expect(page.getByTestId('echo-screen')).toBeInViewport({ ratio: 1 });
-    // On a phone the note's line uses the gap above the screen: the screen starts where it does in English (12 + 48 + 24 px).
-    if (width === 375) expect((await page.getByTestId('echo-screen').boundingBox())?.y).toBeLessThanOrEqual(85);
+    // On a phone the note's line uses the gap above the screen: the screen starts where it does in English (12 + 48 + 24 px),
+    // under the title's own small line (#432 S6: "Simulated Alexa+ add-on" always in view, 14 px × 1.3 + 4 px).
+    // In Italian the note's own line (16 px) comes on top: the gap it used to take is the title's now.
+    if (width === 375) expect((await page.getByTestId('echo-screen').boundingBox())?.y).toBeLessThanOrEqual(85 + 23 + (italian ? 16 : 0));
     const scroll = await page.getByTestId('screen-viewport').evaluate((el: { scrollHeight: number; clientHeight: number }) => el.scrollHeight - el.clientHeight);
     expect(scroll).toBeLessThanOrEqual(1);
     expect(await page.locator('html').evaluate((el: { scrollWidth: number; clientWidth: number }) => el.scrollWidth - el.clientWidth)).toBe(0);

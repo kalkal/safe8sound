@@ -10,7 +10,6 @@ type Page = import('@playwright/test').Page;
 const clockOf = (page: Page) => page.getByRole('group', { name: 'Simulated time' });
 
 test('Power cut → the grid goes down and Ana is told; Skip ahead → Essential; "Skip ahead" said → power back', async ({ page }) => {
-  // The desktop shows all three examples (a short Echo shows two; "Power cut" can be typed or said there).
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/');
   const phone = page.getByRole('region', { name: "Your daughter's phone (simulated)" });
@@ -22,8 +21,8 @@ test('Power cut → the grid goes down and Ana is told; Skip ahead → Essential
   await expect(clock.getByRole('status')).toHaveText('Nothing more to skip to today.');
   await expect(clock.getByRole('button', { name: /Skip ahead/ })).toBeDisabled();
 
-  await page.getByRole('group', { name: 'Example questions' }).getByRole('button', { name: 'Power cut' }).click();
-  await page.getByRole('button', { name: 'Ask' }).click();
+  // H (owner, 19 Oct): "Power cut" is the judges' command, one tap: the grid goes down and the question is asked for Leo.
+  await (await openDemoControls(page)).getByRole('button', { name: 'Power cut' }).click();
   await expect(plays).toContainText('Storm · power outage');
   await expect(clock.getByRole('status')).toHaveText('The simulated grid is now down.');
   await expect(clock.locator('time')).toHaveText('19:42');

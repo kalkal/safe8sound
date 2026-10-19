@@ -1,4 +1,5 @@
 import { expect, test } from '../no-network.js';
+import { openPhone } from '../surface.js';
 
 // The device layout is a template another can replace (#432). In dev, `?layout=plain` draws the same simulator
 // without the Echo: the same question gets the same answer, with no change to the logic. The judges' site ignores
@@ -12,7 +13,7 @@ test('?layout=plain: the same simulator without the device; a question gets its 
   await page.getByRole('button', { name: 'Battery level', exact: true }).click();
   await page.getByRole('button', { name: 'Ask', exact: true }).click();
   await expect(page.getByTestId('answer-caption')).toContainText(/battery/i);
-  await expect(page.getByRole('region', { name: "Your daughter's phone (simulated)" })).toBeVisible();
+  await expect(await openPhone(page)).toBeVisible();
 });
 
 test('without ?layout the dev page is the Alexa Echo Show', async ({ page }) => {

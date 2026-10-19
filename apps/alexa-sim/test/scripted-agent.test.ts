@@ -1,4 +1,4 @@
-import { PlanSchema, ReserveOutlookSchema } from '@cold-reserve/contracts';
+import { PlanSchema, ReserveOutlookSchema, SafeRoomStatusSchema } from '@cold-reserve/contracts';
 import { CATALOGS } from '@cold-reserve/i18n';
 import { describe, expect, it } from 'vitest';
 import { lastResortPlan } from '@cold-reserve/ui-cards';
@@ -213,6 +213,14 @@ describe('ScriptedAgent: the storm scene and the family phone (#24)', () => {
     const reply = await agent().callTool('get_reserve_outlook', {}, ctx);
     expect(reply.isError).not.toBe(true);
     expect(ReserveOutlookSchema.safeParse(reply.structuredContent).success).toBe(true);
+  });
+
+  it("the idle screen reads Leo's room (#432 S6): get_safe_room_status answers with the calm room of the demo home, by its name", async () => {
+    const reply = await agent().callTool('get_safe_room_status', {}, ctx);
+    expect(reply.isError).not.toBe(true);
+    const room = SafeRoomStatusSchema.parse(reply.structuredContent);
+    expect(room.stormPhase).toBeUndefined();
+    expect(room.safeRoomName).toBe("Leo's room");
   });
 
   it('in the degraded mode never pretends a message was sent', async () => {
