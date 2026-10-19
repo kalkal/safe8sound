@@ -155,8 +155,12 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     const place = shippedPlace(choices.locationId);
     const played = withHousehold(builtInScenario(choices.scenarioId, choices.locationId), choices.household);
     const sandboxScenario = startSoc === undefined ? played : { ...played, initial: { ...played.initial, batterySocPct: pct(startSoc) } };
+    // #449: a sandbox plays its day from the scenario's own hour (the clear day from 12:00), a new one and a restart alike.
+    // An explicit MCP_SCENARIO_START_H (a test, a local run) is the hour to play from instead, never added to it.
+    const playFromH = env['MCP_SCENARIO_START_H'] === undefined ? (sandboxScenario.playFromH ?? 0) : 0;
+    const playFromMs = Date.parse(sandboxScenario.startAt) + playFromH * HOUR_MS;
     const homeClock = timeline.value.clockFor({
-      startAt: sandboxScenario.startAt,
+      startAt: new Date(playFromMs).toISOString(),
       tz: place.tz,
       ...(choices.scenarioStartedAt === undefined ? {} : { startedAtMs: Date.parse(choices.scenarioStartedAt) }),
       ...(choices.advancedMs === undefined ? {} : { advancedMs: choices.advancedMs }),
@@ -164,29 +168,35 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     if (!homeClock.ok) return homeClock;
     const profile = profileAtPlace(demo, place);
     const sim = new SimulatorSource({ profile: HomeProfileSchema.parse({ ...profile, homeId }), scenario: sandboxScenario, params, clock: homeClock.value });
-    const since = new Date(Date.parse(sandboxScenario.startAt) + startHMs).toISOString();
+    const since = new Date(playFromMs + startHMs).toISOString();
     return ok({
       entry: { source: sim, profile, readOnly: false, levelSince: since, clock: homeClock.value },
       forecast: () => sim.forecast(),
       units: choices.units,
       place: choices.locationId,
       scenario: sandboxScenario,
-      startMs: Date.parse(sandboxScenario.startAt) + startHMs,
+      startMs: playFromMs + startHMs,
       ...(choices.version === undefined ? {} : { version: choices.version }),
     });
+  };
+  /**
+   * #449: a new sandbox starts its day now, whatever the hour: the start a "Restart the day" gives. Its first request
+   * stores that start (refreshFrom), so every container plays the same one.
+   */
+  const newSandbox = (homeId: HomeId): SandboxPlay => {
+    const firstStart = { ...sandboxDefaults, scenarioStartedAt: new Date(opts.wallClock.now()).toISOString() };
+    const play = playSandbox(homeId, firstStart);
+    // The defaults always build: they are today's sandbox, checked at start-up below.
+    if (!play.ok) throw new Error(play.error.message);
+    return { ...play.value, firstStart };
   };
   const settingsStoreFor = opts.settingsStoreFor;
   const sandboxes = createSandboxes<SandboxPlay, SandboxSettings>({
     clock: opts.wallClock,
     ttlMs: sandboxTtlH.value * HOUR_MS,
     maxNewPerDay: sandboxMaxNew.value,
-    // The defaults always build: they are today's sandbox, checked at start-up below.
-    create: (homeId) => {
-      const play = playSandbox(homeId, sandboxDefaults);
-      if (!play.ok) throw new Error(play.error.message);
-      return play.value;
-    },
-    ...(settingsStoreFor === undefined ? {} : { refresh: refreshFrom(settingsStoreFor, playSandbox, opts.logger) }),
+    create: newSandbox,
+    ...(settingsStoreFor === undefined ? {} : { refresh: refreshFrom(settingsStoreFor, playSandbox, opts.logger, opts.wallClock) }),
   });
   const startUp = playSandbox(DEMO, sandboxDefaults);
   if (!startUp.ok) return startUp;

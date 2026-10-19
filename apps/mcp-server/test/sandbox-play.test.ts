@@ -1,5 +1,5 @@
-import { HomeIdSchema, SandboxSettingsSchema, err, ok, toolError } from '@cold-reserve/contracts';
-import { memoryLogger, type StateStore, type StateStoreFactory } from '@cold-reserve/core';
+import { HomeIdSchema, SandboxSettingsSchema, err, ok, toolError, type SandboxSettings } from '@cold-reserve/contracts';
+import { fixedClock, memoryLogger, type StateStore, type StateStoreFactory } from '@cold-reserve/core';
 import { builtInScenario } from '@cold-reserve/source-simulator';
 import { describe, expect, it } from 'vitest';
 import { refreshFrom, safeRoomRole, withHousehold, type SandboxPlay } from '../src/sandbox-play.js';
@@ -43,11 +43,12 @@ describe('refreshFrom: one settings read per request (C2b)', () => {
   const settings = SandboxSettingsSchema.parse({ version: 2, updatedAt: '2026-10-04T10:00:00Z', scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' });
   const play = (version?: number): SandboxPlay => ({ entry: {} as SandboxPlay['entry'], forecast: () => ({}) as ReturnType<SandboxPlay['forecast']>, units: 'C', place: 'reference', scenario: {} as SandboxPlay['scenario'], startMs: 0, ...(version === undefined ? {} : { version }) });
   const storeWith = (read: Awaited<ReturnType<StateStore['getSandboxSettings']>>): StateStoreFactory => () => ({ getSandboxSettings: () => Promise.resolve(read) }) as unknown as StateStore;
+  const clock = fixedClock(Date.parse('2026-10-19T07:00:00Z'));
 
   it('keeps the sandbox when the version is the one played, and rebuilds it on a new one', async () => {
     const logger = memoryLogger();
     const rebuilt = play(2);
-    const refresh = refreshFrom(storeWith(ok(settings)), () => ok(rebuilt), logger);
+    const refresh = refreshFrom(storeWith(ok(settings)), () => ok(rebuilt), logger, clock);
     const same = play(2);
     expect(await refresh(A, same, 'c')).toBe(same);
     expect(await refresh(A, play(1), 'c')).toBe(rebuilt);
@@ -64,7 +65,7 @@ describe('refreshFrom: one settings read per request (C2b)', () => {
         },
       }) as unknown as StateStore;
     const rebuilt = play(2);
-    const refresh = refreshFrom(counting, () => ok(rebuilt), logger);
+    const refresh = refreshFrom(counting, () => ok(rebuilt), logger, clock);
     expect(await refresh(A, play(1), 'c', settings)).toBe(rebuilt);
     const same = play(2);
     expect(await refresh(A, same, 'c', settings)).toBe(same);
@@ -74,7 +75,7 @@ describe('refreshFrom: one settings read per request (C2b)', () => {
 
   it('warns once per build when no settings are saved, and keeps the defaults', async () => {
     const logger = memoryLogger();
-    const refresh = refreshFrom(storeWith(err(toolError('settings_not_found', 'None.'))), () => ok(play(9)), logger);
+    const refresh = refreshFrom(storeWith(err(toolError('settings_not_found', 'None.'))), () => ok(play(9)), logger, clock);
     const defaults = play();
     expect(await refresh(A, defaults, 'c')).toBe(defaults);
     expect(await refresh(A, defaults, 'c')).toBe(defaults);
@@ -85,12 +86,66 @@ describe('refreshFrom: one settings read per request (C2b)', () => {
   it('keeps playing when the store fails or the settings cannot be played, and logs each with its code', async () => {
     const logger = memoryLogger();
     const current = play(1);
-    expect(await refreshFrom(storeWith(err(toolError('store_unavailable', 'Down.'))), () => ok(play(2)), logger)(A, current, 'c')).toBe(current);
-    expect(await refreshFrom(storeWith(ok(settings)), () => err(toolError('invalid_config', 'No place.')), logger)(A, current, 'c')).toBe(current);
+    expect(await refreshFrom(storeWith(err(toolError('store_unavailable', 'Down.'))), () => ok(play(2)), logger, clock)(A, current, 'c')).toBe(current);
+    expect(await refreshFrom(storeWith(ok(settings)), () => err(toolError('invalid_config', 'No place.')), logger, clock)(A, current, 'c')).toBe(current);
     expect(logger.lines.map((l) => [l.level, l.code, l.details?.['event']])).toEqual([
       ['warn', 'store_unavailable', 'settings_read_failed'],
       ['error', 'invalid_config', 'settings_play_failed'],
     ]);
+    expect(JSON.stringify(logger.lines)).not.toContain(A);
+  });
+});
+
+describe('refreshFrom: a new sandbox stores its start at its first request (#449)', () => {
+  const A = HomeIdSchema.parse('demo#00000000000000aa');
+  const clock = fixedClock(Date.parse('2026-10-19T07:00:00Z'));
+  const firstStart = { scenarioId: 'clear-day', locationId: 'reference', units: 'C', household: 'older-man', scenarioStartedAt: '2026-10-19T06:00:00.000Z' } as const;
+  const fresh = (): SandboxPlay => ({ entry: {} as SandboxPlay['entry'], forecast: () => ({}) as ReturnType<SandboxPlay['forecast']>, units: 'C', place: 'reference', scenario: {} as SandboxPlay['scenario'], startMs: 0, firstStart });
+  const notFound = err(toolError('settings_not_found', 'None.'));
+  const storeOf = (put: Awaited<ReturnType<StateStore['putSandboxSettings']>>, reads: Awaited<ReturnType<StateStore['getSandboxSettings']>>[]) => {
+    const puts: [SandboxSettings, number | undefined][] = [];
+    const factory: StateStoreFactory = () =>
+      ({
+        getSandboxSettings: () => Promise.resolve(reads.shift() ?? notFound),
+        putSandboxSettings: (s: SandboxSettings, expected: number | undefined) => {
+          puts.push([s, expected]);
+          return Promise.resolve(put);
+        },
+      }) as unknown as StateStore;
+    return { factory, puts };
+  };
+
+  it('stores it create-if-absent as version 1 and keeps playing it, with no warning', async () => {
+    const logger = memoryLogger();
+    const { factory, puts } = storeOf(ok(undefined), [notFound]);
+    const played = await refreshFrom(factory, () => ok(fresh()), logger, clock)(A, fresh(), 'c');
+    expect(puts).toEqual([[{ ...firstStart, version: 1, updatedAt: '2026-10-19T07:00:00.000Z' }, undefined]]);
+    expect(played.version).toBe(1);
+    expect(played.firstStart).toBeUndefined();
+    expect(logger.lines).toEqual([]);
+  });
+
+  it('plays the start another container stored first', async () => {
+    const logger = memoryLogger();
+    const theirs = SandboxSettingsSchema.parse({ ...firstStart, version: 1, updatedAt: '2026-10-19T06:59:00Z', scenarioStartedAt: '2026-10-19T05:00:00.000Z' });
+    const { factory } = storeOf(err(toolError('settings_version_conflict', 'Taken.')), [notFound, ok(theirs)]);
+    const adopted: SandboxPlay = { ...fresh(), version: 1, startMs: 1 };
+    const seen: SandboxSettings[] = [];
+    const playing = (_h: unknown, s: SandboxSettings) => {
+      seen.push(s);
+      return ok(adopted);
+    };
+    expect(await refreshFrom(factory, playing, logger, clock)(A, fresh(), 'c')).toBe(adopted);
+    expect(seen).toEqual([theirs]);
+    expect(logger.lines).toEqual([]);
+  });
+
+  it('keeps its own start when the store fails, and logs it with its code, never the home', async () => {
+    const logger = memoryLogger();
+    const { factory } = storeOf(err(toolError('store_unavailable', 'Down.')), [notFound]);
+    const current = fresh();
+    expect(await refreshFrom(factory, () => ok(fresh()), logger, clock)(A, current, 'c')).toBe(current);
+    expect(logger.lines.map((l) => [l.level, l.code, l.details?.['event']])).toEqual([['warn', 'store_unavailable', 'settings_first_start_failed']]);
     expect(JSON.stringify(logger.lines)).not.toContain(A);
   });
 });

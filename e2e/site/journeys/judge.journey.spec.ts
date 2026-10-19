@@ -89,10 +89,11 @@ test.describe.serial("a judge's journey", { tag: ['@journey:judge', '@outcome:O1
     await expect(ui.emptyPhone).toBeVisible();
   });
 
-  test('1. [scenario anchor daily] a fresh session starts the day at its beginning, whatever the hour', async () => {
+  test('1. [scenario anchor daily] a fresh session starts the day at 12:00, whatever the hour', async () => {
     if (probing) console.log(`PROBE fresh session at ${(await ui.time.textContent()) ?? ''}, Rome now ${wallTime('Europe/Rome')}`);
-    // The clear day starts at 00:00; as deployed it plays the hour in Rome now instead.
-    await check(page, BUGS.anchor, () => expect(ui.time).toHaveText('00:00', QUICK));
+    // The owner's choice B (#449): every fresh session plays the clear day from 12:00, as the storm day starts; the
+    // clock runs at real speed, so a minute or two may have passed since the session opened.
+    await expect(ui.time).toHaveText(/^12:0[0-2]$/, QUICK);
   });
 
   test('1. [settings selection not evident] the tapped place is chosen at once, and the drawer says what it saved', async () => {

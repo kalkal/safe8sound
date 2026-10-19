@@ -36,8 +36,8 @@ export function chainEnv() {
   const phone = secret('SITE_E2E_PHONE');
   const mcpUrl = `http://127.0.0.1:${String(PORTS.mcp)}/mcp`;
   return {
-    // As deployed (infra/cdk.json): the daily anchor at real speed, so a fresh sandbox plays the hour of the day in its place
-    // (a new scenario, place or restart plays the day again from its start, no start hour: the storm lies ahead).
+    // As deployed (infra/cdk.json): the daily anchor at real speed; a fresh sandbox stores its own start at its first request
+    // (#449: a new sandbox, scenario, place or restart plays the day from its own hour, the clear day from 12:00).
     mcp: {
       PORT: String(PORTS.mcp),
       MCP_CLIENTS: `agent:agent@demo#*=${agentMcp},cards:simapi@demo#*=${simMcp},phone:daughter@demo#*=${phone}`,

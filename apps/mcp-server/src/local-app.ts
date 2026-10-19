@@ -1,6 +1,6 @@
 import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import type { Clock, Logger } from '@cold-reserve/core';
-import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
+import { createMemoryBacking, memoryStateStoreFactory, type MemoryBacking } from '@cold-reserve/store-memory';
 import { createApp, scenarioPlayFor, type App } from './app.js';
 import type { CardDocuments } from './cards.js';
 import { wallStamped } from './log-clock.js';
@@ -28,7 +28,13 @@ export function localStartSocPct(env: Readonly<Record<string, string | undefined
 
 export function createLocalApp(
   env: Readonly<Record<string, string | undefined>>,
-  opts: { readonly wallClock: Clock; readonly logger: Logger; readonly cardDocuments?: CardDocuments },
+  opts: {
+    readonly wallClock: Clock;
+    readonly logger: Logger;
+    readonly cardDocuments?: CardDocuments;
+    /** The store's data: a test shares one between two servers, as Lambda containers share DynamoDB (#449). */
+    readonly backing?: MemoryBacking;
+  },
 ): Result<LocalApp, ErrorEnvelope> {
   const play = scenarioPlayFor(env, opts.wallClock);
   if (!play.ok) return play;
@@ -36,7 +42,7 @@ export function createLocalApp(
   const startSoc = localStartSocPct(env);
   if (!startSoc.ok) return startSoc;
   // The store's clock is the wall's: it drives only the retention; plan expiry is judged on the home's scenario time (#175).
-  const memory = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: opts.wallClock });
+  const memory = memoryStateStoreFactory({ backing: opts.backing ?? createMemoryBacking(), clock: opts.wallClock });
   const wired = wireModules({ store: memory, clock });
   if (!wired.ok) return wired;
   const { modules, stormMode, comfortPlan } = wired.value;

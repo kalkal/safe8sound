@@ -1,5 +1,5 @@
 import { categoryOf, ok, type ErrorEnvelope, type Forecast, type HomeId, type Household, type LocationId, type Result, type SandboxSettings, type TempUnit } from '@cold-reserve/contracts';
-import type { Logger, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, Logger, StateStoreFactory } from '@cold-reserve/core';
 import { builtInPlace, type Place, type Scenario } from '@cold-reserve/source-simulator';
 import type { HomeEntry } from './modules/energy-status/index.js';
 import { homeDetail } from './sandbox-log.js';
@@ -40,6 +40,11 @@ export interface SandboxPlay {
   readonly startMs: number;
   /** The missing settings were reported for this build (one warning per build, C2b Q3). */
   missingReported?: boolean;
+  /**
+   * #449: a new sandbox's own start, not stored yet: its first request stores it (create-if-absent), so every
+   * container plays the start of the first one.
+   */
+  readonly firstStart?: Omit<SandboxSettings, 'version' | 'updatedAt'> | undefined;
 }
 
 type Play = (homeId: HomeId, settings: SandboxSettings) => Result<SandboxPlay, ErrorEnvelope>;
@@ -53,6 +58,7 @@ export function refreshFrom(
   storeFor: StateStoreFactory,
   play: Play,
   logger: Logger,
+  clock: Clock,
 ): (homeId: HomeId, current: SandboxPlay, correlationId: string, saved?: SandboxSettings) => Promise<SandboxPlay> {
   const warn = (homeId: HomeId, correlationId: string, error: ErrorEnvelope, event: string, message: string, level: 'warn' | 'error' = 'warn') => {
     logger.log({
@@ -66,8 +72,17 @@ export function refreshFrom(
       details: { event, ...homeDetail(homeId) },
     });
   };
-  return async (homeId, current, correlationId, saved) => {
+  const refresh = async (homeId: HomeId, current: SandboxPlay, correlationId: string, saved?: SandboxSettings): Promise<SandboxPlay> => {
     const read = saved === undefined ? await storeFor(homeId, { correlationId }).getSandboxSettings() : ok(saved);
+    if (!read.ok && read.error.code === 'settings_not_found' && current.firstStart !== undefined && current.version === undefined) {
+      // #449: the first request of a new sandbox stores its start; one stored first by another container wins.
+      const first: SandboxSettings = { ...current.firstStart, version: 1, updatedAt: new Date(clock.now()).toISOString() };
+      const stored = await storeFor(homeId, { correlationId }).putSandboxSettings(first, undefined);
+      if (stored.ok) return { ...current, version: 1, firstStart: undefined };
+      if (stored.error.code === 'settings_version_conflict') return refresh(homeId, { ...current, firstStart: undefined }, correlationId);
+      warn(homeId, correlationId, stored.error, 'settings_first_start_failed', 'The new sandbox start could not be stored: this container plays its own until the next request.');
+      return current;
+    }
     if (!read.ok) {
       if (read.error.code !== 'settings_not_found') {
         warn(homeId, correlationId, read.error, 'settings_read_failed', 'The sandbox settings could not be read: the sandbox keeps what it plays.');
@@ -85,4 +100,5 @@ export function refreshFrom(
     }
     return next.value;
   };
+  return refresh;
 }

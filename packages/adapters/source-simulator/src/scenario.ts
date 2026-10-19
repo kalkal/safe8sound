@@ -43,6 +43,8 @@ export const ScenarioSchema = z
     description: z.string().min(1).max(300),
     startAt: IsoDateTimeSchema,
     durationH: z.number().int().positive().max(168),
+    /** #449: the hour into the day a visitor's sandbox plays from (a new one and a restart); absent: the start. */
+    playFromH: z.number().int().min(0).max(167).optional(),
     stepSeconds: z.number().int().positive().max(3600),
     seed: z.number().int(),
     /** Groups this scenario replaces with simulated data, even over a live home. */

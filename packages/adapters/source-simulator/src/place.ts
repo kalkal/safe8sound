@@ -60,6 +60,11 @@ export const ScriptSchema = z.strictObject({
   /** The local hour the scenario starts at, on the place's day. */
   startHour: z.number().int().min(0).max(23),
   durationH: z.number().int().positive().max(168),
+  /**
+   * #449 (owner's choice B): the hour into its day a visitor's sandbox plays from, a new one and a restart alike, so
+   * every judge starts at the same moment of the story. Absent: the start itself.
+   */
+  playFromH: z.number().int().min(0).max(167).optional(),
   stepSeconds: z.number().int().positive().max(3600),
   seed: z.number().int(),
   simulatedGroups: z.array(z.string()).min(1),
@@ -82,6 +87,9 @@ export function mergeScenario(rawScript: unknown, place: Place, profile: HomePro
   const s = script.data;
   const day = place.days[s.id as ScenarioId] as Place['days'][ScenarioId] | undefined;
   if (day === undefined) return err(invalidConfig(`Place "${place.id}"`, [{ path: `days.${s.id}`, message: 'No day for this scenario' }]));
+  if (s.playFromH !== undefined && s.playFromH >= s.durationH) {
+    return err(invalidConfig('Scenario script', [{ path: 'playFromH', message: `Plays from hour ${String(s.playFromH)}, past its ${String(s.durationH)}-hour day` }]));
+  }
   if (day.hourly.length !== s.hourly.length) {
     return err(invalidConfig(`Place "${place.id}"`, [{ path: `days.${s.id}.hourly`, message: `Expected ${String(s.hourly.length)} hourly values, got ${String(day.hourly.length)}` }]));
   }
@@ -92,6 +100,7 @@ export function mergeScenario(rawScript: unknown, place: Place, profile: HomePro
     description: s.description,
     startAt: localIso(zonedTimeMs(day.date, s.startHour, place.tz), place.tz),
     durationH: s.durationH,
+    ...(s.playFromH === undefined ? {} : { playFromH: s.playFromH }),
     stepSeconds: s.stepSeconds,
     seed: s.seed,
     simulatedGroups: s.simulatedGroups,

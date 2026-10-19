@@ -14,11 +14,27 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
 describe('the reference place keeps today numbers', () => {
   it.each(SCENARIO_IDS)('%s: script + reference place = the scenario as it was before the split', (id) => {
-    expect(builtInScenario(id)).toEqual(ScenarioSchema.parse(LEGACY[id]));
+    // The hour a sandbox plays from (#449) is new since the split; every number is as it was.
+    expect({ ...builtInScenario(id), playFromH: undefined }).toEqual(ScenarioSchema.parse(LEGACY[id]));
   });
 
   it('gives the sandbox profile the place location (rounded coordinates, IANA zone)', () => {
     expect(profileAtPlace(demoProfile(), builtInPlace('reference')).location).toEqual({ latRounded: 41.9, lonRounded: 12.5, tz: 'Europe/Rome' });
+  });
+});
+
+describe('the hour a sandbox plays a day from (#449, owner’s choice B)', () => {
+  it('the clear day plays from 12 hours into its day (12:00), in every place; the storm day from its start (already 12:00)', () => {
+    for (const place of ['reference', 'turin', 'houston'] as const) {
+      expect(builtInScenario('clear-day', place).playFromH).toBe(12);
+      expect(builtInScenario('storm-blackout', place).playFromH).toBeUndefined();
+    }
+  });
+
+  it('a script cannot play from past its own day', () => {
+    const script = clone(rawScript('clear-day')) as { playFromH: number; durationH: number };
+    script.playFromH = script.durationH;
+    expect(mergeScenario(script, builtInPlace('reference'), demoProfile()).ok).toBe(false);
   });
 });
 

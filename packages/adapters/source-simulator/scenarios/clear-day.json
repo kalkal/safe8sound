@@ -5,6 +5,7 @@
   "description": "A clear, hot July day. Grandpa stays home in the safe room; the daughter works from the study and comes back to the living room in the evening.",
   "startHour": 0,
   "durationH": 24,
+  "playFromH": 12,
   "stepSeconds": 60,
   "seed": 20260715,
   "simulatedGroups": ["weather"],

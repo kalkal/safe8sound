@@ -6,10 +6,10 @@
       "locationId": "houston"
     },
     "isError": false,
-    "text": "Saved: Scenario storm-blackout in houston, temperatures in °F, at home: older-man; settings version 1. The day starts again from its beginning.",
+    "text": "Saved: Scenario storm-blackout in houston, temperatures in °F, at home: older-man; settings version 2. The day starts again from its beginning.",
     "structuredContent": {
       "settings": {
-        "version": 1,
+        "version": 2,
         "updatedAt": "2026-10-18T07:00:00.000Z",
         "scenarioId": "storm-blackout",
         "locationId": "houston",
@@ -24,10 +24,10 @@
     "tool": "get_demo_settings",
     "args": {},
     "isError": false,
-    "text": "Scenario storm-blackout in Houston, Texas (America/Chicago), temperatures in °F, at home: older-man; settings version 1.",
+    "text": "Scenario storm-blackout in Houston, Texas (America/Chicago), temperatures in °F, at home: older-man; settings version 2.",
     "structuredContent": {
       "settings": {
-        "version": 1,
+        "version": 2,
         "updatedAt": "2026-10-18T07:00:00.000Z",
         "scenarioId": "storm-blackout",
         "locationId": "houston",
@@ -403,10 +403,10 @@
       "at": "2024-07-07T15:00:00-05:00"
     },
     "isError": false,
-    "text": "The sandbox's time is now 2024-07-07T15:00:00-05:00 (settings version 2).",
+    "text": "The sandbox's time is now 2024-07-07T15:00:00-05:00 (settings version 3).",
     "structuredContent": {
       "now": "2024-07-07T15:00:00-05:00",
-      "settingsVersion": 2
+      "settingsVersion": 3
     }
   },
   {
@@ -1163,10 +1163,10 @@
       "at": "2024-07-07T21:00:00-05:00"
     },
     "isError": false,
-    "text": "The sandbox's time is now 2024-07-07T21:00:00-05:00 (settings version 3).",
+    "text": "The sandbox's time is now 2024-07-07T21:00:00-05:00 (settings version 4).",
     "structuredContent": {
       "now": "2024-07-07T21:00:00-05:00",
-      "settingsVersion": 3
+      "settingsVersion": 4
     }
   },
   {
@@ -1747,10 +1747,10 @@
       "at": "2024-07-08T06:40:00-05:00"
     },
     "isError": false,
-    "text": "The sandbox's time is now 2024-07-08T06:40:00-05:00 (settings version 5).",
+    "text": "The sandbox's time is now 2024-07-08T06:40:00-05:00 (settings version 6).",
     "structuredContent": {
       "now": "2024-07-08T06:40:00-05:00",
-      "settingsVersion": 5
+      "settingsVersion": 6
     }
   },
   {
@@ -2168,10 +2168,10 @@
       "at": "2024-07-08T11:00:00-05:00"
     },
     "isError": false,
-    "text": "The sandbox's time is now 2024-07-08T11:00:00-05:00 (settings version 6).",
+    "text": "The sandbox's time is now 2024-07-08T11:00:00-05:00 (settings version 7).",
     "structuredContent": {
       "now": "2024-07-08T11:00:00-05:00",
-      "settingsVersion": 6
+      "settingsVersion": 7
     }
   },
   {

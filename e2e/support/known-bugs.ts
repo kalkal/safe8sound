@@ -69,13 +69,6 @@ export const BUGS = {
    * server lets start_storm_mode open a storm again after "power back" on the same day.
    */
   stormAgain: fakeModel('A question about the storm after the power is back prepares storm mode again and tells Ana again.'),
-  /**
-   * Every judge should start the same story at its start. Deployed with the daily anchor, a fresh session plays the
-   * reference place's hour now instead (09:00 for a judge at 09:00 in Rome, 21:00 at 21:00); the `start` anchor would
-   * play the hours since the Lambda container started, no better (apps/mcp-server/test/e2e/fresh-session-hour.test.ts).
-   * Which start a fresh session gets is the owner's call (analysis of 18 Oct, decision 5).
-   */
-  anchor: 'A fresh session plays the hour of the day in Rome (daily anchor), not the day from its start.',
   /** The user's settings live in the judges' demo drawer: the Echo has no settings page of its own yet (owner, 18 Oct). */
   echoSettings: 'The user settings are not inside the Echo yet (separation of demo controls and settings, 18 Oct).',
 } as const;

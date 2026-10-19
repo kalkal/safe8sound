@@ -6,10 +6,10 @@
       "locationId": "houston"
     },
     "isError": false,
-    "text": "Saved: Scenario clear-day in houston, temperatures in °F, at home: older-man; settings version 1. The day starts again from its beginning.",
+    "text": "Saved: Scenario clear-day in houston, temperatures in °F, at home: older-man; settings version 2. The day starts again from its beginning.",
     "structuredContent": {
       "settings": {
-        "version": 1,
+        "version": 2,
         "updatedAt": "2026-10-18T07:00:00.000Z",
         "scenarioId": "clear-day",
         "locationId": "houston",
@@ -24,10 +24,10 @@
     "tool": "get_demo_settings",
     "args": {},
     "isError": false,
-    "text": "Scenario clear-day in Houston, Texas (America/Chicago), temperatures in °F, at home: older-man; settings version 1.",
+    "text": "Scenario clear-day in Houston, Texas (America/Chicago), temperatures in °F, at home: older-man; settings version 2.",
     "structuredContent": {
       "settings": {
-        "version": 1,
+        "version": 2,
         "updatedAt": "2026-10-18T07:00:00.000Z",
         "scenarioId": "clear-day",
         "locationId": "houston",
@@ -46,56 +46,54 @@
     "tool": "get_home_status",
     "args": {},
     "isError": false,
-    "text": "Battery at 45%, comfort level; 0 of 4 rooms served (simulated data). The grid is on: the home draws 0 W from it. Rooms: Leo's room waiting with Leo (grandpa), Second bedroom waiting with daughter, Study waiting, Living room waiting. Room ids for tools (do not say them): Leo's room = bedroom-1; Second bedroom = bedroom-2; Study = study; Living room = living.",
+    "text": "Battery at 92.7%, comfort level; 2 of 4 rooms served (simulated data). The grid is on: the home draws 0 W from it. Rooms: Leo's room served with Leo (grandpa), Second bedroom waiting, Study served with daughter, Living room waiting. Room ids for tools (do not say them): Leo's room = bedroom-1; Second bedroom = bedroom-2; Study = study; Living room = living.",
     "structuredContent": {
       "homeId": "demo#00000000000000c0",
-      "ts": "2024-07-05T05:00:00.000Z",
-      "batterySocPct": 45,
-      "pvW": 0,
-      "loadW": 244,
+      "ts": "2024-07-05T17:00:00.000Z",
+      "batterySocPct": 92.7,
+      "pvW": 5304,
+      "loadW": 774,
       "gridW": 0,
       "gridAvailable": true,
       "level": "comfort",
       "levelReason": "user_choice",
-      "levelChangedAt": "2024-07-05T05:00:00.000Z",
+      "levelChangedAt": "2024-07-05T17:00:00.000Z",
       "controlAvailability": "ok",
       "rooms": [
         {
           "roomId": "bedroom-1",
           "name": "Leo's room",
           "tempC": 26,
-          "humidityPct": 55,
+          "humidityPct": 54,
           "occupants": [
             "grandpa"
           ],
-          "state": "waiting",
-          "waitingReason": "user_off"
+          "state": "served"
         },
         {
           "roomId": "bedroom-2",
           "name": "Second bedroom",
-          "tempC": 26.5,
-          "humidityPct": 55,
-          "occupants": [
-            "daughter"
-          ],
+          "tempC": 30.3,
+          "humidityPct": 82,
+          "occupants": [],
           "state": "waiting",
           "waitingReason": "user_off"
         },
         {
           "roomId": "study",
           "name": "Study",
-          "tempC": 27,
-          "humidityPct": 52,
-          "occupants": [],
-          "state": "waiting",
-          "waitingReason": "user_off"
+          "tempC": 26,
+          "humidityPct": 53,
+          "occupants": [
+            "daughter"
+          ],
+          "state": "served"
         },
         {
           "roomId": "living",
           "name": "Living room",
-          "tempC": 27,
-          "humidityPct": 55,
+          "tempC": 29,
+          "humidityPct": 81,
           "occupants": [],
           "state": "waiting",
           "waitingReason": "user_off"
@@ -114,18 +112,18 @@
     "tool": "get_safe_room_status",
     "args": {},
     "isError": false,
-    "text": "Safe room Leo's room: 78.8 °F, 55 % humidity, occupants: Leo (grandpa). It is above the night limit of 75.2 °F now. Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario clear-day). Context, to say only if someone may be unwell: the emergency number here is 911.",
+    "text": "Safe room Leo's room: 78.8 °F, 54 % humidity, occupants: Leo (grandpa). Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario clear-day). Context, to say only if someone may be unwell: the emergency number here is 911.",
     "structuredContent": {
       "safeRoomId": "bedroom-1",
       "tempC": 26,
-      "humidityPct": 55,
+      "humidityPct": 54,
       "occupantRoles": [
         "grandpa"
       ],
       "level": "comfort",
       "levelReason": "user_choice",
       "safeHours": 24,
-      "safeUntil": "2024-07-06T00:00:00-05:00",
+      "safeUntil": "2024-07-06T12:00:00-05:00",
       "gridAvailable": true,
       "origin": {
         "energy": "simulated",
@@ -135,8 +133,8 @@
       },
       "homeLink": "ok",
       "limitNow": {
-        "limitC": 24,
-        "kind": "night"
+        "limitC": 27,
+        "kind": "maximum"
       },
       "safeRoomName": "Leo's room",
       "people": [
@@ -151,12 +149,12 @@
     "tool": "get_reserve_outlook",
     "args": {},
     "isError": false,
-    "text": "For comfort, above the storm reserve: about 1.6 hours at comfort level, or 5.6 hours at essential with the same energy; the storm reserve alone gives 8.0 hours at essential. The grid is on. As of 12:00 AM (simulated data (energy, rooms, weather, scenario clear-day)).",
+    "text": "For comfort, above the storm reserve: about 4.9 hours at comfort level, or 16.9 hours at essential with the same energy; the storm reserve alone gives 15.2 hours at essential. The grid is on. As of 12:00 PM (simulated data (energy, rooms, weather, scenario clear-day)).",
     "structuredContent": {
       "level": "comfort",
-      "hoursAtCurrentLevel": 1.6201111111111106,
-      "hoursAtEssential": 5.554666666666665,
-      "reserveHoursAtEssential": 8,
+      "hoursAtCurrentLevel": 4.921424444444444,
+      "hoursAtEssential": 16.87345523809524,
+      "reserveHoursAtEssential": 15.154285714285715,
       "gridAvailable": true,
       "origin": {
         "energy": "simulated",
@@ -164,7 +162,7 @@
         "weather": "simulated",
         "scenario": "clear-day"
       },
-      "ts": "2024-07-05T00:00:00-05:00"
+      "ts": "2024-07-05T12:00:00-05:00"
     }
   },
   {
@@ -173,15 +171,15 @@
       "goal": "cool"
     },
     "isError": false,
-    "text": "Proposed plan: comfort level until 8:00 AM (nothing changes until apply_plan), built on simulated data (energy, rooms, weather, scenario clear-day). What it does: Second bedroom: cool at 77 °F; Leo's room: cool at 74.3 °F. Confirming it also allows these steps down if the battery falls behind: comfort: setpoint +0 K, cool, fans off, Leo's room, Second bedroom; balanced: setpoint +1 K, dry or cool, fans on, Leo's room, Second bedroom; saver: setpoint +2 K, dry or cool, fans on, Leo's room, Second bedroom; essential: setpoint +1.5 K, dry or cool, fans on, Leo's room. Guarantees: storm reserve holds: Keeps 3.2 kWh for a storm: the battery stays at or above 30.7 %. inverter limit holds: Peak load 3.5 kW, within the 6.0 kW the inverter delivers on grid. battery power holds: The battery delivers at most 0.8 kW, within its 5.0 kW. safe room comfort holds: The safe room stays between 74.3 and 75 °F, humidity 45-57 %. pacing on track holds: The battery follows the plan until the next recharge. Storm reserve 3.2 kWh: the battery stays at or above 30.7 % while the grid is up. Night recovery (elderly) met: 6.75 of 4 hours at or below 75.2 °F. Without the plan the safe room, Leo's room, would peak at 82.2 °F at 7:55 AM (74.2 heat-index °F-hours, 0.0 night hours at or below the threshold); with the naive plan (air conditioning until the battery dies) at 78.8 °F at 12:00 AM (0.0 heat-index °F-hours, 0.0 night hours at or below the threshold); with this plan at 78.8 °F at 12:00 AM (0.0 heat-index °F-hours, 6.8 night hours at or below the threshold). Say it to the person and ask to confirm. Plan plan_<id> is waiting for the person's yes: when they say yes, call apply_plan with planId plan_<id>.",
+    "text": "Proposed plan: comfort level until 12:00 AM (nothing changes until apply_plan), built on simulated data (energy, rooms, weather, scenario clear-day). What it does: Leo's room: cool at 77 °F; Study: cool at 77 °F; Second bedroom: cool at 73.4 °F. Solar surplus from 12:15 PM to 7:25 PM: 2.6 kWh kept at home instead of exported to the grid. Where it went, in order: 1) Leo's room (safe room), now 78.8 °F, 1.8 °F above the 77.0 °F comfort, cooling to 75.2 °F; 2) Second bedroom (slept in tonight), now 86.5 °F, 9.5 °F above the 77.0 °F comfort, cooling to 73.4 °F; 3) Study (occupied), now 78.8 °F, 1.8 °F above the 77.0 °F comfort, cooling to 73.4 °F. Good time to run the washing machine from 12:25 PM: an eco cycle fits; the sun should cover it until about 7:35 PM. Advice only, nothing is switched on. Confirming it also allows these steps down if the battery falls behind: comfort: setpoint +0 K, cool, fans off, Leo's room, Study; balanced: setpoint +1 K, dry or cool, fans on, Leo's room, Study; saver: setpoint +2 K, dry or cool, fans on, Leo's room, Study; essential: setpoint +1.5 K, dry or cool, fans on, Leo's room. Guarantees: storm reserve holds: Keeps 6.0 kWh for a storm: the battery stays at or above 49.2 %. inverter limit holds: Peak load 5.2 kW, within the 6.0 kW the inverter delivers on grid. battery power holds: The battery delivers at most 0.9 kW, within its 5.0 kW. safe room comfort holds: The safe room stays between 74.3 and 77 °F, humidity 44-57 %. pacing on track holds: The battery follows the plan until the next recharge. Storm reserve 6.0 kWh: the battery stays at or above 49.2 % while the grid is up. Night recovery (elderly) not assessable yet: the plan covers only 2 of the 9 night hours. Without the plan the safe room, Leo's room, would peak at 92.8 °F at 11:55 PM (292.1 heat-index °F-hours, 0.0 night hours at or below the threshold); with the naive plan (air conditioning until the battery dies) at 78.8 °F at 12:00 PM (0.0 heat-index °F-hours, 0.0 night hours at or below the threshold); with this plan at 78.8 °F at 12:00 PM (0.0 heat-index °F-hours, 1.8 night hours at or below the threshold). Say it to the person and ask to confirm. Plan plan_<id> is waiting for the person's yes: when they say yes, call apply_plan with planId plan_<id>.",
     "structuredContent": {
       "schemaVersion": 1,
       "id": "plan_<id>",
       "homeId": "demo#00000000000000c0",
       "status": "proposed",
-      "createdAt": "2024-07-05T05:00:00.000Z",
-      "expiresAt": "2024-07-05T05:10:00.000Z",
-      "horizonAt": "2024-07-05T08:00:00-05:00",
+      "createdAt": "2024-07-05T17:00:00.000Z",
+      "expiresAt": "2024-07-05T17:10:00.000Z",
+      "horizonAt": "2024-07-06T00:00:00-05:00",
       "goal": "cool",
       "ladder": [
         {
@@ -193,7 +191,7 @@
           ],
           "roomIds": [
             "bedroom-1",
-            "bedroom-2"
+            "study"
           ]
         },
         {
@@ -206,7 +204,7 @@
           ],
           "roomIds": [
             "bedroom-1",
-            "bedroom-2"
+            "study"
           ]
         },
         {
@@ -219,7 +217,7 @@
           ],
           "roomIds": [
             "bedroom-1",
-            "bedroom-2"
+            "study"
           ]
         },
         {
@@ -237,184 +235,292 @@
       ],
       "steps": [
         {
-          "ts": "2024-07-05T05:00:00.000Z",
+          "ts": "2024-07-05T17:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 92.7
+        },
+        {
+          "ts": "2024-07-05T17:00:00.000Z",
+          "roomId": "study",
+          "hvacMode": "cool",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 92.7
+        },
+        {
+          "ts": "2024-07-05T17:15:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 94.525
+        },
+        {
+          "ts": "2024-07-05T17:15:00.000Z",
           "roomId": "bedroom-2",
           "hvacMode": "cool",
-          "setpointC": 25,
+          "setpointC": 23,
           "fanOn": false,
           "level": "comfort",
-          "batteryTargetSocPct": 38.24085511807679
+          "batteryTargetSocPct": 94.525
         },
         {
-          "ts": "2024-07-05T05:00:00.000Z",
-          "roomId": "bedroom-1",
+          "ts": "2024-07-05T17:15:00.000Z",
+          "roomId": "study",
           "hvacMode": "cool",
-          "setpointC": 23.5,
+          "setpointC": 23,
           "fanOn": false,
           "level": "comfort",
-          "batteryTargetSocPct": 38.24085511807679
+          "batteryTargetSocPct": 94.525
         },
         {
-          "ts": "2024-07-05T12:00:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "dry",
-          "setpointC": 25,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
-        },
-        {
-          "ts": "2024-07-05T05:40:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "dry",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 34.68775657676248
-        },
-        {
-          "ts": "2024-07-05T08:55:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "cool",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
-        },
-        {
-          "ts": "2024-07-05T09:20:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "dry",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
-        },
-        {
-          "ts": "2024-07-05T10:10:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "cool",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
-        },
-        {
-          "ts": "2024-07-05T10:35:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "dry",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
-        },
-        {
-          "ts": "2024-07-05T11:25:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "cool",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
-        },
-        {
-          "ts": "2024-07-05T11:50:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "dry",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
-        },
-        {
-          "ts": "2024-07-05T12:30:00.000Z",
+          "ts": "2024-07-06T00:25:00.000Z",
           "roomId": "bedroom-1",
           "hvacMode": "cool",
           "setpointC": 25,
           "fanOn": false,
           "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
+          "batteryTargetSocPct": 97.77564909503607
         },
         {
-          "ts": "2024-07-05T12:55:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "dry",
+          "ts": "2024-07-06T00:25:00.000Z",
+          "roomId": "bedroom-2",
+          "hvacMode": "off",
+          "setpointC": 23,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 97.77564909503607
+        },
+        {
+          "ts": "2024-07-06T00:25:00.000Z",
+          "roomId": "study",
+          "hvacMode": "cool",
           "setpointC": 25,
           "fanOn": false,
           "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
+          "batteryTargetSocPct": 97.77564909503607
         },
         {
-          "ts": "2024-07-05T06:00:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "dry",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 32.911207306105325
-        },
-        {
-          "ts": "2024-07-05T07:00:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "dry",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
-        },
-        {
-          "ts": "2024-07-05T08:00:00.000Z",
-          "roomId": "bedroom-1",
-          "hvacMode": "dry",
-          "setpointC": 23.5,
-          "fanOn": false,
-          "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
-        },
-        {
-          "ts": "2024-07-05T09:00:00.000Z",
+          "ts": "2024-07-06T03:00:00.000Z",
           "roomId": "bedroom-1",
           "hvacMode": "cool",
           "setpointC": 23.5,
           "fanOn": false,
           "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
+          "batteryTargetSocPct": 84.62350444416667
         },
         {
-          "ts": "2024-07-05T10:00:00.000Z",
+          "ts": "2024-07-05T23:30:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "dry",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 99.59682266908152
+        },
+        {
+          "ts": "2024-07-05T23:55:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 99.26084155998278
+        },
+        {
+          "ts": "2024-07-06T00:35:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "dry",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 97.20845059778529
+        },
+        {
+          "ts": "2024-07-06T00:55:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 96.07405360328372
+        },
+        {
+          "ts": "2024-07-06T01:25:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "dry",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 93.60755276062434
+        },
+        {
+          "ts": "2024-07-06T01:45:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 91.86123148539717
+        },
+        {
+          "ts": "2024-07-06T02:25:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "dry",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 88.08149632697257
+        },
+        {
+          "ts": "2024-07-06T02:45:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 86.1055009653692
+        },
+        {
+          "ts": "2024-07-06T03:40:00.000Z",
           "roomId": "bedroom-1",
           "hvacMode": "dry",
           "setpointC": 23.5,
           "fanOn": false,
           "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
+          "batteryTargetSocPct": 81.63961726410304
         },
         {
-          "ts": "2024-07-05T11:00:00.000Z",
+          "ts": "2024-07-06T04:20:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 23.5,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 80.14767367407121
+        },
+        {
+          "ts": "2024-07-06T04:50:00.000Z",
           "roomId": "bedroom-1",
           "hvacMode": "dry",
           "setpointC": 23.5,
           "fanOn": false,
           "level": "comfort",
-          "batteryTargetSocPct": 30.657092268345465
+          "batteryTargetSocPct": 80.14767367407121
+        },
+        {
+          "ts": "2024-07-05T18:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 100
+        },
+        {
+          "ts": "2024-07-05T19:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 100
+        },
+        {
+          "ts": "2024-07-05T20:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 100
+        },
+        {
+          "ts": "2024-07-05T21:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 100
+        },
+        {
+          "ts": "2024-07-05T22:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 100
+        },
+        {
+          "ts": "2024-07-05T23:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 100
+        },
+        {
+          "ts": "2024-07-06T00:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 24,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 99.19364533816304
+        },
+        {
+          "ts": "2024-07-06T01:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 95.79045435465832
+        },
+        {
+          "ts": "2024-07-06T02:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "cool",
+          "setpointC": 25,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 90.55149052897679
+        },
+        {
+          "ts": "2024-07-06T04:00:00.000Z",
+          "roomId": "bedroom-1",
+          "hvacMode": "dry",
+          "setpointC": 23.5,
+          "fanOn": false,
+          "level": "comfort",
+          "batteryTargetSocPct": 80.14767367407121
         }
       ],
-      "reserveWh": 3167,
+      "reserveWh": 6000,
       "guarantees": [
         {
           "id": "storm_reserve",
           "ok": true,
-          "reason": "Keeps 3.2 kWh for a storm: the battery stays at or above 30.7 %.",
-          "measured": 30.7,
-          "limit": 30.7,
-          "nearestAllowed": 30.7,
+          "reason": "Keeps 6.0 kWh for a storm: the battery stays at or above 49.2 %.",
+          "measured": 80.1,
+          "limit": 49.2,
+          "nearestAllowed": 49.2,
           "unit": "%"
         },
         {
           "id": "inverter_limit",
           "ok": true,
-          "reason": "Peak load 3.5 kW, within the 6.0 kW the inverter delivers on grid.",
-          "measured": 3450,
+          "reason": "Peak load 5.2 kW, within the 6.0 kW the inverter delivers on grid.",
+          "measured": 5200,
           "limit": 6000,
           "nearestAllowed": 6000,
           "unit": "W"
@@ -422,8 +528,8 @@
         {
           "id": "battery_power",
           "ok": true,
-          "reason": "The battery delivers at most 0.8 kW, within its 5.0 kW.",
-          "measured": 817,
+          "reason": "The battery delivers at most 0.9 kW, within its 5.0 kW.",
+          "measured": 909,
           "limit": 5000,
           "nearestAllowed": 5000,
           "unit": "W"
@@ -431,8 +537,8 @@
         {
           "id": "safe_room_comfort",
           "ok": true,
-          "reason": "The safe room stays between 74.3 and 75 °F, humidity 45-57 %.",
-          "measured": 23.9,
+          "reason": "The safe room stays between 74.3 and 77 °F, humidity 44-57 %.",
+          "measured": 25,
           "limit": 27,
           "unit": "C"
         },
@@ -456,39 +562,75 @@
         "mode": "elderly",
         "thresholdC": 24,
         "window": {
-          "start": "2024-07-05T05:00:00.000Z",
-          "end": "2024-07-05T12:00:00.000Z"
+          "start": "2024-07-06T03:00:00.000Z",
+          "end": "2024-07-06T05:00:00.000Z"
         },
-        "requiredHours": 4,
-        "achievedHours": 6.75,
+        "requiredHours": 0,
+        "achievedHours": 1.83,
         "status": "met",
         "heatIndexDegreeHoursAbove26_7": 0,
         "budgetDegreeHours": 4
       },
-      "reserveFloorSocPct": 30.657092268345465,
+      "reserveFloorSocPct": 49.130434782608695,
       "gridAvailable": true,
       "counterfactual": {
         "roomId": "bedroom-1",
         "scenarios": {
           "noPlan": {
-            "peakTempC": 27.9,
-            "peakAt": "2024-07-05T12:55:00.000Z",
-            "heatIndexDegreeHours": 41.23,
+            "peakTempC": 33.8,
+            "peakAt": "2024-07-06T04:55:00.000Z",
+            "heatIndexDegreeHours": 162.26,
             "hoursAtOrBelowThreshold": 0
           },
           "naive": {
             "peakTempC": 26,
-            "peakAt": "2024-07-05T05:00:00.000Z",
+            "peakAt": "2024-07-05T17:00:00.000Z",
             "heatIndexDegreeHours": 0,
             "hoursAtOrBelowThreshold": 0
           },
           "plan": {
             "peakTempC": 26,
-            "peakAt": "2024-07-05T05:00:00.000Z",
+            "peakAt": "2024-07-05T17:00:00.000Z",
             "heatIndexDegreeHours": 0,
-            "hoursAtOrBelowThreshold": 6.75
+            "hoursAtOrBelowThreshold": 1.83
           }
         }
+      },
+      "surplus": {
+        "from": "2024-07-05T12:15:00-05:00",
+        "to": "2024-07-05T19:25:00-05:00",
+        "keptKWh": 2.6,
+        "rooms": [
+          {
+            "roomId": "bedroom-1",
+            "name": "Leo's room",
+            "setpointC": 24,
+            "reason": "safe_room",
+            "aboveTargetK": 1
+          },
+          {
+            "roomId": "bedroom-2",
+            "name": "Second bedroom",
+            "setpointC": 23,
+            "reason": "occupied_tonight",
+            "aboveTargetK": 5.3
+          },
+          {
+            "roomId": "study",
+            "name": "Study",
+            "setpointC": 23,
+            "reason": "occupied",
+            "aboveTargetK": 1
+          }
+        ],
+        "comfortC": 25
+      },
+      "householdTip": {
+        "load": "washing",
+        "cycle": "eco",
+        "windowFrom": "2024-07-05T12:25:00-05:00",
+        "windowTo": "2024-07-05T19:35:00-05:00",
+        "probable": false
       }
     }
   },
@@ -623,216 +765,11 @@
     "tool": "get_milestones",
     "args": {},
     "isError": false,
-    "text": "Now 2024-07-05T00:00:00-05:00; the day runs from 2024-07-05T00:00:00-05:00 to 2024-07-06T00:00:00-05:00. Next: Next recharge at 2024-07-05T08:00:00-05:00.",
+    "text": "Now 2024-07-05T12:00:00-05:00; the day runs from 2024-07-05T12:00:00-05:00 to 2024-07-06T00:00:00-05:00. No moment ahead in the next 24 hours.",
     "structuredContent": {
-      "now": "2024-07-05T00:00:00-05:00",
+      "now": "2024-07-05T12:00:00-05:00",
       "day": {
-        "from": "2024-07-05T00:00:00-05:00",
-        "to": "2024-07-06T00:00:00-05:00"
-      },
-      "milestones": [
-        {
-          "kind": "next_recharge",
-          "at": "2024-07-05T08:00:00-05:00",
-          "label": "Next recharge"
-        }
-      ]
-    }
-  },
-  {
-    "tool": "advance_clock",
-    "args": {
-      "kind": "next_recharge",
-      "at": "2024-07-05T08:00:00-05:00"
-    },
-    "isError": false,
-    "text": "The sandbox's time is now 2024-07-05T08:00:00-05:00 (settings version 2).",
-    "structuredContent": {
-      "now": "2024-07-05T08:00:00-05:00",
-      "settingsVersion": 2
-    }
-  },
-  {
-    "tool": "get_home_status",
-    "args": {},
-    "isError": false,
-    "text": "Battery at 32.6%, comfort level; 0 of 4 rooms served (simulated data). The grid is on: the home draws 0 W from it. Rooms: Leo's room waiting with Leo (grandpa), Second bedroom waiting, Study waiting, Living room waiting. Room ids for tools (do not say them): Leo's room = bedroom-1; Second bedroom = bedroom-2; Study = study; Living room = living.",
-    "structuredContent": {
-      "homeId": "demo#00000000000000c0",
-      "ts": "2024-07-05T13:00:00.000Z",
-      "batterySocPct": 32.6,
-      "pvW": 829,
-      "loadW": 492,
-      "gridW": 0,
-      "gridAvailable": true,
-      "level": "comfort",
-      "levelReason": "user_choice",
-      "levelChangedAt": "2024-07-05T05:00:00.000Z",
-      "controlAvailability": "ok",
-      "rooms": [
-        {
-          "roomId": "bedroom-1",
-          "name": "Leo's room",
-          "tempC": 27.9,
-          "humidityPct": 100,
-          "occupants": [
-            "grandpa"
-          ],
-          "state": "waiting",
-          "waitingReason": "user_off"
-        },
-        {
-          "roomId": "bedroom-2",
-          "name": "Second bedroom",
-          "tempC": 28.3,
-          "humidityPct": 98,
-          "occupants": [],
-          "state": "waiting",
-          "waitingReason": "user_off"
-        },
-        {
-          "roomId": "study",
-          "name": "Study",
-          "tempC": 27.6,
-          "humidityPct": 89,
-          "occupants": [],
-          "state": "waiting",
-          "waitingReason": "user_off"
-        },
-        {
-          "roomId": "living",
-          "name": "Living room",
-          "tempC": 27.1,
-          "humidityPct": 87,
-          "occupants": [],
-          "state": "waiting",
-          "waitingReason": "user_off"
-        }
-      ],
-      "origin": {
-        "energy": "simulated",
-        "rooms": "simulated",
-        "weather": "simulated",
-        "scenario": "clear-day"
-      },
-      "homeLink": "ok"
-    }
-  },
-  {
-    "tool": "get_safe_room_status",
-    "args": {},
-    "isError": false,
-    "text": "Safe room Leo's room: 82.2 °F, 100 % humidity, occupants: Leo (grandpa). It is above the safety maximum of 80.6 °F now. Level comfort (reason: user_choice). The grid powers the safe room; on the battery alone it would hold at least 24.0 hours. No storm mode. Home link ok, simulated data (energy, rooms, weather, scenario clear-day). Context, to say only if someone may be unwell: the emergency number here is 911.",
-    "structuredContent": {
-      "safeRoomId": "bedroom-1",
-      "tempC": 27.9,
-      "humidityPct": 100,
-      "occupantRoles": [
-        "grandpa"
-      ],
-      "level": "comfort",
-      "levelReason": "user_choice",
-      "safeHours": 24,
-      "safeUntil": "2024-07-06T08:00:00-05:00",
-      "gridAvailable": true,
-      "origin": {
-        "energy": "simulated",
-        "rooms": "simulated",
-        "weather": "simulated",
-        "scenario": "clear-day"
-      },
-      "homeLink": "ok",
-      "limitNow": {
-        "limitC": 27,
-        "kind": "maximum"
-      },
-      "safeRoomName": "Leo's room",
-      "people": [
-        {
-          "role": "grandpa",
-          "name": "Leo"
-        }
-      ]
-    }
-  },
-  {
-    "tool": "plan_comfort",
-    "args": {
-      "goal": "cool"
-    },
-    "isError": true,
-    "text": "The plan takes the battery to 32.6 %, below the 49.2 % kept for a storm (6.0 kWh). Nearest allowed: 49.2 %.",
-    "structuredContent": {
-      "code": "storm_reserve_violated",
-      "category": "guard_rejection",
-      "message": "The plan takes the battery to 32.6 %, below the 49.2 % kept for a storm (6.0 kWh). Nearest allowed: 49.2 %.",
-      "retryable": false,
-      "details": {
-        "guarantee": "storm_reserve",
-        "measured": 32.6,
-        "limit": 49.2,
-        "nearestAllowed": 49.2,
-        "unit": "%",
-        "guarantees": [
-          {
-            "id": "storm_reserve",
-            "ok": false,
-            "reason": "The plan takes the battery to 32.6 %, below the 49.2 % kept for a storm (6.0 kWh).",
-            "measured": 32.6,
-            "limit": 49.2,
-            "nearestAllowed": 49.2,
-            "unit": "%"
-          },
-          {
-            "id": "inverter_limit",
-            "ok": true,
-            "reason": "Peak load 1.2 kW, within the 6.0 kW the inverter delivers on grid.",
-            "measured": 1225,
-            "limit": 6000,
-            "nearestAllowed": 6000,
-            "unit": "W"
-          },
-          {
-            "id": "battery_power",
-            "ok": true,
-            "reason": "The battery delivers at most 0.8 kW, within its 5.0 kW.",
-            "measured": 801,
-            "limit": 5000,
-            "nearestAllowed": 5000,
-            "unit": "W"
-          },
-          {
-            "id": "safe_room_comfort",
-            "ok": true,
-            "reason": "The safe room stays between 79.7 and 79.7 °F, humidity 43-56 %.",
-            "measured": 26.5,
-            "limit": 27,
-            "unit": "C"
-          },
-          {
-            "id": "pacing_on_track",
-            "ok": true,
-            "reason": "The battery follows the plan until the next recharge."
-          }
-        ],
-        "origin": {
-          "energy": "simulated",
-          "rooms": "simulated",
-          "weather": "simulated",
-          "scenario": "clear-day"
-        }
-      }
-    }
-  },
-  {
-    "tool": "get_milestones",
-    "args": {},
-    "isError": false,
-    "text": "Now 2024-07-05T08:00:00-05:00; the day runs from 2024-07-05T00:00:00-05:00 to 2024-07-06T00:00:00-05:00. No moment ahead in the next 24 hours.",
-    "structuredContent": {
-      "now": "2024-07-05T08:00:00-05:00",
-      "day": {
-        "from": "2024-07-05T00:00:00-05:00",
+        "from": "2024-07-05T12:00:00-05:00",
         "to": "2024-07-06T00:00:00-05:00"
       },
       "milestones": []

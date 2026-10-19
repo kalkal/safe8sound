@@ -132,7 +132,8 @@ export function demoClockTools(deps: DemoClockDeps, settings: SettingsAccess, o:
       if (!plan.ok) return plan;
       return ok({
         now: localIso(day.nowMs, day.timeZone),
-        day: { from: localIso(day.startMs, day.timeZone), to: localIso(day.startMs + DAY_MS, day.timeZone) },
+        // A day of 24 hours, never past the scenario's end: the clear day played from 12:00 ends at midnight (#449).
+        day: { from: localIso(day.startMs, day.timeZone), to: localIso(Math.min(day.startMs + DAY_MS, day.endMs), day.timeZone) },
         milestones: listOf(day, plan.value, deps.stableGridMs),
       });
     },

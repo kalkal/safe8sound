@@ -62,7 +62,7 @@ describe('sandbox settings on the local entry', () => {
     expect(await planDay(a.call)).toBe('2026-07-16');
     const set = await a.call('set_scenario', { scenarioId: 'storm-blackout', household: 'older-woman' });
     expect(set.isError).not.toBe(true);
-    expect(SetScenarioOutputSchema.parse(set.structuredContent)).toMatchObject({ restarted: true, settings: { version: 1, scenarioId: 'storm-blackout' } });
+    expect(SetScenarioOutputSchema.parse(set.structuredContent)).toMatchObject({ restarted: true, settings: { version: 2, scenarioId: 'storm-blackout' } });
 
     // The sandbox's own clock: its plans and safe room fall on the storm day, with grandma in the safe room.
     expect(await planDay(a.call)).toBe('2026-07-17');
@@ -73,8 +73,8 @@ describe('sandbox settings on the local entry', () => {
 
     expect(await planDay(b.call)).toBe('2026-07-16');
     expect(await planDay(demo.call)).toBe('2026-07-16');
-    // One warning per sandbox built from the defaults (B and A before its first change), never a home id.
-    expect(logger.lines.filter((l) => l.level === 'warn' && l.details?.['event'] === 'settings_missing').length).toBeGreaterThanOrEqual(1);
+    // A new sandbox stores its start at its first request (#449): no "no settings saved" warning for it, and never a home id.
+    expect(logger.lines.filter((l) => l.details?.['event'] === 'settings_missing')).toEqual([]);
     expect(JSON.stringify(logger.lines)).not.toContain(A);
   });
 

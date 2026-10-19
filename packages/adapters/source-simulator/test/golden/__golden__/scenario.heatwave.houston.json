@@ -5,6 +5,7 @@
   "description": "A heatwave day, 38 degrees in the afternoon, a warm night and the next hot morning (36 hours, so a plan sees the whole night). The safe room is cooled all day with the fan on.",
   "startAt": "2024-07-05T00:00:00-05:00",
   "durationH": 36,
+  "playFromH": 12,
   "stepSeconds": 60,
   "seed": 20260716,
   "simulatedGroups": [

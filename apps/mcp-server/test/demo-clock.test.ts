@@ -263,6 +263,12 @@ describe('advance_clock (#311)', () => {
     expect(r.ok && GetMilestonesOutputSchema.parse(r.value).milestones.map((m) => m.kind)).toEqual(['storm_start']);
   });
 
+  it("ends the day's span at the scenario's end when it is played from midway (#449: the clear day from 12:00)", async () => {
+    const { list } = setup({ day: () => ({ nowMs: START + 12 * H, version: undefined, anchorMs: ANCHOR, startMs: START + 12 * H, endMs: START + 24 * H, timeZone: TZ, outages: [] }) });
+    const r = await list.handler({}, ctx(A));
+    expect(r.ok && GetMilestonesOutputSchema.parse(r.value).day).toEqual({ from: '2026-07-17T12:00:00+02:00', to: '2026-07-18T00:00:00+02:00' });
+  });
+
   it('the same milestone twice: the second time it is behind now and refused', async () => {
     const { advance } = setup();
     const storm = { kind: 'storm_start', at: '2026-07-17T03:00:00+02:00' };

@@ -1,5 +1,6 @@
 import { GetMilestonesOutputSchema, HOME_HEADER } from '@cold-reserve/contracts';
 import { memoryLogger } from '@cold-reserve/core';
+import { createMemoryBacking } from '@cold-reserve/store-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -9,11 +10,11 @@ import { startNodeServer } from '../../src/node-server.js';
 import { settableClock } from '../comfort-plan/support.js';
 import { TOKEN } from '../helpers.js';
 
-// The judge's journey (owner, 18 Oct): what a judge sees on a FRESH session depends on the wall-clock hour they open
-// the site. Deployed as infra/cdk.json says (the clear day, the daily anchor, real speed), a fresh sandbox plays the
-// clear day at the reference place's hour now: 09:00 for a judge at 09:00 in Rome, 21:00 for one at 21:00. The `start`
-// anchor is no better: a fresh sandbox plays the hours since the server (a Lambda container) started. Only a new
-// scenario, a new place or "Restart the day" starts the day at its beginning, the storm day at 12:00, for everyone.
+// #449 (the judge's journey, 18 Oct): every judge sees the same story from its start. A NEW sandbox plays the scenario's
+// day from its beginning, whatever the wall-clock hour they open the site: the start a "Restart the day" gives. Before,
+// with the daily anchor as deployed (infra/cdk.json), a fresh sandbox played the reference place's hour now (09:00 for a
+// judge at 09:00 in Rome, 21:00 at 21:00), and with the `start` anchor the hours since the Lambda container started.
+// Every container plays the same start: the first one stores it with the sandbox's settings, the others adopt it.
 
 const H = 3_600_000;
 /** 18 Oct 2026, 09:00 and 21:00 in Rome (CEST, UTC+2). */
@@ -26,14 +27,15 @@ afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
 });
 
-async function server(env: Record<string, string>, wallMs: number) {
+/** One server (a Lambda container), on its own wall clock; `backing`: the store it shares with other containers. */
+async function server(env: Record<string, string>, wallMs: number, backing = createMemoryBacking()) {
   const wall = settableClock(wallMs);
-  const local = createLocalApp({ ...CLIENTS, ...env }, { wallClock: wall, logger: memoryLogger() });
+  const local = createLocalApp({ ...CLIENTS, ...env }, { wallClock: wall, logger: memoryLogger(), backing });
   if (!local.ok) throw new Error(local.error.message);
   const { app } = local.value;
   const node = await startNodeServer(app.handler, { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: app.config.maxBodyBytes });
   cleanup.push(() => node.close());
-  /** A new visitor session: its own sandbox, as each demo code exchange is (#101). */
+  /** A visitor session on this container: the sandbox of `home`, as each demo code exchange is (#101). */
   const visitor = async (home: string) => {
     const client = new Client({ name: `e2e-${home}`, version: '0.0.0' });
     await client.connect(new StreamableHTTPClientTransport(new URL(node.url), { requestInit: { headers: { authorization: `Bearer ${TOKEN}`, [HOME_HEADER]: home } } }) as unknown as Transport);
@@ -41,34 +43,61 @@ async function server(env: Record<string, string>, wallMs: number) {
     const call = (name: string, args: Record<string, unknown> = {}) => client.callTool({ name, arguments: args });
     /** The sandbox's local time now, "HH:MM", as the clock bar shows it. */
     const time = async () => /T(\d{2}:\d{2})/.exec(GetMilestonesOutputSchema.parse((await call('get_milestones')).structuredContent).now)?.[1];
-    return { call, time };
+    /** The start "Restart the day" gives the same scenario. */
+    const restarted = async () => {
+      expect((await call('set_scenario', { restart: true })).isError).not.toBe(true);
+      return time();
+    };
+    return { call, time, restarted };
   };
   return { wall, visitor };
 }
 
-describe("a judge's fresh session and the wall-clock hour (owner, 18 Oct)", () => {
-  it('daily anchor, as deployed: a fresh session plays the hour of the day in Rome; picking the storm starts it at 12:00', async () => {
-    for (const [wallMs, hour, home] of [
-      [MORNING, '09:00', 'demo#00000000000000a1'],
-      [EVENING, '21:00', 'demo#00000000000000a2'],
+describe("a judge's fresh session starts the day at its beginning, whatever the hour (#449)", () => {
+  it('daily anchor, as deployed: fresh sandboxes at 09:00 and at 21:00 both show the day start a restart gives', async () => {
+    const seen: string[] = [];
+    for (const [wallMs, home] of [
+      [MORNING, 'demo#00000000000000a1'],
+      [EVENING, 'demo#00000000000000a2'],
     ] as const) {
       const { visitor } = await server({ MCP_SCENARIO_ANCHOR: 'daily' }, wallMs);
       const judge = await visitor(home);
-      expect(await judge.time()).toBe(hour);
-      expect((await judge.call('set_scenario', { scenarioId: 'storm-blackout' })).isError).not.toBe(true);
-      expect(await judge.time()).toBe('12:00');
+      const fresh = (await judge.time()) ?? '';
+      expect(fresh).toBe(await judge.restarted());
+      seen.push(fresh);
     }
+    expect(seen[0]).toBe(seen[1]);
+    // The owner's choice B (19 Oct): the clear day plays from 12:00, as the storm day starts.
+    expect(seen[0]).toBe('12:00');
   });
 
-  it('start anchor: a fresh session plays the hours since the server started, so it is no fixed start either', async () => {
+  it('start anchor: a judge nine hours after the container started still starts at the day start', async () => {
     const { wall, visitor } = await server({}, MORNING);
     const first = await visitor('demo#00000000000000b1');
-    expect(await first.time()).toBe('00:00');
-    // A second judge, nine hours later on the same server (a warm container).
+    const start = await first.time();
     wall.set(MORNING + 9 * H);
     const second = await visitor('demo#00000000000000b2');
-    expect(await second.time()).toBe('09:00');
-    expect((await second.call('set_scenario', { scenarioId: 'storm-blackout' })).isError).not.toBe(true);
-    expect(await second.time()).toBe('12:00');
+    expect(await second.time()).toBe(start);
+    expect(await second.time()).toBe(await second.restarted());
+  });
+
+  it('an explicit MCP_SCENARIO_START_H is the hour a sandbox plays from, a new one and a restart alike, never added to the scenario hour', async () => {
+    const { visitor } = await server({ MCP_SCENARIO_ANCHOR: 'daily', MCP_SCENARIO_START_H: '3' }, MORNING);
+    const judge = await visitor('demo#00000000000000d1');
+    expect(await judge.time()).toBe('03:00');
+    expect(await judge.restarted()).toBe('03:00');
+  });
+
+  it('two containers sharing the store play one start for the same sandbox, the one stored first', async () => {
+    const backing = createMemoryBacking();
+    const a = await server({ MCP_SCENARIO_ANCHOR: 'daily' }, MORNING, backing);
+    const judgeOnA = await a.visitor('demo#00000000000000c1');
+    const start = await judgeOnA.time();
+    // Three real hours later the same judge's next request lands on a container that never saw this sandbox.
+    const b = await server({ MCP_SCENARIO_ANCHOR: 'daily' }, MORNING + 3 * H, backing);
+    a.wall.set(MORNING + 3 * H);
+    const judgeOnB = await b.visitor('demo#00000000000000c1');
+    expect(await judgeOnB.time()).toBe(await judgeOnA.time());
+    expect(await judgeOnA.time()).not.toBe(start);
   });
 });
