@@ -26,12 +26,12 @@ describe('the last-resort family alert (#364)', () => {
   const battery = { safeUntil: '2026-07-16T03:05:00+02:00', safeHours: 7.2, limitedBy: 'battery', limitCrossedAt: '2026-07-16T06:00:00+02:00', limitCrossedC: 24, worstAt: '2026-07-16T07:00:00+02:00' };
 
   it('cooling: the room time first, then the battery', async () => {
-    expect(await sent(plan({ ...battery, comfortLimitC: 24, worstC: 26.1 }))).toContain('stays within its limits until about 6:00 AM (battery until 3:05 AM), then gets warmer.');
+    expect(await sent(plan({ ...battery, comfortLimitC: 24, worstC: 26.1 }))).toContain('stays within its limits until about 06:00 (battery until 03:05), then gets warmer.');
   });
 
   it('heating: the battery time only, never "then gets warmer" after a crossing under the minimum', async () => {
     const text = await sent(plan({ ...battery, comfortLimitC: 18, worstC: 16.5, limitCrossedC: 18 }));
     expect(text).not.toContain('until about');
-    expect(text).toContain('until 3:05 AM');
+    expect(text).toContain('until 03:05');
   });
 });

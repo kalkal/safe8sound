@@ -47,7 +47,7 @@ describe('local entry: one scenario clock for everything', () => {
 
       const outlook = await call('get_reserve_outlook');
       expect(ReserveOutlookSchema.parse(outlook.structuredContent).ts).toMatch(/^2026-07-17T16:0\d:\d\d\+02:00$/);
-      expect(textOf(outlook)).toMatch(/As of 4:0\d PM \(/);
+      expect(textOf(outlook)).toMatch(/As of 16:0\d \(/);
       expect(textOf(outlook)).not.toMatch(/\d{4}-\d\d-\d\dT/);
       expect(textOf(planned)).not.toMatch(/\d{4}-\d\d-\d\dT/);
     } finally {

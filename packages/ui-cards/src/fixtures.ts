@@ -115,7 +115,7 @@ export function lastResortBatteryPlan(place?: LocationId): Plan {
       actions: ['close_curtains', 'drink_water', 'fan_below_35c'],
       ...(place === undefined ? {} : { place }),
     },
-    warnings: [{ code: 'last_resort_plan', message: 'No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up.' }],
+    warnings: [{ code: 'last_resort_plan', message: 'No plan keeps the Bedroom within its limits until the next recharge: within them until about 06:00, the battery until 03:05; then it warms up.' }],
   });
 }
 

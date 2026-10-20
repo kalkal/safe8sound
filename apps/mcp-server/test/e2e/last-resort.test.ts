@@ -25,7 +25,7 @@ import { preferences } from '../storm-mode/support.js';
 const H = 3_600_000;
 const DEMO = HomeIdSchema.parse('demo');
 const textOf = (r: Record<string, unknown>): string => (r['content'] as { type: string; text: string }[] | undefined)?.[0]?.text ?? '';
-const clock = (iso: string) => new Intl.DateTimeFormat('en-US', { timeZone: demoProfile().location.tz, hour: 'numeric', minute: '2-digit' }).format(Date.parse(iso));
+const clock = (iso: string) => new Intl.DateTimeFormat('en-GB', { timeZone: demoProfile().location.tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(Date.parse(iso));
 /** #390: the family reads a time on the day after the storm afternoon (17 July) as tomorrow's. */
 const said = (iso: string) => clock(iso) + (iso.slice(0, 10) > '2026-07-17' ? ' tomorrow' : '');
 

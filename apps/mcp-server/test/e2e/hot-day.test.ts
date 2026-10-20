@@ -73,7 +73,7 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       expect(text).toContain('simulated data');
       // The 36-hour heatwave shows the whole night: the night-recovery guarantee is met and said with its hours.
       expect(plan.nightRecovery?.status).toBe('met');
-      expect(text).toMatch(/Night recovery \(elderly\) met: [\d.]+ of 6 hours at or below 24 °C/);
+      expect(text).toMatch(/Night recovery \(elderly\) met: [\d.]+ hours at or below 24 °C \(6 needed\)/);
       expect(text).toMatch(/What it does: Leo's room: (cool|dry) at \d+(\.\d)? °C/);
       expect(plan.counterfactual?.scenarios.noPlan.peakTempC).toBeGreaterThan(plan.counterfactual?.scenarios.plan.peakTempC ?? Infinity);
       // An ordinary summer day (#203): the battery is full at 2 PM, so the solar surplus cools the house instead
@@ -81,11 +81,11 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       const surplus = plan.surplus;
       if (surplus === undefined) throw new Error('no solar surplus on the hot day');
       expect(surplus.rooms[0]?.reason).toBe('safe_room');
-      expect(text).toMatch(/Solar surplus from \d{1,2}:\d\d [AP]M to \d{1,2}:\d\d [AP]M: [\d.]+ kWh kept at home instead of exported to the grid\. Where it went, in order: 1\) Leo's room \(safe room\), now [\d.]+ °C, [\d.]+ °C (above|below) the [\d.]+ °C comfort, cooling to [\d.]+ °C/);
+      expect(text).toMatch(/Solar surplus from \d{2}:\d\d to \d{2}:\d\d: [\d.]+ kWh kept at home instead of exported to the grid\. Where it went, in order: 1\) Leo's room \(safe room\), now [\d.]+ °C, [\d.]+ °C (above|below) the [\d.]+ °C comfort, cooling to [\d.]+ °C/);
       expect(text).toContain(`${surplus.keptKWh.toFixed(1)} kWh kept at home`);
       // With the battery full the sun keeps exporting (#219): the text suggests a load and until when, advice only.
       if (plan.householdTip === undefined) throw new Error('no household tip on the hot day');
-      expect(text).toMatch(/(Good time to (run the washing machine|cook) from \d{1,2}:\d\d [AP]M: .*the sun should cover it until about \d{1,2}:\d\d [AP]M\.|Probably a good time to .+ from \d{1,2}:\d\d [AP]M.*\.) Advice only, nothing is switched on\./);
+      expect(text).toMatch(/(Good time to (run the washing machine|cook) from \d{2}:\d\d: .*the sun should cover it until about \d{2}:\d\d\.|Probably a good time to .+ from \d{2}:\d\d.*\.) Advice only, nothing is switched on\./);
 
       // 3. The person confirms; the agent retries after a timeout: one application only.
       const first = await call(TOKEN, 'apply_plan', { planId: plan.id });
@@ -95,7 +95,7 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       expect([applied.alreadyApplied, retried.alreadyApplied]).toEqual([false, true]);
       expect(retried.plan).toEqual(applied.plan);
       expect(textOf(first)).toBe(`The plan was applied.`);
-      expect(textOf(again)).toBe(`The plan was already applied.`);
+      expect(textOf(again)).toBe('The plan was already applied: it is in place, so tell the person that and never ask them to confirm it again.');
 
       // 4. The ice cubes.
       const ice = await call(TOKEN, 'get_reserve_outlook', {});

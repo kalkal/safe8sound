@@ -63,7 +63,7 @@ describe('the storm story of a sandbox (#390)', () => {
     // 12:00, a storm is forecast: preparing tells Ana once, whatever the model asks again.
     const prepared = await call('start_storm_mode', { mode: 'prepare' });
     expect(prepared.text).toContain('Family told that a storm is expected: daughter (in_app).');
-    expect(prepared.text).toContain('is covered for at least 24.0 hours, at least until 12:00 PM tomorrow.');
+    expect(prepared.text).toContain('is covered for at least 24.0 hours, at least until 12:00 tomorrow.');
     await call('start_storm_mode', { mode: 'prepare' });
     expect((await phone()).map((m) => m.transition)).toEqual(['storm_prepared']);
 
@@ -87,12 +87,12 @@ describe('the storm story of a sandbox (#390)', () => {
     const messages = await phone();
     expect(messages.map((m) => `${m.transition}@${m.at}`)).toEqual(['storm_prepared@12:00', 'storm_started@15:00', 'essential_level@21:00', 'power_back@06:40']);
     const [forecast, started, essential, back] = messages.map((m) => m.text);
-    expect(forecast).toContain("a storm is expected and the home is ready for a power cut. Leo's room is at 26.0 °C; if the power goes out, the battery keeps it safe at least until 12:00 PM tomorrow.");
-    // The storm-start time is never the time it is sent ("until 3:00 PM" at 3:00 PM): at the 24-hour cap it is a horizon.
-    expect(started).toMatch(/Leo's room is at 26\.0 °C and the battery keeps it safe at least until 3:00 PM tomorrow\. No action is needed now\./);
-    expect(essential).toMatch(/the home stepped down to its essential settings to keep Leo's room safe longer, at least until 9:00 PM tomorrow\. Leo's room is at 25\.0 °C\. No action is needed now\./);
+    expect(forecast).toContain("a storm is expected and the home is ready for a power cut. Leo's room is at 26.0 °C; if the power goes out, the battery keeps it safe at least until 12:00 tomorrow.");
+    // The storm-start time is never the time it is sent ("until 15:00" at 15:00): at the 24-hour cap it is a horizon.
+    expect(started).toMatch(/Leo's room is at 26\.0 °C and the battery keeps it safe at least until 15:00 tomorrow\. No action is needed now\./);
+    expect(essential).toMatch(/the home stepped down to its essential settings to keep Leo's room safe longer, at least until 21:00 tomorrow\. Leo's room is at 25\.0 °C\. No action is needed now\./);
     // Power back: grandpa's room within his 24 °C night limit, so no action is needed (above it, the family would be asked to check).
-    expect(back).toContain("power came back at home at 6:30 AM. Leo's room is at 24.0 °C. Storm mode has ended. No action is needed now.");
+    expect(back).toContain("power came back at home at 06:30. Leo's room is at 24.0 °C. Storm mode has ended. No action is needed now.");
     for (const text of [started, essential, back]) expect(tempOf(text ?? '')).toBeLessThanOrEqual(26);
 
     // After power back the house is no longer in a storm: storm mode ended, the comfort level, the living room cooled again.

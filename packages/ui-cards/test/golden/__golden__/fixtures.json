@@ -1408,7 +1408,7 @@
     "warnings": [
       {
         "code": "last_resort_plan",
-        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up."
+        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 06:00, the battery until 03:05; then it warms up."
       }
     ],
     "lastResort": {
@@ -1586,7 +1586,7 @@
     "warnings": [
       {
         "code": "last_resort_plan",
-        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up."
+        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 06:00, the battery until 03:05; then it warms up."
       }
     ],
     "lastResort": {
@@ -1764,7 +1764,7 @@
     "warnings": [
       {
         "code": "last_resort_plan",
-        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up."
+        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 06:00, the battery until 03:05; then it warms up."
       }
     ],
     "lastResort": {
@@ -1942,7 +1942,7 @@
     "warnings": [
       {
         "code": "last_resort_plan",
-        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 6:00 AM, the battery until 3:05 AM; then it warms up."
+        "message": "No plan keeps the Bedroom within its limits until the next recharge: within them until about 06:00, the battery until 03:05; then it warms up."
       }
     ],
     "lastResort": {

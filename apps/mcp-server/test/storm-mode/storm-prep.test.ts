@@ -133,7 +133,7 @@ describe('the last check-in from the family (queue item 3)', () => {
     if (!out.ok) throw new Error(out.error.message);
     expect(out.value.lastCheckIn).toEqual({ role: 'daughter', reply: 'on_my_way', at: '2026-09-30T21:30:00+02:00' });
     const text = safeRoomSummary(out.value);
-    expect(text).toContain('Last check-in: your daughter is on the way (9:30 PM).');
+    expect(text).toContain('Last check-in: your daughter is on the way (21:30).');
     expect(text).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
   });
 

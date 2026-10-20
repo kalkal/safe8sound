@@ -6,9 +6,9 @@
       "role": "daughter",
       "channel": "in_app",
       "transition": "storm_started",
-      "text": "Safe-8-Sound alert for Ana: a storm cut the power at home. Leo's room is at 26.8 °C and the battery keeps it safe until 6:40 AM tomorrow. No action is needed now. Next message: when the level changes or power returns."
+      "text": "Safe-8-Sound alert for Ana: a storm cut the power at home. Leo's room is at 26.8 °C and the battery keeps it safe until 06:40 tomorrow. No action is needed now. Next message: when the level changes or power returns."
     },
-    "it": "Avviso di Safe-8-Sound per Ana: un temporale ha tolto la corrente in casa. Leo's room è a 26.8 °C e la batteria la tiene al sicuro fino alle 6:40 di domani. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente."
+    "it": "Avviso di Safe-8-Sound per Ana: un temporale ha tolto la corrente in casa. Leo's room è a 26.8 °C e la batteria la tiene al sicuro fino alle 06:40 di domani. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente."
   },
   {
     "name": "essential",
@@ -17,9 +17,9 @@
       "role": "daughter",
       "channel": "in_app",
       "transition": "essential_level",
-      "text": "Safe-8-Sound update for Ana: the home stepped down to its essential settings to keep Leo's room safe longer, until 6:40 AM tomorrow. Leo's room is at 26.8 °C. No action is needed now. Next message: when the level changes or power returns."
+      "text": "Safe-8-Sound update for Ana: the home stepped down to its essential settings to keep Leo's room safe longer, until 06:40 tomorrow. Leo's room is at 26.8 °C. No action is needed now. Next message: when the level changes or power returns."
     },
-    "it": "Aggiornamento di Safe-8-Sound per Ana: la casa è passata alle impostazioni essenziali per tenere Leo's room al sicuro più a lungo, fino alle 6:40 di domani. Leo's room è a 26.8 °C. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente."
+    "it": "Aggiornamento di Safe-8-Sound per Ana: la casa è passata alle impostazioni essenziali per tenere Leo's room al sicuro più a lungo, fino alle 06:40 di domani. Leo's room è a 26.8 °C. Per ora non serve fare nulla. Prossimo messaggio: quando cambia il livello o torna la corrente."
   },
   {
     "name": "power-back",
@@ -28,9 +28,9 @@
       "role": "daughter",
       "channel": "in_app",
       "transition": "power_back",
-      "text": "Safe-8-Sound update for Ana: power came back at home at 5:48 AM. Leo's room is at 26.2 °C. Storm mode has ended. No action is needed now."
+      "text": "Safe-8-Sound update for Ana: power came back at home at 05:48. Leo's room is at 26.2 °C. Storm mode has ended. No action is needed now."
     },
-    "it": "Aggiornamento di Safe-8-Sound per Ana: la corrente è tornata in casa alle 5:48. Leo's room è a 26.2 °C. La modalità temporale è finita. Per ora non serve fare nulla."
+    "it": "Aggiornamento di Safe-8-Sound per Ana: la corrente è tornata in casa alle 05:48. Leo's room è a 26.2 °C. La modalità temporale è finita. Per ora non serve fare nulla."
   },
   {
     "name": "last-resort",
@@ -39,7 +39,7 @@
       "role": "daughter",
       "channel": "in_app",
       "transition": "last_resort_applied",
-      "text": "Safe-8-Sound alert for Ana: the home battery is low. Leo's room is at 23.6 °C and stays within its limits until 10:00 PM, then gets warmer. Please check on them."
+      "text": "Safe-8-Sound alert for Ana: the home battery is low. Leo's room is at 23.6 °C and stays within its limits until 22:00, then gets warmer. Please check on them."
     },
     "it": "Avviso di Safe-8-Sound per Ana: la batteria di casa è quasi scarica. Leo's room è a 23.6 °C e resta nei suoi limiti fino alle 22:00, poi si scalda. Per favore, vai a controllare."
   }

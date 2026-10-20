@@ -345,7 +345,7 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
   describe('the family alert (#160): once, when the plan is really applied', () => {
     // #390: a time on a later day than the storm afternoon (17 July, the ISO's local date) says so.
     const clock = (w: ReturnType<typeof world>, iso: string) =>
-      new Intl.DateTimeFormat('en-US', { timeZone: w.profile.location.tz, hour: 'numeric', minute: '2-digit' }).format(Date.parse(iso)) + (iso.slice(0, 10) > '2026-07-17' ? ' tomorrow' : '');
+      new Intl.DateTimeFormat('en-GB', { timeZone: w.profile.location.tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(Date.parse(iso)) + (iso.slice(0, 10) > '2026-07-17' ? ' tomorrow' : '');
 
     it('every registered contact gets the fixed text, with until when the plan keeps the safe room safe', async () => {
       const w = stormAt(20);

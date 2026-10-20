@@ -21,7 +21,7 @@ const H = 3_600_000;
 const DEMO = HomeIdSchema.parse('demo');
 const textOf = (r: Record<string, unknown>): string => (r['content'] as { type: string; text: string }[] | undefined)?.[0]?.text ?? '';
 /** The clock time as the family message writes it, in the home's time zone. */
-const clock = (ms: number) => new Intl.DateTimeFormat('en-US', { timeZone: demoProfile().location.tz, hour: 'numeric', minute: '2-digit' }).format(ms);
+const clock = (ms: number) => new Intl.DateTimeFormat('en-GB', { timeZone: demoProfile().location.tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms);
 
 describe('storm blackout (seeded): prepare, the grid drops, the family is told, power comes back', () => {
   it('runs the whole flow through MCP, with the safe hours of the guard hold of the safe room', async () => {

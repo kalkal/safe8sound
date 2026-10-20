@@ -25,9 +25,9 @@ const byId = (id: string) => {
 };
 
 describe('eval suite v1 (plan §10.2: 20 utterances, threshold 90%)', () => {
-  it('has 28 cases with unique ids and a 0.9 threshold (20 from plan §10.2, plus #273 "Is the power back?", #274 scene 2b, a °F setpoint (#306), #271 "Keep Leo safe" and no invented name, and the #438 health cases)', () => {
-    expect(EVAL_SUITE.cases).toHaveLength(28);
-    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(28);
+  it('has 33 cases with unique ids and a 0.9 threshold (20 from plan §10.2, plus the 20 Oct cases (room name, 24-hour times, one question, refusal first, exact night hours), #273 "Is the power back?", #274 scene 2b, a °F setpoint (#306), #271 "Keep Leo safe" and no invented name, and the #438 health cases)', () => {
+    expect(EVAL_SUITE.cases).toHaveLength(33);
+    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(33);
     expect(EVAL_SUITE.threshold).toBe(0.9);
   });
 
@@ -148,7 +148,10 @@ describe('#438 review: the fake model hears a health worry about a person only',
 describe('runEvals on the Strands loop with the fake model (no Bedrock: cost rule)', () => {
   it('scores the reference policy at or above the threshold', async () => {
     const report = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: new FakeModel(referencePolicy), tools: stubTools() }));
-    expect(report.results).toHaveLength(28);
+    expect(report.results).toHaveLength(33);
+    // The 0.9 threshold hides a failing case: the cases added on 20 Oct must each pass on the reference policy.
+    const NEW = ['status-room-name', 'hot-times-24h', 'hot-plan-asks-once', 'hot-refused-says-so', 'hot-night-hours-exact'];
+    expect(report.results.filter((r) => NEW.includes(r.id) && !r.pass).map((r) => r.id)).toEqual([]);
     expect(report.passRate).toBeGreaterThanOrEqual(0.9);
     expect(report.passed).toBe(true);
     // #438: the health cases and the ordinary status one pass, each on its own.
@@ -179,7 +182,7 @@ describe('runEvals on the Strands loop with the fake model (no Bedrock: cost rul
     const eager = new FakeModel((call) => {
       if (call.toolResults.length === 0) return { toolUse: { name: 'plan_comfort', input: { goal: 'cool' } } };
       if (call.toolResults.length === 1) return { toolUse: { name: 'apply_plan', input: { planId: 'p-1' } } };
-      return { text: 'I have set up cooling for Grandpa. The plan is active.' };
+      return { text: 'I have set up cooling for Leo. The plan is active.' };
     });
     const report = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: eager, tools: stubTools() }));
     expect(report.results.find((r) => r.id === 'hot-grandpa')).toMatchObject({ toolChoice: true, trajectory: false, answer: false, pass: false });

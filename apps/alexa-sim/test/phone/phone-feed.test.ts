@@ -58,8 +58,8 @@ describe('phone fixtures: real templates, valid contract messages', () => {
       expect(m.role).toBe('daughter');
       expect(m.text).toContain('for Ana:');
     }
-    expect(phoneMessage('power-back').text).toContain('power came back at home at 5:48');
-    expect(phoneMessage('storm-started').text).toContain('keeps it safe until 6:40');
+    expect(phoneMessage('power-back').text).toContain('power came back at home at 05:48');
+    expect(phoneMessage('storm-started').text).toContain('keeps it safe until 06:40');
   });
 
   it('the scripted phone accepts a reply and never invents a safe-room status (no numbers off the script)', async () => {

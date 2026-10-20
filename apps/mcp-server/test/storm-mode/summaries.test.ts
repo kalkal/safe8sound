@@ -20,7 +20,7 @@ describe('what the model reads', () => {
     expect(text).toContain('Storm mode is prepared: the grid is still up, so the storm reserve stays locked.');
     // #390: at the 24-hour cap the same clock time is tomorrow's, and the text says so.
     expect(text).toContain(`about ${one(out.value.safeHours)} hours, until ${localTimeText(out.value.safeUntil)} tomorrow`);
-    expect(text).toMatch(/until \d{1,2}:\d\d [AP]M/);
+    expect(text).toMatch(/until \d{2}:\d\d/);
     // The person hears the clock time only, never an ISO stamp (#160 acceptance test).
     expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
     expect(text).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
@@ -139,9 +139,9 @@ describe('what the model reads', () => {
   });
 
   it('says the local clock time the way the family message does, then the exact time', () => {
-    expect(localTimeText('2026-07-17T21:05:00+02:00')).toBe('9:05 PM');
-    expect(localTimeText('2026-07-18T00:30:00+02:00')).toBe('12:30 AM');
-    expect(localTimeText('2026-07-18T12:00:00+02:00')).toBe('12:00 PM');
+    expect(localTimeText('2026-07-17T21:05:00+02:00')).toBe('21:05');
+    expect(localTimeText('2026-07-18T00:30:00+02:00')).toBe('00:30');
+    expect(localTimeText('2026-07-18T12:00:00+02:00')).toBe('12:00');
   });
 
   it('notify_family inside the interval says nothing was sent and why', () => {
@@ -177,17 +177,17 @@ describe('#364: the room time leads, the battery time follows', () => {
 
   it('with the limit crossed: both times, the room first, and every number on the card', () => {
     const text = safeRoomSummary(status({ until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) }));
-    expect(text).toContain('The safe room stays at or below its 24 °C limit until about 6:00 AM tomorrow; the battery lasts until 3:05 AM tomorrow (about 7.2 hours), then the room warms up.');
+    expect(text).toContain('The safe room stays at or below its 24 °C limit until about 06:00 tomorrow; the battery lasts until 03:05 tomorrow (about 7.2 hours), then the room warms up.');
     expect(text).not.toContain('Safe for about');
     const f = safeRoomSummary(status({ until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) }), 'F');
-    expect(f).toContain('at or below its 75.2 °F limit until about 6:00 AM tomorrow');
+    expect(f).toContain('at or below its 75.2 °F limit until about 06:00 tomorrow');
   });
 
   it('inside its limits to the end of the projection: "at least until"', () => {
     const text = safeRoomSummary(status({ until: '2026-07-18T20:00:00+02:00' }));
-    expect(text).toContain('The safe room stays within its limits at least until 8:00 PM tomorrow; the battery lasts until 3:05 AM tomorrow (about 7.2 hours).');
-    // #390: read at 7:53 PM, both times are on the next day, and the text says so.
-    expect(text).not.toMatch(/until 3:05 AM;/);
+    expect(text).toContain('The safe room stays within its limits at least until 20:00 tomorrow; the battery lasts until 03:05 tomorrow (about 7.2 hours).');
+    // #390: read at 19:53, both times are on the next day, and the text says so.
+    expect(text).not.toMatch(/until 03:05;/);
   });
 });
 

@@ -89,7 +89,7 @@ describe('#364: the battery runs out first, the room then holds its limits a whi
       // In the home's zone, with its offset, as safeUntil.
       expect(within.until.slice(-6)).toBe(status.safeUntil.slice(-6));
       // The family reads the room's time first, the battery's after it, only with a real crossing.
-      if (within.limitC !== undefined) expect(message).toMatch(/stays within its limits until about \d{1,2}:\d\d [AP]M(?: tomorrow)? \(battery until \d{1,2}:\d\d [AP]M(?: tomorrow)?\), then gets warmer/);
+      if (within.limitC !== undefined) expect(message).toMatch(/stays within its limits until about \d{2}:\d\d(?: tomorrow)? \(battery until \d{2}:\d\d(?: tomorrow)?\), then gets warmer/);
     }
     // A property that never meets the case proves nothing.
     expect(seen.length).toBeGreaterThan(0);

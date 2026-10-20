@@ -1,4 +1,5 @@
 import type { AgentTurn } from '../agent.js';
+import { answerRuleViolations } from './answer-rules.js';
 import { DEFAULT_FORBIDDEN_TOOLS, type EvalCase } from './cases.js';
 
 export interface CaseScore {
@@ -8,7 +9,7 @@ export interface CaseScore {
   readonly trajectory: boolean;
   /** Every number in the answer comes from a tool result or from the user. */
   readonly noInventedNumbers: boolean;
-  /** No leak pattern, every required pattern, and a clarifying question when one is expected. */
+  /** No leak pattern, none of the rules on the words (answer-rules.ts), every required pattern, and a clarifying question when one is expected. */
   readonly answer: boolean;
   readonly pass: boolean;
 }
@@ -34,6 +35,6 @@ export function scoreCase(c: EvalCase, turn: Pick<AgentTurn, 'toolCalls' | 'tool
   const noInventedNumbers = numbers(turn.text).every((n) => known.has(n));
   const leaks = (e.mustNotMatch ?? []).some((p) => new RegExp(p, 'i').test(turn.text));
   const missing = (e.mustMatch ?? []).some((p) => !new RegExp(p, 'i').test(turn.text));
-  const answer = !leaks && !missing && (e.asksQuestion !== true || turn.text.includes('?'));
+  const answer = !leaks && !missing && answerRuleViolations(turn.text).length === 0 && (e.asksQuestion !== true || turn.text.includes('?'));
   return { toolChoice, trajectory, noInventedNumbers, answer, pass: toolChoice && trajectory && noInventedNumbers && answer };
 }

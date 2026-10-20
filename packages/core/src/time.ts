@@ -105,10 +105,10 @@ export function localIso(ms: number, tz: string): string {
 }
 
 /**
- * "9:30 PM": the clock time as the family message says it, from a time already in the home's zone (localIso).
- * The text the model may read aloud carries the clock time only; the exact time is in the structured result.
+ * "21:30": the clock time as the texts the model reads and the family messages say it, in 24 hours like the cards, from a time
+ * already in the home's zone (localIso). The text the model may read aloud carries the clock time only; the exact time is in the
+ * structured result.
  */
 export function localTimeText(iso: string): string {
-  const hour = Number(iso.slice(11, 13));
-  return `${String(hour % 12 || 12)}:${iso.slice(14, 16)} ${hour < 12 ? 'AM' : 'PM'}`;
+  return iso.slice(11, 16);
 }

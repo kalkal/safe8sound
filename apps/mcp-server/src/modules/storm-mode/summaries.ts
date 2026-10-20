@@ -11,7 +11,7 @@ import { localTimeText } from '@cold-reserve/core';
 const one = (x: number) => x.toFixed(1);
 
 /**
- * #390: a time on a later day than the reading says so ("3:00 PM tomorrow"): at the 24-hour cap of the safe hours the
+ * #390: a time on a later day than the reading says so ("15:00 tomorrow"): at the 24-hour cap of the safe hours the
  * clock alone reads as the time it is now. The reading is the safe-hours end minus the hours (both from the same hold);
  * both are local ISO times with the home's offset, so the day is the home's.
  */
@@ -56,7 +56,7 @@ const noName: RoomLabel = () => undefined;
 
 /**
  * #390 review: the safe hours at the projection's cap (`capHours`) are a horizon, never an end: "at least 24.0 hours,
- * at least until 3:00 PM tomorrow", as withinText says "at least until" for the room. Without the cap, never said.
+ * at least until 15:00 tomorrow", as withinText says "at least until" for the room. Without the cap, never said.
  */
 const hoursText = (hours: number, capHours: number | undefined) => `${capHours !== undefined && hours >= capHours ? 'at least' : 'about'} ${one(hours)} hours`;
 const untilWords = (hours: number, capHours: number | undefined) => (capHours !== undefined && hours >= capHours ? 'at least until' : 'until');

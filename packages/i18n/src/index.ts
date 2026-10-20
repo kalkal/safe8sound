@@ -84,8 +84,9 @@ export interface StormMessageFields {
   readonly timeZone: string;
 }
 
-const clockTime = (locale: Locale, ms: number, timeZone: string) =>
-  new Intl.DateTimeFormat(locale, { timeZone, hour: 'numeric', minute: '2-digit' }).format(ms);
+/** "06:40": 24 hours in every language, as the cards write the time (a message and a card on one screen never disagree). */
+const clockTime = (ms: number, timeZone: string) =>
+  new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms);
 
 /**
  * #364: when the battery ends the safe hours first and the room then holds its limits a while, the room's time leads
@@ -105,11 +106,11 @@ const keyOf = (transition: SendableTransition, within: boolean): MessageKey =>
 const dayOf = (ms: number, timeZone: string) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
 
 /**
- * #390: a time ahead on a later day than the message says so ("3:00 PM tomorrow"): at the 24-hour cap of the safe hours
+ * #390: a time ahead on a later day than the message says so ("15:00 tomorrow"): at the 24-hour cap of the safe hours
  * the clock alone would read as the time the message is sent. The times are at most a day ahead (the projection's cap).
  */
 function untilTime(locale: Locale, ms: number, fields: StormMessageFields): string {
-  const time = clockTime(locale, ms, fields.timeZone);
+  const time = clockTime(ms, fields.timeZone);
   if (ms <= fields.atMs || dayOf(ms, fields.timeZone) === dayOf(fields.atMs, fields.timeZone)) return time;
   return CATALOGS[locale]['storm.tomorrow'].replace('{time}', time);
 }
@@ -131,14 +132,14 @@ function renderStorm(locale: Locale, transition: SendableTransition, addressee: 
     name: addressee,
     room: fields.roomName,
     temp: formatTempFixed(fields.tempC, fields.unit ?? 'C'),
-    at: clockTime(locale, fields.atMs, fields.timeZone),
+    at: clockTime(fields.atMs, fields.timeZone),
     ...(fields.safeUntilMs === undefined
       ? {}
       : {
           safeUntil: untilTime(locale, fields.safeUntilMs, fields),
           untilSafe: CATALOGS[locale][fields.safeUntilCapped === true ? 'storm.atLeastUntil' : 'storm.until'].replace('{time}', untilTime(locale, fields.safeUntilMs, fields)),
         }),
-    ...(fields.powerBackAtMs === undefined ? {} : { powerBackAt: clockTime(locale, fields.powerBackAtMs, fields.timeZone) }),
+    ...(fields.powerBackAtMs === undefined ? {} : { powerBackAt: clockTime(fields.powerBackAtMs, fields.timeZone) }),
   });
 }
 

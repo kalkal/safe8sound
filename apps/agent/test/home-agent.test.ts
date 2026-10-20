@@ -68,7 +68,7 @@ describe('createHomeAgent: one sandbox home, its agent, its MCP session and its 
     const say = (text: string): FakePolicy => () => ({ text });
     const ask = async (text: string, log?: (e: AgentLogEntry) => void) => {
       const agent = createHomeAgent({ config: CONFIG, home: HOME, model: new FakeModel(say(text)), connect: () => Promise.resolve(session()), ...(log ? { log } : {}) });
-      const reply = await agent.ask('Keep Grandpa cool tomorrow', '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60');
+      const reply = await agent.ask('Keep Leo cool tomorrow', '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60');
       if (!reply.ok) throw new Error(reply.error.message);
       return TurnReplySchema.parse(reply.value).text;
     };

@@ -21,14 +21,14 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
   it('storm started: who it is from, the hazard, the room, its temperature (one decimal), until when (home time), what to do', () => {
     const r = stormMessage('en-US', 'storm_started', 'Ana', fields);
     expect(r.ok && r.value).toBe(
-      `${PRODUCT_NAME} alert for Ana: a storm cut the power at home. Bedroom is at 26.4 °C and the battery keeps it safe until 7:30 AM. No action is needed now. Next message: when the level changes or power returns.`,
+      `${PRODUCT_NAME} alert for Ana: a storm cut the power at home. Bedroom is at 26.4 °C and the battery keeps it safe until 07:30. No action is needed now. Next message: when the level changes or power returns.`,
     );
   });
 
   it('in the unit the sandbox chose: 26.44 °C is 79.6 °F, in English and Italian (#306)', () => {
     const f = { ...fields, unit: 'F' as const };
     const r = stormMessage('en-US', 'power_back', 'Ana', f);
-    expect(r.ok && r.value).toBe(`${PRODUCT_NAME} update for Ana: power came back at home at 6:30 AM. Bedroom is at 79.6 °F. Storm mode has ended. No action is needed now.`);
+    expect(r.ok && r.value).toBe(`${PRODUCT_NAME} update for Ana: power came back at home at 06:30. Bedroom is at 79.6 °F. Storm mode has ended. No action is needed now.`);
     const it = stormMessage('it-IT', 'power_back', 'Ana', f);
     expect(it.ok && it.value).toContain('Bedroom è a 79.6 °F.');
     for (const t of SENDABLE_TRANSITIONS) expect(JSON.stringify(stormMessage('en-US', t, 'Ana', f))).not.toContain('°C');
@@ -36,19 +36,19 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
 
   it('essential level says until when', () => {
     const r = stormMessage('en-US', 'essential_level', 'Ana', fields);
-    expect(r.ok && r.value).toContain('the home stepped down to its essential settings to keep Bedroom safe longer, until 7:30 AM.');
-    expect(r.ok && r.value).toContain('until 7:30 AM');
+    expect(r.ok && r.value).toContain('the home stepped down to its essential settings to keep Bedroom safe longer, until 07:30.');
+    expect(r.ok && r.value).toContain('until 07:30');
   });
 
   it('power back says when the grid came back (not when the message is sent), and that no action is needed (below its limit)', () => {
     const r = stormMessage('en-US', 'power_back', 'Ana', fields);
-    expect(r.ok && r.value).toBe(`${PRODUCT_NAME} update for Ana: power came back at home at 6:30 AM. Bedroom is at 26.4 °C. Storm mode has ended. No action is needed now.`);
+    expect(r.ok && r.value).toBe(`${PRODUCT_NAME} update for Ana: power came back at home at 06:30. Bedroom is at 26.4 °C. Storm mode has ended. No action is needed now.`);
   });
 
   it('last resort applied: battery low, check on them, with until when the room is safe (#160)', () => {
     const r = stormMessage('en-US', 'last_resort_applied', 'Ana', fields);
     expect(r.ok && r.value).toBe(
-      `${PRODUCT_NAME} alert for Ana: the home battery is low. Bedroom is at 26.4 °C and stays within its limits until 7:30 AM, then gets warmer. Please check on them.`,
+      `${PRODUCT_NAME} alert for Ana: the home battery is low. Bedroom is at 26.4 °C and stays within its limits until 07:30, then gets warmer. Please check on them.`,
     );
     const noUntil = { roomName: fields.roomName, tempC: fields.tempC, atMs: fields.atMs, timeZone: fields.timeZone };
     expect(stormMessage('en-US', 'last_resort_applied', 'Ana', noUntil)).toMatchObject({ ok: false, error: { missing: ['safeUntil'] } });
@@ -58,16 +58,16 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
     const within = { ...fields, withinLimitsUntilMs: Date.parse('2026-07-18T08:00:00Z') };
     const lr = stormMessage('en-US', 'last_resort_applied', 'Ana', within);
     expect(lr.ok && lr.value).toBe(
-      `${PRODUCT_NAME} alert for Ana: the home battery is low. Bedroom is at 26.4 °C and stays within its limits until about 10:00 AM (battery until 7:30 AM), then gets warmer. Please check on them.`,
+      `${PRODUCT_NAME} alert for Ana: the home battery is low. Bedroom is at 26.4 °C and stays within its limits until about 10:00 (battery until 07:30), then gets warmer. Please check on them.`,
     );
     const started = stormMessage('en-US', 'storm_started', 'Ana', within);
     expect(started.ok && started.value).toBe(
-      `${PRODUCT_NAME} alert for Ana: a storm cut the power at home. Bedroom is at 26.4 °C and stays within its limits until about 10:00 AM (battery until 7:30 AM), then gets warmer. No action is needed now. Next message: when the level changes or power returns.`,
+      `${PRODUCT_NAME} alert for Ana: a storm cut the power at home. Bedroom is at 26.4 °C and stays within its limits until about 10:00 (battery until 07:30), then gets warmer. No action is needed now. Next message: when the level changes or power returns.`,
     );
     const essential = stormMessage('en-US', 'essential_level', 'Ana', within);
-    expect(essential.ok && essential.value).toContain('the home stepped down to its essential settings to keep Bedroom safe longer. Bedroom is at 26.4 °C and stays within its limits until about 10:00 AM (battery until 7:30 AM)');
+    expect(essential.ok && essential.value).toContain('the home stepped down to its essential settings to keep Bedroom safe longer. Bedroom is at 26.4 °C and stays within its limits until about 10:00 (battery until 07:30)');
     const it = stormMessage('it-IT', 'last_resort_applied', 'Ana', within);
-    expect(it.ok && it.value).toContain('resta nei suoi limiti fino alle 10:00 circa (batteria fino alle 7:30), poi si scalda');
+    expect(it.ok && it.value).toContain('resta nei suoi limiti fino alle 10:00 circa (batteria fino alle 07:30), poi si scalda');
     // Power back quotes neither time.
     expect(stormMessage('en-US', 'power_back', 'Ana', within)).toEqual(stormMessage('en-US', 'power_back', 'Ana', fields));
   });
@@ -98,7 +98,7 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
   it('#390: above its limit as said, the room is never told "no action": the family is asked to check, with the limit', () => {
     const hot = { ...fields, tempC: 26.96, limitC: 26 };
     const back = stormMessage('en-US', 'power_back', 'Ana', hot);
-    expect(back.ok && back.value).toBe(`${PRODUCT_NAME} update for Ana: power came back at home at 6:30 AM. Bedroom is at 27.0 °C. Storm mode has ended. Bedroom is above its 26 °C limit: please check on them.`);
+    expect(back.ok && back.value).toBe(`${PRODUCT_NAME} update for Ana: power came back at home at 06:30. Bedroom is at 27.0 °C. Storm mode has ended. Bedroom is above its 26 °C limit: please check on them.`);
     for (const t of SENDABLE_TRANSITIONS) {
       const r = stormMessage('en-US', t, 'Ana', hot);
       expect(r.ok && r.value).not.toContain('No action');
@@ -112,17 +112,17 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
   });
 
   it('#390: a time on a later day than the message says so: at the 24-hour cap it never reads as the time it is sent', () => {
-    const atMs = Date.parse('2026-07-17T13:00:00Z'); // 3:00 PM in Rome
+    const atMs = Date.parse('2026-07-17T13:00:00Z'); // 15:00 in Rome
     const capped = { ...fields, atMs, safeUntilMs: atMs + 24 * 3_600_000, safeUntilCapped: true };
     const r = stormMessage('en-US', 'storm_started', 'Ana', capped);
-    expect(r.ok && r.value).toContain('keeps it safe at least until 3:00 PM tomorrow.');
+    expect(r.ok && r.value).toContain('keeps it safe at least until 15:00 tomorrow.');
     // Past midnight the same evening counts as tomorrow too; the same day never does.
     const night = stormMessage('en-US', 'essential_level', 'Ana', { ...capped, safeUntilCapped: false, safeUntilMs: Date.parse('2026-07-17T23:10:00Z') });
-    expect(night.ok && night.value).toContain('safe longer, until 1:10 AM tomorrow.');
+    expect(night.ok && night.value).toContain('safe longer, until 01:10 tomorrow.');
     const sameDay = stormMessage('en-US', 'essential_level', 'Ana', { ...capped, safeUntilCapped: false, safeUntilMs: Date.parse('2026-07-17T19:00:00Z') });
-    expect(sameDay.ok && sameDay.value).toContain('safe longer, until 9:00 PM.');
+    expect(sameDay.ok && sameDay.value).toContain('safe longer, until 21:00.');
     const within = stormMessage('en-US', 'storm_started', 'Ana', { ...capped, safeUntilMs: Date.parse('2026-07-17T20:00:00Z'), withinLimitsUntilMs: atMs + 24 * 3_600_000 });
-    expect(within.ok && within.value).toContain('until about 3:00 PM tomorrow (battery until 10:00 PM)');
+    expect(within.ok && within.value).toContain('until about 15:00 tomorrow (battery until 22:00)');
     const it = stormMessage('it-IT', 'storm_started', 'Ana', capped);
     expect(it.ok && it.value).toContain('almeno fino alle 15:00 di domani.');
   });
@@ -131,7 +131,7 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
     const atMs = Date.parse('2026-07-17T10:00:00Z'); // noon in Rome
     const r = stormMessage('en-US', 'storm_prepared', 'Ana', { ...fields, atMs, safeUntilMs: atMs + 24 * 3_600_000, safeUntilCapped: true });
     expect(r.ok && r.value).toBe(
-      `${PRODUCT_NAME} notice for Ana: a storm is expected and the home is ready for a power cut. Bedroom is at 26.4 °C; if the power goes out, the battery keeps it safe at least until 12:00 PM tomorrow. No action is needed now. Next message: if the power goes out.`,
+      `${PRODUCT_NAME} notice for Ana: a storm is expected and the home is ready for a power cut. Bedroom is at 26.4 °C; if the power goes out, the battery keeps it safe at least until 12:00 tomorrow. No action is needed now. Next message: if the power goes out.`,
     );
   });
 });

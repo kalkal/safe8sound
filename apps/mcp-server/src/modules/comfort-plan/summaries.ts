@@ -273,7 +273,8 @@ function nightText(n: NonNullable<Plan['nightRecovery']>, opts: PlanSummaryOptio
   // With no hour required, only the heat budget can fail: say that, not "0.5 of 0 hours".
   if (n.requiredHours === 0 && n.status !== 'met') return `${head} ${n.status}: ${heat}.`;
   const best = n.bestAchievableHours === undefined ? '' : `, best achievable ${String(n.bestAchievableHours)} hours`;
-  const hours = `${String(n.achievedHours)} of ${String(n.requiredHours)} hours at or below ${deg(n.thresholdC, unit)}${best}`;
+  // "8.75 hours at or below 24 °C (6 needed)", never "8.75 of 6 hours": the real model read that as "9 of 6" (20 Oct).
+  const hours = `${String(n.achievedHours)} hours at or below ${deg(n.thresholdC, unit)} (${String(n.requiredHours)} needed${best})`;
   return `${head} ${n.status}: ${hours}${overBudget ? `, and ${heat}` : ''}.`;
 }
 
@@ -288,7 +289,7 @@ export function applySummary(o: ApplyPlanOutput): string {
       'Never ask the person for a token or a code, and never make one up.'
     );
   }
-  const applied = o.alreadyApplied ? `The plan was already applied.` : `The plan was applied${o.advisoryOnly ? ' as advice' : ''}.`;
+  const applied = o.alreadyApplied ? 'The plan was already applied: it is in place, so tell the person that and never ask them to confirm it again.' : `The plan was applied${o.advisoryOnly ? ' as advice' : ''}.`;
   const head = o.familyAlert === undefined ? applied : `${applied} ${familyAlertText(o.familyAlert)}`;
   if (!o.advisoryOnly) return head;
   const steps = o.manualInstructions.map((m) => m.text).join('; ');

@@ -278,7 +278,7 @@ describe('last resort (approved in #19: proposal only)', () => {
     // The time as the person says it, in the home's zone (the guard's reasons use local time too).
     expect(p.warnings?.find((x) => x.code === 'last_resort_plan')?.message).toMatch(
       // #364: the room holds its limit after the battery runs out: its time first, then the battery's.
-      /^No plan keeps the Bedroom within its limits until the next recharge: (safe for about [\d.]+ hours, until \d{1,2}:\d\d (AM|PM); then |within them until about \d{1,2}:\d\d (AM|PM), the battery until \d{1,2}:\d\d (AM|PM); then it warms up\.$)/,
+      /^No plan keeps the Bedroom within its limits until the next recharge: (safe for about [\d.]+ hours, until \d{2}:\d\d; then |within them until about \d{2}:\d\d, the battery until \d{2}:\d\d; then it warms up\.$)/,
     );
     expect(p.lastResort?.safeUntil).toMatch(/\+02:00$/);
     // A last resort names a real limit inside the horizon, never a battery that does not run out.
@@ -288,7 +288,7 @@ describe('last resort (approved in #19: proposal only)', () => {
   });
 
   it('when the battery runs out but the room holds its limit to the next recharge: no window, no crossing, said so (#272 review)', async () => {
-    // A storm at 3:00 AM with 14 %: the battery ends at 3:30 AM, the room stays inside its limit until 8:00 AM.
+    // A storm at 03:00 with 14 %: the battery ends at 03:30, the room stays inside its limit until 08:00.
     const w = world('storm-blackout', 15, { snapshot: (s) => ({ ...s, batterySocPct: pct(14) }) });
     const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
@@ -698,7 +698,7 @@ describe('in a °F sandbox (#306): every text in °F, every number and decision 
     expect(f.value.guarantees.map((g) => [g.id, g.ok, g.measured, g.limit])).toEqual(c.value.guarantees.map((g) => [g.id, g.ok, g.measured, g.limit]));
     const words = JSON.stringify({ warnings: f.value.warnings, guarantees: f.value.guarantees.map((g) => g.reason) });
     expect(words).not.toContain('°C');
-    expect(f.value.warnings?.find((w) => w.code === 'night_recovery_infeasible')?.message).toBe('Tonight the Bedroom stays at or below 75.2 °F until about 3:35 AM, then it warms up.');
+    expect(f.value.warnings?.find((w) => w.code === 'night_recovery_infeasible')?.message).toBe('Tonight the Bedroom stays at or below 75.2 °F until about 03:35, then it warms up.');
   });
 
   it('a setpoint that can only be °F is refused, with the °C to send: inputs are always °C (#306 review)', async () => {
@@ -731,7 +731,7 @@ describe('the night warning next to a last resort (#272)', () => {
   const lr = { safeUntil: '2026-07-17T23:40:00+02:00', safeHours: 1.67, limitedBy: 'battery' as const, comfortLimitC: celsius(24), worstC: celsius(24.7), worstAt: '2026-07-18T06:20:00+02:00', limitCrossedAt: '2026-07-18T02:15:00+02:00', limitCrossedC: celsius(24) };
 
   it('the hours variant ends at the clock time the room crosses the night threshold, with no duration', () => {
-    expect(alignedNightWarning(hours, lr, night, 'Bedroom').message).toBe('Tonight the Bedroom stays at or below 24 °C until about 2:15 AM, then it warms up.');
+    expect(alignedNightWarning(hours, lr, night, 'Bedroom').message).toBe('Tonight the Bedroom stays at or below 24 °C until about 02:15, then it warms up.');
     const noWindow = { safeUntil: lr.safeUntil, safeHours: lr.safeHours, limitedBy: 'battery' as const };
     expect(alignedNightWarning(hours, noWindow, night, 'Bedroom').message).toBe('Tonight the Bedroom stays at or below 24 °C until the next recharge, then it warms up.');
   });

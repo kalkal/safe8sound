@@ -119,7 +119,7 @@ describe('the get_home_status text', () => {
   it('says the last live reading as the clock time of the home, never an ISO stamp (#177 review)', () => {
     const s = { batterySocPct: 40, level: 'essential', rooms: [], origin: { energy: 'simulated' }, homeLink: 'lost', lastLiveAt: '2026-07-17T19:30:00.000Z' } as unknown as HomeStatus;
     const text = homeStatusSummary(s, 'Europe/Rome');
-    expect(text).toContain('Home link lost, last live reading at 9:30 PM.');
+    expect(text).toContain('Home link lost, last live reading at 21:30.');
     expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
   });
 });

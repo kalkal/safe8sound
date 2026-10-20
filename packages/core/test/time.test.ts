@@ -59,7 +59,7 @@ describe('localHour and localIso, moved here from core/night and mcp-server/time
     expect(localIso(Date.parse('2026-07-15T20:30:00Z'), TURIN)).toBe('2026-07-15T22:30:00+02:00');
     expect(localIso(Date.parse('2026-01-15T20:30:00Z'), TURIN)).toBe('2026-01-15T21:30:00+01:00');
     expect(localIso(Date.parse('2026-07-16T03:00:00Z'), HOUSTON)).toBe('2026-07-15T22:00:00-05:00');
-    expect(localTimeText('2026-07-15T22:30:00+02:00')).toBe('10:30 PM');
+    expect(localTimeText('2026-07-15T22:30:00+02:00')).toBe('22:30');
   });
 });
 
