@@ -300,8 +300,8 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     closeHome();
     closeSettingsPage();
   }, [closeHome, closeSettingsPage]);
-  // The judges' demo controls (#432): a column beside the Echo in a window twice as wide as it is tall (owner, 19 Oct:
-  // 1920 × 950), a sheet behind the dashed button of the top bar elsewhere; removable by config (the real home keeps only
+  // The judges' demo controls (#432): a column beside the Echo on a wide screen (WIDE_CONTROLS: from 1600 px
+  // at 3:2 or wider), a sheet behind the dashed button of the top bar elsewhere; removable by config (the real home keeps only
   // its own controls). The simulated clock and its jump stay under the Echo, big (#391), so the time is always in view.
   const demoShown = config.demoControls && hasSandbox;
   const wide = useMediaQuery(WIDE_CONTROLS);

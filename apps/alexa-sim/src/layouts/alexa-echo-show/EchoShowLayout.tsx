@@ -9,7 +9,8 @@ import './layout.css';
 // style on top of the sky. The four skies are stacked and only the current one is shown, so a change fades (≥ 1 s,
 // still with reduced motion). Below the device width the bezel goes and the sky stays. The top bar sits above the
 // device, the simulated clock and the judges' question bar in one row under the device and the phone, the judges' demo
-// controls a sheet behind a button of the top bar (owner, 19 Oct); none of them inside its screen.
+// controls a column on its left on a wide screen and a sheet behind a button of the top bar elsewhere (owner, 19-20 Oct;
+// WIDE_CONTROLS); none of them inside its screen.
 
 /**
  * The width the screen's content is drawn for (#432 S6, owner 19 Oct: "the real Echo as it appears, at the right size").

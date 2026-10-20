@@ -51,10 +51,6 @@ test('on a window wide for its height (1904 × 870) the demo controls are a colu
   const panel = page.getByRole('region', { name: 'Demo controls · simulation' });
   await expect(panel).toBeVisible();
   await expect(demoControlsButton(page)).toHaveCount(0);
-  // Beside the screen, never over it.
-  const screen = await page.getByTestId('echo-screen').boundingBox();
-  const column = await panel.boundingBox();
-  expect(screen !== null && column !== null && column.x + column.width <= screen.x).toBe(true);
 
   await panel.getByText('Storm · power outage').click();
   const day = panel.getByRole('list', { name: 'The day' });
@@ -65,6 +61,31 @@ test('on a window wide for its height (1904 × 870) the demo controls are a colu
   await expect(panel.getByTestId('demo-controls-jump')).toHaveText(/^\d{2}:\d{2} — /);
   await expect(day.locator('[aria-current="step"]')).toHaveCount(1);
 });
+
+// The column on every wide screen (owner, 20 Oct: a full-screen 1920 × 1080 lost it to the sheet), the sheet on the
+// laptop windows; the Echo never under it and the page never scrolling are surface-geometry.spec's.
+const COLUMN: readonly (readonly [number, number])[] = [[1904, 870], [1920, 950], [1920, 1080], [1920, 1200]];
+const SHEET: readonly (readonly [number, number])[] = [[1536, 735], [1440, 900], [1366, 768]];
+for (const [width, height] of [...COLUMN, ...SHEET]) {
+  const column = COLUMN.some(([w, h]) => w === width && h === height);
+  test(`at ${String(width)} × ${String(height)} the demo controls are ${column ? 'a column beside the Echo' : 'a sheet behind the top bar button'}`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/');
+    await expect(page.getByTestId('echo-screen')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Demo controls · simulation' })).toHaveCount(column ? 1 : 0);
+    await expect(demoControlsButton(page)).toHaveCount(column ? 0 : 1);
+    const screen = await page.getByTestId('echo-screen').boundingBox();
+    if (!column) {
+      // The open sheet never takes the column's place: the Echo keeps its width under it.
+      await demoControlsButton(page).click();
+      await expect(demoControls(page)).toBeVisible();
+      expect((await page.getByTestId('echo-screen').boundingBox())?.width).toBe(screen?.width);
+      return;
+    }
+    const panel = await demoControls(page).boundingBox();
+    expect(screen !== null && panel !== null && panel.x + panel.width <= screen.x).toBe(true);
+  });
+}
 
 test('"Settings" holds the person\'s own settings, not the demo controls', async ({ page }) => {
   await page.goto('/');

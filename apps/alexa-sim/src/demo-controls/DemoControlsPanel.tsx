@@ -16,10 +16,11 @@ import './demo-controls.css';
 // The big "Go to …" button stays on the clock bar under the Echo, so the time and its jump are always in view.
 
 /**
- * Where the demo controls are a column beside the Echo, not a sheet (owner, 19 Oct: a window at least twice as wide as
- * it is tall, from 1600 px: 1920 × 950, 1904 × 870). The Echo layout's CSS uses the same query.
+ * Where the demo controls are a column beside the Echo, not a sheet (owner, 19-20 Oct: from 1600 px, in a window at
+ * least 3:2, so a full-screen 1920 × 1080 and a 1920 × 1200 get it as 1920 × 950 and 1904 × 870 do). The only copy of
+ * the rule: the Echo layout's CSS follows the column this renders, never a media query of its own.
  */
-export const WIDE_CONTROLS = '(width >= 100rem) and (min-aspect-ratio: 2 / 1)';
+export const WIDE_CONTROLS = '(width >= 100rem) and (min-aspect-ratio: 3 / 2)';
 
 /** Whether the sheet is open, and the button that opens it (the focus goes back to it). */
 export function useDemoControlsSheet() {

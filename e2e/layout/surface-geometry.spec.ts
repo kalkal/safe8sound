@@ -24,7 +24,7 @@ async function oneScreen(page: Page, label: string) {
   expect(viewport.scroll, `${label}: the screen scrolls`).toBeLessThanOrEqual(viewport.client + 1);
   for (const name of SLOTS) await expect(slot(page, name), `${label}: slot ${name}`).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole('group', { name: 'Simulated time' }), `${label}: the clock`).toBeInViewport({ ratio: 1 });
-  // The judges' demo controls: the column in a window twice as wide as tall (owner, 19 Oct), else the button that opens
+  // The judges' demo controls: the column on a wide screen (WIDE_CONTROLS, owner 19-20 Oct), else the button that opens
   // their sheet.
   const controls = (await demoControls(page).isVisible()) ? demoControls(page) : demoControlsButton(page);
   await expect(controls, `${label}: the demo controls`).toBeInViewport({ ratio: 1 });

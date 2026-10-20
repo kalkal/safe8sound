@@ -512,45 +512,43 @@
   }
 }
 
-/* The judges' demo controls as a column on the left of the device, in a window at least twice as wide as it is tall
-   (owner, 19 Oct: 1920 × 950; WIDE_CONTROLS in demo-controls/DemoControlsPanel.tsx is the same query): the weather,
-   Power cut and the day always in view; the device takes what the column leaves. Elsewhere they are a sheet behind the
-   dashed button of the top bar. */
+/* The judges' demo controls as a column on the left of the device, when the page renders them as one (WIDE_CONTROLS in
+   demo-controls/DemoControlsPanel.tsx is the one place that decides it; the column is the panel's section, the sheet a
+   layer): the weather, Power cut and the day always in view; the device takes what the column leaves. Elsewhere they
+   are a sheet behind the dashed button of the top bar. */
 @layer surfaces {
   .echo-controls {
     display: contents;
   }
 
-  @media (width >= 100rem) and (min-aspect-ratio: 2 / 1) {
-    .echo-stage:has(> .echo-controls > *) {
-      --controls-w: 17rem;
-      --screen-w: min(
-        calc((100dvh - var(--stage-pad) * 2 - var(--target-min) - var(--under-h) - var(--space-2) * 2 - var(--bezel) * 2) * 1.6),
-        calc(100vw - var(--stage-pad) * 2 - var(--controls-w) - var(--phone-w) - var(--phone-gap) * 2 - var(--bezel) * 2),
-        80rem
-      );
+  .echo-stage:has(> .echo-controls > .demo-controls) {
+    --controls-w: 17rem;
+    --screen-w: min(
+      calc((100dvh - var(--stage-pad) * 2 - var(--target-min) - var(--under-h) - var(--space-2) * 2 - var(--bezel) * 2) * 1.6),
+      calc(100vw - var(--stage-pad) * 2 - var(--controls-w) - var(--phone-w) - var(--phone-gap) * 2 - var(--bezel) * 2),
+      80rem
+    );
 
-      grid-template-columns: var(--controls-w) minmax(0, 1fr) var(--phone-w);
-      grid-template-areas:
-        "top top top"
-        "controls device phone"
-        "under under under";
-    }
+    grid-template-columns: var(--controls-w) minmax(0, 1fr) var(--phone-w);
+    grid-template-areas:
+      "top top top"
+      "controls device phone"
+      "under under under";
+  }
 
-    /* As tall as the device: the panel scrolls inside itself, never the page. */
-    .echo-stage > .echo-controls:has(> *) {
-      display: grid;
-      grid-area: controls;
-      align-self: stretch;
+  /* As tall as the device: the panel scrolls inside itself, never the page. */
+  .echo-stage > .echo-controls:has(> .demo-controls) {
+    display: grid;
+    grid-area: controls;
+    align-self: stretch;
+    min-block-size: 0;
+    max-block-size: calc(var(--screen-w) / 1.6 + var(--bezel) * 2);
+
+    & > * {
+      box-sizing: border-box;
       min-block-size: 0;
-      max-block-size: calc(var(--screen-w) / 1.6 + var(--bezel) * 2);
-
-      & > * {
-        box-sizing: border-box;
-        min-block-size: 0;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-      }
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
   }
 }
