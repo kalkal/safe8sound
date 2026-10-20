@@ -36,11 +36,11 @@ test('open the settings, change the comfort, refuse a looser maximum, choose ano
   await expect(other).toBeChecked();
   await expect(rooms.getByRole('radio', { name: "Leo's room" })).not.toBeChecked();
 
-  // One Save writes the draft; afterwards there is nothing left to save and the values stay.
+  // One Save writes the draft; afterwards it says "Saved ✓", off (owner, 20 Oct), and the values stay.
   const save = section.getByRole('button', { name: 'Save' });
   await expect(save).toHaveAttribute('aria-disabled', 'false');
   await save.click();
-  await expect(save).toHaveAttribute('aria-disabled', 'true');
+  await expect(section.getByRole('button', { name: 'Saved ✓' })).toHaveAttribute('aria-disabled', 'true');
   await expect(comfort.locator('output')).toHaveText('24.5 °C');
   await expect(other).toBeChecked();
 

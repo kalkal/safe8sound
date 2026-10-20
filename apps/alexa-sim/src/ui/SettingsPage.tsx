@@ -196,7 +196,7 @@ export function SettingsPage({ model, locale, onLocale, announce = true }: Setti
           )}
           {shown !== undefined && (
             <button type="button" className="button" aria-disabled={!model.dirty || model.saving} onClick={model.save} data-testid="limits-save">
-              {t('settings.limits.save')}
+              {t(model.justSaved ? 'settings.limits.saved' : 'settings.limits.save')}
             </button>
           )}
           <p className="notice" role={announce ? 'alert' : undefined} data-testid="limit-refusal">

@@ -180,6 +180,10 @@ export function Conversation({
   // Follow Up (#432 S6): the mic listens again after a spoken answer; the answer stays on screen meanwhile.
   const followUp = snapshot.matches('followUp');
   const micOpen = listening || followUp;
+  // After Speak and while the assistant thinks, the question box and Ask are off (owner report, 20 Oct): no half-typed
+  // text goes out over a spoken question. The box stays read-only, not disabled, so it keeps the focus. Follow Up is not
+  // locked: typing in its listen-again window closes the mic and the keyboard wins.
+  const askLocked = listening || snapshot.matches('thinking');
   const speaking = snapshot.matches('speaking');
   // Read by the reset of a new play: only a reading voice is stopped, never a turn on its way ("Power cut" restarts the day).
   const speakingRef = useRef(speaking);
@@ -246,6 +250,7 @@ export function Conversation({
 
   const onSubmit = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (askLocked) return;
     // Inside the tap: the answer arrives later, and the browser only reads it aloud if the page was unlocked here.
     voice.unlock();
     const turnId = crypto.randomUUID();
@@ -402,13 +407,17 @@ export function Conversation({
               name="question"
               autoComplete="off"
               aria-describedby="question-hint"
-              placeholder={t('chat.placeholder')}
+              placeholder={t(listening ? 'voice.listening' : 'chat.placeholder')}
+              readOnly={askLocked}
+              aria-disabled={askLocked}
               value={draft}
               onChange={(e) => {
+                // Typing in Follow Up's listen-again window closes the mic: the keyboard wins.
+                if (followUp) send({ type: 'CANCEL' });
                 setDraft(e.target.value);
               }}
             />
-            <button type="submit" className="button button-quiet" aria-busy={thinking} disabled={thinking}>
+            <button type="submit" className="button button-quiet" aria-busy={thinking} disabled={askLocked}>
               {t('chat.send')}
             </button>
             {/* Three bands: stopping the voice is an action in this row, in the place of Speak (disabled while the answer

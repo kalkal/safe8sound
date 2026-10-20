@@ -55,6 +55,27 @@ test('ask by voice → the answer is shown and read aloud, Follow Up listens aga
   await expect(page.getByTestId('battery-soc')).toHaveText('78%');
 });
 
+test('after Speak the question box is off and says "Listening…"; in Follow Up typing closes the mic and the keyboard wins (owner report, 20 Oct)', async ({ page }) => {
+  const box = page.getByLabel('Ask a question');
+  await page.getByRole('button', { name: 'Speak', exact: true }).click();
+  await expect(box).toHaveAttribute('placeholder', 'Listening…');
+  await expect(box).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('button', { name: 'Ask', exact: true })).toBeDisabled();
+  expect(await speak(page, "What's my battery level?")).toBe(true);
+  await expect(page.getByTestId('battery-soc')).toHaveText('78%');
+  await voice(page, (d) => {
+    d.startAudio();
+    d.finishAudio();
+  });
+  // Follow Up listens again, and the box stays usable: the first key closes the mic.
+  await expect(page.getByRole('button', { name: 'Stop listening' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(box).not.toHaveAttribute('aria-disabled', 'true');
+  await box.pressSequentially('Is Leo safe?');
+  await expect(page.getByRole('button', { name: 'Speak', exact: true })).toBeEnabled();
+  await expect(box).toHaveValue('Is Leo safe?');
+  await expect(page.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled();
+});
+
 test('voice and touch together: a hot-day plan asked by voice is applied by touch in its card', async ({ page }) => {
   await page.getByRole('button', { name: 'Speak', exact: true }).click();
   await speak(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");

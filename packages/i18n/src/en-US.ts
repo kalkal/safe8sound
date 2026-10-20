@@ -140,6 +140,7 @@ export const enUS = {
   'settings.limits.refusedSafeBelowComfort': 'Not changed: the safe room maximum cannot be below the comfort temperature ({value}).',
   'settings.limits.refusedCeiling': 'Not changed: {name} cannot go above {value}.',
   'settings.limits.save': 'Save',
+  'settings.limits.saved': 'Saved ✓',
   'settings.limits.unsaved': 'Not saved yet: press Save.',
   'settings.limits.rateLimited': "Not saved: this demo allows a limited number of changes per day, and today's are used up. Try again tomorrow.",
   // #432 S5: the settings as a page of the Echo's screen (and of Ana's phone). Leo's age is the demo home's text.

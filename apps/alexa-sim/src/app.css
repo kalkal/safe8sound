@@ -214,6 +214,13 @@
     gap: var(--space-2);
   }
 
+  /* After Speak and while the assistant thinks the box is off (owner report, 20 Oct): dimmed as the buttons are, so
+     the judge sees it too (read-only, so it keeps the focus). */
+  .ask-row input[aria-disabled="true"] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   /* Three example questions (guided test, 3/10): touch targets in a row that wraps at phone width. */
   .examples {
     display: flex;

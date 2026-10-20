@@ -248,11 +248,11 @@ describe('Temperatures and limits section', () => {
       roomPriority: [other, ...view.preferences.roomPriority.filter((id) => id !== other)],
       safety: { stricterNightLimit: true },
     });
-    // Nothing left to save: a second Save sends nothing.
+    // Nothing left to save: the button says Saved ✓ and a second press sends nothing.
     await waitFor(() => {
-      expect(within(section).getByRole('button', { name: 'Save' }).getAttribute('aria-disabled')).toBe('true');
+      expect(within(section).getByRole('button', { name: 'Saved ✓' }).getAttribute('aria-disabled')).toBe('true');
     });
-    fireEvent.click(within(section).getByRole('button', { name: 'Save' }));
+    fireEvent.click(within(section).getByRole('button', { name: 'Saved ✓' }));
     expect(onLimit).toHaveBeenCalledTimes(1);
   });
 
@@ -314,6 +314,27 @@ describe('Temperatures and limits section', () => {
     expect(within(phone).getByTestId('limit-refusal').textContent).toContain('can only be made stricter');
     fireEvent.click(screen.getByRole('button', { name: 'a new answer' }));
     expect(within(phone).getByTestId('limit-refusal').textContent).toContain('can only be made stricter');
+  });
+
+  it('after a save the button says "Saved ✓", off, on the open page; the next change makes it Save again (owner, 20 Oct, A)', async () => {
+    const { section, onLimit } = open();
+    onLimit.mockImplementationOnce(() => Promise.resolve<LimitSave>('saved'));
+    fireEvent.click(within(section).getByRole('button', { name: 'Lower: Comfort temperature' }));
+    fireEvent.click(within(section).getByRole('button', { name: 'Save' }));
+    const saved = await within(section).findByRole('button', { name: 'Saved ✓' });
+    expect(saved.getAttribute('aria-disabled')).toBe('true');
+    expect(screen.getByRole('region', { name: TITLE })).toBeTruthy();
+    fireEvent.click(within(section).getByRole('button', { name: 'Lower: Comfort temperature' }));
+    expect(within(section).getByRole('button', { name: 'Save' }).getAttribute('aria-disabled')).toBe('false');
+  });
+
+  it('says "Salvato ✓" in Italian', async () => {
+    setLocale('it-IT');
+    render(<Harness settings={scriptedDemoSettings()} locale="it-IT" limits={view} onLimit={() => Promise.resolve<LimitSave>('saved')} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Impostazioni' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abbassa: Temperatura di comfort' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByRole('button', { name: 'Salvato ✓' })).toBeTruthy();
   });
 
   it('Save is blocked while it saves: a second press sends nothing', async () => {

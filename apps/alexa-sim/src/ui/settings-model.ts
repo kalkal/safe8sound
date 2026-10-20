@@ -23,6 +23,8 @@ export function useSettingsModel({ settings, onChange, limits, onLimit }: Settin
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
+  // Owner, 20 Oct (A): after a save the button says so ("Saved ✓", off) until the next change.
+  const [justSaved, setJustSaved] = useState(false);
   // #402: why a move was not made, said in words under the rows.
   const [refusal, setRefusal] = useState<{ id: LimitId; why: LimitRefusal } | undefined>(undefined);
   // #402: the +/- and the choices change a draft; Save sends it as one write.
@@ -36,6 +38,7 @@ export function useSettingsModel({ settings, onChange, limits, onLimit }: Settin
   const dirty = Object.keys(draft).length > 0;
 
   const addToDraft = (change: LimitChange) => {
+    setJustSaved(false);
     setRateLimited(false);
     setDraft((previous) => mergeChange(previous, change));
   };
@@ -47,6 +50,7 @@ export function useSettingsModel({ settings, onChange, limits, onLimit }: Settin
     void (onLimit?.(draft) ?? Promise.resolve<LimitSave>('failed')).then((saved) => {
       setSaving(false);
       if (saved === 'saved') setDraft({});
+      setJustSaved(saved === 'saved');
       setFailed(saved === 'failed');
       setRateLimited(saved === 'rate_limited');
     });
@@ -71,6 +75,7 @@ export function useSettingsModel({ settings, onChange, limits, onLimit }: Settin
   const { forget } = unit;
   // A page that closes forgets what its last tap said; the draft stays.
   const leave = useCallback(() => {
+    setJustSaved(false);
     setRefusal(undefined);
     forget();
   }, [forget]);
@@ -83,6 +88,7 @@ export function useSettingsModel({ settings, onChange, limits, onLimit }: Settin
     view,
     dirty,
     saving,
+    justSaved,
     status,
     refusal,
     unitPending: unit.pendingOf('units'),

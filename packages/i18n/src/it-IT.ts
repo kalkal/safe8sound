@@ -131,6 +131,7 @@ export const itIT = {
   'settings.limits.refusedSafeBelowComfort': 'Non cambiato: il massimo della stanza sicura non può stare sotto la temperatura di comfort ({value}).',
   'settings.limits.refusedCeiling': 'Non cambiato: {name} non può salire sopra {value}.',
   'settings.limits.save': 'Salva',
+  'settings.limits.saved': 'Salvato ✓',
   'settings.limits.unsaved': 'Non ancora salvato: premi Salva.',
   'settings.limits.rateLimited': 'Non salvato: questa demo permette un numero limitato di modifiche al giorno e quelle di oggi sono finite. Riprova domani.',
   'settings.page.title': 'Impostazioni di {product} · casa di Leo',
