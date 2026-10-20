@@ -21,6 +21,7 @@ export function ChipGroup({
   value,
   onPick,
   pending,
+  locked = false,
 }: {
   label: string;
   name: string;
@@ -29,22 +30,26 @@ export function ChipGroup({
   onPick: (value: string) => void;
   /** The choice just tapped, while it is saved (owner, 18 Oct): shown as chosen at once, saying it is being saved. */
   pending?: string | undefined;
+  /** Every choice off (audit of 20 Oct): another change is on its way, or the demo session has ended. */
+  locked?: boolean;
 }) {
   const labelId = useId();
   const chosen = pending ?? value;
   return (
-    <fieldset className="chip-group" role="radiogroup" aria-labelledby={labelId}>
+    <fieldset className="chip-group" role="radiogroup" aria-labelledby={labelId} aria-busy={pending !== undefined}>
       <legend id={labelId}>{label}</legend>
       {options.map((o) => (
-        <label key={o.value} className="chip-row" data-checked={o.value === chosen} data-disabled={o.disabled === true}>
+        <label key={o.value} className="chip-row" data-checked={o.value === chosen} data-disabled={locked || o.disabled === true}>
           <input
             type="radio"
             name={name}
             value={o.value}
             checked={o.value === chosen}
             disabled={o.disabled === true}
+            // Locked, the choice stays focusable (no focus lost to the page) and a tap does nothing (review of #484).
+            aria-disabled={locked || undefined}
             onChange={() => {
-              onPick(o.value);
+              if (!locked) onPick(o.value);
             }}
           />
           {o.sky !== undefined && <span className="chip-sky" data-layer={o.sky} aria-hidden="true" />}

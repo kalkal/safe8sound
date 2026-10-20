@@ -279,7 +279,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       if (!isPowerCut(question) || settings === undefined) return ok(undefined);
       // Ana's phone says whether the family already heard of this storm.
       const familyTold = phone.messages().some((m) => m.transition === 'storm_started');
-      const cut = await cutPower({ stormScenario: settings.scenarioId === 'storm-blackout', familyTold, saveStorm: onSettingsChange }, context);
+      const cut = await cutPower({ stormScenario: settings.scenarioId === 'storm-blackout', familyTold, saveStorm: async (c) => (await onSettingsChange(c)) === true }, context);
       if (!cut.ok) return cut;
       setSky('storm');
       return ok(undefined);
@@ -381,7 +381,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     </>
   );
   const demoControls = demoShown ? (
-    <DemoControlsPanel sheet={sheet} wide={wide} settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} stops={stops} now={clock?.now} lastJump={lastJump} onPowerCut={onPowerCut} />
+    <DemoControlsPanel sheet={sheet} wide={wide} sessionEnded={needsCode} settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} stops={stops} now={clock?.now} lastJump={lastJump} onPowerCut={onPowerCut} />
   ) : undefined;
   // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
   const phonePanel = (

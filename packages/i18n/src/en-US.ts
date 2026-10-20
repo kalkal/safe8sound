@@ -79,6 +79,7 @@ export const enUS = {
   'demo.backAt': 'Back at {time} (your time).',
   'demo.unreachable': "The demo can't be reached right now. Try again in a moment.",
   'demo.expired': 'Session expired: enter the demo code again.',
+  'demoControls.expired': 'Your demo session has expired: enter the demo code again below to continue.',
   'demo.again': 'Enter the demo code again to continue.',
   'demo.disabled': 'The demo is switched off for now.',
   'demo.privacy': 'This demo keeps your IP address in its access logs for 30 days, for security.',

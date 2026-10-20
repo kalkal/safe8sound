@@ -70,6 +70,7 @@ export const itIT = {
   'demo.backAt': 'Di nuovo disponibile alle {time} (ora tua).',
   'demo.unreachable': 'La demo ora non è raggiungibile. Riprova tra un momento.',
   'demo.expired': 'Sessione scaduta: inserisci di nuovo il codice demo.',
+  'demoControls.expired': 'La sessione demo è scaduta: inserisci di nuovo il codice demo qui sotto per continuare.',
   'demo.again': 'Inserisci di nuovo il codice demo per continuare.',
   'demo.disabled': 'La demo per ora è spenta.',
   'demo.privacy': 'Questa demo conserva il tuo indirizzo IP nei registri di accesso per 30 giorni, per sicurezza.',

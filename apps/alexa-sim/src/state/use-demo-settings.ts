@@ -2,14 +2,15 @@ import type { ErrorEnvelope, ScenarioId, SetScenarioInput } from '@cold-reserve/
 import { useCallback, useEffect, useState } from 'react';
 import type { Agent } from '../agent/agent.js';
 import { applyChange, readDemoSettings, saveDemoSettings, scriptedDemoSettings, type DemoSettingsView } from '../ui/demo-settings.js';
+import type { SettingChangeResult } from '../ui/use-setting-change.js';
 
 export interface DemoSettingsState {
   /** The judge's demo settings; undefined for a home that is not a sandbox (or before the sandbox is read). */
   readonly settings: DemoSettingsView | undefined;
   /** Counts each new play of the day (Restart the day, a new scenario or place): the clock is read again on each. */
   readonly playthrough: number;
-  /** Saves one change; resolves to whether it was stored. */
-  readonly change: (change: SetScenarioInput) => Promise<boolean>;
+  /** Saves one change; resolves to true when it was stored, else its error (the day's quota is said as such). */
+  readonly change: (change: SetScenarioInput) => Promise<SettingChangeResult>;
   /** Why the sandbox could not be read after Start, when it is the day's turns used up (closedNoticeOf), and when. */
   readonly unavailable: { readonly error: ErrorEnvelope; readonly at: number } | undefined;
 }
@@ -44,7 +45,7 @@ export function useDemoSettings(o: {
     };
   }, [agent, scripted, sessionToken]);
   const change = useCallback(
-    async (c: SetScenarioInput) => {
+    async (c: SetScenarioInput): Promise<SettingChangeResult> => {
       const newPlay = c.restart === true || c.scenarioId !== undefined || c.locationId !== undefined;
       if (scripted) {
         setSettings((previous) => (previous === undefined ? previous : applyChange(previous, c)));
@@ -55,7 +56,7 @@ export function useDemoSettings(o: {
         return true;
       }
       const saved = await saveDemoSettings(agent, c, { correlationId: crypto.randomUUID() });
-      if (!saved.ok) return false;
+      if (!saved.ok) return saved.error;
       setSettings(saved.value);
       if (c.scenarioId !== undefined || c.restart === true) onScenario?.(saved.value.scenarioId);
       if (newPlay) {

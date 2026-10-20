@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import type { Milestone } from '@cold-reserve/contracts';
+import { toolError, type Milestone } from '@cold-reserve/contracts';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '@cold-reserve/i18n';
 import { DemoControlsPanel, DemoControlsOpener, useDemoControlsSheet } from '../../src/demo-controls/DemoControlsPanel.js';
 import { scriptedDemoSettings } from '../../src/ui/demo-settings.js';
+import type { SettingChangeResult } from '../../src/ui/use-setting-change.js';
 
 // The judges' demo controls (brief 1, 3b; #432): outside the Echo, clearly a simulation. Weather (the three scenarios),
 // place, who is at home, the day's timeline with the current stop and the next one named, Restart the day in two taps;
@@ -18,7 +20,7 @@ const stops: Milestone[] = [
   { kind: 'power_back', at: at('23:40'), label: 'x' },
 ];
 
-function Wide(props: { onChange?: (c: unknown) => Promise<boolean>; onPowerCut?: () => void }) {
+function Wide(props: { onChange?: (c: unknown) => Promise<SettingChangeResult>; onPowerCut?: () => void; sessionEnded?: boolean }) {
   const sheet = useDemoControlsSheet();
   return (
     <DemoControlsPanel
@@ -30,6 +32,7 @@ function Wide(props: { onChange?: (c: unknown) => Promise<boolean>; onPowerCut?:
       stops={stops}
       now={at('15:20')}
       {...(props.onPowerCut === undefined ? {} : { onPowerCut: props.onPowerCut })}
+      {...(props.sessionEnded === undefined ? {} : { sessionEnded: props.sessionEnded })}
     />
   );
 }
@@ -166,5 +169,87 @@ describe('DemoControlsPanel', () => {
     render(<NoSandbox />);
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.queryByTestId('demo-controls')).toBeNull();
+  });
+});
+
+// Audit of 20 Oct (points 1 and 8) and the owner's "No one at risk does nothing" (expired session): one write at a
+// time, held until the real call ends; a refused or failed write gives the panel back and says why; the restart question
+// closes on any other choice; an expired session says so once, in the panel, with every choice off until Start.
+describe('DemoControlsPanel while a change is saved', () => {
+  const panelOf = () => screen.getByRole('region', { name: 'Demo controls · simulation' });
+  const off = (el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled;
+
+  it('the tapped choice says Saving… and every other choice, Power cut and Restart are off until it ends', async () => {
+    let done: (saved: boolean) => void = () => undefined;
+    const onChange = vi.fn(() => new Promise<boolean>((resolve) => { done = resolve; }));
+    render(<Wide onChange={onChange} onPowerCut={vi.fn()} />);
+    fireEvent.click(within(panelOf()).getByRole('radio', { name: /No one at risk/ }));
+    expect(within(panelOf()).getByRole('radio', { name: /No one at risk/ }).closest('label')?.textContent).toContain('Saving…');
+    for (const radio of within(panelOf()).getAllByRole('radio')) expect(off(radio)).toBe(true);
+    expect(within(panelOf()).getByRole('button', { name: 'Power cut' })).toHaveProperty('disabled', true);
+    expect(within(panelOf()).getByRole('button', { name: 'Restart the day' })).toHaveProperty('disabled', true);
+    // A locked choice still takes the focus but sends nothing.
+    fireEvent.click(within(panelOf()).getByRole('radio', { name: /Turin/ }));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    await act(async () => { done(true); await Promise.resolve(); });
+    expect(off(within(panelOf()).getByRole('radio', { name: /Turin/ }))).toBe(false);
+  });
+
+  it('a slow change that is stored after 20 s is never said "not saved": the lock holds until the real answer', async () => {
+    vi.useFakeTimers();
+    try {
+      const onChange = vi.fn(() => new Promise<boolean>((resolve) => { setTimeout(() => { resolve(true); }, 20_000); }));
+      render(<Wide onChange={onChange} />);
+      fireEvent.click(within(panelOf()).getByRole('radio', { name: /Turin/ }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(16_000); });
+      expect(within(panelOf()).getByTestId('demo-controls-summary').textContent).toBe('Saving…');
+      expect(off(within(panelOf()).getByRole('radio', { name: /Houston/ }))).toBe(true);
+      await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+      expect(within(panelOf()).getByTestId('demo-controls-summary').textContent).not.toContain("wasn't saved");
+      expect(off(within(panelOf()).getByRole('radio', { name: /Houston/ }))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a change that throws gives the panel back with a visible line, the choice as it was', async () => {
+    render(<Wide onChange={vi.fn(() => Promise.reject(new Error('network')))} />);
+    fireEvent.click(within(panelOf()).getByRole('radio', { name: /Turin/ }));
+    expect(await within(panelOf()).findByText("That change wasn't saved. Try again.")).toBeTruthy();
+    expect(within(panelOf()).getByRole('radio', { name: /Reference home/ })).toHaveProperty('checked', true);
+    expect(off(within(panelOf()).getByRole('radio', { name: /Turin/ }))).toBe(false);
+  });
+
+  it("the day's quota used up says so, with when the demo comes back (closedNoticeOf), never 'Try again'", async () => {
+    const quota = toolError('demo_quota_exceeded', 'Quota.');
+    const { unmount } = render(<Wide onChange={vi.fn(() => Promise.resolve(quota))} />);
+    fireEvent.click(within(panelOf()).getByRole('radio', { name: /Turin/ }));
+    expect(await within(panelOf()).findByText('The demo limit for today is reached.')).toBeTruthy();
+    expect(within(panelOf()).queryByText("That change wasn't saved. Try again.")).toBeNull();
+    unmount();
+    setLocale('it-IT');
+    try {
+      render(<Wide onChange={vi.fn(() => Promise.resolve(quota))} />);
+      fireEvent.click(within(screen.getByRole('region', { name: 'Comandi della demo · simulazione' })).getByRole('radio', { name: /Torino/ }));
+      expect(await screen.findByText('Il limite della demo per oggi è stato raggiunto.')).toBeTruthy();
+    } finally {
+      setLocale('en-US');
+    }
+  });
+
+  it('the restart question closes when another choice is made', () => {
+    render(<Wide />);
+    fireEvent.click(within(panelOf()).getByRole('button', { name: 'Restart the day' }));
+    expect(within(panelOf()).getByRole('button', { name: 'Yes, restart it now' })).toBeTruthy();
+    fireEvent.click(within(panelOf()).getByRole('radio', { name: /Turin/ }));
+    expect(within(panelOf()).queryByRole('button', { name: 'Yes, restart it now' })).toBeNull();
+  });
+
+  it('an expired session says so once, in the panel, and every choice is off until the code is entered again', () => {
+    render(<Wide sessionEnded onPowerCut={vi.fn()} />);
+    expect(within(panelOf()).getByTestId('demo-controls-summary').textContent).toBe('Your demo session has expired: enter the demo code again below to continue.');
+    for (const radio of within(panelOf()).getAllByRole('radio')) expect(off(radio)).toBe(true);
+    expect(within(panelOf()).getByRole('button', { name: 'Power cut' })).toHaveProperty('disabled', true);
+    expect(within(panelOf()).getByRole('button', { name: 'Restart the day' })).toHaveProperty('disabled', true);
   });
 });

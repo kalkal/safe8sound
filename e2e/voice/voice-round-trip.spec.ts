@@ -85,9 +85,10 @@ test('in Follow Up an example picked closes the mic and fills the box, as typing
     d.finishAudio();
   });
   await expect(page.getByRole('button', { name: 'Stop listening' })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('group', { name: 'Example questions' }).getByRole('button').first().click();
+  // The chip shows a short label and fills the box with its whole question.
+  await page.getByRole('group', { name: 'Example questions' }).getByRole('button', { name: 'Battery level' }).click();
   await expect(page.getByRole('button', { name: 'Speak', exact: true })).toBeEnabled();
-  await expect(page.getByLabel('Ask a question')).not.toHaveValue('');
+  await expect(page.getByLabel('Ask a question')).toHaveValue("What's my battery level?");
 });
 
 test('voice and touch together: a hot-day plan asked by voice is applied by touch in its card', async ({ page }) => {

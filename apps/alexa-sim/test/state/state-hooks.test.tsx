@@ -8,6 +8,7 @@ import { SCRIPT_FIXTURES } from '../../src/agent/script-fixtures.js';
 import { createScriptedClock } from '../../src/agent/scripted-clock.js';
 import { createScriptedPhone } from '../../src/phone/phone-feed.js';
 import { useDemoSettings } from '../../src/state/use-demo-settings.js';
+import type { SettingChangeResult } from '../../src/ui/use-setting-change.js';
 import { useLocaleSetting } from '../../src/state/use-locale-setting.js';
 import { usePreferences } from '../../src/state/use-preferences.js';
 import { useReserve, useSafeRoom } from '../../src/state/use-reserve.js';
@@ -56,7 +57,7 @@ describe('useDemoSettings', () => {
     const onNewPlay = vi.fn();
     const { result } = renderHook(() => useDemoSettings({ agent, scripted: true, sessionToken: undefined, onScenario, onNewPlay }));
     expect(result.current.settings?.scenarioId).toBe('heatwave');
-    let saved = false;
+    let saved: SettingChangeResult = false;
     await act(async () => {
       saved = await result.current.change({ scenarioId: 'storm-blackout' });
     });
@@ -104,12 +105,26 @@ describe('useDemoSettings', () => {
     for (const answer of [refused('invalid_input'), new Error('network down')]) {
       fake.answers['set_scenario'] = answer;
       await act(async () => {
-        expect(await result.current.change({ restart: true })).toBe(false);
+        expect(await result.current.change({ restart: true })).not.toBe(true);
       });
     }
     expect(result.current.settings?.scenarioId).toBe('heatwave');
     expect(result.current.playthrough).toBe(0);
     expect(onNewPlay).not.toHaveBeenCalled();
+  });
+
+  it("remote: the day's quota used up comes back from change() as its error, so the panel can say so (review of #484)", async () => {
+    const fake = fakeAgent({ get_demo_settings: reply({ settings, place }), set_scenario: refused('demo_quota_exceeded') });
+    const { result } = renderHook(() => useDemoSettings({ agent: fake.agent, scripted: false, sessionToken: 'tok' }));
+    await waitFor(() => {
+      expect(result.current.settings?.scenarioId).toBe('heatwave');
+    });
+    let answer = true as SettingChangeResult;
+    await act(async () => {
+      answer = await result.current.change({ locationId: 'turin' });
+    });
+    expect(typeof answer === 'object' ? answer.code : answer).toBe('demo_quota_exceeded');
+    expect(result.current.settings?.locationId).toBe('reference');
   });
 });
 

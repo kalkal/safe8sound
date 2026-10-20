@@ -2,7 +2,7 @@ import type { GetPreferencesOutput, SetScenarioInput, TempUnit } from '@cold-res
 import { useCallback, useState } from 'react';
 import type { DemoSettingsView } from './demo-settings.js';
 import { changesAnything, chooseSafeRoom, limitsView, mergeChange, moveLimit, withDraft, type LimitChange, type LimitId, type LimitRefusal, type LimitSave, type LimitsView } from './limits.js';
-import { useSettingChange } from './use-setting-change.js';
+import { useSettingChange, type SettingChangeResult } from './use-setting-change.js';
 
 // The person's own settings as one model (#432 S5): the saved preferences with the unsaved draft on them, the unit
 // choice and what each save said. It lives once, above every view of the settings (the Echo's page, Ana's phone), so
@@ -12,7 +12,7 @@ export interface SettingsModelInput {
   /** The sandbox's settings; undefined when there are none (not a sandbox, or not read yet): language only (#284). */
   settings: DemoSettingsView | undefined;
   /** Sends one change (the units); resolves true when it was saved. */
-  onChange: (change: SetScenarioInput) => Promise<boolean>;
+  onChange: (change: SetScenarioInput) => Promise<SettingChangeResult>;
   /** #402: the home's preferences with their limits; undefined until read. */
   limits: GetPreferencesOutput | undefined;
   /** Saves the draft as one change (the Preferences card's tool): how it ended. */

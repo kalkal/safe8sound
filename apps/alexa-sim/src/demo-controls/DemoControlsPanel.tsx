@@ -5,7 +5,7 @@ import { HOUSEHOLDS, PLACES, SCENARIOS, nothingAheadText, skyOfScenario, type De
 import { clockTime } from '../ui/sim-clock.js';
 import { t } from '../ui/text.js';
 import { useModal } from '../ui/use-modal.js';
-import { useSettingChange } from '../ui/use-setting-change.js';
+import { useSettingChange, type SettingChangeResult } from '../ui/use-setting-change.js';
 import { timelineOf } from './timeline.js';
 import './demo-controls.css';
 
@@ -66,7 +66,7 @@ export interface DemoControlsPanelProps {
   /** The sandbox's settings; without them (not a sandbox) there are no demo controls. */
   settings: DemoSettingsView | undefined;
   availablePlaces: readonly LocationId[];
-  onChange: (change: SetScenarioInput) => Promise<boolean>;
+  onChange: (change: SetScenarioInput) => Promise<SettingChangeResult>;
   /** The day's stops seen so far and the simulated time (state/use-sim-clock). */
   stops: readonly Milestone[];
   now: string | undefined;
@@ -74,14 +74,22 @@ export interface DemoControlsPanelProps {
   lastJump?: { at: string; kind: MilestoneKind; told: number } | undefined;
   /** H (owner, 19 Oct): one tap cuts the simulated grid and says "The power's out" for the person; absent, no button. */
   onPowerCut?: (() => void) | undefined;
+  /** The demo session has ended (expired or refused): every choice is off and the panel says so, once (audit of 20 Oct). */
+  sessionEnded?: boolean;
 }
 
-export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onChange, stops, now, lastJump, onPowerCut }: DemoControlsPanelProps) {
+export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onChange, stops, now, lastJump, onPowerCut, sessionEnded = false }: DemoControlsPanelProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
-  const { send, pendingOf, appliedText, failed, forget } = useSettingChange(onChange, settings);
+  const { send: sendChange, pendingOf, appliedText, failed, busy, forget } = useSettingChange(onChange, settings);
+  // One write at a time, none once the session has ended; any other choice closes the restart question.
+  const locked = busy || sessionEnded;
   const [confirmRestart, setConfirmRestart] = useState(false);
+  const send: typeof sendChange = (change, picked) => {
+    if (change.restart !== true) setConfirmRestart(false);
+    sendChange(change, picked);
+  };
   const modal = !wide && sheet.open;
   const close = () => {
     sheet.setOpen(false);
@@ -110,13 +118,14 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
       <p className="muted">{t('demoControls.intro')}</p>
       {/* One line says what the demo plays, and while a change is saved, that it is, then that it was (or was not). */}
       <p className="demo-controls-summary" role="status" data-testid="demo-controls-summary" data-failed={failed}>
-        {appliedText === '' ? summaryOf(settings) : appliedText}
+        {sessionEnded ? t('demoControls.expired') : appliedText === '' ? summaryOf(settings) : appliedText}
       </p>
       <ChipGroup
         label={t('demoControls.weather')}
         name="scenario"
         value={settings.scenarioId}
         pending={pendingOf('scenario')}
+        locked={locked}
         options={SCENARIOS.map((id) => ({ value: id, label: t(`settings.scenario.${id}`), sky: skyOfScenario(id) }))}
         onPick={(v) => {
           send({ scenarioId: v as (typeof SCENARIOS)[number] }, { name: 'scenario', value: v });
@@ -130,6 +139,7 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
           <button
             type="button"
             className="chip-button"
+            disabled={locked}
             onClick={() => {
               if (!wide) close();
               onPowerCut();
@@ -150,6 +160,7 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
         name="place"
         value={settings.locationId}
         pending={pendingOf('place')}
+        locked={locked}
         options={PLACES.map((id) => {
           const available = availablePlaces.includes(id);
           return { value: id, label: t(`settings.place.${id}`), disabled: !available, ...(available ? {} : { hint: t('settings.notYet') }) };
@@ -163,6 +174,7 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
         name="household"
         value={settings.household}
         pending={pendingOf('household')}
+        locked={locked}
         options={HOUSEHOLDS.map((h) => ({ value: h, label: t(`settings.household.${h}`) }))}
         onPick={(v) => {
           send({ household: v as (typeof HOUSEHOLDS)[number] }, { name: 'household', value: v });
@@ -176,6 +188,7 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
               ref={confirmRef}
               type="button"
               className="button"
+              disabled={locked}
               onClick={() => {
                 setConfirmRestart(false);
                 send({ restart: true });
@@ -188,6 +201,7 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
           <button
             type="button"
             className="chip-button"
+            disabled={locked}
             onClick={() => {
               setConfirmRestart(true);
             }}
