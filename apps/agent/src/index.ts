@@ -5,7 +5,7 @@ export { createAgent, type AgentLogEntry, type AgentTurn, type ColdReserveAgent 
 export { classifyFailure, type Failure } from './failure.js';
 export { AgentConfigSchema, McpToken, loadAgentConfig, loadInvokeToken, loadMcpToken, type AgentConfig } from './config.js';
 export { FakeModel, type FakeCall, type FakePolicy, type FakeReply } from './fake-model.js';
-export { FEW_SHOT, PLAN_TOOLS, PROMPT_VERSION, SYSTEM_PROMPT_TEMPLATE, buildSystemPrompt, type Dialogue } from './prompts.js';
+export { FEW_SHOT, FEW_SHOT_BY_VERSION, PLAN_TOOLS, PROMPT_VERSION, SYSTEM_PROMPT_TEMPLATE, buildSystemPrompt, type Dialogue } from './prompts.js';
 export { EVAL_SUITE, EvalSuiteSchema, type EvalCase, type EvalSuite } from './evals/cases.js';
 export { runEvals, type CaseResult, type EvalReport } from './evals/harness.js';
 export { scoreCase, type CaseScore } from './evals/metrics.js';

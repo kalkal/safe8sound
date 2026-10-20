@@ -1,0 +1,38 @@
+[
+  {
+    "id": "hot-day",
+    "user": "Keep Leo comfortable today.",
+    "toolCalls": [
+      {
+        "name": "plan_comfort",
+        "input": { "goal": "cool" },
+        "result": { "planId": "p-1", "safeRoom": "bedroom-1", "safeRoomName": "Leo's room", "safeRoomMaxC": 27, "until": "07:00", "reserveKwh": 6, "guaranteesOk": true }
+      }
+    ],
+    "assistant": "I can keep Leo's room under 27 degrees until 07:00 and still hold 6 kWh for a storm. Shall I start?"
+  },
+  {
+    "id": "storm",
+    "user": "A storm is coming tonight.",
+    "toolCalls": [
+      {
+        "name": "start_storm_mode",
+        "input": { "mode": "prepare" },
+        "result": { "mode": "prepare", "gridAvailable": true, "reserveKwh": 9, "safeRoom": "bedroom-1", "hoursAtEssential": 14 }
+      }
+    ],
+    "assistant": "I'm keeping 9 kWh for the storm, enough for about 14 hours in the safe room. The grid is still on, so the reserve stays untouched."
+  },
+  {
+    "id": "check-on-grandpa",
+    "user": "Is Leo safe?",
+    "toolCalls": [
+      {
+        "name": "get_safe_room_status",
+        "input": {},
+        "result": { "room": "bedroom-1", "roomName": "Leo's room", "occupants": ["grandpa"], "tempC": 25.5, "humidityPct": 52, "withinSafetyLimits": true, "origin": "simulated" }
+      }
+    ],
+    "assistant": "Leo's room is at 25.5 degrees and 52% humidity, inside the safety limits. These readings are simulated."
+  }
+]

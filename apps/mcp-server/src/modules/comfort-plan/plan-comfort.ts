@@ -107,10 +107,37 @@ const unitOf = (deps: ComfortPlanDeps, ctx: ToolContext): TempUnit => deps.homes
 /** The home's place (#376): the last-resort card names the number to call there. */
 const placeOf = (deps: ComfortPlanDeps, ctx: ToolContext): LocationId | undefined => deps.homes(ctx.homeId)?.place;
 
-export async function planComfort(deps: ComfortPlanDeps, input: PlanComfortInput, ctx: ToolContext): Promise<Result<Plan, ErrorEnvelope>> {
+/**
+ * A room the model named by its display name where an id belongs ("living-room" for "Living room", seen on the real model, #274):
+ * the id of the one room whose name reads the same. Anything else stays as it is and is refused with the rooms listed.
+ */
+function roomIdOf(id: string, rooms: readonly { id: string; name: string }[]): string {
+  if (rooms.some((r) => r.id === id)) return id;
+  // Apostrophes go before comparing, so "leos-room" reads as "Leo's room".
+  const slug = (text: string) => text.toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const named = rooms.filter((r) => slug(r.name) === slug(id));
+  return named.length === 1 && named[0] !== undefined ? named[0].id : id;
+}
+
+export async function planComfort(deps: ComfortPlanDeps, asked: PlanComfortInput, ctx: ToolContext): Promise<Result<Plan, ErrorEnvelope>> {
   const loaded = await loadInputs(deps, ctx);
   if (!loaded.ok) return loaded;
   const { snapshot, forecast, profile, preferences } = loaded.value;
+  const input: PlanComfortInput = asked.roomIds === undefined ? asked : { ...asked, roomIds: asked.roomIds.map((id) => roomIdOf(id, profile.rooms)) };
+  // The safety net mapped a name to an id: said once per call, with the id it resolved to (never the model's words).
+  const resolved = input.roomIds?.filter((id, i) => id !== asked.roomIds?.[i]) ?? [];
+  if (resolved.length > 0) {
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'info',
+      component: 'mcp-server',
+      message: 'A room named instead of its id was resolved to the room it names.',
+      correlationId: ctx.correlationId,
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      category: 'validation',
+      details: { event: 'room_name_resolved', roomIds: resolved, ...homeDetail(ctx.homeId) },
+    });
+  }
   // Off grid the plan is projected on the EPS circuits: without their load nothing is assumed (#107).
   if (!snapshot.gridAvailable) {
     const eps = epsBaseLoadW(profile);

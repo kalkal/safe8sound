@@ -130,6 +130,60 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(!r.ok && r.error).toMatchObject({ code: 'unknown_room', details: { roomId: 'garage' } });
   });
 
+  it('a room named by its display name where an id belongs is the room it names (the real model said "living-room", #274)', async () => {
+    const byName = world('heatwave', 14);
+    const named = await planComfort(byName.deps, { goal: 'cool', roomIds: ['living-room'] }, byName.ctx);
+    const byId = world('heatwave', 14);
+    const real = await planComfort(byId.deps, { goal: 'cool', roomIds: ['living'] }, byId.ctx);
+    expect(named.ok).toBe(true);
+    expect(named.ok && real.ok && named.value.steps.map((x) => [x.roomId, x.setpointC])).toEqual(real.ok ? real.value.steps.map((x) => [x.roomId, x.setpointC]) : undefined);
+    // Only an exact reading of a name: anything else is still refused, with the rooms listed as Name (id).
+    const other = world('heatwave', 14);
+    const unknown = await planComfort(other.deps, { goal: 'cool', roomIds: ['living-area'] }, other.ctx);
+    expect(!unknown.ok && unknown.error).toMatchObject({ code: 'unknown_room', details: { roomId: 'living-area' } });
+    expect(!unknown.ok && unknown.error.message).toContain('Living room (living)');
+  });
+
+  const renamed = (w: ReturnType<typeof world>, f: (p: HomeProfile) => HomeProfile) => {
+    const home = w.deps.homes(w.ctx.homeId);
+    if (home === undefined) throw new Error('no home');
+    return { ...w.deps, homes: () => ({ ...home, profile: f(home.profile) }) };
+  };
+
+  it('the net says once, with an event name and the resolved id, that it mapped a name (no model words, no sandbox id)', async () => {
+    const w = world('heatwave', 14);
+    await planComfort(w.deps, { goal: 'cool', roomIds: ['living-room', 'study'] }, w.ctx);
+    const lines = w.logger.lines.filter((l) => l.details?.['event'] === 'room_name_resolved');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ level: 'info', category: 'validation', correlationId: 'test-correlation', details: { roomIds: ['living'] } });
+    expect(JSON.stringify(lines[0])).not.toContain('living-room');
+    const none = world('heatwave', 14);
+    await planComfort(none.deps, { goal: 'cool', roomIds: ['living'] }, none.ctx);
+    expect(none.logger.lines.some((l) => l.details?.['event'] === 'room_name_resolved')).toBe(false);
+  });
+
+  it('two rooms with the same name are never guessed between: the name is refused with both listed', async () => {
+    const w = world('heatwave', 14);
+    const twin = (p: HomeProfile): HomeProfile => ({ ...p, rooms: p.rooms.map((r) => (r.id === 'study' ? { ...r, name: 'Living room' } : r)) });
+    const r = await planComfort(renamed(w, twin), { goal: 'cool', roomIds: ['living-room'] }, w.ctx);
+    expect(!r.ok && r.error).toMatchObject({ code: 'unknown_room', details: { roomId: 'living-room' } });
+    expect(!r.ok && r.error.message).toContain('Living room (study), Living room (living)');
+  });
+
+  it("apostrophes do not matter when a name is read: 'leos-room' is Leo's room", async () => {
+    const w = world('heatwave', 14);
+    const leo = (p: HomeProfile): HomeProfile => ({ ...p, rooms: p.rooms.map((r) => (r.id === 'bedroom-1' ? { ...r, name: "Leo's room" } : r)) });
+    const named = await planComfort(renamed(w, leo), { goal: 'cool', roomIds: ['leos-room'] }, w.ctx);
+    expect(named.ok && named.value.steps.some((x) => x.roomId === 'bedroom-1')).toBe(true);
+  });
+
+  it('the live defect: "living-room" at 21 °C reaches the guard, which refuses the 21 °C (the plan that holds comes back)', async () => {
+    const w = world('heatwave', 14);
+    const r = await planComfort(w.deps, { goal: 'cool', roomIds: ['living-room'], setpointC: celsius(21) }, w.ctx);
+    expect(!r.ok && r.error.code).not.toBe('unknown_room');
+    expect(r.ok ? r.value.refusedProposal : undefined).toBeDefined();
+  });
+
   it('the room list fits the 300-character error message: what does not fit is counted, never cut mid-name', () => {
     const rooms = Array.from({ length: 15 }, (_, i) => ({ id: `room-${String(i)}`, name: `A long room name number ${String(i)}` }));
     const text = roomsText(rooms, 200);
@@ -140,9 +194,9 @@ describe('plan_comfort (two-phase: propose)', () => {
 
   it('a refused room id lists the rooms there are, as "Name (id)", so the model can retry with the right id (#274)', async () => {
     const w = world('heatwave', 14);
-    const r = await planComfort(w.deps, { goal: 'cool', roomIds: ['living-room'] }, w.ctx);
+    const r = await planComfort(w.deps, { goal: 'cool', roomIds: ['living-area'] }, w.ctx);
     expect(!r.ok && r.error.message).toBe(
-      'There is no room "living-room" in this home. The rooms are: Bedroom (bedroom-1), Second bedroom (bedroom-2), Study (study), Living room (living).',
+      'There is no room "living-area" in this home. The rooms are: Bedroom (bedroom-1), Second bedroom (bedroom-2), Study (study), Living room (living).',
     );
   });
 

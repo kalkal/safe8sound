@@ -1,11 +1,14 @@
 import { PRODUCT_NAME } from '@cold-reserve/i18n';
 import { z } from 'zod';
 import fewShotV1 from '../prompts/few-shot.v1.json' with { type: 'json' };
+import fewShotV5 from '../prompts/few-shot.v5.json' with { type: 'json' };
+import fewShotV6 from '../prompts/few-shot.v6.json' with { type: 'json' };
 import { SYSTEM_PROMPTS } from './prompts.generated.js';
 
 // The system prompt and few-shot dialogues are data, versioned in apps/agent/prompts/ (plan §4).
-// A new version is a new file; the snapshot test shows every change in review.
-export const PROMPT_VERSION: keyof typeof SYSTEM_PROMPTS = 'v5';
+// A new version is a new file, for the system prompt AND for its examples (a version never changes under an older one);
+// the snapshot test shows every change in review, and a test freezes which examples file each version uses.
+export const PROMPT_VERSION: keyof typeof SYSTEM_PROMPTS = 'v6';
 
 /** The MCP tools of the plan (§4). Few-shot dialogues may only use these. */
 export const PLAN_TOOLS = [
@@ -30,7 +33,23 @@ const DialogueSchema = z.strictObject({
 export type Dialogue = z.infer<typeof DialogueSchema>;
 
 /** Our own data: if it does not validate, that is a bug, so it throws at startup. */
-export const FEW_SHOT: readonly Dialogue[] = z.array(DialogueSchema).parse(fewShotV1);
+const dialogues = (raw: unknown): readonly Dialogue[] => z.array(DialogueSchema).parse(raw);
+
+/**
+ * The examples file each prompt version uses: v1 to v4 the original one, v5 the one of 20 Oct (rooms and times as the tools
+ * write them), v6 that plus the every-room example. A version's examples never change under it (a test freezes this map).
+ */
+export const FEW_SHOT_BY_VERSION: Readonly<Record<keyof typeof SYSTEM_PROMPTS, readonly Dialogue[]>> = {
+  v1: dialogues(fewShotV1),
+  v2: dialogues(fewShotV1),
+  v3: dialogues(fewShotV1),
+  v4: dialogues(fewShotV1),
+  v5: dialogues(fewShotV5),
+  v6: dialogues(fewShotV6),
+};
+
+/** The examples of the current version. */
+export const FEW_SHOT: readonly Dialogue[] = FEW_SHOT_BY_VERSION[PROMPT_VERSION];
 
 // The .md is the source people review; scripts/prompts.ts turns it into code, so the prompt survives the
 // one-file CJS bundle for AgentCore (G1a). A test fails when the generated module is stale.
@@ -43,7 +62,7 @@ function renderDialogue(d: Dialogue): string {
 
 /** The prompt of a version: the current one by default; an older one only to compare them (the eval script). */
 export function buildSystemPrompt(version: keyof typeof SYSTEM_PROMPTS = PROMPT_VERSION): string {
-  const examples = FEW_SHOT.map(renderDialogue).join('\n\n');
+  const examples = FEW_SHOT_BY_VERSION[version].map(renderDialogue).join('\n\n');
   return `${SYSTEM_PROMPTS[version].replaceAll('{product}', PRODUCT_NAME)}\n\nExamples:\n\n${examples}`;
 }
 

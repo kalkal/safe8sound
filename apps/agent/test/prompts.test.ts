@@ -1,7 +1,7 @@
 import './no-network.js';
 import { PRODUCT_NAME } from '@cold-reserve/i18n';
 import { describe, expect, it } from 'vitest';
-import { FEW_SHOT, PLAN_TOOLS, PROMPT_VERSION, SYSTEM_PROMPT_TEMPLATE, buildSystemPrompt, promptVersionOf } from '../src/prompts.js';
+import { FEW_SHOT, FEW_SHOT_BY_VERSION, PLAN_TOOLS, PROMPT_VERSION, SYSTEM_PROMPT_TEMPLATE, buildSystemPrompt, promptVersionOf } from '../src/prompts.js';
 
 const sentences = (text: string) => text.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
 const numbersIn = (text: string) => text.match(/\d+(?:[.,]\d+)?/g) ?? [];
@@ -10,7 +10,7 @@ describe('system prompt (versioned, short: cost rule)', () => {
   const prompt = buildSystemPrompt();
 
   it('is versioned and matches the snapshot, so every change shows up in review', () => {
-    expect(PROMPT_VERSION).toBe('v5');
+    expect(PROMPT_VERSION).toBe('v6');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -55,8 +55,9 @@ describe('system prompt (versioned, short: cost rule)', () => {
     expect(prompt).not.toContain('{product}');
   });
 
-  it('stays short: at most 4,000 characters including the few-shot dialogues', () => {
-    expect(prompt.length).toBeLessThanOrEqual(4000);
+  it('stays short: at most 4,300 characters including the few-shot dialogues', () => {
+    // 4,000 until v5 (3,5xx); v6 adds one rule and one example with the real status line (4,285): the limit moves to 4,300, no further.
+    expect(prompt.length).toBeLessThanOrEqual(4300);
   });
 
   it.each([
@@ -74,8 +75,8 @@ describe('system prompt (versioned, short: cost rule)', () => {
 });
 
 describe('few-shot dialogues (plan §4: hot day, storm, "is Leo safe?")', () => {
-  it('has exactly the three planned dialogues', () => {
-    expect(FEW_SHOT.map((d) => d.id)).toEqual(['hot-day', 'storm', 'check-on-grandpa']);
+  it('has the three planned dialogues and the every-room one (v6)', () => {
+    expect(FEW_SHOT.map((d) => d.id)).toEqual(['hot-day', 'storm', 'check-on-grandpa', 'every-room']);
   });
 
   it.each(FEW_SHOT.map((d) => [d.id, d] as const))('%s: answers in at most two sentences', (_id, dialogue) => {
@@ -93,13 +94,56 @@ describe('few-shot dialogues (plan §4: hot day, storm, "is Leo safe?")', () => 
   });
 });
 
+describe('the examples of each prompt version never change under it (20 Oct: v5 once edited the examples of v1 to v4 in place)', () => {
+  const read = async (name: string) => JSON.parse((await (await import('node:fs/promises')).readFile(new URL('../prompts/' + name, import.meta.url), 'utf8'))) as unknown;
+
+  it('v1 to v4 use few-shot.v1.json, v5 few-shot.v5.json, v6 few-shot.v6.json', async () => {
+    const [v1, v5, v6] = await Promise.all([read('few-shot.v1.json'), read('few-shot.v5.json'), read('few-shot.v6.json')]);
+    for (const v of ['v1', 'v2', 'v3', 'v4'] as const) expect(FEW_SHOT_BY_VERSION[v]).toEqual(v1);
+    expect(FEW_SHOT_BY_VERSION.v5).toEqual(v5);
+    expect(FEW_SHOT_BY_VERSION.v6).toEqual(v6);
+    expect(Object.keys(FEW_SHOT_BY_VERSION)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6']);
+  });
+
+  it('freezes what each file says, so an edit in place is a failing test', () => {
+    const said = (v: keyof typeof FEW_SHOT_BY_VERSION) => FEW_SHOT_BY_VERSION[v].map((d) => d.assistant).join(' ');
+    // v1 to v4: as they were before 20 Oct (the examples that taught "Grandpa's room" and "7 am").
+    expect(said('v4')).toContain("Grandpa's room under 27 degrees until 7 am");
+    expect(said('v4')).not.toContain('every');
+    // v5: the examples of #473, rooms by name and times in 24 hours.
+    expect(said('v5')).toContain("Leo's room under 27 degrees until 07:00");
+    expect(said('v5')).not.toContain("Grandpa's room");
+    expect(FEW_SHOT_BY_VERSION.v5.map((d) => d.id)).toEqual(['hot-day', 'storm', 'check-on-grandpa']);
+    // v6: v5 and the every-room example.
+    expect(FEW_SHOT_BY_VERSION.v6.slice(0, 3)).toEqual(FEW_SHOT_BY_VERSION.v5);
+    expect(FEW_SHOT_BY_VERSION.v6.map((d) => d.id)).toEqual(['hot-day', 'storm', 'check-on-grandpa', 'every-room']);
+  });
+
+  it('builds each version with its own examples', () => {
+    // (the v5 and v6 system text itself names "Grandpa's room" as what not to say: look at the examples, not the rule)
+    expect(buildSystemPrompt('v4')).toContain('until 7 am');
+    expect(buildSystemPrompt('v5')).toContain('until 07:00');
+    expect(buildSystemPrompt('v5')).not.toContain('until 7 am');
+    expect(buildSystemPrompt('v5')).not.toContain('every-room');
+    expect(buildSystemPrompt('v6')).toContain('Set every room to 21 degrees.');
+  });
+});
+
+describe('prompt v6 (20 Oct, the real model said "no room named living-room")', () => {
+  it('says what to do with every or all rooms, and with a room a tool says does not exist', () => {
+    const prompt = buildSystemPrompt('v6');
+    expect(prompt).toContain("For every or all rooms, use the room ids the tools give (Leo's room = bedroom-1); never invent an id, and read get_home_status first if you lack them. If a tool says a room does not exist, retry at once with a listed id.");
+    expect(buildSystemPrompt('v5')).not.toContain('every or all rooms');
+  });
+});
+
 describe('the system prompt inside the code (G1a: it must survive the CJS bundle for AgentCore)', () => {
   it('comes from a generated module that matches every prompts/system.<version>.md (run `pnpm --filter @cold-reserve/agent prompts`)', async () => {
     const { readFile } = await import('node:fs/promises');
     const read = async (version: string) => (await readFile(new URL(`../prompts/system.${version}.md`, import.meta.url), 'utf8')).trim();
     const { SYSTEM_PROMPTS } = await import('../src/prompts.generated.js');
     // A new version is a new file (#215 review): the old ones stay, unchanged, next to it.
-    expect(Object.keys(SYSTEM_PROMPTS)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5']);
+    expect(Object.keys(SYSTEM_PROMPTS)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6']);
     for (const [version, text] of Object.entries(SYSTEM_PROMPTS)) expect(text).toBe(await read(version));
     expect(SYSTEM_PROMPT_TEMPLATE).toBe(await read(PROMPT_VERSION));
   });
