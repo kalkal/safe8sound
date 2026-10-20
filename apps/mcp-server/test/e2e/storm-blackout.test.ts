@@ -66,7 +66,7 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       expect((await inbox())[0]?.text).toContain('a storm is expected and the home is ready for a power cut.');
       expect(textOf(injected)).toContain('Family told that a storm is expected: daughter (in_app).');
 
-      expect(JSON.stringify(injected)).not.toMatch(/Giulia|phone-/);
+      expect(JSON.stringify(injected)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
 
       // 2. 15:30, the grid is down. Reading the safe room changes nothing (read-only); asking to prepare
       //    runs the detector: the storm is active and the daughter is told once, with the safe-until time.
@@ -80,10 +80,10 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       // Queue item 7: the simulated house docks its mower and closes its shutter; the voice says so by fixed labels.
       expect(start.session.devicesSecured?.map((d) => `${d.entityId}:${d.action}:${d.outcome}`)).toEqual(['lawn_mower.garden:dock:done', 'cover.living_room:close:done']);
       expect(textOf(started)).toContain('Made safe before the storm: the robot mower is docked, the shutters are closed.');
-      expect(JSON.stringify(started)).not.toMatch(/Giulia|phone-/);
+      expect(JSON.stringify(started)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
       expect((await inbox())[0]?.text).toContain(`keeps it safe ${start.safeHours >= 24 ? 'at least ' : ''}until ${clock(Date.parse(start.safeUntil))}${start.safeHours >= 24 ? ' tomorrow' : ''}.`);
       const status = await call('get_safe_room_status');
-      expect(JSON.stringify(status)).not.toMatch(/Giulia|phone-/);
+      expect(JSON.stringify(status)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
       const s = SafeRoomStatusSchema.parse(status.structuredContent);
       // #429: Saver from the grid loss; Essential only from the essential moment.
       expect(s).toMatchObject({ safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], level: 'saver', levelReason: 'storm', stormPhase: 'active' });
@@ -99,7 +99,7 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       // 3. The model tells the family the house went to Essential: roles only in what it reads.
       const told = await call('notify_family', { transition: 'essential_level' });
       expect(NotifyFamilyOutputSchema.parse(told.structuredContent).sent).toEqual([{ role: 'daughter', channel: 'in_app' }]);
-      expect(JSON.stringify(told)).not.toMatch(/Giulia|phone-daughter/);
+      expect(JSON.stringify(told)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-daughter/);
       // A recipient said in conversation is refused.
       const stranger = await call('notify_family', { transition: 'essential_level', roles: ['neighbor'] });
       expect(ErrorEnvelopeSchema.parse(stranger.structuredContent).code).toBe('recipient_not_registered');

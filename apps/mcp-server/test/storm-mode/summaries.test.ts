@@ -23,7 +23,7 @@ describe('what the model reads', () => {
     expect(text).toMatch(/until \d{1,2}:\d\d [AP]M/);
     // The person hears the clock time only, never an ISO stamp (#160 acceptance test).
     expect(text).not.toMatch(/\d{4}-\d\d-\d\dT/);
-    expect(text).not.toMatch(/Giulia|phone-/);
+    expect(text).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
     // #390: preparing a storm tells the family once (the forecast message), by role and channel only.
     expect(text).toContain('Family told that a storm is expected: daughter (in_app).');
   });
@@ -35,7 +35,7 @@ describe('what the model reads', () => {
     const text = startSummary(out.value);
     expect(text).toContain('Storm mode is active: the grid is down, so the storm reserve is now the budget.');
     expect(text).toContain('Family told that the storm started: daughter (in_app).');
-    expect(text).not.toMatch(/Giulia|phone-/);
+    expect(text).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
   });
 
   it('get_safe_room_status: room, temperature, humidity, occupants, level with reason, hours, storm and data origin', async () => {
@@ -48,7 +48,7 @@ describe('what the model reads', () => {
     expect(text).toContain(`Safe room: ${one(s.tempC)} °C, ${String(s.humidityPct)} % humidity, occupants: Leo (grandpa).`);
     expect(text).toContain('Level saver (reason: storm).');
     expect(text).toContain(`Safe for about ${one(s.safeHours)} hours, until ${localTimeText(s.safeUntil)}${s.safeHours >= 24 ? ' tomorrow' : ''}.`);
-    expect(text).not.toMatch(/Giulia|phone-/);
+    expect(text).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
     expect(text).toContain('Storm mode: active.');
     expect(text).toContain('simulated data (');
   });
@@ -135,7 +135,7 @@ describe('what the model reads', () => {
     expect(text).toContain('Message sent to: daughter (in_app).');
     expect(text).toContain('Not sent to: neighbor (not a registered contact).');
     expect(text).toContain(`Message: ${out.value.preview}`);
-    expect(text).not.toMatch(/Giulia|phone-/);
+    expect(text).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
   });
 
   it('says the local clock time the way the family message does, then the exact time', () => {

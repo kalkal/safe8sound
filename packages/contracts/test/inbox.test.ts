@@ -6,7 +6,7 @@ const message = {
   role: 'daughter',
   channel: 'in_app',
   transition: 'storm_started',
-  text: 'Cold Reserve alert for Giulia Example: a storm cut the power at home.',
+  text: 'Safe-8-Sound alert for Ana: a storm cut the power at home.',
 };
 
 describe('InboxMessageSchema (the family phone, approved in #24)', () => {
@@ -19,7 +19,7 @@ describe('InboxMessageSchema (the family phone, approved in #24)', () => {
     expect(InboxMessageSchema.safeParse({ ...message, transition: 'storm_done' }).success).toBe(false);
     // #390: the forecast message is sent too (owner decision).
     expect(InboxMessageSchema.safeParse({ ...message, transition: 'storm_prepared' }).success).toBe(true);
-    expect(InboxMessageSchema.safeParse({ ...message, role: 'Giulia' }).success).toBe(false);
+    expect(InboxMessageSchema.safeParse({ ...message, role: 'Ana' }).success).toBe(false);
     expect(InboxMessageSchema.safeParse({ ...message, handle: 'phone-1' }).success).toBe(false);
   });
 

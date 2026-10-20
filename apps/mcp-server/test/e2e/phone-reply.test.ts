@@ -42,7 +42,7 @@ describe('the family phone replies during a storm (local entry, real HTTP)', () 
 
       const status = await client.callTool({ name: 'get_safe_room_status', arguments: {} });
       expect(SafeRoomStatusSchema.parse(status.structuredContent).lastCheckIn).toMatchObject({ role: 'daughter', reply: 'on_my_way' });
-      expect(JSON.stringify(status)).not.toMatch(/Giulia|phone-/);
+      expect(JSON.stringify(status)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
 
       const tooSoon = await tap({ reply: 'check_status' });
       expect(tooSoon.status).toBe(429);
@@ -54,7 +54,7 @@ describe('the family phone replies during a storm (local entry, real HTTP)', () 
       expect(check.status).toBe(200);
       const body = PhoneReplyOutputSchema.parse(await check.json());
       expect(body.status).toMatchObject({ safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], stormPhase: 'active' });
-      expect(JSON.stringify(body)).not.toMatch(/Giulia|phone-/);
+      expect(JSON.stringify(body)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
     } finally {
       await client.close();
       await server.close();

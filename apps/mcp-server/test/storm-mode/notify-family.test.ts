@@ -28,10 +28,10 @@ describe('notify_family', () => {
     if (!out.ok) throw new Error(out.error.message);
     expect(NotifyFamilyOutputSchema.parse(out.value)).toMatchObject({ sent: [{ role: 'daughter', channel: 'in_app' }], skipped: [] });
     expect(out.value.preview).toMatch(/ for daughter: /);
-    expect(JSON.stringify(out.value)).not.toMatch(/Giulia|phone-daughter/);
+    expect(JSON.stringify(out.value)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-daughter/);
     const [latest] = (await w.inbox());
     expect(latest).toMatchObject({ role: 'daughter', transition: 'essential_level' });
-    expect(latest?.text).toMatch(/ for Giulia Example: /);
+    expect(latest?.text).toMatch(/ for Ana: /);
   });
 
   it('records the message in the session', async () => {
@@ -103,7 +103,7 @@ describe('notify_family', () => {
     const role = fc.stringMatching(/^[a-z][a-z_-]{0,31}$/);
     await fc.assert(
       fc.asyncProperty(fc.uniqueArray(fc.oneof(role, fc.constant('daughter'), fc.constant('son')), { minLength: 1, maxLength: 3 }), async (roles) => {
-        const contacts = [...preferences.familyContacts, { role: 'son', name: 'Marco Example', channel: 'in_app' as const, handle: 'phone-son-1' }];
+        const contacts = [...preferences.familyContacts, { role: 'son', name: 'Second contact', channel: 'in_app' as const, handle: 'phone-son-1' }];
         const w = await activeStorm({ preferences: { ...preferences, familyContacts: contacts } });
         const before = (await w.inbox()).length;
         const out = await notifyFamily(w.deps, { transition: 'essential_level', roles }, w.ctx);
@@ -112,7 +112,7 @@ describe('notify_family', () => {
         expect(delivered.every((m) => registered.has(m.role) && roles.includes(m.role))).toBe(true);
         expect(delivered).toHaveLength(roles.filter((r) => registered.has(r)).length);
         const seen = JSON.stringify(out.ok ? out.value : out.error);
-        expect(seen).not.toMatch(/Example|phone-/);
+        expect(seen).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|Second contact|phone-/);
         return true;
       }),
       { numRuns: 40 },

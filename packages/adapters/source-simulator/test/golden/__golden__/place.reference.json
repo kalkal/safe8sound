@@ -6,7 +6,7 @@
   "lonRounded": 12.5,
   "tz": "Europe/Rome",
   "source": {
-    "name": "Cold Reserve scenario scripts (values written for the demo)",
+    "name": "Safe-8-Sound scenario scripts (values written for the demo)",
     "url": "https://github.com/kalkal/safe-8-sound",
     "license": "Written for this project",
     "retrievedAt": "2026-10-04"

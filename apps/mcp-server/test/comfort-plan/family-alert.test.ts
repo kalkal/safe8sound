@@ -17,7 +17,7 @@ async function sent(p: Plan): Promise<string> {
   const read = await w.deps.homes(w.ctx.homeId)?.source.snapshot();
   if (read?.ok !== true) throw new Error('no snapshot');
   const snapshot = read.value;
-  const contacts = { ...preferences, familyContacts: [{ role: 'daughter', name: 'Giulia Example', channel: 'in_app' as const, handle: 'phone-daughter-1' }] };
+  const contacts = { ...preferences, familyContacts: [{ role: 'daughter', name: 'Ana', channel: 'in_app' as const, handle: 'phone-daughter-1' }] };
   await alertFamily(notifier, { plan: p, profile: w.profile, preferences: contacts, snapshot, nowMs: Date.parse(snapshot.ts) });
   return texts[0] ?? '';
 }

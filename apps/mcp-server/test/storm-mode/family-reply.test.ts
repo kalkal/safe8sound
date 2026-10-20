@@ -17,7 +17,7 @@ describe('a reply from the family phone', () => {
     expect(PhoneReplyOutputSchema.parse(out.value)).toEqual({ recorded: { role: 'daughter', reply: 'on_my_way', at: new Date(w.clock.now()).toISOString() } });
     const status = await safeRoomStatus(w.deps, w.ctx);
     expect(status.ok && status.value.lastCheckIn).toMatchObject({ role: 'daughter', reply: 'on_my_way' });
-    expect(JSON.stringify(out.value)).not.toMatch(/Giulia|phone-/);
+    expect(JSON.stringify(out.value)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
   });
 
   it('"Check status" also returns the safe room as the phone shows it, roles only', async () => {
@@ -26,7 +26,7 @@ describe('a reply from the family phone', () => {
     const out = await familyReply(w.deps, { reply: 'check_status' }, phoneCtx(w));
     if (!out.ok) throw new Error(out.error.message);
     expect(out.value.status).toMatchObject({ safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], stormPhase: 'active' });
-    expect(JSON.stringify(out.value)).not.toMatch(/Giulia|phone-/);
+    expect(JSON.stringify(out.value)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
   });
 
   it('"Check status" when the safe room cannot be read: an error, and nothing recorded, so a retry is not refused as too soon', async () => {
@@ -113,6 +113,6 @@ describe('a reply from the family phone', () => {
     await familyReply(w.deps, { reply: 'on_my_way' }, phoneCtx(w));
     const line = w.logs.find((l) => l.details?.['event'] === 'family_reply_recorded');
     expect(line).toMatchObject({ level: 'info', correlationId: 'test-correlation', details: { role: 'daughter', reply: 'on_my_way' } });
-    expect(JSON.stringify(w.logs)).not.toMatch(/Giulia|phone-daughter/);
+    expect(JSON.stringify(w.logs)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-daughter/);
   });
 });

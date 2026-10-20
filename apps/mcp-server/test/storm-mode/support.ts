@@ -38,7 +38,7 @@ export const preferences: Preferences = PreferencesSchema.parse({
   roomPriority: ['bedroom-1', 'bedroom-2', 'living', 'study'],
   safety: { cooling: { maxC: 27 }, heating: { minC: 18 }, humidity: { minPct: 40, maxPct: 60 } },
   autoStormOnGridLoss: true,
-  familyContacts: [{ role: 'daughter', name: 'Giulia Example', channel: 'in_app', handle: 'phone-daughter-1' }],
+  familyContacts: [{ role: 'daughter', name: 'Ana', channel: 'in_app', handle: 'phone-daughter-1' }],
   language: 'en-US',
 });
 

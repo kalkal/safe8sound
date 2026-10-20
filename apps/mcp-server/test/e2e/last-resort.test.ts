@@ -112,7 +112,7 @@ describe('storm, battery 20 %: the last resort, confirmed twice, tells the famil
           ? `until ${said(lr.safeUntil)}, then gets warmer. Please check on them.`
           : `stays within its limits until about ${said(lr.limitCrossedAt)} (battery until ${said(lr.safeUntil)}), then gets warmer. Please check on them.`,
       );
-      expect(JSON.stringify(second)).not.toMatch(/Giulia|phone-/);
+      expect(JSON.stringify(second)).not.toMatch(/(^|[^A-Za-z])Ana([^A-Za-z]|$)|phone-/);
 
       // 4. A plan the model proposes past the physical limits is still a refusal, never a last resort.
       const all = demoProfile().rooms.map((r) => r.id);

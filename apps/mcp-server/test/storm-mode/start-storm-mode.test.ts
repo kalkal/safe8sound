@@ -36,7 +36,7 @@ describe('start_storm_mode', () => {
     expect(out.value.session.notifications).toEqual([{ at: new Date(w.clock.now()).toISOString(), transition: 'storm_started', contactRole: 'daughter', channel: 'in_app', delivered: true }]);
     const [message] = (await w.inbox());
     expect(message).toMatchObject({ role: 'daughter', transition: 'storm_started' });
-    expect(message?.text).toMatch(/^.+ alert for Giulia Example: a storm cut the power at home\. Bedroom is at \d+\.\d °C/);
+    expect(message?.text).toMatch(/^.+ alert for Ana: a storm cut the power at home\. Bedroom is at \d+\.\d °C/);
   });
 
   it('asking again changes nothing and sends nothing more', async () => {
