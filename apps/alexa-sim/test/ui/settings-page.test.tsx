@@ -86,6 +86,14 @@ describe('the settings page', () => {
     expect(protect.textContent).not.toMatch(/condition|medical|diagnos|medicine/i);
   });
 
+  it('with no one at risk at home, "Who we protect" shows the small house and says so, never Leo (owner, 20 Oct)', () => {
+    render(<Harness settings={{ ...scriptedDemoSettings(), household: 'no-one-at-risk' }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    const people = within(screen.getByRole('region', { name: 'Who we protect' })).getAllByRole('listitem');
+    expect(people.map((p) => p.textContent)).toEqual(['No one at risk at home: the home keeps everyone comfortable', 'Ana, daughter, gets the alerts on her phone']);
+    expect(people.map((p) => p.querySelector('svg')?.getAttribute('data-avatar'))).toEqual(['home', 'adult-woman']);
+  });
+
   it('holds only the person\'s own settings, never a demo control, and says where they are saved', () => {
     const { button } = setup();
     fireEvent.click(button);
@@ -323,9 +331,14 @@ describe('Temperatures and limits section', () => {
     fireEvent.click(within(section).getByRole('button', { name: 'Save' }));
     const saved = await within(section).findByRole('button', { name: 'Saved ✓' });
     expect(saved.getAttribute('aria-disabled')).toBe('true');
+    // The status line says it too, for a screen reader (review of #469).
+    expect(screen.getAllByText('Saved.').length).toBeGreaterThan(0);
     expect(screen.getByRole('region', { name: TITLE })).toBeTruthy();
     fireEvent.click(within(section).getByRole('button', { name: 'Lower: Comfort temperature' }));
     expect(within(section).getByRole('button', { name: 'Save' }).getAttribute('aria-disabled')).toBe('false');
+    // A step back to the saved value leaves nothing to save: Saved ✓ again (review of #469).
+    fireEvent.click(within(section).getByRole('button', { name: 'Raise: Comfort temperature' }));
+    expect(within(section).getByRole('button', { name: 'Saved ✓' }).getAttribute('aria-disabled')).toBe('true');
   });
 
   it('says "Salvato ✓" in Italian', async () => {
@@ -335,6 +348,25 @@ describe('Temperatures and limits section', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abbassa: Temperatura di comfort' }));
     fireEvent.click(screen.getByRole('button', { name: 'Salva' }));
     expect(await screen.findByRole('button', { name: 'Salvato ✓' })).toBeTruthy();
+  });
+
+  it('says honestly, in a small Winter block right after the temperatures and limits, that winter mode comes next (owner, 20 Oct)', () => {
+    const { section } = open();
+    const winter = screen.getAllByRole('region', { name: 'Winter' })[0] as HTMLElement;
+    expect(within(winter).getByTestId('winter-note').textContent).toBe("Winter mode (keeping warm when it's cold): coming next. This demo covers summer heat and storms.");
+    // Its own block, after the limits, with a decorative snowflake and no switch.
+    expect(section.contains(winter)).toBe(false);
+    expect(section.compareDocumentPosition(winter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(winter.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(within(winter).queryByRole('checkbox')).toBeNull();
+  });
+
+  it('says it in Italian too', () => {
+    setLocale('it-IT');
+    render(<Harness settings={scriptedDemoSettings()} locale="it-IT" limits={view} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Impostazioni' }));
+    const winter = screen.getByRole('region', { name: 'Inverno' });
+    expect(within(winter).getByTestId('winter-note').textContent).toBe('Modalità inverno (tenere al caldo quando fa freddo): in arrivo. Questa demo copre il caldo estivo e le tempeste.');
   });
 
   it('Save is blocked while it saves: a second press sends nothing', async () => {

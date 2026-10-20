@@ -4,7 +4,9 @@
 // and external images. No ids, so the same avatar can be drawn twice on a page. The avatar sits beside the person's
 // name, which says who it is, so screen readers skip it. Kept out of index.ts: the card bundle never carries it.
 
-export const AVATAR_KINDS = ['older-man', 'adult-woman'] as const;
+import { t } from './text.js';
+
+export const AVATAR_KINDS = ['older-man', 'adult-woman', 'home'] as const;
 export type AvatarKind = (typeof AVATAR_KINDS)[number];
 
 const DISC = 'M32 0a32 32 0 1 1 0 64a32 32 0 1 1 0-64Z';
@@ -53,12 +55,31 @@ function AdultWoman() {
   );
 }
 
-/** One person's avatar on its disc, sized by the caller through `className`. */
-export function Avatar({ kind, className }: { kind: AvatarKind; className?: string }) {
+function Home() {
   return (
-    <svg className={className === undefined ? 'avatar' : `avatar ${className}`} data-avatar={kind} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <>
+      {/* A small house (owner, 20 Oct, B): no one at risk is at home, so no person is drawn. A chimney, the roof, the
+          walls, a door and a window. */}
+      <rect x="40" y="17" width="5" height="9" className="avatar-hair" />
+      <path d="M13 34 32 16 51 34Z" className="avatar-hair" />
+      <path d="M18 32H46V50H18Z" className="avatar-clothes" />
+      <rect x="28" y="38" width="8" height="12" className="avatar-skin" />
+      <rect x="38" y="36" width="5" height="5" className="avatar-skin" />
+      <path d="M13 34 32 16 51 34 M18 50H46" className="avatar-line" />
+    </>
+  );
+}
+
+/**
+ * One person's avatar on its disc, sized by the caller through `className`. A person sits beside their name, so
+ * screen readers skip it; the house has no name beside it and says what it means ("No one at risk at home").
+ */
+export function Avatar({ kind, className }: { kind: AvatarKind; className?: string }) {
+  const label = kind === 'home' ? { role: 'img', 'aria-label': t('avatar.home') } : { 'aria-hidden': true };
+  return (
+    <svg className={className === undefined ? 'avatar' : `avatar ${className}`} data-avatar={kind} viewBox="0 0 64 64" focusable="false" {...label}>
       <path d={DISC} className="avatar-disc" />
-      {kind === 'older-man' ? <OlderMan /> : <AdultWoman />}
+      {kind === 'older-man' ? <OlderMan /> : kind === 'home' ? <Home /> : <AdultWoman />}
     </svg>
   );
 }

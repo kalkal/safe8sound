@@ -130,3 +130,13 @@ export function WeatherOutline({ sky }: { sky: 'mild' | 'hot' | 'dusk' | 'storm'
       return <path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973 M13 12l-3 5h4l-3 5" />;
   }
 }
+
+/** Lucide "snowflake" (ISC, see NOTICE): the settings' winter block (owner, 20 Oct). */
+export function SnowflakeOutline({ className }: { className: string }) {
+  return (
+    <path
+      d="M10 20l-1.25-2.5L6 18 M10 4L8.75 6.5 6 6 M14 20l1.25-2.5L18 18 M14 4l1.25 2.5L18 6 M17 21l-3-6h-4 M17 3l-3 6 1.5 3 M2 12h6.5L10 9 M20 10l-1.5 2 1.5 2 M22 12h-6.5L14 15 M4 10l1.5 2L4 14 M7 21l3-6-1.5-3 M7 3l3 6h4"
+      className={className}
+    />
+  );
+}

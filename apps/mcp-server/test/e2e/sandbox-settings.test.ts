@@ -46,7 +46,7 @@ const planDay = async (call: (name: string, args?: Record<string, unknown>) => P
   PlanSchema.parse((await call('plan_comfort', { goal: 'cool' }))['structuredContent']).createdAt.slice(0, 10);
 
 describe('sandbox settings on the local entry', () => {
-  it('a visitor plays the storm with grandma at home; the other sandbox and demo keep the heatwave; demo lists no settings tools', async () => {
+  it('a visitor plays the storm with no one at risk at home; the other sandbox and demo keep the heatwave; demo lists no settings tools', async () => {
     const logger = memoryLogger();
     const local = createLocalApp(ENV, { wallClock: settableClock(WALL), logger });
     if (!local.ok) throw new Error(local.error.message);
@@ -60,16 +60,16 @@ describe('sandbox settings on the local entry', () => {
     expect(await demo.tools()).not.toContain('get_demo_settings');
 
     expect(await planDay(a.call)).toBe('2026-07-16');
-    const set = await a.call('set_scenario', { scenarioId: 'storm-blackout', household: 'older-woman' });
+    const set = await a.call('set_scenario', { scenarioId: 'storm-blackout', household: 'no-one-at-risk' });
     expect(set.isError).not.toBe(true);
     expect(SetScenarioOutputSchema.parse(set.structuredContent)).toMatchObject({ restarted: true, settings: { version: 2, scenarioId: 'storm-blackout' } });
 
-    // The sandbox's own clock: its plans and safe room fall on the storm day, with grandma in the safe room.
+    // The sandbox's own clock: its plans and safe room fall on the storm day, with an adult (no one at risk) in the safe room.
     expect(await planDay(a.call)).toBe('2026-07-17');
     const room = SafeRoomStatusSchema.parse((await a.call('get_safe_room_status')).structuredContent);
-    expect(room.occupantRoles).toContain('grandma');
+    expect(room.occupantRoles).toContain('adult');
     expect(room.occupantRoles).not.toContain('grandpa');
-    expect(GetDemoSettingsOutputSchema.parse((await a.call('get_demo_settings')).structuredContent).settings.household).toBe('older-woman');
+    expect(GetDemoSettingsOutputSchema.parse((await a.call('get_demo_settings')).structuredContent).settings.household).toBe('no-one-at-risk');
 
     expect(await planDay(b.call)).toBe('2026-07-16');
     expect(await planDay(demo.call)).toBe('2026-07-16');

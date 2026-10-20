@@ -15,6 +15,12 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
     expect(screen.getByText('No messages from Safe-8-Sound yet.')).toBeTruthy();
   });
 
+  it('with no one at risk at home the line names no one: "Manage home settings" (owner, 20 Oct, A)', () => {
+    render(<PhonePanel feed={createScriptedPhone()} timeZone="Europe/Rome" named={false} settings={<section aria-label="the settings page">page</section>} />);
+    expect(screen.getByRole('button', { name: 'Manage home settings' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: "Manage Leo's home settings" })).toBeNull();
+  });
+
   // #432 S5: Ana manages Leo's home settings from her phone: the same page as the Echo's, Back to her messages.
   it('"Manage Leo\'s home settings" opens the settings in place of the messages; Back brings the messages again', () => {
     const feed = createScriptedPhone();

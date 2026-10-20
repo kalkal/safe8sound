@@ -8,7 +8,8 @@ import { AVATAR_KINDS, Avatar } from '../src/avatars.js';
 
 // The drawn avatars of the household (#432 S3): hand-drawn inline SVG, never a photo. The card and site CSP allows
 // inline SVG but no <style>, no style attribute and no external <image>; ids would clash when the same avatar is
-// drawn twice on one page. The avatar sits beside the person's name, so screen readers skip it. It lives under its
+// drawn twice on one page. A person's avatar sits beside their name, so screen readers skip it; the house (no one at
+// risk at home, 20 Oct) has no name beside it and says what it means. It lives under its
 // own export path, so the card bundle (6.5 kB under its budget) never carries it.
 
 afterEach(cleanup);
@@ -19,14 +20,17 @@ const src = (file: string) => readFileSync(join(here, '..', 'src', file), 'utf8'
 
 describe('Avatar', () => {
   for (const kind of AVATAR_KINDS) {
-    it(`${kind}: one inline SVG, hidden from screen readers, never focusable`, () => {
+    it(`${kind}: one inline SVG, never focusable; a person is hidden from screen readers (their name is beside it), the house says what it means`, () => {
       const { container } = render(<Avatar kind={kind} className="who" />);
       const svgs = container.querySelectorAll('svg');
       expect(svgs).toHaveLength(1);
       const svg = svgs[0];
       expect(svg?.getAttribute('class')).toBe('avatar who');
       expect(svg?.getAttribute('data-avatar')).toBe(kind);
-      expect(svg?.getAttribute('aria-hidden')).toBe('true');
+      if (kind === 'home') {
+        expect(svg?.getAttribute('role')).toBe('img');
+        expect(svg?.getAttribute('aria-label')).toBe('No one at risk at home');
+      } else expect(svg?.getAttribute('aria-hidden')).toBe('true');
       expect(svg?.getAttribute('focusable')).toBe('false');
       expect(svg?.getAttribute('viewBox')).toBe('0 0 64 64');
     });
@@ -48,7 +52,7 @@ describe('Avatar', () => {
     });
   }
 
-  it('draws the two people differently', () => {
+  it('draws each kind differently', () => {
     const drawn = AVATAR_KINDS.map((kind) => render(<Avatar kind={kind} />).container.innerHTML);
     expect(new Set(drawn).size).toBe(AVATAR_KINDS.length);
   });

@@ -1,7 +1,7 @@
 import { setLocale } from '@cold-reserve/i18n';
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '../../src/agent/agent.js';
-import { applyChange, badgeText, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario } from '../../src/ui/demo-settings.js';
+import { HOUSEHOLDS, applyChange, homeFaceOf, badgeText, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario } from '../../src/ui/demo-settings.js';
 
 // B1 (additions plan): what the scenario badge says and how a choice changes the settings shown, in scripted mode.
 
@@ -78,6 +78,11 @@ describe('remote demo settings (B2): read and saved through the card tool route'
     expect(await fetchDemoSettings(agent, ctx)).toEqual({ ok: true, value: { scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man', timeZone: 'Europe/Rome' } });
   });
 
+  it('a sandbox that saved "A frail person" (older-woman, no longer offered, 20 Oct) shows as "An older man"', async () => {
+    const { agent } = agentAnswering({ get_demo_settings: reply({ settings: { ...settings, household: 'older-woman' }, place }) });
+    expect(await fetchDemoSettings(agent, ctx)).toMatchObject({ ok: true, value: { household: 'older-man' } });
+  });
+
   it("every time on screen is on the sandbox place's clock (Houston: America/Chicago), whatever the browser's zone", async () => {
     const houston = { ...settings, locationId: 'houston' as const, units: 'F' as const };
     const { agent } = agentAnswering({ get_demo_settings: reply({ settings: houston, place: { id: 'houston', label: 'Houston', tz: 'America/Chicago' } }) });
@@ -111,5 +116,16 @@ describe('remote demo settings (B2): read and saved through the card tool route'
     expect(await saveDemoSettings(agent, { locationId: 'houston' }, ctx)).toMatchObject({ ok: false });
     const broken = agentAnswering({ set_scenario: new Error('network') });
     expect(await saveDemoSettings(broken.agent, { units: 'F' }, ctx)).toMatchObject({ ok: false });
+  });
+});
+
+describe('who is at home (owner, 20 Oct)', () => {
+  it('offers an older man and no one at risk, never "A frail person"', () => {
+    expect(HOUSEHOLDS).toEqual(['older-man', 'no-one-at-risk']);
+  });
+
+  it("the home's face and its line: the small house and 'no one at risk' with no one at risk, Leo for a man, a saved older-woman and before the settings are read", () => {
+    const leo = { avatar: 'older-man', who: 'settings.protect.leo', named: true };
+    expect([homeFaceOf('older-man'), homeFaceOf('no-one-at-risk'), homeFaceOf('older-woman'), homeFaceOf(undefined)]).toEqual([leo, { avatar: 'home', who: 'settings.protect.noOne', named: false }, leo, leo]);
   });
 });

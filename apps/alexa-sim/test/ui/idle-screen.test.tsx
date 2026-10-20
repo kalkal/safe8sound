@@ -22,7 +22,7 @@ const next: Milestone = { at: '2026-07-17T21:00:00+02:00', kind: 'essential_leve
 
 describe('ScreenTop', () => {
   it('shows the time on the home clock and the weather the sky says, with the menu and the bell', () => {
-    render(<ScreenTop now="2026-07-17T15:00:00+02:00" sky="storm" unseen={0} onSeen={() => undefined} menu={<button type="button">Show my home</button>} />);
+    render(<ScreenTop avatar="older-man" now="2026-07-17T15:00:00+02:00" sky="storm" unseen={0} onSeen={() => undefined} menu={<button type="button">Show my home</button>} />);
     expect(screen.getByTestId('screen-time').textContent).toBe('15:00');
     expect(screen.getByTestId('screen-weather').textContent).toBe('Storm');
     expect(screen.getByRole('button', { name: 'Notifications' }).dataset['new']).toBe('false');
@@ -31,19 +31,19 @@ describe('ScreenTop', () => {
 
   it('names each sky as weather, in both languages', () => {
     const words = (['mild', 'hot', 'dusk', 'storm'] as const).map((sky) => {
-      render(<ScreenTop now="2026-07-17T12:00:00+02:00" sky={sky} unseen={0} onSeen={() => undefined} menu={null} />);
+      render(<ScreenTop avatar="older-man" now="2026-07-17T12:00:00+02:00" sky={sky} unseen={0} onSeen={() => undefined} menu={null} />);
       const word = screen.getByTestId('screen-weather').textContent;
       cleanup();
       return word;
     });
     expect(words).toEqual(['Sunny', 'Hot', 'Warm evening', 'Storm']);
     setLocale('it-IT');
-    render(<ScreenTop now="2026-07-17T12:00:00+02:00" sky="storm" unseen={0} onSeen={() => undefined} menu={null} />);
+    render(<ScreenTop avatar="older-man" now="2026-07-17T12:00:00+02:00" sky="storm" unseen={0} onSeen={() => undefined} menu={null} />);
     expect(screen.getByTestId('screen-weather').textContent).toBe('Temporale');
   });
 
   it('the menu opens its list and closes with Escape or after a choice', () => {
-    render(<ScreenTop now="2026-07-17T12:00:00+02:00" sky="mild" unseen={0} onSeen={() => undefined} menu={<button type="button">Show my home</button>} />);
+    render(<ScreenTop avatar="older-man" now="2026-07-17T12:00:00+02:00" sky="mild" unseen={0} onSeen={() => undefined} menu={<button type="button">Show my home</button>} />);
     const menu = screen.getByRole('button', { name: 'Menu' });
     fireEvent.click(menu);
     expect(menu.getAttribute('aria-expanded')).toBe('true');
@@ -57,7 +57,7 @@ describe('ScreenTop', () => {
 
   it('the bell has a dot while a message is unseen, and a touch marks it seen', () => {
     let seen = 0;
-    render(<ScreenTop now="2026-07-17T15:00:00+02:00" sky="storm" unseen={1} onSeen={() => (seen += 1)} menu={null} />);
+    render(<ScreenTop avatar="older-man" now="2026-07-17T15:00:00+02:00" sky="storm" unseen={1} onSeen={() => (seen += 1)} menu={null} />);
     const bell = screen.getByRole('button', { name: 'Notifications · 1 new' });
     expect(bell.dataset['new']).toBe('true');
     fireEvent.click(bell);
@@ -68,7 +68,7 @@ describe('ScreenTop', () => {
 describe('IdleTiles', () => {
   it("Leo's room with his drawn avatar and the time it stays safe until, the reserve, and the next moment", () => {
     const room = { ...safeRoomCalm(), safeRoomName: "Leo's room", safeUntil: '2026-07-18T06:40:00+02:00' };
-    render(<IdleTiles room={room} reserve={<p>9½ h</p>} next={next} notice={undefined} timeZone="Europe/Rome" />);
+    render(<IdleTiles avatar="older-man" room={room} reserve={<p>9½ h</p>} next={next} notice={undefined} timeZone="Europe/Rome" />);
     const tile = screen.getByTestId('tile-safe-room');
     expect(within(tile).getByText("Leo's room")).toBeTruthy();
     expect(within(tile).getByText('Safe until 06:40')).toBeTruthy();
@@ -80,43 +80,52 @@ describe('IdleTiles', () => {
 
   it("says what the safe room card says: the room's own limits time, or the battery's hold past the limit (review of #458)", () => {
     const base = { ...safeRoomCalm(), safeRoomName: "Leo's room", safeUntil: '2026-07-18T03:05:00+02:00' };
-    const { unmount } = render(<IdleTiles room={{ ...base, withinLimits: { until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) } }} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    const { unmount } = render(<IdleTiles avatar="older-man" room={{ ...base, withinLimits: { until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) } }} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(within(screen.getByTestId('tile-safe-room')).getByText('Within its limits until about 06:00')).toBeTruthy();
     unmount();
     const above = { ...base, tempC: celsius(27), limitNow: { limitC: celsius(24), kind: 'night' as const } };
-    render(<IdleTiles room={above} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    render(<IdleTiles avatar="older-man" room={above} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(within(screen.getByTestId('tile-safe-room')).getByText('Battery holds it until 03:05')).toBeTruthy();
   });
 
   it('the clear day at 12:00: safe at least until 12:00 tomorrow, never "until" the hour it is now', () => {
     const room = { ...safeRoomCalm(), safeRoomName: "Leo's room", safeUntilCapped: true as const, safeHours: 24, safeUntil: '2026-07-16T12:00:00+02:00' };
-    const { unmount } = render(<IdleTiles room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    const { unmount } = render(<IdleTiles avatar="older-man" room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(within(screen.getByTestId('tile-safe-room')).getByText('Safe at least until 12:00 tomorrow')).toBeTruthy();
     unmount();
     setLocale('it-IT');
-    render(<IdleTiles room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    render(<IdleTiles avatar="older-man" room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(within(screen.getByTestId('tile-safe-room')).getByText('Al sicuro almeno fino alle 12:00 di domani')).toBeTruthy();
   });
 
   it('#459: a room that never crosses its limits in the projection is "at least", as on the card, in both languages', () => {
     const room = { ...safeRoomCalm(), safeRoomName: "Leo's room", safeUntil: '2026-07-18T03:05:00+02:00', withinLimits: { until: '2026-07-18T06:00:00+02:00' } };
-    const { unmount } = render(<IdleTiles room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    const { unmount } = render(<IdleTiles avatar="older-man" room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(within(screen.getByTestId('tile-safe-room')).getByText('Within its limits at least until 06:00')).toBeTruthy();
     unmount();
     setLocale('it-IT');
-    render(<IdleTiles room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    render(<IdleTiles avatar="older-man" room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(within(screen.getByTestId('tile-safe-room')).getByText('Nei suoi limiti almeno fino alle 06:00')).toBeTruthy();
   });
 
+  it('with no one at risk at home, the top bar and the safe-room tile show a small house that says so (owner, 20 Oct, B)', () => {
+    render(<ScreenTop avatar="home" now="2026-07-17T12:00:00+02:00" sky="storm" unseen={0} onSeen={() => undefined} menu={null} />);
+    render(<IdleTiles avatar="home" named={false} room={{ ...safeRoomCalm(), safeRoomName: "Leo's room" }} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    expect(screen.getAllByRole('img', { name: 'No one at risk at home' })).toHaveLength(2);
+    expect(document.querySelector('[data-avatar="older-man"]')).toBeNull();
+    // The tile names no one's room either (owner, 20 Oct, A).
+    expect(within(screen.getByTestId('tile-safe-room')).getByText('Safe room')).toBeTruthy();
+  });
+
   it('leaves out a tile whose reading is missing (a failed read, the end of the day), never an empty box', () => {
-    render(<IdleTiles room={undefined} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    render(<IdleTiles avatar="older-man" room={undefined} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(screen.queryByTestId('tile-safe-room')).toBeNull();
     expect(screen.queryByTestId('tile-reserve')).toBeNull();
     expect(screen.queryByTestId('tile-next')).toBeNull();
   });
 
   it('a new message to Ana comes first, with what it says and when, until it is seen', () => {
-    render(<IdleTiles room={undefined} reserve={undefined} next={undefined} notice={storm} timeZone="Europe/Rome" />);
+    render(<IdleTiles avatar="older-man" room={undefined} reserve={undefined} next={undefined} notice={storm} timeZone="Europe/Rome" />);
     expect(screen.getByTestId('tile-notice').textContent).toBe('Message to Ana · 15:00Power outage (storm) at home');
   });
 });
@@ -131,6 +140,8 @@ describe('greetingOf', () => {
     expect(greetingOf('2026-07-17T19:42:00+02:00', room)).toBe('Good evening, Leo.');
     expect(greetingOf('2026-07-18T03:00:00+02:00', room)).toBe('Good evening, Leo.');
     expect(greetingOf('2026-07-17T15:00:00+02:00', safeRoomCalm())).toBe('Good afternoon.');
+    // No one at risk at home (owner, 20 Oct, A): no name, whoever the room's people are.
+    expect(greetingOf('2026-07-17T15:00:00+02:00', room, false)).toBe('Good afternoon.');
   });
 
   it('without a simulated clock there is no greeting (the first screen says what to ask)', () => {

@@ -93,3 +93,18 @@ test('"Settings" holds the person\'s own settings, not the demo controls', async
   for (const name of ['Language', 'Temperature units']) await expect(settings.getByRole('radiogroup', { name })).toBeVisible();
   for (const name of ['Weather', 'Place', 'Who is at home']) await expect(settings.getByRole('radiogroup', { name })).toHaveCount(0);
 });
+
+test('"Who is at home": an older man or no one at risk; with no one at risk the Echo shows the house and names no one (owner, 20 Oct)', async ({ page }) => {
+  await page.setViewportSize({ width: 1904, height: 870 });
+  await page.goto('/');
+  const panel = page.getByRole('region', { name: 'Demo controls · simulation' });
+  const who = panel.getByRole('radiogroup', { name: 'Who is at home' });
+  await expect(who.getByRole('radio')).toHaveCount(2);
+  await expect(who).not.toContainText('A frail person');
+  await who.getByText('No one at risk', { exact: true }).click();
+  const screen = page.getByTestId('echo-screen');
+  await expect(screen.getByRole('img', { name: 'No one at risk at home' })).toHaveCount(2);
+  await expect(screen.getByTestId('tile-safe-room')).toContainText('Safe room');
+  await expect(screen).not.toContainText('Leo');
+  await expect(page.getByRole('button', { name: 'Manage home settings' })).toBeVisible();
+});

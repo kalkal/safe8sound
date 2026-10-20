@@ -6,6 +6,7 @@ import { refreshFrom, safeRoomRole, withHousehold, type SandboxPlay } from '../s
 
 // C2b (#222, decided by the owner on 3/10): who is at home decides the role in the safe room. Grandpa and grandma are
 // at risk (same limits and windows); with no one at risk the occupant is an adult. Health thresholds are not settings.
+// Since 20 Oct only an older man or no one at risk is offered; a saved 'older-woman' plays as the older man.
 
 const rolesOf = (s: ReturnType<typeof builtInScenario>) => s.occupancy.flatMap((o) => o.roles);
 
@@ -16,11 +17,17 @@ describe('withHousehold', () => {
     expect(safeRoomRole('older-man')).toBe('grandpa');
   });
 
-  it('puts grandma in the safe room for an older woman, and an adult when no one is at risk; the others stay', () => {
+  it('plays a saved "older-woman" ("A frail person", no longer offered, 20 Oct) as the older man: grandpa', () => {
+    const storm = builtInScenario('storm-blackout');
+    expect(withHousehold(storm, 'older-woman')).toEqual(storm);
+    expect(safeRoomRole('older-woman')).toBe('grandpa');
+  });
+
+  it('puts an adult in the safe room when no one is at risk; the others stay', () => {
     for (const id of ['clear-day', 'heatwave', 'storm-blackout'] as const) {
       const scenario = builtInScenario(id);
       const daughters = rolesOf(scenario).filter((r) => r === 'daughter').length;
-      for (const [household, role] of [['older-woman', 'grandma'], ['no-one-at-risk', 'adult']] as const) {
+      for (const [household, role] of [['no-one-at-risk', 'adult']] as const) {
         const played = withHousehold(scenario, household);
         expect(rolesOf(played)).not.toContain('grandpa');
         expect(rolesOf(played)).toContain(role);
@@ -33,7 +40,7 @@ describe('withHousehold', () => {
   it('never changes the scenario it was given', () => {
     const storm = builtInScenario('storm-blackout');
     const before = structuredClone(storm);
-    withHousehold(storm, 'older-woman');
+    withHousehold(storm, 'no-one-at-risk');
     expect(storm).toEqual(before);
   });
 });

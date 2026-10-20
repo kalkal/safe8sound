@@ -83,8 +83,9 @@ function PhoneIcon({ alert }: { alert: boolean }) {
  * `units`: the temperature unit the person chose (°F everywhere, owner decision, 9 Oct); °C by default. `settings`
  * (#432 S5): Leo's home settings, the same page as the Echo's on the same model; a line opens it in place of the
  * messages, Back brings them again. None for the phone alone (?view=phone), which has no preferences to show.
+ * `named` false (no one at risk at home, owner 20 Oct, A): the line names no one ("Manage home settings").
  */
-export function PhonePanel({ feed, timeZone, units = 'C', settings }: { feed: PhoneFeed; timeZone: string; units?: TempUnit; settings?: ReactNode }) {
+export function PhonePanel({ feed, timeZone, units = 'C', settings, named = true }: { feed: PhoneFeed; timeZone: string; units?: TempUnit; settings?: ReactNode; named?: boolean }) {
   const messages = useSyncExternalStore(feed.subscribe, feed.messages);
   const titleId = useId();
   const [onSettings, setOnSettings] = useState(false);
@@ -130,7 +131,7 @@ export function PhonePanel({ feed, timeZone, units = 'C', settings }: { feed: Ph
                 setOnSettings(true);
               }}
             >
-              {t('phone.manageSettings')}
+              {t(named ? 'phone.manageSettings' : 'phone.manageHomeSettings')}
             </button>
           )}
           <PhoneMessages feed={feed} messages={messages} timeZone={timeZone} units={units} />

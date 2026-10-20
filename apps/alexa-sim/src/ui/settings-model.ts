@@ -1,7 +1,7 @@
 import type { GetPreferencesOutput, SetScenarioInput, TempUnit } from '@cold-reserve/contracts';
 import { useCallback, useState } from 'react';
 import type { DemoSettingsView } from './demo-settings.js';
-import { chooseSafeRoom, limitsView, mergeChange, moveLimit, withDraft, type LimitChange, type LimitId, type LimitRefusal, type LimitSave, type LimitsView } from './limits.js';
+import { changesAnything, chooseSafeRoom, limitsView, mergeChange, moveLimit, withDraft, type LimitChange, type LimitId, type LimitRefusal, type LimitSave, type LimitsView } from './limits.js';
 import { useSettingChange } from './use-setting-change.js';
 
 // The person's own settings as one model (#432 S5): the saved preferences with the unsaved draft on them, the unit
@@ -35,10 +35,10 @@ export function useSettingsModel({ settings, onChange, limits, onLimit }: Settin
   // What the views show: the saved preferences with the draft on them.
   const shown = limits === undefined ? undefined : withDraft(limits, draft);
   const view: LimitsView | undefined = shown === undefined ? undefined : limitsView(shown);
-  const dirty = Object.keys(draft).length > 0;
+  // Review of #469: a draft that leaves every value as saved is nothing to save (a step down and back up).
+  const dirty = limits !== undefined && changesAnything(limits, draft);
 
   const addToDraft = (change: LimitChange) => {
-    setJustSaved(false);
     setRateLimited(false);
     setDraft((previous) => mergeChange(previous, change));
   };
@@ -79,7 +79,9 @@ export function useSettingsModel({ settings, onChange, limits, onLimit }: Settin
     setRefusal(undefined);
     forget();
   }, [forget]);
-  const status = saving ? 'saving' : failed ? 'failed' : rateLimited ? 'rateLimited' : dirty ? 'unsaved' : undefined;
+  // "Saved ✓" while nothing differs from what was just saved: a step down and back up keeps it (review of #469).
+  const saved = justSaved && !dirty;
+  const status = saving ? 'saving' : failed ? 'failed' : rateLimited ? 'rateLimited' : dirty ? 'unsaved' : saved ? 'saved' : undefined;
 
   return {
     settings,
@@ -88,7 +90,7 @@ export function useSettingsModel({ settings, onChange, limits, onLimit }: Settin
     view,
     dirty,
     saving,
-    justSaved,
+    justSaved: saved,
     status,
     refusal,
     unitPending: unit.pendingOf('units'),

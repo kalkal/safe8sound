@@ -45,6 +45,10 @@ describe('the question box', () => {
     expect(box().readOnly || box().getAttribute('aria-disabled') === 'true').toBe(false);
     expect(send().disabled).toBe(false);
     expect(box().value).toBe("What's my batt");
+    // An example picked while the mic listened would have replaced it: it is ignored (review of #469).
+    fireEvent.click(screen.getByRole('button', { name: 'Speak' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Battery level' }));
+    expect(box().value).toBe("What's my batt");
   });
 
   it('is off while the assistant thinks, and back when the answer is in', async () => {

@@ -142,3 +142,8 @@ export function withDraft(view: GetPreferencesOutput, change: LimitChange): GetP
   });
   return next.success ? { ...view, preferences: next.data } : view;
 }
+
+/** Whether a draft changes any saved value (review of #469): a step down and back up leaves nothing to save. */
+export function changesAnything(view: GetPreferencesOutput, change: LimitChange): boolean {
+  return JSON.stringify(withDraft(view, change).preferences) !== JSON.stringify(withDraft(view, {}).preferences);
+}

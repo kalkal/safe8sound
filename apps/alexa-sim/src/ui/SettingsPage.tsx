@@ -1,11 +1,13 @@
-import { formatTemp, type TempUnit } from '@cold-reserve/contracts';
+import { formatTemp, type Household, type TempUnit } from '@cold-reserve/contracts';
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import { LOCALES, isLocale, type Locale } from '@cold-reserve/i18n';
 import { roomLabel } from '@cold-reserve/ui-cards';
 import { Avatar } from '@cold-reserve/ui-cards/avatars';
+import { IconFrame, SnowflakeOutline } from '@cold-reserve/ui-cards/icons';
 import type { LimitId, LimitRefusal, LimitRow } from './limits.js';
 import type { SettingsModel } from './settings-model.js';
 import { ChipGroup } from './ChipGroup.js';
+import { homeFaceOf } from './demo-settings.js';
 import { t } from './text.js';
 import './limits.css';
 import './settings-page.css';
@@ -71,20 +73,37 @@ function refusalText(id: LimitId, refusal: LimitRefusal, units: TempUnit): strin
   }
 }
 
+/** Winter mode comes next (owner, 20 Oct): its own small block after the temperatures and limits, never a switch. */
+function WinterNext() {
+  const titleId = useId();
+  return (
+    <section className="settings-winter" aria-labelledby={titleId}>
+      <h3 id={titleId}>
+        <IconFrame className="settings-winter-icon">
+          <SnowflakeOutline className="settings-winter-line" />
+        </IconFrame>
+        {t('settings.winter.title')}
+      </h3>
+      <p data-testid="winter-note">{t('settings.limits.winterNext')}</p>
+    </section>
+  );
+}
+
 /**
  * Who the home protects (owner, 18 Oct): fixed and read only until the submission, with the drawn avatars; never a
  * health condition (health data, and the product is never framed as medical protection). Leo's age band is what drives
  * the stricter night limit below (over 65: 24 °C).
  */
-function WhoWeProtect() {
+function WhoWeProtect({ household }: { household: Household | undefined }) {
+  const face = homeFaceOf(household);
   const titleId = useId();
   return (
     <section className="settings-protect" aria-labelledby={titleId}>
       <h3 id={titleId}>{t('settings.protect.title')}</h3>
       <ul>
         <li>
-          <Avatar kind="older-man" className="settings-avatar" />
-          <span>{t('settings.protect.leo')}</span>
+          <Avatar kind={face.avatar} className="settings-avatar" />
+          <span>{t(face.who)}</span>
         </li>
         <li>
           <Avatar kind="adult-woman" className="settings-avatar" />
@@ -142,7 +161,7 @@ export function SettingsPage({ model, locale, onLocale, announce = true }: Setti
   return (
     <section className="settings-page" aria-labelledby={titleId} tabIndex={-1} data-testid="settings-page">
       <h2 id={titleId}>{t('settings.page.title')}</h2>
-      <WhoWeProtect />
+      <WhoWeProtect household={model.settings?.household} />
       {settings !== undefined && (
         <p className="notice settings-applied" role={announce ? 'status' : undefined} data-testid="settings-applied" data-failed={model.unitFailed}>
           {model.unitText}
@@ -204,6 +223,8 @@ export function SettingsPage({ model, locale, onLocale, announce = true }: Setti
           </p>
         </section>
       )}
+      {/* Owner, 20 Oct: honest about what the demo does not cover yet, in a block of its own, plain text, no switch. */}
+      <WinterNext />
       <p className="notice" role={announce ? 'status' : undefined}>
         {model.status === undefined ? '' : t(model.status === 'rateLimited' ? 'settings.limits.rateLimited' : model.status === 'unsaved' ? 'settings.limits.unsaved' : `settings.${model.status}`)}
       </p>

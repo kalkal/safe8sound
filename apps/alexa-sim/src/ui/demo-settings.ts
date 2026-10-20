@@ -12,7 +12,8 @@ import {
   type ScenarioId,
   type SetScenarioInput,
 } from '@cold-reserve/contracts';
-import { isTimeZone } from '@cold-reserve/core';
+import { HOUSEHOLD_CHOICES, isTimeZone, playedHousehold } from '@cold-reserve/core';
+import type { AvatarKind } from '@cold-reserve/ui-cards/avatars';
 import type { Agent, AskContext } from '../agent/agent.js';
 import { log as defaultLog, type Log } from '../log.js';
 import type { Sky } from './sky.js';
@@ -35,7 +36,25 @@ export interface DemoSettingsView {
 
 export const SCENARIOS: readonly ScenarioId[] = ['clear-day', 'heatwave', 'storm-blackout'];
 export const PLACES: readonly LocationId[] = ['reference', 'turin', 'houston'];
-export const HOUSEHOLDS: readonly Household[] = ['older-man', 'older-woman', 'no-one-at-risk'];
+/** Who is at home (owner, 20 Oct): an older man, or no one at risk (core's HOUSEHOLD_CHOICES). */
+export const HOUSEHOLDS: readonly Household[] = HOUSEHOLD_CHOICES;
+
+/**
+ * The home as the Echo and the settings show it (owner, 20 Oct, B and A): Leo, his line in "Who we protect" and his name
+ * in the greeting, the safe-room tile and the phone; or, with no one at risk at home, a small house, a line that says so
+ * and neutral words (`named` false). One rule for every place.
+ */
+export interface HomeFace {
+  avatar: AvatarKind;
+  who: 'settings.protect.leo' | 'settings.protect.noOne';
+  /** Whether the texts name Leo (the greeting, the safe-room tile, the phone's settings line). */
+  named: boolean;
+}
+
+export function homeFaceOf(household: Household | undefined): HomeFace {
+  return household !== undefined && playedHousehold(household) === 'no-one-at-risk' ? { avatar: 'home', who: 'settings.protect.noOne', named: false }
+    : { avatar: 'older-man', who: 'settings.protect.leo', named: true };
+}
 
 /** The scripted sandbox: the heat-wave day of the video, at the reference home. */
 export function scriptedDemoSettings(): DemoSettingsView {
@@ -113,7 +132,7 @@ export async function fetchDemoSettings(agent: Agent, context: AskContext, logEv
   if (!read.ok) return read;
   const { settings, place } = read.value;
   // The zone is host data: one this browser does not know is left out, and the page keeps its configured zone.
-  return ok({ scenarioId: settings.scenarioId, locationId: settings.locationId, units: settings.units, household: settings.household, ...(isTimeZone(place.tz) ? { timeZone: place.tz } : {}) });
+  return ok({ scenarioId: settings.scenarioId, locationId: settings.locationId, units: settings.units, household: playedHousehold(settings.household), ...(isTimeZone(place.tz) ? { timeZone: place.tz } : {}) });
 }
 
 /** B2: saves one change, then reads the settings back, so what is shown is what is stored (never an optimistic guess). */

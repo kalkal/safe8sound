@@ -1,5 +1,5 @@
 import { categoryOf, ok, type ErrorEnvelope, type Forecast, type HomeId, type Household, type LocationId, type Result, type SandboxSettings, type TempUnit } from '@cold-reserve/contracts';
-import type { Clock, Logger, StateStoreFactory } from '@cold-reserve/core';
+import { playedHousehold, type Clock, type Logger, type PlayedHousehold, type StateStoreFactory } from '@cold-reserve/core';
 import { builtInPlace, type Place, type Scenario } from '@cold-reserve/source-simulator';
 import type { HomeEntry } from './modules/energy-status/index.js';
 import { homeDetail } from './sandbox-log.js';
@@ -11,9 +11,10 @@ import { homeDetail } from './sandbox-log.js';
 /** The at-risk role the built-in scripts put in the safe room. */
 const SCRIPT_ROLE = 'grandpa';
 
-const SAFE_ROOM_ROLE: Record<Household, string> = { 'older-man': 'grandpa', 'older-woman': 'grandma', 'no-one-at-risk': 'adult' };
+// A saved 'older-woman' (no longer offered, 20 Oct) plays as the older man (core's playedHousehold).
+const SAFE_ROOM_ROLE: Record<PlayedHousehold, string> = { 'older-man': 'grandpa', 'no-one-at-risk': 'adult' };
 
-export const safeRoomRole = (household: Household): string => SAFE_ROOM_ROLE[household];
+export const safeRoomRole = (household: Household): string => SAFE_ROOM_ROLE[playedHousehold(household)];
 
 /** The scenario with the household's role in place of the script's; a new object, the given one is untouched. */
 export function withHousehold(scenario: Scenario, household: Household): Scenario {

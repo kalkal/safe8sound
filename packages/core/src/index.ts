@@ -26,6 +26,7 @@ export * from './storm-session.js';
 export * from './storm.js';
 export * from './surplus.js';
 export * from './household-tip.js';
+export * from './household.js';
 export * from './thermal.js';
 export * from './time.js';
 export * from './logger.js';

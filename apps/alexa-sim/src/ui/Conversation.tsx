@@ -397,7 +397,10 @@ export function Conversation({
             <ExampleQuestions
             {...(examples === undefined ? {} : { examples })}
             onPick={(question) => {
-              // Only fills the field: the person reads it and presses Ask (never sent by itself).
+              // Only fills the field: the person reads it and presses Ask (never sent by itself). Not while the box is off
+              // (review of #469); in Follow Up a pick is like typing: the mic closes and the keyboard wins.
+              if (askLocked) return;
+              if (followUp) send({ type: 'CANCEL' });
               setDraft(question);
               inputRef.current?.focus();
             }}

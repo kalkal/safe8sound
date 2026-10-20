@@ -33,7 +33,7 @@ import { ReserveClock } from './ui/ReserveClock.js';
 import { SimClock } from './ui/SimClock.js';
 import { POWER_CUT_QUESTION, clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
 import { isAppliedPlan } from './ui/steps.js';
-import { SHIPPED_PLACES, skyOfScenario } from './ui/demo-settings.js';
+import { SHIPPED_PLACES, homeFaceOf, skyOfScenario } from './ui/demo-settings.js';
 import { SettingsPage, settingsAnnounce, useSettingsPage } from './ui/SettingsPage.js';
 import { useSettingsModel } from './ui/settings-model.js';
 import { DemoControlsOpener, DemoControlsPanel, WIDE_CONTROLS, jumpText, useDemoControlsSheet } from './demo-controls/DemoControlsPanel.js';
@@ -203,6 +203,9 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // Every time on screen (phone, cards, answers, sky) is on the home's own clock: the sandbox place's zone (Houston:
   // America/Chicago) when known, else the configured home zone; never the browser's or the server's.
   const homeTimeZone = demoSettings?.timeZone ?? config.homeTimeZone;
+  // The home's face on the Echo (owner, 20 Oct, B): Leo, or a small house when no one at risk is at home.
+  const homeFace = homeFaceOf(demoSettings?.household);
+  const homeAvatar = homeFace.avatar;
   // The plan on screen (time pack): the simulated clock lists its own moments too (the essential level, the emergency plan).
   const [planId, setPlanId] = useState<string | undefined>(undefined);
   const onAnswer = useCallback(
@@ -373,7 +376,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const phonePanel = (
     <ErrorBoundary>
       {/* Ana's page shows the same lines as the Echo's and announces them when the Echo's page is closed or under her sheet. */}
-      <PhonePanel feed={phone} timeZone={homeTimeZone} units={demoSettings?.units ?? 'C'} settings={<SettingsPage model={settingsModel} locale={locale} onLocale={onLocale} announce={settingsAnnounce('phone', { echoOpen: settingsPage.isOpen, phoneModal })} />} />
+      <PhonePanel feed={phone} timeZone={homeTimeZone} units={demoSettings?.units ?? 'C'} named={homeFace.named} settings={<SettingsPage model={settingsModel} locale={locale} onLocale={onLocale} announce={settingsAnnounce('phone', { echoOpen: settingsPage.isOpen, phoneModal })} />} />
     </ErrorBoundary>
   );
   // The device layout from config (#432): the Alexa Echo Show unless configured; the judges' site always has it.
@@ -422,7 +425,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                       setTheme('dark');
                     } },
                 ]}
-                head={<ScreenTop now={clock?.now} sky={sky} unseen={notices.unseen} onSeen={notices.markSeen} menu={<>{homePanel.button}{settingsPage.button}</>} menuRef={menuRef} />}
+                head={<ScreenTop now={clock?.now} sky={sky} unseen={notices.unseen} onSeen={notices.markSeen} menu={<>{homePanel.button}{settingsPage.button}</>} avatar={homeAvatar} menuRef={menuRef} />}
                 pageView={settingsPage.view ?? homePanel.view}
                 onClosePage={closePage}
                 appliedTurns={appliedTurns}
@@ -436,13 +439,15 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                     next={demoShown ? clock?.next : undefined}
                     notice={notices.newest}
                     timeZone={homeTimeZone}
+                    avatar={homeAvatar}
+                    named={homeFace.named}
                   />
                 }
                 idleReturnMs={config.idleReturnMs}
                 onScreen={setScreenState}
                 actionsHost={askHost}
                 askRef={askRef}
-                greeting={greetingOf(clock?.now, safeRoom)}
+                greeting={greetingOf(clock?.now, safeRoom, homeFace.named)}
                 {...(session === undefined ? {} : { session })}
                 {...(studioVoice === undefined ? {} : { studioVoice })}
               />

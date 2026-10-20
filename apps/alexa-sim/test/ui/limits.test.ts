@@ -2,7 +2,7 @@ import { ELDERLY_CAP_MAX_C, HEAT_INDEX_CAP_MAX_C, type GetPreferencesOutput } fr
 import guard from '@cold-reserve/guard/config/guard.json' with { type: 'json' };
 import { describe, expect, it } from 'vitest';
 import { SCRIPT_FIXTURES } from '../../src/agent/script-fixtures.js';
-import { chooseSafeRoom, limitsView, mergeChange, moveLimit, withDraft, withSaved, type LimitId } from '../../src/ui/limits.js';
+import { chooseSafeRoom, limitsView, mergeChange, moveLimit, changesAnything, withDraft, withSaved, type LimitId } from '../../src/ui/limits.js';
 
 // #402: the temperatures and limits the settings section shows and moves. Pure rules, no screen: comfort between the
 // heating comfort and the safe room maximum; the safe room maximum and the health caps only stricter (#266, #307).
@@ -166,6 +166,15 @@ describe('the draft: several moves, one change', () => {
     const merged = mergeChange(mergeChange({ comfortC: { cooling: 24 } }, { safety: { elderlyCapC: 29 } }), { comfortC: { cooling: 23.5 }, safety: { cooling: { maxC: 26 } } });
     expect(merged).toEqual({ comfortC: { cooling: 23.5 }, safety: { elderlyCapC: 29, cooling: { maxC: 26 } } });
     expect(mergeChange({}, {})).toEqual({});
+  });
+
+  it('a draft that leaves every value as saved changes nothing (Lower then Raise back: nothing to save)', () => {
+    const view = base();
+    const cooling = view.preferences.comfortC.cooling;
+    expect(changesAnything(view, {})).toBe(false);
+    expect(changesAnything(view, { comfortC: { cooling } })).toBe(false);
+    expect(changesAnything(view, { comfortC: { cooling: cooling - 0.5 } })).toBe(true);
+    expect(changesAnything(view, { safeRoomId: view.preferences.safeRoomId })).toBe(false);
   });
 
   it('shows what Save would store: the draft over the saved preferences, the saved view untouched', () => {

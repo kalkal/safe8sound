@@ -86,7 +86,7 @@ export function demoSettingsModule(deps: DemoSettingsDeps): CapabilityModule {
     name: 'set_scenario',
     title: 'Change the demo scenario',
     description:
-      "Changes what this demo sandbox plays: the scenario (clear-day, heatwave, storm-blackout), the place, the temperature units or who is at home (older-man, older-woman, no-one-at-risk); restart: true plays the day again from its start. A new scenario or place also starts the day again. Only the visitor's own sandbox changes.",
+      "Changes what this demo sandbox plays: the scenario (clear-day, heatwave, storm-blackout), the place, the temperature units or who is at home (older-man, no-one-at-risk); restart: true plays the day again from its start. A new scenario or place also starts the day again. Only the visitor's own sandbox changes.",
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     input: SetScenarioInputSchema,
     output: SetScenarioOutputSchema,

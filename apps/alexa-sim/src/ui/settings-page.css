@@ -29,6 +29,42 @@
     }
   }
 
+  /* Winter comes next (owner, 20 Oct): a block of its own, as visible as the others; plain text, no switch. */
+  .settings-winter {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-card);
+    background: var(--surface-card-raised);
+
+    & h3 {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin: 0;
+      font-size: var(--font-size-lead);
+    }
+
+    & p {
+      margin: 0;
+      color: var(--text-primary);
+    }
+  }
+
+  .settings-winter-icon {
+    flex: none;
+    inline-size: 1.5em;
+    block-size: 1.5em;
+  }
+
+  .settings-winter-line {
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
   /* Who we protect: read only, one row per person with the drawn avatar, large enough to read from a distance. */
   .settings-protect {
     display: grid;

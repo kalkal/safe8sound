@@ -1,6 +1,6 @@
 import type { InboxMessage, Milestone, SafeRoomStatus } from '@cold-reserve/contracts';
 import { homeClock, roomLabel, safeRoomHeadline } from '@cold-reserve/ui-cards';
-import { Avatar } from '@cold-reserve/ui-cards/avatars';
+import { Avatar, type AvatarKind } from '@cold-reserve/ui-cards/avatars';
 import { BellOutline, IconFrame, MenuOutline, MessageDot, WeatherOutline } from '@cold-reserve/ui-cards/icons';
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
 import type { PhoneFeed } from '../phone/phone-feed.js';
@@ -43,11 +43,13 @@ export interface ScreenTopProps {
   onSeen: () => void;
   /** What the menu lists: "Show my home" and (#432 S5) "Settings". */
   menu: ReactNode;
+  /** The home's face (homeFaceOf): Leo, or a small house when no one at risk is at home. */
+  avatar: AvatarKind;
   /** The menu button, so the focus can come back to it when what it opened closes. */
   menuRef?: RefObject<HTMLButtonElement | null>;
 }
 
-export function ScreenTop({ now, sky, unseen, onSeen, menu, menuRef }: ScreenTopProps) {
+export function ScreenTop({ now, sky, unseen, onSeen, menu, avatar, menuRef }: ScreenTopProps) {
   return (
     <>
       <div className="screen-icons">
@@ -70,8 +72,8 @@ export function ScreenTop({ now, sky, unseen, onSeen, menu, menuRef }: ScreenTop
           <span className="screen-time" data-testid="screen-time">
             {clockTime(now)}
           </span>
-          {/* The profile picture of the real home, top right: Leo, the one this home is set up for. */}
-          <Avatar kind="older-man" className="screen-profile" />
+          {/* The profile picture of the real home, top right: Leo, the one this home is set up for, or the house (homeFaceOf). */}
+          <Avatar kind={avatar} className="screen-profile" />
         </p>
       )}
     </>
@@ -141,6 +143,10 @@ export interface IdleTilesProps {
   /** The newest message to Ana while it is unseen. */
   notice: InboxMessage | undefined;
   timeZone: string;
+  /** The home's face, as on the top bar (homeFaceOf). */
+  avatar: AvatarKind;
+  /** False with no one at risk at home: the tile names no one's room ("Safe room"). */
+  named?: boolean;
 }
 
 /** The tile says what the safe room card says (safeRoomHeadline): the same time, the same meaning. */
@@ -152,7 +158,7 @@ function headlineOf(room: SafeRoomStatus, timeZone: string): string {
   return t(headline.kind === 'held' ? 'idle.heldUntil' : 'idle.safeUntil', { time });
 }
 
-export function IdleTiles({ room, reserve, next, notice, timeZone }: IdleTilesProps) {
+export function IdleTiles({ room, reserve, next, notice, timeZone, avatar, named = true }: IdleTilesProps) {
   return (
     <div className="idle-tiles">
       {notice !== undefined && (
@@ -163,9 +169,9 @@ export function IdleTiles({ room, reserve, next, notice, timeZone }: IdleTilesPr
       )}
       {room !== undefined && (
         <section className="idle-tile idle-room" data-testid="tile-safe-room">
-          <Avatar kind="older-man" className="idle-avatar" />
+          <Avatar kind={avatar} className="idle-avatar" />
           <div>
-            <p className="idle-tile-label">{room.safeRoomName ?? roomLabel(room.safeRoomId)}</p>
+            <p className="idle-tile-label">{named ? (room.safeRoomName ?? roomLabel(room.safeRoomId)) : t('idle.safeRoomNeutral')}</p>
             <p className="idle-tile-big">{headlineOf(room, timeZone)}</p>
           </div>
         </section>
@@ -194,10 +200,11 @@ const EVENING_FROM_H = 18;
  * part of the day on the home's clock, by the fictional name the sandbox gives him (never a real name), plainly
  * without one. None without a simulated clock: the first screen then says what to ask.
  */
-export function greetingOf(now: string | undefined, room: SafeRoomStatus | undefined): string | undefined {
+/** `named` false (no one at risk at home, owner 20 Oct, A): the greeting names no one. */
+export function greetingOf(now: string | undefined, room: SafeRoomStatus | undefined, named = true): string | undefined {
   if (now === undefined) return undefined;
   const hour = Number(clockTime(now).slice(0, 2));
   const part = hour >= MORNING_FROM_H && hour < AFTERNOON_FROM_H ? 'morning' : hour >= AFTERNOON_FROM_H && hour < EVENING_FROM_H ? 'afternoon' : 'evening';
-  const name = room?.people?.find((p) => p.role === 'grandpa')?.name;
+  const name = named ? room?.people?.find((p) => p.role === 'grandpa')?.name : undefined;
   return name === undefined ? t(`idle.greetingNoName.${part}`) : t(`idle.greeting.${part}`, { name });
 }
