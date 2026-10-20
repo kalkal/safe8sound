@@ -23,12 +23,29 @@ function pastLimitOf(status: SafeRoomStatus): boolean {
 /**
  * The safe room's headline time and what it means, for the card's big time and for every other place that shows it
  * (the Echo's idle tile): one rule, one place (review of #458). "within": the battery runs out first and the room then
- * holds its limits until about this time (#364); "held": the room is past its limit now and the battery holds it until
- * this time (#271); "safe": comfortable at least until this time.
+ * holds its limits until about this time (#364), or at least until it when it crosses none in the projection (`atLeast`,
+ * #459); "held": the room is past its limit now and the battery holds it until this time (#271), with the store down too
+ * (#459); "safe": comfortable at least until this time; "atLeast": the battery outlasts the projection and this is only
+ * its end (the clear day: 24 h from now, so the same hour as now), with `tomorrow` when it falls on the next day.
  */
-export function safeRoomHeadline(status: SafeRoomStatus): { until: string; kind: 'safe' | 'within' | 'held' } {
-  if (status.withinLimits !== undefined) return { until: status.withinLimits.until, kind: 'within' };
-  return { until: status.safeUntil, kind: pastLimitOf(status) ? 'held' : 'safe' };
+export type SafeRoomHeadline =
+  | { until: string; kind: 'safe' | 'held' }
+  | { until: string; kind: 'within'; atLeast: boolean }
+  | { until: string; kind: 'atLeast'; tomorrow: boolean };
+
+export function safeRoomHeadline(status: SafeRoomStatus): SafeRoomHeadline {
+  if (status.withinLimits !== undefined) return { until: status.withinLimits.until, kind: 'within', atLeast: status.withinLimits.limitC === undefined };
+  if (pastLimitOf(status)) return { until: status.safeUntil, kind: 'held' };
+  // "Tomorrow": the end falls on the day after the reading (`safeUntil` − `safeHours`), never two days on.
+  if (status.safeUntilCapped === true) return { until: status.safeUntil, kind: 'atLeast', tomorrow: dayOf(status.safeUntil, 24 - status.safeHours) === dayOf(status.safeUntil, 0) };
+  return { until: status.safeUntil, kind: 'safe' };
+}
+
+/** The home's calendar day `hours` after a time the server wrote with its offset (the reading is `safeUntil` − `safeHours`). */
+function dayOf(iso: string, hours: number): string {
+  const offset = /([+-])(\d\d):(\d\d)$/.exec(iso);
+  const offsetMs = offset === null ? 0 : (offset[1] === '-' ? -1 : 1) * (Number(offset[2]) * 60 + Number(offset[3])) * 60_000;
+  return new Date(Date.parse(iso) + hours * 3_600_000 + offsetMs).toISOString().slice(0, 10);
 }
 
 /**
@@ -56,13 +73,18 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
   // the grace period) stops keeping it, said plainly.
   // #364 (owner, 12 Oct): when the battery runs out first and the room then holds its limits a while, the big time is
   // the room's ("Under 24 °C until about 06:00"), the battery time goes below it.
+  // #459: the label follows the headline's kind, so the idle tile and the card hedge the same time the same way (past
+  // the limit the battery holds the room, the store down or not).
   const within = status.withinLimits;
+  const headline = safeRoomHeadline(status);
   const eyebrow =
     within !== undefined
       ? within.limitC === undefined
         ? t('hold.withinAtLeast')
         : t('hold.underUntil', { limit: formatTemp(within.limitC, getTempUnit()) })
-      : t(status.storeUnavailable !== true ? (overLimit === undefined ? 'safeRoom.until' : 'safeRoom.untilHeld') : status.stricterNightLimit === true ? 'safeRoom.untilStrict' : 'safeRoom.untilLive');
+      : headline.kind === 'held'
+        ? t('safeRoom.untilHeld')
+        : t(status.storeUnavailable !== true ? 'safeRoom.until' : status.stricterNightLimit === true ? 'safeRoom.untilStrict' : 'safeRoom.untilLive');
   return (
     <CardShell
       title={t('safeRoom.title', { room: status.safeRoomName ?? roomLabel(status.safeRoomId) })}
@@ -89,11 +111,17 @@ export function SafeRoomCard({ status }: { status: SafeRoomStatus }) {
           {/* The big time and the cubes: one row on a short screen (data-fit-tight), so both stay at full size. */}
           <div className="hero-row">
             <p className="hero-value" data-testid="safe-until">
-              {clockOf(safeRoomHeadline(status).until)}
+              {clockOf(headline.until)}
             </p>
             {/* The signature element right under the big time, so it is in the first view on every screen (owner, 1 and 11 Oct). */}
             <CubeRow hours={status.safeHours} storm={inStorm} />
           </div>
+          {/* The end of the projection on the next day (the clear day at 12:00): the big 12:00 is not now. */}
+          {headline.kind === 'atLeast' && headline.tomorrow && (
+            <p className="muted" data-testid="safe-until-day">
+              {t('safeRoom.tomorrow')}
+            </p>
+          )}
           {within !== undefined && (
             <p className="muted" data-testid="battery-until">
               {t('hold.batteryLine', { time: clockOf(status.safeUntil) })}

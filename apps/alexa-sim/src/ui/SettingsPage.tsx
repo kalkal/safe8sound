@@ -17,7 +17,7 @@ import './settings-page.css';
 // same page opens on Ana's phone, on the same model (settings-model).
 
 /** One temperature of the section: its name and rule, then "lower", the value and "raise" in 48 px buttons. */
-function LimitStepper({ name, hint, value, onMove }: { name: string; hint: string; value: string; onMove: (direction: 'up' | 'down') => void }) {
+function LimitStepper({ name, hint, value, onMove, announce }: { name: string; hint: string; value: string; onMove: (direction: 'up' | 'down') => void; announce: boolean }) {
   const nameId = useId();
   return (
     <div className="limit-row" role="group" aria-labelledby={nameId}>
@@ -36,7 +36,7 @@ function LimitStepper({ name, hint, value, onMove }: { name: string; hint: strin
         >
           −
         </button>
-        <output className="limit-value" aria-live="polite">
+        <output className="limit-value" aria-live={announce ? 'polite' : 'off'}>
           {value}
         </output>
         <button
@@ -100,10 +100,24 @@ export interface SettingsPageProps {
   /** #263: the page's language, a setting of this viewer only (never sent to the sandbox). */
   locale: Locale;
   onLocale: (locale: Locale) => void;
+  /**
+   * Whether this view's lines are live regions (default true). Two views open at once (the Echo's page and Ana's
+   * phone) show the same lines, and only one may announce them, or a screen reader says each twice.
+   */
+  announce?: boolean;
+}
+
+/**
+ * Whether a view of the settings page announces its lines: exactly one does while both are on screen. The Echo's page,
+ * unless Ana's phone is a modal sheet over it (the page behind is inert); Ana's page while the Echo's is closed or
+ * under her sheet.
+ */
+export function settingsAnnounce(view: 'echo' | 'phone', o: { readonly echoOpen: boolean; readonly phoneModal: boolean }): boolean {
+  return view === 'echo' ? !o.phoneModal : !o.echoOpen || o.phoneModal;
 }
 
 /** The page itself, one per view (the Echo's screen, Ana's phone): a region named by its title. */
-export function SettingsPage({ model, locale, onLocale }: SettingsPageProps) {
+export function SettingsPage({ model, locale, onLocale, announce = true }: SettingsPageProps) {
   const titleId = useId();
   const limitsTitleId = useId();
   // One radio name per view: two views open at once (the Echo's page and the phone's) are two groups, not one.
@@ -115,6 +129,7 @@ export function SettingsPage({ model, locale, onLocale }: SettingsPageProps) {
       .map((r) => (
         <LimitStepper
           key={r.id}
+          announce={announce}
           name={t(`settings.limits.${r.id}`)}
           hint={t(`settings.limits.${r.id}Hint`, { range: t('settings.limits.range', { min: formatTemp(r.minC, units), max: formatTemp(r.maxC, units) }) })}
           value={formatTemp(r.valueC, units)}
@@ -129,7 +144,7 @@ export function SettingsPage({ model, locale, onLocale }: SettingsPageProps) {
       <h2 id={titleId}>{t('settings.page.title')}</h2>
       <WhoWeProtect />
       {settings !== undefined && (
-        <p className="notice settings-applied" role="status" data-testid="settings-applied" data-failed={model.unitFailed}>
+        <p className="notice settings-applied" role={announce ? 'status' : undefined} data-testid="settings-applied" data-failed={model.unitFailed}>
           {model.unitText}
         </p>
       )}
@@ -184,12 +199,12 @@ export function SettingsPage({ model, locale, onLocale }: SettingsPageProps) {
               {t('settings.limits.save')}
             </button>
           )}
-          <p className="notice" role="alert" data-testid="limit-refusal">
+          <p className="notice" role={announce ? 'alert' : undefined} data-testid="limit-refusal">
             {refusal === undefined ? '' : refusalText(refusal.id, refusal.why, units)}
           </p>
         </section>
       )}
-      <p className="notice" role="status">
+      <p className="notice" role={announce ? 'status' : undefined}>
         {model.status === undefined ? '' : t(model.status === 'rateLimited' ? 'settings.limits.rateLimited' : model.status === 'unsaved' ? 'settings.limits.unsaved' : `settings.${model.status}`)}
       </p>
       {/* The brief's order (18 Oct): the home's safe room and limits first, then the language. */}
@@ -225,9 +240,10 @@ export interface UseSettingsPageInput {
 
 /**
  * The page on the Echo's screen, as useHomePanel: the menu's button ("Settings" / "Hide settings"), the page for the
- * content band (null while closed), and open / close for the said commands and for the content band's Back.
+ * content band (null while closed), and open / close for the said commands and for the content band's Back. `isOpen`: whether it
+ * is on screen, so another view of the same model knows it must not announce its lines too.
  */
-export function useSettingsPage({ model, render, onShow, onFocusLost }: UseSettingsPageInput): { button: ReactElement; view: ReactElement | null; open: () => void; close: () => void } {
+export function useSettingsPage({ model, render, onShow, onFocusLost }: UseSettingsPageInput): { button: ReactElement; view: ReactElement | null; isOpen: boolean; open: () => void; close: () => void } {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -281,5 +297,5 @@ export function useSettingsPage({ model, render, onShow, onFocusLost }: UseSetti
     onShow?.();
     setOpen(true);
   }, [onShow]);
-  return { button, view, open: show, close };
+  return { button, view, isOpen: open, open: show, close };
 }

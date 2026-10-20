@@ -1,5 +1,6 @@
-import type { MilestoneKind } from '@cold-reserve/contracts';
+import type { MilestoneKind, ScenarioId } from '@cold-reserve/contracts';
 import { useId } from 'react';
+import { nothingAheadText } from './demo-settings.js';
 import { clockTime, type ClockState } from './sim-clock.js';
 import { Spinner } from './Spinner.js';
 import { t } from './text.js';
@@ -13,17 +14,17 @@ export type ClockNote = { readonly kind: 'grid_down' } | { readonly kind: 'reach
 
 const momentText = (kind: MilestoneKind) => t(`clock.kind.${kind}`);
 
-function noteText(state: ClockState, note: ClockNote | undefined, busy: boolean): string {
+function noteText(state: ClockState, note: ClockNote | undefined, busy: boolean, scenarioId: ScenarioId | undefined): string {
   if (busy) return t('clock.moving');
   if (note?.kind === 'grid_down') return t('clock.gridDown');
   if (note?.kind === 'failed') return t('clock.failed');
   if (note?.kind === 'limit') return t('clock.limit');
   if (note?.kind === 'reached') return t('clock.reached', { moment: momentText(note.moment) });
-  return state.next === undefined ? t('clock.nothingNext') : t('clock.next', { moment: momentText(state.next.kind), time: clockTime(state.next.at) });
+  return state.next === undefined ? nothingAheadText(scenarioId, 'clock.nothingNext') : t('clock.next', { moment: momentText(state.next.kind), time: clockTime(state.next.at) });
 }
 
-/** `summary`: what the last jump changed, where the judges' panel that says it is a closed sheet (owner, 19 Oct, J = a). */
-export function SimClock({ state, note, busy, onSkip, summary }: { state: ClockState; note?: ClockNote; busy: boolean; onSkip: () => void; summary?: string | undefined }) {
+/** `summary`: what the last jump changed, where the judges' panel that says it is a closed sheet (owner, 19 Oct, J = a). `scenarioId`: the sandbox's weather, for the line with nothing ahead. */
+export function SimClock({ state, note, busy, onSkip, summary, scenarioId }: { state: ClockState; note?: ClockNote; busy: boolean; onSkip: () => void; summary?: string | undefined; scenarioId?: ScenarioId | undefined }) {
   const noteId = useId();
   // The button says where it goes ("Go to 22:00 · the home steps down to its essential settings"); with nothing ahead it keeps
   // its plain name, disabled, and the line beside it says why.
@@ -40,7 +41,7 @@ export function SimClock({ state, note, busy, onSkip, summary }: { state: ClockS
       </button>
       <span className="sim-dock-lines">
         <span id={noteId} className="sim-dock-note" role="status">
-          {noteText(state, note, busy)}
+          {noteText(state, note, busy, scenarioId)}
         </span>
         {summary !== undefined && (
           <span className="sim-dock-summary" data-testid="clock-jump-summary">

@@ -34,7 +34,7 @@ import { SimClock } from './ui/SimClock.js';
 import { POWER_CUT_QUESTION, clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
 import { isAppliedPlan } from './ui/steps.js';
 import { SHIPPED_PLACES, skyOfScenario } from './ui/demo-settings.js';
-import { SettingsPage, useSettingsPage } from './ui/SettingsPage.js';
+import { SettingsPage, settingsAnnounce, useSettingsPage } from './ui/SettingsPage.js';
 import { useSettingsModel } from './ui/settings-model.js';
 import { DemoControlsOpener, DemoControlsPanel, WIDE_CONTROLS, jumpText, useDemoControlsSheet } from './demo-controls/DemoControlsPanel.js';
 import { messagesBetween } from './demo-controls/timeline.js';
@@ -288,10 +288,18 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [clearNote, onSettingsChange],
   );
+  // Ana's messages: the jump summary counts them, and a new one opens her phone below the side-by-side width.
+  const phoneMessages = useSyncExternalStore(phone.subscribe, phone.messages);
+  const phoneCount = phoneMessages.length;
+  // Ana's phone (#432, owner J = a): beside the Echo where it fits, else a sheet that also opens on a new message.
+  const phoneBeside = useMediaQuery(PHONE_BESIDE);
+  const phoneSheet = usePhoneSheet({ beside: phoneBeside, messages: phoneMessages, peekMs: config.phonePeekMs });
   // #432 S5: the person's own settings, one model for the Echo's page and Ana's phone (same data, same unsaved draft).
   // Without demo settings the page holds who we protect and the language only (#284).
   const settingsModel = useSettingsModel({ settings: demoSettings, onChange: onDrawerChange, limits, onLimit });
-  const settingsView = <SettingsPage model={settingsModel} locale={locale} onLocale={onLocale} />;
+  // One view announces the page's lines (settingsAnnounce): under the phone's modal sheet the Echo's page is inert.
+  const phoneModal = !phoneBeside && phoneSheet.open;
+  const settingsView = <SettingsPage model={settingsModel} locale={locale} onLocale={onLocale} announce={settingsAnnounce('echo', { echoOpen: true, phoneModal })} />;
   const settingsPage = useSettingsPage({ model: settingsModel, render: () => settingsView, onShow: closeHome, onFocusLost: focusMenu });
   closeSettingsRef.current = settingsPage.close;
   // Back, or the idle screen coming back, closes the page on screen, whichever it is.
@@ -313,9 +321,6 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   }, [wide, closeSheet]);
   // After each jump the panel says what changed, with the messages Ana got on the way: those sent after the time the
   // jump left and up to the time it reached (brief 3b; a later answer's message is never counted as the jump's).
-  // Ana's messages: the jump summary counts them, and a new one opens her phone below the side-by-side width.
-  const phoneMessages = useSyncExternalStore(phone.subscribe, phone.messages);
-  const phoneCount = phoneMessages.length;
   const jumpFrom = useRef<string | undefined>(undefined);
   const onJump = useCallback(() => {
     jumpFrom.current = clock?.now;
@@ -323,10 +328,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   }, [clock?.now, onSkip]);
   const lastJump =
     clockNote?.kind === 'reached' && clock !== undefined ? { at: clock.now, kind: clockNote.moment, told: messagesBetween(phone.messages(), jumpFrom.current, clock.now) } : undefined;
-  const clockDock = demoShown && clock !== undefined ? <SimClock state={clock} busy={clockBusy} onSkip={onJump} {...(clockNote === undefined ? {} : { note: clockNote })} summary={!wide && lastJump !== undefined ? jumpText(lastJump) : undefined} /> : undefined;
-  // Ana's phone (#432, owner J = a): beside the Echo where it fits, else a sheet that also opens on a new message.
-  const phoneBeside = useMediaQuery(PHONE_BESIDE);
-  const phoneSheet = usePhoneSheet({ beside: phoneBeside, messages: phoneMessages, peekMs: config.phonePeekMs });
+  const clockDock = demoShown && clock !== undefined ? <SimClock state={clock} busy={clockBusy} onSkip={onJump} {...(clockNote === undefined ? {} : { note: clockNote })} summary={!wide && lastJump !== undefined ? jumpText(lastJump) : undefined} scenarioId={demoSettings.scenarioId} /> : undefined;
   // The title sits above the device, always in view (contest rule: "Simulated Alexa+ add-on" in plain words); the
   // screen itself has no app title, like the real Echo Show (#432 S6). The theme switch stays there: the settings page
   // holds the person's own settings only (brief of 18 Oct, point 2).
@@ -370,7 +372,8 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
   const phonePanel = (
     <ErrorBoundary>
-      <PhonePanel feed={phone} timeZone={homeTimeZone} units={demoSettings?.units ?? 'C'} settings={settingsView} />
+      {/* Ana's page shows the same lines as the Echo's and announces them when the Echo's page is closed or under her sheet. */}
+      <PhonePanel feed={phone} timeZone={homeTimeZone} units={demoSettings?.units ?? 'C'} settings={<SettingsPage model={settingsModel} locale={locale} onLocale={onLocale} announce={settingsAnnounce('phone', { echoOpen: settingsPage.isOpen, phoneModal })} />} />
     </ErrorBoundary>
   );
   // The device layout from config (#432): the Alexa Echo Show unless configured; the judges' site always has it.

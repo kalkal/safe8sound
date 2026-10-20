@@ -42,6 +42,14 @@ export function scriptedDemoSettings(): DemoSettingsView {
   return { scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' };
 }
 
+/**
+ * What the clock bar and the judges' panel say with nothing ahead. The clear day has no moment from its 12:00 start to
+ * midnight (no outage; the recharge is the next morning): it points the judges to the scenarios that have some (20 Oct).
+ */
+export function nothingAheadText(scenarioId: ScenarioId | undefined, otherwise: 'clock.nothingNext' | 'demoControls.nothingNext'): string {
+  return t(scenarioId === 'clear-day' ? 'clock.nothingClearDay' : otherwise);
+}
+
 export function badgeText(view: DemoSettingsView): string {
   // The place in the page's language at render time (#284), never a label kept from another language.
   return t('settings.badge', { place: t(`settings.place.${view.locationId}`), scenario: t(`settings.scenario.${view.scenarioId}`) });

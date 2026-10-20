@@ -1,7 +1,7 @@
 import type { LocationId, Milestone, MilestoneKind, SetScenarioInput } from '@cold-reserve/contracts';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ChipGroup } from '../ui/ChipGroup.js';
-import { HOUSEHOLDS, PLACES, SCENARIOS, skyOfScenario, type DemoSettingsView } from '../ui/demo-settings.js';
+import { HOUSEHOLDS, PLACES, SCENARIOS, nothingAheadText, skyOfScenario, type DemoSettingsView } from '../ui/demo-settings.js';
 import { clockTime } from '../ui/sim-clock.js';
 import { t } from '../ui/text.js';
 import { useModal } from '../ui/use-modal.js';
@@ -140,7 +140,7 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
           <p className="muted">{t('demoControls.powerCutHint')}</p>
         </div>
       )}
-      {line !== undefined && <DayTimeline line={line} />}
+      {line !== undefined && <DayTimeline line={line} scenarioId={settings.scenarioId} />}
       {/* What the last jump changed, said once it is done; the clock bar keeps its own short status. */}
       <p className="demo-jump" aria-live="polite" data-testid="demo-controls-jump">
         {lastJump === undefined ? '' : jumpText(lastJump)}
@@ -225,7 +225,7 @@ export function jumpText(jump: { at: string; kind: MilestoneKind; told: number }
 }
 
 /** The day as its stops: each with its time, the current one marked, the next one named under them. */
-function DayTimeline({ line }: { line: ReturnType<typeof timelineOf> }) {
+function DayTimeline({ line, scenarioId }: { line: ReturnType<typeof timelineOf>; scenarioId: DemoSettingsView['scenarioId'] }) {
   const titleId = useId();
   return (
     <section className="demo-timeline" aria-labelledby={titleId}>
@@ -239,7 +239,7 @@ function DayTimeline({ line }: { line: ReturnType<typeof timelineOf> }) {
         ))}
       </ol>
       <p className="demo-timeline-next" data-testid="demo-controls-next">
-        {line.next === undefined ? t('demoControls.nothingNext') : t('demoControls.next', { time: clockTime(line.next.at), moment: t(`clock.kind.${line.next.kind}`) })}
+        {line.next === undefined ? nothingAheadText(scenarioId, 'demoControls.nothingNext') : t('demoControls.next', { time: clockTime(line.next.at), moment: t(`clock.kind.${line.next.kind}`) })}
       </p>
     </section>
   );

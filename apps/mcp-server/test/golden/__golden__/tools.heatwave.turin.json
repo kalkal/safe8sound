@@ -141,7 +141,8 @@
           "role": "grandpa",
           "name": "Leo"
         }
-      ]
+      ],
+      "safeUntilCapped": true
     }
   },
   {
@@ -1035,7 +1036,8 @@
           "role": "grandpa",
           "name": "Leo"
         }
-      ]
+      ],
+      "safeUntilCapped": true
     }
   },
   {

@@ -190,7 +190,33 @@ describe('safeRoomHeadline', () => {
   it('is the time and the meaning of the big time, for every place that shows it (review of #458)', () => {
     const calm = safeRoomCalm();
     expect(safeRoomHeadline(calm)).toEqual({ until: calm.safeUntil, kind: 'safe' });
-    expect(safeRoomHeadline({ ...calm, withinLimits: { until: '2026-07-18T06:00:00+02:00' } })).toEqual({ until: '2026-07-18T06:00:00+02:00', kind: 'within' });
+    // #459: the hedge goes with the time: "about" where the room crosses a named limit, "at least" where it never does.
+    expect(safeRoomHeadline({ ...calm, withinLimits: { until: '2026-07-18T06:00:00+02:00' } })).toEqual({ until: '2026-07-18T06:00:00+02:00', kind: 'within', atLeast: true });
+    expect(safeRoomHeadline({ ...calm, withinLimits: { until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) } })).toEqual({ until: '2026-07-18T06:00:00+02:00', kind: 'within', atLeast: false });
     expect(safeRoomHeadline({ ...calm, tempC: celsius(27), limitNow: { limitC: celsius(24), kind: 'night' } })).toEqual({ until: calm.safeUntil, kind: 'held' });
+  });
+
+  it('#459: with the store down and the room past its limit, the card says the battery holds it, as the idle tile does', () => {
+    render(<SafeRoomCard status={{ ...safeRoomCalm(), storeUnavailable: true, tempC: celsius(27), limitNow: { limitC: celsius(24), kind: 'night' } }} />);
+    expect(screen.getByText('The battery holds the room until')).toBeTruthy();
+    expect(screen.queryByText('From the live reading, at least until')).toBeNull();
+  });
+
+  it('the end of the projection is "at least", and says when it falls on the next day (the clear day at 12:00: 12:00 tomorrow)', () => {
+    const clear = { ...safeRoomCalm(), safeUntilCapped: true as const, safeHours: 24, safeUntil: '2026-07-16T12:00:00+02:00' };
+    expect(safeRoomHeadline(clear)).toEqual({ until: clear.safeUntil, kind: 'atLeast', tomorrow: true });
+    expect(safeRoomHeadline({ ...clear, safeHours: 6, safeUntil: '2026-07-15T18:00:00+02:00' })).toEqual({ until: '2026-07-15T18:00:00+02:00', kind: 'atLeast', tomorrow: false });
+    // Houston (−05:00): read at 20:00, the end 24 h later is 20:00 tomorrow; read at 00:30, it is 00:30 tomorrow.
+    expect(safeRoomHeadline({ ...clear, safeUntil: '2026-07-16T20:00:00-05:00' })).toMatchObject({ kind: 'atLeast', tomorrow: true });
+    expect(safeRoomHeadline({ ...clear, safeUntil: '2026-07-16T00:30:00-05:00' })).toMatchObject({ kind: 'atLeast', tomorrow: true });
+    // A longer cap (up to 72 h in config) ending two days on is not "tomorrow".
+    expect(safeRoomHeadline({ ...clear, safeHours: 48, safeUntil: '2026-07-17T12:00:00+02:00' })).toMatchObject({ kind: 'atLeast', tomorrow: false });
+  });
+
+  it('the card says it too: "at least until" and the day under the big time', () => {
+    render(<SafeRoomCard status={{ ...safeRoomCalm(), safeUntilCapped: true, safeHours: 24, safeUntil: '2026-07-16T12:00:00+02:00' }} />);
+    expect(screen.getByText('Comfortable at least until')).toBeTruthy();
+    expect(screen.getByTestId('safe-until').textContent).toBe('12:00');
+    expect(screen.getByTestId('safe-until-day').textContent).toBe('tomorrow');
   });
 });

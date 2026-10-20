@@ -6,7 +6,7 @@ import type { GetPreferencesOutput, SetScenarioInput } from '@cold-reserve/contr
 import { SCRIPT_FIXTURES } from '../../src/agent/script-fixtures.js';
 import { scriptedDemoSettings, type DemoSettingsView } from '../../src/ui/demo-settings.js';
 import type { LimitChange, LimitSave } from '../../src/ui/limits.js';
-import { SettingsPage, useSettingsPage } from '../../src/ui/SettingsPage.js';
+import { SettingsPage, settingsAnnounce, useSettingsPage } from '../../src/ui/SettingsPage.js';
 import { useSettingsModel } from '../../src/ui/settings-model.js';
 
 // The person's own settings inside the Echo (#432 S5): "Settings" in the screen's menu opens a page of the screen, like
@@ -43,7 +43,7 @@ function Harness({ settings, onChange = () => Promise.resolve(true), locale = 'e
       {twice && (
         <>
           <div data-testid="phone">
-            <SettingsPage model={model} locale={locale} onLocale={onLocale} />
+            <SettingsPage model={model} locale={locale} onLocale={onLocale} announce={settingsAnnounce('phone', { echoOpen: page.isOpen, phoneModal: false })} />
           </div>
           {/* What a new answer does on the Echo: close its page, open or not. */}
           <button type="button" onClick={page.close}>
@@ -276,6 +276,34 @@ describe('Temperatures and limits section', () => {
     // Two views at once are two radio groups each: a choice on one never unchecks the other's (one name per view).
     const checked = (root: HTMLElement) => within(within(root).getByRole('radiogroup', { name: 'Safe room' })).getAllByRole('radio').filter((r) => (r as HTMLInputElement).checked).length;
     expect([checked(echo), checked(phone)]).toEqual([1, 1]);
+  });
+
+  it("two views open at once announce once: the Echo's page speaks, Ana's shows the same lines silently; alone, Ana's speaks", () => {
+    render(<Harness settings={scriptedDemoSettings()} limits={view} twice />);
+    const phone = screen.getByTestId('phone');
+    // The lines the page itself makes live (an <output> is a status by its tag: its aria-live is checked below).
+    const live = () => [...document.querySelectorAll<HTMLElement>('[data-testid="settings-page"] [role="status"], [data-testid="settings-page"] [role="alert"]')];
+    // The Echo's page closed: only Ana's page has live lines.
+    expect(live().every((el) => phone.contains(el))).toBe(true);
+    expect(live()).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    // Both open: still one of each line, now on the Echo's page; Ana's page shows the same text without a live role.
+    expect(live()).toHaveLength(3);
+    expect(live().some((el) => phone.contains(el))).toBe(false);
+    expect(within(phone).getByTestId('limit-refusal').getAttribute('role')).toBeNull();
+    expect(phone.querySelectorAll('output[aria-live="polite"]')).toHaveLength(0);
+    expect(phone.querySelectorAll('output[aria-live="off"]').length).toBeGreaterThan(0);
+  });
+
+  it('exactly one view announces while both are on screen, also under the phone\'s modal sheet (the Echo\'s page is inert there)', () => {
+    for (const echoOpen of [true, false])
+      for (const phoneModal of [true, false]) {
+        const echo = echoOpen && settingsAnnounce('echo', { echoOpen, phoneModal });
+        const phone = settingsAnnounce('phone', { echoOpen, phoneModal });
+        expect([echoOpen, phoneModal, Number(echo) + Number(phone)]).toEqual([echoOpen, phoneModal, 1]);
+      }
+    expect(settingsAnnounce('phone', { echoOpen: true, phoneModal: true })).toBe(true);
+    expect(settingsAnnounce('echo', { echoOpen: true, phoneModal: true })).toBe(false);
   });
 
   it("closing the Echo's page when it is already closed leaves Ana's page as it is (a refusal stays said)", () => {

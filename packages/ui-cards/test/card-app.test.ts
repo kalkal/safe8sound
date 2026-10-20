@@ -102,9 +102,9 @@ describe('renderCardHtml: one self-contained document per card', () => {
 
 describe('checkBundleSize: the card bundle never grows silently', () => {
   it('passes under the budget and fails above it with the numbers', () => {
-    expect(BUNDLE_BUDGET_BYTES).toBe(1_020_000);
-    expect(checkBundleSize(1_020_000)).toEqual({ ok: true, value: 1_020_000 });
-    expect(checkBundleSize(1_020_001)).toEqual({ ok: false, error: 'The card bundle is 1020001 bytes, over the budget of 1020000.' });
+    expect(BUNDLE_BUDGET_BYTES).toBe(1_030_000);
+    expect(checkBundleSize(1_030_000)).toEqual({ ok: true, value: 1_030_000 });
+    expect(checkBundleSize(1_030_001)).toEqual({ ok: false, error: 'The card bundle is 1030001 bytes, over the budget of 1030000.' });
   });
 });
 

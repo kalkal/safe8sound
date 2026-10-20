@@ -145,8 +145,11 @@ export interface IdleTilesProps {
 
 /** The tile says what the safe room card says (safeRoomHeadline): the same time, the same meaning. */
 function headlineOf(room: SafeRoomStatus, timeZone: string): string {
-  const { until, kind } = safeRoomHeadline(room);
-  return t(kind === 'within' ? 'idle.withinUntil' : kind === 'held' ? 'idle.heldUntil' : 'idle.safeUntil', { time: homeClock(until, timeZone) });
+  const headline = safeRoomHeadline(room);
+  const time = homeClock(headline.until, timeZone);
+  if (headline.kind === 'atLeast') return t(headline.tomorrow ? 'idle.atLeastTomorrow' : 'idle.atLeastUntil', { time });
+  if (headline.kind === 'within') return t(headline.atLeast ? 'idle.withinAtLeast' : 'idle.withinUntil', { time });
+  return t(headline.kind === 'held' ? 'idle.heldUntil' : 'idle.safeUntil', { time });
 }
 
 export function IdleTiles({ room, reserve, next, notice, timeZone }: IdleTilesProps) {

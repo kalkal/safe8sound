@@ -1,4 +1,4 @@
-import { HomeProfileSchema, SafeRoomStatusSchema, type HomeProfile } from '@cold-reserve/contracts';
+import { HomeProfileSchema, SafeRoomStatusSchema, pct, type HomeProfile } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
 import { runStormDetector } from '../../src/modules/storm-mode/observe.js';
 import { safeRoomStatus, startStormMode } from '../../src/modules/storm-mode/tools.js';
@@ -43,6 +43,19 @@ describe('get_safe_room_status', () => {
     expect(out.value.safeUntil).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+02:00$/); // Europe/Rome, summer time
     const held = expectedHold({ snapshot: w.snapshot(), forecast: w.forecast(), profile: w.profile, preferences, config: stormConfig() });
     expect(Date.parse(out.value.safeUntil)).toBeCloseTo(held.untilMs, -3);
+  });
+
+  it('says when the time is only the end of the projection (the clear day: the battery outlasts it), so a screen says "at least"', async () => {
+    const clear = world(12, {}, 'clear-day');
+    const capped = await safeRoomStatus(clear.deps, clear.ctx);
+    if (!capped.ok) throw new Error(capped.error.message);
+    expect(SafeRoomStatusSchema.parse(capped.value).safeUntilCapped).toBe(true);
+    expect(capped.value.safeHours).toBe(stormConfig().capHours);
+    const storm = world(4, { snapshot: (s) => ({ ...s, batterySocPct: pct(12) }) });
+    const held = await safeRoomStatus(storm.deps, storm.ctx);
+    if (!held.ok) throw new Error(held.error.message);
+    expect(held.value.safeHours).toBeLessThan(stormConfig().capHours);
+    expect(held.value.safeUntilCapped).toBeUndefined();
   });
 
   it('is read-only: with the grid down it writes no session and sends no message', async () => {

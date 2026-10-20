@@ -165,6 +165,11 @@ export const SafeRoomStatusSchema = z.strictObject({
    * ("at least until"). Absent when the battery is not what ends the safe hours, or in the heating season.
    */
   withinLimits: z.strictObject({ until: IsoDateTimeSchema, limitC: CelsiusSchema.optional() }).optional(),
+  /**
+   * (additive, approved 20 Oct): `safeUntil` is only the end of the projection, the battery outlasts it (the clear day),
+   * so a screen says "at least until", as the voice does. Absent when the hold ends inside the projection.
+   */
+  safeUntilCapped: z.literal(true).optional(),
 }).superRefine((s, ctx) => {
   if (s.withinLimits !== undefined && epochMs(s.withinLimits.until) <= epochMs(s.safeUntil)) {
     ctx.addIssue({ code: 'custom', path: ['withinLimits', 'until'], message: 'The room stays within its limits past the battery time, or the field is absent' });

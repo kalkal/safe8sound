@@ -110,6 +110,15 @@ describe('DemoControlsPanel', () => {
     expect(screen.getByTestId('demo-controls-jump').textContent).toBe('21:00 — the home steps down to its essential settings');
   });
 
+  it('with nothing ahead it says to restart the day; on the clear day it points to the scenarios that have moments', () => {
+    const sheet = { open: false, setOpen: vi.fn(), opener: { current: null } };
+    const props = { sheet, wide: true, availablePlaces: ['reference'] as const, onChange: vi.fn(() => Promise.resolve(true)), stops: [], now: at('12:00') };
+    const { rerender } = render(<DemoControlsPanel {...props} settings={scriptedDemoSettings()} />);
+    expect(screen.getByTestId('demo-controls-next').textContent).toBe('Nothing more today: Restart the day to play it again.');
+    rerender(<DemoControlsPanel {...props} settings={{ ...scriptedDemoSettings(), scenarioId: 'clear-day' }} />);
+    expect(screen.getByTestId('demo-controls-next').textContent).toBe('A clear day has nothing to skip to: try Heat wave or Storm.');
+  });
+
   it('a place that has not shipped yet is disabled and says so', () => {
     function OnePlace() {
       const sheet = useDemoControlsSheet();

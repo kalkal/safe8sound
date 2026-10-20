@@ -80,12 +80,32 @@ describe('IdleTiles', () => {
 
   it("says what the safe room card says: the room's own limits time, or the battery's hold past the limit (review of #458)", () => {
     const base = { ...safeRoomCalm(), safeRoomName: "Leo's room", safeUntil: '2026-07-18T03:05:00+02:00' };
-    const { unmount } = render(<IdleTiles room={{ ...base, withinLimits: { until: '2026-07-18T06:00:00+02:00' } }} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    const { unmount } = render(<IdleTiles room={{ ...base, withinLimits: { until: '2026-07-18T06:00:00+02:00', limitC: celsius(24) } }} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(within(screen.getByTestId('tile-safe-room')).getByText('Within its limits until about 06:00')).toBeTruthy();
     unmount();
     const above = { ...base, tempC: celsius(27), limitNow: { limitC: celsius(24), kind: 'night' as const } };
     render(<IdleTiles room={above} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(within(screen.getByTestId('tile-safe-room')).getByText('Battery holds it until 03:05')).toBeTruthy();
+  });
+
+  it('the clear day at 12:00: safe at least until 12:00 tomorrow, never "until" the hour it is now', () => {
+    const room = { ...safeRoomCalm(), safeRoomName: "Leo's room", safeUntilCapped: true as const, safeHours: 24, safeUntil: '2026-07-16T12:00:00+02:00' };
+    const { unmount } = render(<IdleTiles room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    expect(within(screen.getByTestId('tile-safe-room')).getByText('Safe at least until 12:00 tomorrow')).toBeTruthy();
+    unmount();
+    setLocale('it-IT');
+    render(<IdleTiles room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    expect(within(screen.getByTestId('tile-safe-room')).getByText('Al sicuro almeno fino alle 12:00 di domani')).toBeTruthy();
+  });
+
+  it('#459: a room that never crosses its limits in the projection is "at least", as on the card, in both languages', () => {
+    const room = { ...safeRoomCalm(), safeRoomName: "Leo's room", safeUntil: '2026-07-18T03:05:00+02:00', withinLimits: { until: '2026-07-18T06:00:00+02:00' } };
+    const { unmount } = render(<IdleTiles room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    expect(within(screen.getByTestId('tile-safe-room')).getByText('Within its limits at least until 06:00')).toBeTruthy();
+    unmount();
+    setLocale('it-IT');
+    render(<IdleTiles room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    expect(within(screen.getByTestId('tile-safe-room')).getByText('Nei suoi limiti almeno fino alle 06:00')).toBeTruthy();
   });
 
   it('leaves out a tile whose reading is missing (a failed read, the end of the day), never an empty box', () => {

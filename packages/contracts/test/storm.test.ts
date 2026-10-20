@@ -102,6 +102,9 @@ describe('storm tool contracts', () => {
     };
     expect(SafeRoomStatusSchema.safeParse(status).success).toBe(true);
     expect(SafeRoomStatusSchema.safeParse({ ...status, occupantRoles: ['Grandpa Joe'] }).success).toBe(false);
+    // (additive, 20 Oct): the time is the end of the projection (the battery outlasts it), so "at least until"; only true.
+    expect(SafeRoomStatusSchema.parse({ ...status, safeUntilCapped: true }).safeUntilCapped).toBe(true);
+    expect(SafeRoomStatusSchema.safeParse({ ...status, safeUntilCapped: false }).success).toBe(false);
   });
 
   it('#364 (additive): until when the room stays within its limits after the battery runs out, always after it', () => {

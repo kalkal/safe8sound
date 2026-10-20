@@ -92,6 +92,7 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext, degr
     ...levelOf(session),
     safeHours: o.value.safeHours,
     safeUntil: safeUntilOf(o.value),
+    ...(o.value.capped ? { safeUntilCapped: true as const } : {}),
     ...(session === undefined ? {} : { stormPhase: session.phase }),
     gridAvailable: snapshot.gridAvailable,
     ...(reply === undefined ? {} : { lastCheckIn: { ...reply, at: localIso(Date.parse(reply.at), o.value.home.profile.location.tz) } }),

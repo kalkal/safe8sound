@@ -63,6 +63,14 @@ describe('SimClock', () => {
     expect(screen.getByRole('status').textContent).toBe('Nothing more to skip to today.');
   });
 
+  it('on the clear day, with nothing ahead, it points to the scenarios that have moments', () => {
+    const { rerender } = render(<SimClock state={{ now: AHEAD.now }} scenarioId="clear-day" busy={false} onSkip={vi.fn()} />);
+    expect(screen.getByRole('status').textContent).toBe('A clear day has nothing to skip to: try Heat wave or Storm.');
+    setLocale('it-IT');
+    rerender(<SimClock state={{ now: AHEAD.now }} scenarioId="clear-day" busy={false} onSkip={vi.fn()} />);
+    expect(screen.getByRole('status').textContent).toBe('Una giornata serena non ha tappe a cui saltare: prova Ondata di calore o Temporale.');
+  });
+
   it('in Italian', () => {
     setLocale('it-IT');
     const { rerender } = render(<SimClock state={AHEAD} busy={false} onSkip={vi.fn()} />);

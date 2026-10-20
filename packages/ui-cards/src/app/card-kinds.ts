@@ -187,9 +187,10 @@ export function parseSaveResult(result: ToolResultLike): Result<PublicPreference
 /**
  * Spike S3 measured ~870 kB with React, the SDK and Zod inlined; the build fails above the budget. 1 MB until #376
  * (996 kB on main then); the last-resort advice page and the room-first headline took it to 1002 kB: 1.01 MB. The
- * settings texts of #402 (both languages share one catalog with the cards) took it to 1.011 MB: 1.02 MB.
+ * settings texts of #402 (both languages share one catalog with the cards) took it to 1.011 MB: 1.02 MB. The settings
+ * page of #432 S5 and the clear-day and hedge texts of #459 took it to 1.0206 MB: 1.03 MB.
  */
-export const BUNDLE_BUDGET_BYTES = 1_020_000;
+export const BUNDLE_BUDGET_BYTES = 1_030_000;
 
 export function checkBundleSize(bytes: number): Result<number, string> {
   return bytes <= BUNDLE_BUDGET_BYTES
