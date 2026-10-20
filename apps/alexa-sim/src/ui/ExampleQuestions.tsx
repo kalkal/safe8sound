@@ -37,7 +37,7 @@ export function examplesFor(state: ExampleState): readonly ExampleQuestion[] {
   return isGridDown(state) ? STORM_EXAMPLE_QUESTIONS : EXAMPLE_QUESTIONS;
 }
 
-export function ExampleQuestions({ onPick, examples = EXAMPLE_QUESTIONS }: { onPick: (question: string) => void; examples?: readonly ExampleQuestion[] }) {
+export function ExampleQuestions({ onPick, examples = EXAMPLE_QUESTIONS, disabled = false }: { onPick: (question: string) => void; examples?: readonly ExampleQuestion[]; disabled?: boolean }) {
   return (
     <div className="examples" role="group" aria-label={t('examples.label')}>
       {examples.map((example) => (
@@ -45,6 +45,7 @@ export function ExampleQuestions({ onPick, examples = EXAMPLE_QUESTIONS }: { onP
           key={example.label}
           type="button"
           className="chip-button"
+          disabled={disabled}
           onClick={() => {
             onPick(example.question);
           }}

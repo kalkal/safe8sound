@@ -32,6 +32,18 @@ describe('HomePanel', () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
+  // The day's turns used up (review of #482): the home says the same words as the screen, reads nothing, offers no Retry.
+  it('the demo full for today: the same words as the screen, no read, no failure, no Retry, no stale card', () => {
+    const onOpen = vi.fn();
+    render(<HomePanel status={homeCalm()} renderCard={frame} load="failed" onOpen={onOpen} closedNotice="The demo limit for today is reached. Back at 02:00 (your time)." />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));
+    expect(screen.getByRole('region', { name: 'My home' }).textContent).toBe('My homeThe demo limit for today is reached. Back at 02:00 (your time).');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(screen.queryByTestId('home-card')).toBeNull();
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('is closed at first: only the button, which says what it opens', () => {
     render(<HomePanel status={homeCalm()} renderCard={frame} />);
     const button = screen.getByRole('button', { name: 'Show my home' });

@@ -1,7 +1,10 @@
 import { setLocale } from '@cold-reserve/i18n';
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '../../src/agent/agent.js';
-import { HOUSEHOLDS, applyChange, homeFaceOf, badgeText, fetchDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario } from '../../src/ui/demo-settings.js';
+import { toolError } from '@cold-reserve/contracts';
+import { toolErrorResult } from '../../src/agent/agent.js';
+import type { LogEvent } from '../../src/log.js';
+import { HOUSEHOLDS, applyChange, homeFaceOf, badgeText, closedNoticeOf, fetchDemoSettings, readDemoSettings, saveDemoSettings, scriptedDemoSettings, skyOfScenario } from '../../src/ui/demo-settings.js';
 
 // B1 (additions plan): what the scenario badge says and how a choice changes the settings shown, in scripted mode.
 
@@ -127,5 +130,117 @@ describe('who is at home (owner, 20 Oct)', () => {
   it("the home's face and its line: the small house and 'no one at risk' with no one at risk, Leo for a man, a saved older-woman and before the settings are read", () => {
     const leo = { avatar: 'older-man', who: 'settings.protect.leo', named: true };
     expect([homeFaceOf('older-man'), homeFaceOf('no-one-at-risk'), homeFaceOf('older-woman'), homeFaceOf(undefined)]).toEqual([leo, { avatar: 'home', who: 'settings.protect.noOne', named: false }, leo, leo]);
+  });
+});
+// Test's judge run on the dev site (20 Oct, 375 × 812): the first read of the sandbox settings after Start failed and
+// was never tried again, so the demo controls, the clock and the place never came until F5. A failure that may pass
+// (the catalog's retryable codes) is tried again a few times, with the wait the server asks for; one that will not
+// pass (a home that is not a sandbox) is not. Every try and the last failure are logged with the correlation id.
+describe('reading the sandbox settings after Start', () => {
+  const ctx = { correlationId: 'c1' };
+  const settings = { version: 3, updatedAt: '2026-10-05T10:00:00Z', scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' } as const;
+  const place = { id: 'reference', label: 'Reference home (Italy)', tz: 'Europe/Rome' } as const;
+  const good = { content: [{ type: 'text', text: 'x' }], structuredContent: { settings, place } };
+  const busy = toolErrorResult(toolError('agent_unavailable', 'The assistant service failed (HTTP 503).'));
+  const slowDown = toolErrorResult(toolError('turn_in_progress', 'One moment.', { retryAfterMs: 4000 }));
+  const longWait = toolErrorResult(toolError('turn_in_progress', 'One moment.', { retryAfterMs: 30_000 }));
+  const notSandbox = toolErrorResult(toolError('invalid_input', 'No settings.'));
+  const agentReplying = (...replies: unknown[]) => {
+    let calls = 0;
+    const agent = {
+      canCallTools: true,
+      ask: () => Promise.reject(new Error('unused')),
+      callTool: () => Promise.resolve(replies[Math.min(calls++, replies.length - 1)]),
+    } as unknown as Agent;
+    return { agent, calls: () => calls };
+  };
+  const recorder = () => {
+    const waits: number[] = [];
+    const logs: LogEvent[] = [];
+    return { waits, logs, wait: (ms: number) => (waits.push(ms), Promise.resolve()), log: (e: LogEvent) => logs.push(e) };
+  };
+
+  it('keeps the reason of a failed read: a busy service is worth another try, a home that is not a sandbox is not', async () => {
+    expect(await fetchDemoSettings(agentReplying(busy).agent, ctx, () => undefined)).toMatchObject({ ok: false, error: { code: 'agent_unavailable', retryable: true } });
+    expect(await fetchDemoSettings(agentReplying(notSandbox).agent, ctx, () => undefined)).toMatchObject({ ok: false, error: { retryable: false } });
+  });
+
+  it('a read that fails once and then answers shows the settings', async () => {
+    const { agent, calls } = agentReplying(busy, good);
+    const r = recorder();
+    expect(await readDemoSettings(agent, ctx, { wait: r.wait, logEvent: r.log })).toMatchObject({ ok: true, value: { locationId: 'reference' } });
+    expect(calls()).toBe(2);
+    expect(r.waits).toHaveLength(1);
+  });
+
+  it('waits as long as the server asks before trying again', async () => {
+    const r = recorder();
+    await readDemoSettings(agentReplying(slowDown, good).agent, ctx, { wait: r.wait, logEvent: r.log });
+    expect(r.waits).toEqual([4000]);
+  });
+
+  it('never waits long on the first screen: a retryable failure asking for more than 10 s is not tried again', async () => {
+    const { agent, calls } = agentReplying(longWait, good);
+    const r = recorder();
+    expect(await readDemoSettings(agent, ctx, { wait: r.wait, logEvent: r.log })).toMatchObject({ ok: false, error: { code: 'turn_in_progress' } });
+    expect(calls()).toBe(1);
+    expect(r.waits).toEqual([]);
+  });
+
+  it("the day's turns used up (HTTP 429) are never tried again, even with a short wait", async () => {
+    const soon = toolErrorResult(toolError('demo_quota_exceeded', 'The demo is full for today.', { retryAfterMs: 2000 }));
+    const { agent, calls } = agentReplying(soon, good);
+    const r = recorder();
+    expect(await readDemoSettings(agent, ctx, { wait: r.wait, logEvent: r.log })).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded', retryAfterMs: 2000 } });
+    expect(calls()).toBe(1);
+    expect(r.waits).toEqual([]);
+  });
+
+  it('never tries again what will not pass', async () => {
+    const { agent, calls } = agentReplying(notSandbox, good);
+    const r = recorder();
+    expect(await readDemoSettings(agent, ctx, { wait: r.wait, logEvent: r.log })).toMatchObject({ ok: false });
+    expect(calls()).toBe(1);
+    expect(r.waits).toEqual([]);
+  });
+
+  it('gives up after three tries, says so in the log with the correlation id, and never loops', async () => {
+    const { agent, calls } = agentReplying(busy);
+    const r = recorder();
+    expect(await readDemoSettings(agent, ctx, { wait: r.wait, logEvent: r.log })).toMatchObject({ ok: false, error: { code: 'agent_unavailable' } });
+    expect(calls()).toBe(3);
+    expect(r.waits).toHaveLength(2);
+    expect(r.logs.at(-1)).toMatchObject({ level: 'warn', code: 'agent_unavailable', correlationId: 'c1', details: { step: 'get_demo_settings', tries: 3 } });
+  });
+
+  it('stops when the page no longer wants the answer (a new session, the page closed)', async () => {
+    const { agent, calls } = agentReplying(busy, good);
+    const r = recorder();
+    const read = await readDemoSettings(agent, ctx, { wait: r.wait, logEvent: r.log, wanted: () => false });
+    expect(read).toMatchObject({ ok: false });
+    expect(calls()).toBe(1);
+  });
+});
+
+// The day's turns used up (Test's dev-site run, 20 Oct: every read after Start was HTTP 429): the screen says the
+// server's own words once, with the time the demo comes back on the visitor's own clock, in 24 h (main, 20 Oct).
+describe('the demo closed for today', () => {
+  const full = (retryAfterMs?: number) => toolError('demo_quota_exceeded', 'The demo is full for today.', retryAfterMs === undefined ? {} : { retryAfterMs });
+  const lateEvening = new Date(2026, 9, 20, 23, 30).getTime();
+
+  it("says the demo is full for today and when it comes back, on the visitor's clock, in the page's language", () => {
+    expect(closedNoticeOf(full(150 * 60_000), lateEvening)).toBe('The demo limit for today is reached. Back at 02:00 (your time).');
+    setLocale('it-IT');
+    expect(closedNoticeOf(full(150 * 60_000), lateEvening)).toBe('Il limite della demo per oggi è stato raggiunto. Di nuovo disponibile alle 02:00 (ora tua).');
+    setLocale('en-US');
+  });
+
+  it('says only that the demo is full when the server gives no time', () => {
+    expect(closedNoticeOf(full(), lateEvening)).toBe('The demo limit for today is reached.');
+  });
+
+  it('says nothing for any other failure (the page keeps its usual messages)', () => {
+    expect(closedNoticeOf(toolError('agent_unavailable', 'Down.'), lateEvening)).toBeUndefined();
+    expect(closedNoticeOf(toolError('invalid_input', 'No settings.'), lateEvening)).toBeUndefined();
   });
 });

@@ -66,6 +66,8 @@ export const itIT = {
   'demo.hide': 'Nascondi il codice',
   'demo.invalid': 'Questo codice demo non funziona. Controllalo e riprova.',
   'demo.tooMany': 'Troppi tentativi. Aspetta un po’ e riprova.',
+  'demo.fullToday': 'Il limite della demo per oggi è stato raggiunto.',
+  'demo.backAt': 'Di nuovo disponibile alle {time} (ora tua).',
   'demo.unreachable': 'La demo ora non è raggiungibile. Riprova tra un momento.',
   'demo.expired': 'Sessione scaduta: inserisci di nuovo il codice demo.',
   'demo.again': 'Inserisci di nuovo il codice demo per continuare.',

@@ -33,7 +33,7 @@ import { ReserveClock } from './ui/ReserveClock.js';
 import { SimClock } from './ui/SimClock.js';
 import { POWER_CUT_QUESTION, clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
 import { isAppliedPlan } from './ui/steps.js';
-import { SHIPPED_PLACES, homeFaceOf, skyOfScenario } from './ui/demo-settings.js';
+import { SHIPPED_PLACES, closedNoticeOf, homeFaceOf, skyOfScenario } from './ui/demo-settings.js';
 import { SettingsPage, settingsAnnounce, useSettingsPage } from './ui/SettingsPage.js';
 import { useSettingsModel } from './ui/settings-model.js';
 import { DemoControlsOpener, DemoControlsPanel, WIDE_CONTROLS, jumpText, useDemoControlsSheet } from './demo-controls/DemoControlsPanel.js';
@@ -175,14 +175,6 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const closeSettings = useCallback(() => {
     closeSettingsRef.current();
   }, []);
-  const homePanel = useHomePanel({ status: home, renderCard: (status) => <HomeCard status={status} />, load: needsCode ? 'locked' : homeLoad, onOpen: loadHome, onShow: closeSettings, onRetry: loadHome, onFocusLost: focusMenu });
-  // The home opened before the code (its note asks for it): once the code is accepted it is read at once.
-  const homeOpenRef = useRef(false);
-  homeOpenRef.current = homePanel.view !== null;
-  useEffect(() => {
-    if (sessionToken !== undefined && homeOpenRef.current) loadHome();
-  }, [sessionToken, loadHome]);
-  const closeHome = homePanel.close;
   // The judge's demo settings (state/use-demo-settings). A new scenario starts on its own sky; each new play of a
   // sandbox reads the home and the phone again (Restart keeps the scenario, so without this the clock stayed where it
   // was, owner, 18 Oct). A home that is not a sandbox has no settings: the badge then opens the language row only (#284).
@@ -198,6 +190,25 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   }, [loadHome]);
   const demo = useDemoSettings({ agent, scripted, sessionToken, onScenario, onNewPlay: readWhatFollows });
   const demoSettings = demo.settings;
+  // The day's turns used up after Start (dev-site check, 20 Oct): the screen and the home say so once, the questions are off.
+  const closedNotice = demo.unavailable === undefined ? undefined : closedNoticeOf(demo.unavailable.error, demo.unavailable.at);
+  const homePanel = useHomePanel({
+    status: home,
+    renderCard: (status) => <HomeCard status={status} />,
+    load: needsCode ? 'locked' : homeLoad,
+    ...(closedNotice === undefined ? {} : { closedNotice }),
+    onOpen: loadHome,
+    onShow: closeSettings,
+    onRetry: loadHome,
+    onFocusLost: focusMenu,
+  });
+  // The home opened before the code (its note asks for it): once the code is accepted it is read at once.
+  const homeOpenRef = useRef(false);
+  homeOpenRef.current = homePanel.view !== null;
+  useEffect(() => {
+    if (sessionToken !== undefined && homeOpenRef.current) loadHome();
+  }, [sessionToken, loadHome]);
+  const closeHome = homePanel.close;
   const onSettingsChange = demo.change;
   const playthrough = demo.playthrough;
   // Every time on screen (phone, cards, answers, sky) is on the home's own clock: the sandbox place's zone (Houston:
@@ -448,6 +459,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                 actionsHost={askHost}
                 askRef={askRef}
                 greeting={greetingOf(clock?.now, safeRoom, homeFace.named)}
+                {...(closedNotice === undefined ? {} : { closedNotice })}
                 {...(session === undefined ? {} : { session })}
                 {...(studioVoice === undefined ? {} : { studioVoice })}
               />

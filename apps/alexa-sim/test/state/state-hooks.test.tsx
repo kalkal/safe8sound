@@ -366,3 +366,15 @@ describe('useSimClock', () => {
     expect(nothingFollows).not.toHaveBeenCalled();
   });
 });
+
+describe('useDemoSettings: the demo closed for today', () => {
+  it("remote: the day's turns used up leave no settings and keep the server's refusal for the screen", async () => {
+    const fake = fakeAgent({ get_demo_settings: reply(toolError('demo_quota_exceeded', 'The demo is full for today.', { retryAfterMs: 60_000 }), true) });
+    const { result } = renderHook(() => useDemoSettings({ agent: fake.agent, scripted: false, sessionToken: 'tok' }));
+    await waitFor(() => {
+      expect(result.current.unavailable?.error.code).toBe('demo_quota_exceeded');
+    });
+    expect(result.current.settings).toBeUndefined();
+    expect(fake.calls).toHaveLength(1);
+  });
+});

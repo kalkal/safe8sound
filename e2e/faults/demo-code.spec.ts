@@ -1,5 +1,6 @@
 import { expect, test } from '../no-network.js';
 import { DEMO_CODE, DEMO_TOKEN, openRemote } from '../remote-session.js';
+import { showMyHome } from '../surface.js';
 
 // The demo code gate of remote mode (#101, main's decision): shown only without a token, 48 px, show/hide,
 // never autocompleted, emptied after the exchange, and back with a "Session expired" line on a 401.
@@ -87,3 +88,31 @@ test('after the code, the question field works as before', async ({ page }) => {
   await expect(page.getByLabel('Ask a question')).toBeFocused();
   await expect(page.getByLabel('Demo code')).toHaveCount(0);
 });
+
+// The day's turns used up (dev-site check, 20 Oct, 375 × 812: every read after Start was HTTP 429): the screen says so
+// once in the page's own words, with the time the demo comes back; the notice takes the focus (a status region says it
+// only when it cannot); the question box, Ask and the examples are off; the home says the same words, never "I can't reach
+// your home" and its Retry. Outcome O14 (turns used up say when they reset).
+const NOTICE = /The demo limit for today is reached\. Back at \d\d:\d\d \(your time\)\./;
+for (const [width, height] of [[1904, 870], [375, 812]] as const) {
+  test(`${String(width)} × ${String(height)}: the demo full for today says so once and turns the questions off`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const full = { type: 'urn:cold-reserve:problem:demo_quota_exceeded', title: 'Too Many Requests', status: 429, detail: 'The demo limit for today is reached. Come back after midnight UTC.', instance: 'urn:uuid:00000000-0000-4000-8000-000000000001', code: 'demo_quota_exceeded', retryAfterMs: 2 * 3_600_000 };
+    await page.route('**/sim-api/v1/tools/call', (route) => route.fulfill({ status: 429, contentType: 'application/problem+json', body: JSON.stringify(full) }));
+    await openRemote(page);
+    const welcome = page.getByTestId('welcome-hint');
+    await expect(welcome).toContainText(NOTICE);
+    await expect(welcome).toBeFocused();
+    // Said once: the focused notice is read; the status region stays empty (review of #482).
+    await expect(page.getByRole('status').filter({ hasText: NOTICE })).toHaveCount(0);
+    await expect(page.getByLabel('Ask a question')).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Ask', exact: true })).toBeDisabled();
+    for (const chip of await page.getByRole('group', { name: 'Example questions' }).getByRole('button').all()) await expect(chip).toBeDisabled();
+
+    await showMyHome(page);
+    const home = page.getByRole('region', { name: 'My home' });
+    await expect(home).toContainText(NOTICE);
+    await expect(home.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+    await expect(page.getByText("I can't reach your home right now.")).toHaveCount(0);
+  });
+}

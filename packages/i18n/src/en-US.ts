@@ -74,6 +74,9 @@ export const enUS = {
   'demo.hide': 'Hide code',
   'demo.invalid': "That demo code doesn't work. Check it and try again.",
   'demo.tooMany': 'Too many tries. Wait a while and try again.',
+  // The day's turns used up (main, 20 Oct): when the demo comes back, on the visitor's own clock, in 24 h.
+  'demo.fullToday': 'The demo limit for today is reached.',
+  'demo.backAt': 'Back at {time} (your time).',
   'demo.unreachable': "The demo can't be reached right now. Try again in a moment.",
   'demo.expired': 'Session expired: enter the demo code again.',
   'demo.again': 'Enter the demo code again to continue.',

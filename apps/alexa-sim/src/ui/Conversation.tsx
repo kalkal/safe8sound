@@ -84,6 +84,8 @@ export interface ConversationProps {
   askRef?: RefObject<((question: string) => void) | null>;
   /** The first line of the idle screen (a greeting); without it, what to ask. */
   greeting?: ReactNode;
+  /** The demo closed for today (the day's turns used up, closedNoticeOf): said in the greeting's place, questions off. */
+  closedNotice?: string;
 }
 
 export function Conversation({
@@ -110,6 +112,7 @@ export function Conversation({
   actionsHost,
   askRef,
   greeting,
+  closedNotice,
 }: ConversationProps) {
   // Read when a turn starts: the machine is built once, the frame may hand a new function at each render.
   const prepareRef = useRef(prepareTurn);
@@ -248,9 +251,20 @@ export function Conversation({
     inputRef.current?.focus();
   };
 
+  const closed = closedNotice !== undefined;
+  // When the questions turn off, the focus would drop to the page (the field it was on is disabled): it goes to the
+  // notice instead, which a screen reader then reads. Only when the notice cannot take the focus (no welcome line on
+  // screen) does a status region say it, so it is never said twice (reviews of #482).
+  const welcomeRef = useRef<HTMLParagraphElement>(null);
+  const [noticeFocused, setNoticeFocused] = useState(false);
+  useEffect(() => {
+    if (!closed) return;
+    welcomeRef.current?.focus();
+    setNoticeFocused(welcomeRef.current !== null && document.activeElement === welcomeRef.current);
+  }, [closed]);
   const onSubmit = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (askLocked) return;
+    if (askLocked || closed) return;
     // Inside the tap: the answer arrives later, and the browser only reads it aloud if the page was unlocked here.
     voice.unlock();
     const turnId = crypto.randomUUID();
@@ -395,6 +409,7 @@ export function Conversation({
               {t('examples.trySaying')}
             </span>
             <ExampleQuestions
+            disabled={closed}
             {...(examples === undefined ? {} : { examples })}
             onPick={(question) => {
               // Only fills the field: the person reads it and presses Ask (never sent by itself). Not while the box is off
@@ -416,6 +431,7 @@ export function Conversation({
               placeholder={t(listening ? 'voice.listening' : 'chat.placeholder')}
               readOnly={askLocked}
               aria-disabled={askLocked}
+              disabled={closed}
               value={draft}
               onChange={(e) => {
                 // Typing in Follow Up's listen-again window closes the mic: the keyboard wins.
@@ -423,7 +439,7 @@ export function Conversation({
                 setDraft(e.target.value);
               }}
             />
-            <button type="submit" className="button button-quiet" aria-busy={thinking} disabled={askLocked}>
+            <button type="submit" className="button button-quiet" aria-busy={thinking} disabled={askLocked || closed}>
               {t('chat.send')}
             </button>
             {/* Three bands: stopping the voice is an action in this row, in the place of Speak (disabled while the answer
@@ -448,7 +464,7 @@ export function Conversation({
                 className="button button-quiet voice-button"
                 aria-pressed={micOpen}
                 aria-busy={thinking}
-                disabled={thinking || speaking || replaying}
+                disabled={thinking || speaking || replaying || closed}
                 onClick={() => {
                   voice.unlock();
                   send(micOpen ? { type: 'CANCEL' } : { type: 'MIC_PRESSED' });
@@ -530,6 +546,9 @@ export function Conversation({
           </p>
         )}
         {/* Status and alert announce themselves; the answer needs a live region that exists before it appears. */}
+        <p className="visually-hidden" role="status">
+          {noticeFocused ? '' : (closedNotice ?? '')}
+        </p>
         <div aria-live="polite">
           {!busy && !pageShown && shown.data?.ok === true && shownTurn !== undefined && (
             // One answer, one state: Previous / Next never carry a tab or a frame from another answer.
@@ -538,8 +557,8 @@ export function Conversation({
         </div>
         {pageShown && pageView}
         {firstScreen && (
-          <p className="welcome" data-testid="welcome-hint">
-            {greeting ?? t(gated ? 'chat.hintBeforeStart' : 'chat.hint')}
+          <p ref={welcomeRef} className="welcome" data-testid="welcome-hint" {...(closed ? { tabIndex: -1 } : {})}>
+            {closedNotice ?? greeting ?? t(gated ? 'chat.hintBeforeStart' : 'chat.hint')}
           </p>
         )}
         {firstScreen && idle}
