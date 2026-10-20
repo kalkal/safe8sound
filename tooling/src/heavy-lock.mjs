@@ -118,3 +118,14 @@ export function heldForUs(lockPath, env) {
   const pid = Number(env[HEAVY_HOLDER_ENV]);
   return Number.isInteger(pid) && pid > 0 && readHolder(lockPath)?.pid === pid;
 }
+
+/**
+ * How to stop a heavy step's whole process tree, or undefined where the child's own signal is enough. On Windows
+ * `child.kill()` on a `shell: true` child stops cmd.exe only: Playwright and its Chrome kept running (20 Oct).
+ * @param {NodeJS.Platform} platform
+ * @param {number} pid
+ * @returns {{ command: string, args: string[] } | undefined}
+ */
+export function treeKill(platform, pid) {
+  return platform === 'win32' ? { command: 'taskkill', args: ['/PID', String(pid), '/T', '/F'] } : undefined;
+}

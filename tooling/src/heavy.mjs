@@ -2,12 +2,12 @@
 // The lock lives in the OS temp folder, so it is shared by every worktree and session.
 // A heavy command started inside one that holds the lock for it (`pnpm heavy pnpm journeys`: the journeys take the
 // lock once per size) runs at once: waiting would wait for itself (deadlock seen on 18 Oct).
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { freemem } from 'node:os';
-import { HEAVY_HOLDER_ENV, acquireHeavyLock, heldForUs, isProcessAlive, workersFor } from './heavy-lock.mjs';
+import { HEAVY_HOLDER_ENV, acquireHeavyLock, heldForUs, isProcessAlive, treeKill, workersFor } from './heavy-lock.mjs';
 
 const LOCK_PATH = join(tmpdir(), 'cold-reserve-heavy.lock');
 const POLL_MS = 5_000;
@@ -31,7 +31,11 @@ const options = { pid: process.pid, now: Date.now, isAlive: isProcessAlive, stal
 function run(release, holder) {
   // The workers fit the free memory when the step starts (O7): 2 with more than 4 GB free, else 1.
   const child = spawn(command, { stdio: 'inherit', shell: true, env: { ...process.env, ...workersFor(freemem(), process.env), [HEAVY_HOLDER_ENV]: holder } });
-  const forward = (/** @type {NodeJS.Signals} */ signal) => child.kill(signal);
+  const forward = (/** @type {NodeJS.Signals} */ signal) => {
+    const tree = child.pid === undefined ? undefined : treeKill(process.platform, child.pid);
+    if (tree === undefined) child.kill(signal);
+    else spawnSync(tree.command, tree.args, { stdio: 'ignore' });
+  };
   process.on('SIGINT', forward);
   process.on('SIGTERM', forward);
   child.on('error', (error) => {

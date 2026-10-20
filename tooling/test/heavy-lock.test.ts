@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { HEAVY_HOLDER_ENV, acquireHeavyLock, heldForUs } from '../src/heavy-lock.mjs';
+import { HEAVY_HOLDER_ENV, acquireHeavyLock, heldForUs, treeKill } from '../src/heavy-lock.mjs';
 
 let dir: string;
 let lockPath: string;
@@ -95,6 +95,17 @@ describe('a heavy step inside a heavy step (18 Oct: `pnpm heavy pnpm journeys` w
     expect(heldForUs(lockPath, { [HEAVY_HOLDER_ENV]: '200' })).toBe(false);
     expect(heldForUs(lockPath, {})).toBe(false);
     expect(heldForUs(lockPath, { [HEAVY_HOLDER_ENV]: 'x' })).toBe(false);
+  });
+});
+
+describe('stopping a heavy step (20 Oct: Chrome left behind on Windows)', () => {
+  it('on Windows stops the whole process tree with taskkill, not only the shell', () => {
+    expect(treeKill('win32', 4242)).toEqual({ command: 'taskkill', args: ['/PID', '4242', '/T', '/F'] });
+  });
+
+  it('elsewhere leaves the signal to the child, which the shell passes on', () => {
+    expect(treeKill('linux', 4242)).toBeUndefined();
+    expect(treeKill('darwin', 4242)).toBeUndefined();
   });
 });
 
