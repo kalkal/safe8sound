@@ -84,12 +84,12 @@
       "tokenTtlS": 3600,
       "limits": {
         "dev": {
-          "turnsPerCodePerDay": 20,
-          "turnsGlobalPerDay": 30,
-          "toolCallsPerCodePerDay": 20,
-          "readCallsPerCodePerDay": 200,
-          "readCallsGlobalPerDay": 2000,
-          "demoCallsPerCodePerDay": 150,
+          "turnsPerCodePerDay": 60,
+          "turnsGlobalPerDay": 100,
+          "toolCallsPerCodePerDay": 60,
+          "readCallsPerCodePerDay": 1000,
+          "readCallsGlobalPerDay": 5000,
+          "demoCallsPerCodePerDay": 500,
           "codeAttemptsPerIpPerHour": 10,
           "speechCharsPerCodePerDay": 6000,
           "speechCharsGlobalPerDay": 30000,
