@@ -14,7 +14,7 @@ import {
   type SandboxSettings,
   type SetScenarioInput,
 } from '@cold-reserve/contracts';
-import type { Clock, Logger, StateStoreFactory } from '@cold-reserve/core';
+import { playedHousehold, type Clock, type Logger, type StateStoreFactory } from '@cold-reserve/core';
 import { z } from 'zod';
 import type { CapabilityModule } from '../registry.js';
 import { homeDetail, isSandbox } from '../sandbox-log.js';
@@ -48,10 +48,11 @@ const CHOICES = ['scenarioId', 'locationId', 'units', 'household'] as const;
 
 const notHere = (): ErrorEnvelope => toolError('home_not_allowed', 'Only a visitor sandbox has demo settings.');
 
-/** Every value, said: the model repeats the summary, so it must carry each number and choice (F7). */
+/** Every value, said: the model repeats the summary, so it must carry each number and choice (F7). Who is at home as the
+ * sandbox plays it (core's playedHousehold): a saved 'older-woman' is the older man (20 Oct). */
 function describe(settings: SandboxSettings, place: PlaceView | undefined): string {
   const where = place === undefined ? settings.locationId : `${place.label} (${place.tz})`;
-  return `Scenario ${settings.scenarioId} in ${where}, temperatures in °${settings.units}, at home: ${settings.household}; settings version ${String(settings.version)}.`;
+  return `Scenario ${settings.scenarioId} in ${where}, temperatures in °${settings.units}, at home: ${playedHousehold(settings.household)}; settings version ${String(settings.version)}.`;
 }
 
 export function demoSettingsModule(deps: DemoSettingsDeps): CapabilityModule {

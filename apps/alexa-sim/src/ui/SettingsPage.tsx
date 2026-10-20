@@ -102,7 +102,7 @@ function WhoWeProtect({ household }: { household: Household | undefined }) {
       <h3 id={titleId}>{t('settings.protect.title')}</h3>
       <ul>
         <li>
-          <Avatar kind={face.avatar} className="settings-avatar" />
+          <Avatar kind={face.avatar} className="settings-avatar" decorative />
           <span>{t(face.who)}</span>
         </li>
         <li>

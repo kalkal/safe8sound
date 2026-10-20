@@ -74,8 +74,8 @@ function Home() {
  * One person's avatar on its disc, sized by the caller through `className`. A person sits beside their name, so
  * screen readers skip it; the house has no name beside it and says what it means ("No one at risk at home").
  */
-export function Avatar({ kind, className }: { kind: AvatarKind; className?: string }) {
-  const label = kind === 'home' ? { role: 'img', 'aria-label': t('avatar.home') } : { 'aria-hidden': true };
+export function Avatar({ kind, className, decorative = false }: { kind: AvatarKind; className?: string; /** The text beside it says the same: hidden from screen readers even for the house. */ decorative?: boolean }) {
+  const label = kind === 'home' && !decorative ? { role: 'img', 'aria-label': t('avatar.home') } : { 'aria-hidden': true };
   return (
     <svg className={className === undefined ? 'avatar' : `avatar ${className}`} data-avatar={kind} viewBox="0 0 64 64" focusable="false" {...label}>
       <path d={DISC} className="avatar-disc" />

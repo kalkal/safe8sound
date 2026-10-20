@@ -76,6 +76,20 @@ test('after Speak the question box is off and says "Listening…"; in Follow Up 
   await expect(page.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled();
 });
 
+test('in Follow Up an example picked closes the mic and fills the box, as typing does (review of #469)', async ({ page }) => {
+  await page.getByRole('button', { name: 'Speak', exact: true }).click();
+  expect(await speak(page, "What's my battery level?")).toBe(true);
+  await expect(page.getByTestId('battery-soc')).toHaveText('78%');
+  await voice(page, (d) => {
+    d.startAudio();
+    d.finishAudio();
+  });
+  await expect(page.getByRole('button', { name: 'Stop listening' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('group', { name: 'Example questions' }).getByRole('button').first().click();
+  await expect(page.getByRole('button', { name: 'Speak', exact: true })).toBeEnabled();
+  await expect(page.getByLabel('Ask a question')).not.toHaveValue('');
+});
+
 test('voice and touch together: a hot-day plan asked by voice is applied by touch in its card', async ({ page }) => {
   await page.getByRole('button', { name: 'Speak', exact: true }).click();
   await speak(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");

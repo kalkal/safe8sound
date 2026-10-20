@@ -81,3 +81,12 @@ describe('Avatar', () => {
     }
   });
 });
+
+describe('Avatar beside a text that says the same', () => {
+  it('the house is hidden from screen readers when it is decorative (Who we protect says "No one at risk at home")', () => {
+    const svg = render(<Avatar kind="home" decorative />).container.querySelector('svg');
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    expect(svg?.hasAttribute('role')).toBe(false);
+    expect(svg?.hasAttribute('aria-label')).toBe(false);
+  });
+});

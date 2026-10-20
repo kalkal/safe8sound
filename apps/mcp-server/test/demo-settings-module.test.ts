@@ -169,3 +169,16 @@ describe('set_scenario', () => {
     expect(stored.ok && SandboxSettingsSchema.safeParse(stored.value).success).toBe(true);
   });
 });
+
+describe('the summaries the model reads', () => {
+  it('say who is at home as the sandbox plays it: a saved older-woman is the older man, never "older-woman" (20 Oct)', async () => {
+    const { set, get } = setup();
+    const saved = await set.handler({ household: 'older-woman' }, ctx(A));
+    if (!saved.ok) throw new Error(saved.error.message);
+    expect(set.summarize?.(saved.value, ctx(A))).toContain('at home: older-man');
+    expect(set.summarize?.(saved.value, ctx(A))).not.toContain('older-woman');
+    const read = await get.handler({}, ctx(A));
+    if (!read.ok) throw new Error(read.error.message);
+    expect(get.summarize?.(read.value, ctx(A))).toContain('at home: older-man');
+  });
+});

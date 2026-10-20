@@ -92,6 +92,8 @@ describe('the settings page', () => {
     const people = within(screen.getByRole('region', { name: 'Who we protect' })).getAllByRole('listitem');
     expect(people.map((p) => p.textContent)).toEqual(['No one at risk at home: the home keeps everyone comfortable', 'Ana, daughter, gets the alerts on her phone']);
     expect(people.map((p) => p.querySelector('svg')?.getAttribute('data-avatar'))).toEqual(['home', 'adult-woman']);
+    // The line beside it says the same: the house is not read out twice.
+    expect(people[0]?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('holds only the person\'s own settings, never a demo control, and says where they are saved', () => {
