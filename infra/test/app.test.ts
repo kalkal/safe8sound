@@ -7,6 +7,8 @@ import { InfraConfigSchema, applyGuardrails, buildApp, loadInfraConfig, simApiAg
 import { SITE_DIR, exampleConfig } from './fixtures.js';
 
 const config: InfraConfig = exampleConfig();
+/** #474: dev's limits on the recording days, over the fixture's caps; restored after 23 Oct. */
+const RECORDING_DAYS_DEV = { turnsPerCodePerDay: 60, toolCallsPerCodePerDay: 60, turnsGlobalPerDay: 100, readCallsPerCodePerDay: 1000, readCallsGlobalPerDay: 5000, demoCallsPerCodePerDay: 500 };
 // Bundling the Lambda is left to `pnpm synth`; tests synthesize the templates only.
 const newApp = () => new App({ context: { 'aws:cdk:bundling-stacks': [] } });
 
@@ -28,7 +30,10 @@ describe('loadInfraConfig (region and stages always from config)', () => {
     const loaded = loadInfraConfig((key) => cdk.context[key]);
     if (!loaded.ok) throw new Error('cdk.json is not valid');
     const { simApi, warmup, alexa } = loaded.value;
-    expect(simApi.limits).toEqual(config.simApi.limits);
+    // #474 (owner, 20 Oct): dev's daily limits raised for the recording days (21-22 Oct), to be restored to the
+    // fixture's after 23 Oct; only turns reach the model, and the budget action is unchanged. Demo is untouched.
+    expect(simApi.limits.dev).toEqual({ ...config.simApi.limits.dev, ...RECORDING_DAYS_DEV });
+    expect(simApi.limits.demo).toEqual(config.simApi.limits.demo);
     expect(simApi.codeLimits).toEqual(config.simApi.codeLimits);
     // #445 (owner, 18 Oct): 300 turns a day for the judges' code, and 20 for the owner's on top.
     expect(simApi.limits.demo).toMatchObject({ turnsPerCodePerDay: 300, toolCallsPerCodePerDay: 300, turnsGlobalPerDay: 320 });
