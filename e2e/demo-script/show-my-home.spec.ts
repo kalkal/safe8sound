@@ -28,8 +28,8 @@ for (const width of [375, 1280]) {
     await expect(region.getByRole('list', { name: 'Energy' }).getByRole('listitem')).toHaveText(['Battery 78%', 'Solar 3.2 kW', 'Grid: sending 1.1 kW', 'Level: Comfort (weather)']);
     // The rooms are the home card's page 2 (pages instead of scrolling, owner 10 Oct).
     await toCardPage(home, 2);
-    await expect(region.getByRole('listitem', { name: 'Bedroom 1' })).toContainText('Served');
-    await expect(region.getByRole('listitem', { name: 'Bedroom 2' })).toContainText('Waiting: switched off by you');
+    await expect(region.getByRole('listitem', { name: "Leo's room" })).toContainText('Served');
+    await expect(region.getByRole('listitem', { name: 'Second bedroom' })).toContainText('Waiting: switched off by you');
 
     // A plan applied by touch in its card: the second bedroom is pre-cooled too.
     await ask(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
@@ -37,7 +37,7 @@ for (const width of [375, 1280]) {
     await page.frameLocator('iframe[title="Plan card"]').getByRole('button', { name: 'Apply plan' }).click();
     await showMyHome(page);
     await toCardPage(homeCard(page), 2);
-    await expect(homeCard(page).getByRole('listitem', { name: 'Bedroom 2' })).toContainText('Served');
+    await expect(homeCard(page).getByRole('listitem', { name: 'Second bedroom' })).toContainText('Served');
 
     // The storm: the grid is down, the other rooms wait for the level.
     await ask(page, "The power's out");

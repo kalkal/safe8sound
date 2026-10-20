@@ -23,7 +23,7 @@ export const PHONE_FIXTURE_NAMES = Object.keys(PHONE_FIXTURES) as [PhoneFixture,
 export function phoneMessage(name: PhoneFixture): InboxMessage {
   const f: { transition: SendableTransition; at: string; tempC: number; safeUntil?: string; powerBackAt?: string } = PHONE_FIXTURES[name];
   const text = stormMessage('en-US', f.transition, NAME, {
-    roomName: 'Bedroom',
+    roomName: "Leo's room",
     tempC: f.tempC,
     atMs: ms(f.at),
     timeZone: ZONE,

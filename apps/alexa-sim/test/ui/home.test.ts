@@ -1,6 +1,7 @@
 import { HomeStatusSchema } from '@cold-reserve/contracts';
 import { hotDayPlan, homeCalm, homeInStorm, safeRoomCalm, safeRoomInStorm } from '@cold-reserve/ui-cards';
 import { describe, expect, it } from 'vitest';
+import { withDemoHomeNames } from '../../src/agent/script-fixtures.js';
 import type { CardSlot } from '../../src/agent/wire.js';
 import type { Agent } from '../../src/agent/agent.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from '../../src/ui/home.js';
@@ -14,7 +15,7 @@ const calm: CardSlot = { tool: 'get_safe_room_status', result: { ...safeRoomCalm
 
 describe('homeFor', () => {
   it('starts on the calm scripted home, and on nothing in remote mode', () => {
-    expect(initialHome('scripted')).toEqual(homeCalm());
+    expect(initialHome('scripted')).toEqual(withDemoHomeNames(homeCalm()));
     expect(initialHome('remote')).toBeUndefined();
   });
 
@@ -25,8 +26,8 @@ describe('homeFor', () => {
   });
 
   it('scripted: the storm turns the home to the storm home, power back to the calm one', () => {
-    expect(homeFor([storm], homeCalm(), 'scripted')).toEqual(homeInStorm());
-    expect(homeFor([calm], homeInStorm(), 'scripted')).toEqual(homeCalm());
+    expect(homeFor([storm], homeCalm(), 'scripted')).toEqual(withDemoHomeNames(homeInStorm()));
+    expect(homeFor([calm], homeInStorm(), 'scripted')).toEqual(withDemoHomeNames(homeCalm()));
   });
 
   it('remote: no fixture ever replaces what the home really said', () => {
@@ -42,6 +43,20 @@ describe('homeFor', () => {
     const after = homeAfterApply(homeCalm(), 'scripted');
     expect(after?.rooms.find((r) => r.roomId === 'bedroom-2')?.state).toBe('served');
     expect(homeAfterApply(homeCalm(), 'remote')).toEqual(homeCalm());
+  });
+
+  it("scripted: every room of the home panel has the demo home's name, before and after a plan, in calm and in the storm (#422)", () => {
+    const names = (h: ReturnType<typeof initialHome>) => h?.rooms.map((r) => [r.roomId, r.name]);
+    const expected = [
+      ['bedroom-1', "Leo's room"],
+      ['bedroom-2', 'Second bedroom'],
+      ['living', 'Living room'],
+      ['study', 'Study'],
+    ];
+    const calmHome = initialHome('scripted');
+    expect(names(calmHome)).toEqual(expected);
+    expect(names(homeAfterApply(calmHome, 'scripted'))).toEqual(expected);
+    expect(names(homeFor([storm], calmHome, 'scripted'))).toEqual(expected);
   });
 });
 

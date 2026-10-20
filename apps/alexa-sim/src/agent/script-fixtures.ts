@@ -1,4 +1,4 @@
-import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences, type Plan } from '@cold-reserve/contracts';
+import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPublicPreferences, type HomeStatus } from '@cold-reserve/contracts';
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import { homeInStorm, hotDayPlan, lastResortBatteryPlan, lastResortPlan, planThatHolds, safeRoomBatteryFirst, safeRoomCalm, safeRoomInStorm, stormPlan, surplusPlan } from '@cold-reserve/ui-cards';
 import { ToolCardSchema, type ToolCard } from './wire.js';
@@ -7,17 +7,47 @@ import { ToolCardSchema, type ToolCard } from './wire.js';
 // card tests use. The script file names them; it never embeds a plan by hand. Every fixture is parsed by
 // the same schema as a remote result, so the script can never show what the contracts refuse.
 
-const card = (value: unknown): ToolCard => ToolCardSchema.parse(value);
+/**
+ * The demo home's display names (as its profile has them), on every room a scripted card shows, so the card says "Leo's
+ * room" and never a name made from the id, "Bedroom 1" (#422): the scripted home is the invented one, never the real home.
+ */
+const DEMO_ROOM_NAMES: Readonly<Record<string, string>> = { 'bedroom-1': "Leo's room", 'bedroom-2': 'Second bedroom', study: 'Study', living: 'Living room' };
+const named = <T extends { readonly roomId: string; readonly name?: string | undefined }>(room: T): T => {
+  const name = DEMO_ROOM_NAMES[room.roomId];
+  return name === undefined ? room : { ...room, name };
+};
+/** The scripted home panel's status (calm, in the storm): its rooms named like the cards', the one place for the names. */
+export const withDemoHomeNames = (home: HomeStatus): HomeStatus => ({ ...home, rooms: home.rooms.map(named) });
+const withDemoRoomNames = (parsed: ToolCard): ToolCard => {
+  switch (parsed.tool) {
+    case 'get_safe_room_status': {
+      const name = DEMO_ROOM_NAMES[parsed.result.safeRoomId];
+      return name === undefined ? parsed : { ...parsed, result: { ...parsed.result, safeRoomName: name } };
+    }
+    case 'get_home_status':
+      return { ...parsed, result: { ...parsed.result, rooms: parsed.result.rooms.map(named) } };
+    case 'get_preferences':
+      // The settings name the safe room choices by these (#422), as the server's get_preferences does.
+      return {
+        ...parsed,
+        result: {
+          ...parsed.result,
+          rooms: parsed.result.preferences.roomPriority.flatMap((id) => {
+            const name = DEMO_ROOM_NAMES[id];
+            return name === undefined ? [] : [{ id, name }];
+          }),
+        },
+      };
+    case 'plan_comfort':
+      return 'surplus' in parsed.result && parsed.result.surplus !== undefined
+        ? { ...parsed, result: { ...parsed.result, surplus: { ...parsed.result.surplus, rooms: parsed.result.surplus.rooms.map(named) } } }
+        : parsed;
+    default:
+      return parsed;
+  }
+};
 
-/** The demo home's display names (as its profile has them) on the surplus rooms, so the card says "Leo's room" (#422). */
-const DEMO_ROOM_NAMES: Readonly<Record<string, string>> = { 'bedroom-1': "Leo's room", living: 'Living room' };
-const withDemoRoomNames = (plan: Plan): Plan =>
-  plan.surplus === undefined
-    ? plan
-    : { ...plan, surplus: { ...plan.surplus, rooms: plan.surplus.rooms.map((r) => {
-          const name = DEMO_ROOM_NAMES[r.roomId];
-          return name === undefined ? r : { ...r, name };
-        }) } };
+const card = (value: unknown): ToolCard => withDemoRoomNames(ToolCardSchema.parse(value));
 
 /** The calm safe room of the demo home as its profile names it (#432 S6: the idle tile says "Leo's room", never "Bedroom 1"). */
 export const demoSafeRoom = () => ({ ...safeRoomCalm(), safeRoomName: DEMO_ROOM_NAMES['bedroom-1'] ?? 'bedroom-1', people: [{ role: 'grandpa', name: 'Leo' }] });
@@ -35,7 +65,7 @@ export const SCRIPT_FIXTURES = {
   /** The model proposed too much (#186, scene 2b): the guard refused it, and the answer is the plan that holds (#202). */
   /** An ordinary sunny afternoon (#227, video scene 2a): where the solar surplus went instead of the grid. */
   // The demo home's own room names (#422): the scripted home is the invented one with the grandpa Leo, never the real home.
-  'daily-routing': () => card({ tool: 'plan_comfort', result: withDemoRoomNames(surplusPlan()) }),
+  'daily-routing': () => card({ tool: 'plan_comfort', result: surplusPlan() }),
   'plan-that-holds': () => card({ tool: 'plan_comfort', result: planThatHolds() }),
   /** A last resort (#160): the night limit cannot hold; the plan says until when, and how warm after. */
   'last-resort-plan': () => card({ tool: 'plan_comfort', result: lastResortPlan() }),

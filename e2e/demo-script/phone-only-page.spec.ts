@@ -9,7 +9,7 @@ const storm = {
   role: 'daughter',
   channel: 'in_app',
   transition: 'storm_started',
-  text: 'Safe-8-Sound alert for Ana: a storm cut the power at home. Bedroom 1 is at 26.8 °C and the battery keeps it safe until 06:40. No action is needed now.',
+  text: "Safe-8-Sound alert for Ana: a storm cut the power at home. Leo's room is at 26.8 °C and the battery keeps it safe until 06:40. No action is needed now.",
 };
 
 test('?view=phone shows only the phone with the inbox messages, says what it is, and has no question box', async ({ page }) => {

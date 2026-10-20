@@ -34,7 +34,7 @@ test('open the settings, change the comfort, refuse a looser maximum, choose ano
   const other = rooms.getByRole('radio', { name: 'Living' });
   await other.check();
   await expect(other).toBeChecked();
-  await expect(rooms.getByRole('radio', { name: 'Bedroom 1' })).not.toBeChecked();
+  await expect(rooms.getByRole('radio', { name: "Leo's room" })).not.toBeChecked();
 
   // One Save writes the draft; afterwards there is nothing left to save and the values stay.
   const save = section.getByRole('button', { name: 'Save' });

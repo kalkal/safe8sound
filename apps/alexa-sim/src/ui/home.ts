@@ -1,6 +1,7 @@
 import { HomeStatusSchema, err, ok, toolError, type ErrorEnvelope, type HomeStatus, type Result } from '@cold-reserve/contracts';
 import { homeCalm, homeInStorm } from '@cold-reserve/ui-cards';
 import type { Agent, AskContext } from '../agent/agent.js';
+import { withDemoHomeNames } from '../agent/script-fixtures.js';
 import type { CardSlot } from '../agent/wire.js';
 import { log as defaultLog, type Log } from '../log.js';
 
@@ -11,7 +12,7 @@ import { log as defaultLog, type Log } from '../log.js';
 export type HomeMode = 'scripted' | 'remote';
 
 export function initialHome(mode: HomeMode): HomeStatus | undefined {
-  return mode === 'scripted' ? homeCalm() : undefined;
+  return mode === 'scripted' ? withDemoHomeNames(homeCalm()) : undefined;
 }
 
 export function homeFor(cards: readonly CardSlot[], previous: HomeStatus | undefined, mode: HomeMode): HomeStatus | undefined {
@@ -19,9 +20,9 @@ export function homeFor(cards: readonly CardSlot[], previous: HomeStatus | undef
   if (reported?.tool === 'get_home_status') return reported.result;
   if (mode === 'remote') return previous;
   for (const card of cards) {
-    if (card.tool === 'get_safe_room_status' && card.result.stormPhase === 'active') return homeInStorm();
-    if (card.tool === 'plan_comfort' && 'id' in card.result && card.result.gridAvailable === false) return homeInStorm();
-    if (card.tool === 'get_safe_room_status' && card.result.stormPhase === 'ended') return homeCalm();
+    if (card.tool === 'get_safe_room_status' && card.result.stormPhase === 'active') return withDemoHomeNames(homeInStorm());
+    if (card.tool === 'plan_comfort' && 'id' in card.result && card.result.gridAvailable === false) return withDemoHomeNames(homeInStorm());
+    if (card.tool === 'get_safe_room_status' && card.result.stormPhase === 'ended') return withDemoHomeNames(homeCalm());
   }
   return previous;
 }
@@ -31,7 +32,11 @@ export function homeAfterApply(previous: HomeStatus | undefined, mode: HomeMode)
   if (mode === 'remote' || previous === undefined || !previous.gridAvailable) return previous;
   return {
     ...previous,
-    rooms: previous.rooms.map((r) => (r.roomId === 'bedroom-2' ? { roomId: r.roomId, tempC: r.tempC, ...(r.humidityPct === undefined ? {} : { humidityPct: r.humidityPct }), occupants: r.occupants, state: 'served' as const } : r)),
+    rooms: previous.rooms.map((r) =>
+      r.roomId === 'bedroom-2'
+        ? { roomId: r.roomId, ...(r.name === undefined ? {} : { name: r.name }), tempC: r.tempC, ...(r.humidityPct === undefined ? {} : { humidityPct: r.humidityPct }), occupants: r.occupants, state: 'served' as const }
+        : r,
+    ),
   };
 }
 

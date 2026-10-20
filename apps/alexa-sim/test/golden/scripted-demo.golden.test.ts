@@ -33,7 +33,7 @@ describe('golden: the scripted demo', () => {
     const it_IT = (name: (typeof PHONE_FIXTURE_NAMES)[number]) => {
       const f: { transition: SendableTransition; at: string; tempC: number; safeUntil?: string; powerBackAt?: string } = PHONE_FIXTURES[name];
       const text = stormMessage('it-IT', f.transition, 'Ana', {
-        roomName: 'Bedroom',
+        roomName: "Leo's room",
         tempC: f.tempC,
         atMs: Date.parse(f.at),
         timeZone: 'Europe/Rome',

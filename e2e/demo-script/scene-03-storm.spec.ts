@@ -23,7 +23,7 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
 
   await ask(page, "The power's out");
   const safeRoom = page.frameLocator('iframe[title="Safe room card"]');
-  const card = safeRoom.getByRole('region', { name: 'Safe room · Bedroom 1' });
+  const card = safeRoom.getByRole('region', { name: "Safe room · Leo's room" });
   await expect(card.getByText('Comfortable at least until')).toBeVisible();
   await expect(card.getByTestId('safe-until')).toHaveText('06:40');
   await expect(card.getByRole('alert')).toContainText('Storm mode · the grid is down');
@@ -36,7 +36,7 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   const home = homeFrame.getByRole('region', { name: 'The home right now' });
   await expect(home.getByText('Grid down: the battery feeds the safe room only.')).toBeVisible();
   await toCardPage(homeFrame, 2);
-  await expect(home.getByRole('listitem', { name: 'Bedroom 1' })).toContainText('Served');
+  await expect(home.getByRole('listitem', { name: "Leo's room" })).toContainText('Served');
   await expect(home.getByRole('listitem', { name: 'Living' })).toContainText('Waiting: the level cools fewer rooms right now');
   await expect(phone.getByRole('article', { name: 'Power outage (storm) at home' })).toContainText('keeps it safe until');
   await expect(whenTold).toHaveCount(0);
