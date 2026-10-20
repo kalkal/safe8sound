@@ -13,6 +13,7 @@ export const itIT = {
   'sim.title': '{product} · componente aggiuntivo Alexa+ simulato',
   'chat.label': 'Fai una domanda',
   'chat.hint': 'Chiedi della batteria di casa, di una giornata calda o di un blackout. Oppure scegli un esempio:',
+  'chat.hintBeforeStart': 'Inserisci il codice demo qui sotto, poi chiedi della batteria di casa, di una giornata calda o di un blackout.',
   'examples.label': 'Domande di esempio',
   'examples.trySaying': 'Prova a dire:',
   'examples.battery': 'Livello della batteria',

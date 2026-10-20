@@ -11,6 +11,8 @@ export const enUS = {
   'chat.label': 'Ask a question',
   // The first screen explains itself (guided test, 3/10): what to ask, and three examples that only fill the field.
   'chat.hint': 'Ask about your home battery, a hot day or a power cut. Or pick an example:',
+  // Before Start the examples are not there yet: the demo code comes first (owner, 20 Oct).
+  'chat.hintBeforeStart': 'Enter the demo code below, then ask about your home battery, a hot day or a power cut.',
   'examples.label': 'Example questions',
   // Three bands (owner, 10 Oct): the actions band starts with what to say.
   'examples.trySaying': 'Try saying:',

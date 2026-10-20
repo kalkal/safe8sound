@@ -142,8 +142,12 @@
         calc(100vw - var(--stage-pad) * 2 - var(--phone-w) - var(--phone-gap) - var(--bezel) * 2),
         80rem
       );
+      /* The device column is as wide as the device, never wider: the window's spare width goes to both sides of the
+         device and the phone, which stand as one group in the middle (owner, 20 Oct: the Echo off to the left before
+         Start, with an empty band beside it). */
+      --device-w: calc(var(--screen-w) + var(--bezel) * 2 + var(--border-thin) * 2);
 
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-columns: var(--device-w);
       grid-template-areas:
         "top"
         "device"
@@ -156,7 +160,14 @@
       padding: var(--stage-pad);
     }
 
-    /* The top bar and the row under the device take the width the device and the phone give, never more. */
+    /* The top bar and the row under the device keep the window's width (less its padding), centred on it, whatever the
+       device column is (--device-w): never more, so their content never widens the grid, and never squeezed to the
+       device and the phone on a short window, where the clock and the question field need the room (review of #466). */
+    .echo-stage > :is(.echo-top, .echo-under) {
+      justify-self: center;
+      inline-size: calc(100vw - var(--stage-pad) * 2);
+    }
+
     .echo-stage > .echo-top {
       grid-area: top;
       padding: 0;
@@ -212,7 +223,7 @@
       --phone-w: clamp(12rem, 21vw, 22rem);
       --phone-gap: var(--space-3);
 
-      grid-template-columns: minmax(0, 1fr) var(--phone-w);
+      grid-template-columns: var(--device-w) var(--phone-w);
       grid-template-areas:
         "top top"
         "device phone"
@@ -529,7 +540,7 @@
       80rem
     );
 
-    grid-template-columns: var(--controls-w) minmax(0, 1fr) var(--phone-w);
+    grid-template-columns: var(--controls-w) var(--device-w) var(--phone-w);
     grid-template-areas:
       "top top top"
       "controls device phone"

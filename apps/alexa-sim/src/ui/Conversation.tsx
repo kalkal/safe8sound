@@ -274,6 +274,9 @@ export function Conversation({
   const pageShown = pageView !== undefined && pageView !== null && !busy;
   // Nothing asked yet, or Back from the first answer (idea 5): the content band explains what to ask.
   const firstScreen = !busy && !pageShown && shownTurn === undefined && (history.turns.length > 0 || !snapshot.matches('speaking'));
+  // Before Start (remote mode without a token) the bar holds the demo code gate, not the examples: the first line says
+  // what to do first and never points to examples that are not there (owner, 20 Oct).
+  const gated = session !== undefined && token === undefined;
   const step = (delta: 1 | -1) => {
     setHistory((previous) => stepAnswer(previous, delta));
   };
@@ -376,7 +379,7 @@ export function Conversation({
           )}
         </div>
       )}
-        {session !== undefined && token === undefined ? (
+        {gated ? (
           <DemoCodeGate session={session} />
         ) : (
         <form className="ask band-actions" data-slot="actions" data-testid="slot-actions" onSubmit={onSubmit}>
@@ -533,7 +536,7 @@ export function Conversation({
         {pageShown && pageView}
         {firstScreen && (
           <p className="welcome" data-testid="welcome-hint">
-            {greeting ?? t('chat.hint')}
+            {greeting ?? t(gated ? 'chat.hintBeforeStart' : 'chat.hint')}
           </p>
         )}
         {firstScreen && idle}
