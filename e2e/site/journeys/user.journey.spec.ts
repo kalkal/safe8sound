@@ -103,7 +103,7 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
 
   test('A3. a hot day: a plan, said and shown with the same numbers, applied on a tap', { tag: '@outcome:O2' }, async () => {
     await world.live('heatwave', 'reference');
-    await ask(page, "It's going to be 36 degrees tomorrow, keep Grandpa cool.");
+    await ask(page, "It's going to be 36 degrees tomorrow, keep Leo cool.");
     await expectFakeModelSays(ui.answerText, 'Shall I apply it?');
     const card = page.locator('iframe[title="Plan card"]').last().contentFrame();
     const plan = card.getByRole('region', { name: 'Plan' });

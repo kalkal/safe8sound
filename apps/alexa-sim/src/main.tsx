@@ -256,6 +256,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // Scripted mode: the scenario decides (its home starts calm whatever the scenario) until an answer says what the
   // home is (a storm starting, or the power coming back); that answer then wins (review of #301).
   const homeState = {
+    named: homeFace.named,
     ...(demoSettings === undefined ? {} : { scenarioId: demoSettings.scenarioId }),
     ...(home === undefined || (homeMode !== 'remote' && !homeTold) ? {} : { gridAvailable: home.gridAvailable }),
   };

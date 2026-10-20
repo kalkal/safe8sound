@@ -18,8 +18,8 @@
     },
     {
       "id": "hot-day-plan",
-      "patterns": ["36 degrees", "hot tomorrow", "heatwave", "hot day", "keep grandpa"],
-      "text": "Tomorrow hits 36. I'll pre-cool the bedroom with solar and keep 6 kWh for storms. Shall I apply it?",
+      "patterns": ["36 degrees", "hot tomorrow", "heatwave", "hot day", "keep grandpa", "keep leo", "keep the home comfortable"],
+      "text": "Today hits 36. I'll pre-cool Leo's room with solar and keep 6 kWh for storms. Shall I apply it?",
       "withStatus": false,
       "cards": [
         {
@@ -121,7 +121,7 @@
     {
       "id": "storm-start",
       "patterns": ["power is out", "power s out", "power cut", "blackout", "storm is here"],
-      "text": "Power's out. I've switched to the safe room: the bedroom is at 26.8 degrees, comfortable at least until 6:40, and I've let your daughter know.",
+      "text": "Power's out. I've switched to the safe room: Leo's room is at 26.8 degrees, comfortable at least until 06:40, and I've let your daughter know.",
       "withStatus": false,
       "cards": [
         { "tool": "get_safe_room_status", "fixture": "safe-room-storm" },
@@ -132,8 +132,8 @@
     },
     {
       "id": "safe-room",
-      "patterns": ["how is grandpa", "how s grandpa", "is grandpa safe", "is leo safe", "how is leo", "leo sta bene", "safe room"],
-      "text": "Grandpa is in his bedroom at 26.8 degrees. The battery keeps it comfortable at least until 6:40.",
+      "patterns": ["how is grandpa", "how s grandpa", "is grandpa safe", "is leo safe", "how is leo", "leo sta bene", "is everyone safe", "safe room"],
+      "text": "Leo's room is at 26.8 degrees. The battery keeps it comfortable at least until 06:40.",
       "withStatus": false,
       "cards": [{ "tool": "get_safe_room_status", "fixture": "safe-room-storm" }]
     },

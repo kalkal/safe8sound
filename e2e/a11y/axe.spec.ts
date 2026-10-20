@@ -35,7 +35,7 @@ for (const theme of ['dark', 'light'] as const) {
     });
 
     test('the hot-day plan with its guard receipt', async ({ page }) => {
-      await ask(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.", 'Plan card');
+      await ask(page, "It's going to be 36 degrees tomorrow. Keep Leo comfortable.", 'Plan card');
       await expectNoViolations(page);
     });
 

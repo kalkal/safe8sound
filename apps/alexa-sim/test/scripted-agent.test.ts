@@ -80,7 +80,7 @@ describe('ScriptedAgent', () => {
   });
 
   it('answers the hot-day request with the plan_comfort result, a Plan the contract accepts', async () => {
-    const reply = await agent().ask("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.", ctx);
+    const reply = await agent().ask("It's going to be 36 degrees tomorrow. Keep Leo comfortable.", ctx);
     expect(reply.ok).toBe(true);
     const card = reply.ok ? reply.value.cards?.[0] : undefined;
     expect(card?.tool).toBe('plan_comfort');
@@ -147,7 +147,7 @@ describe('ScriptedAgent', () => {
     const created = createScriptedAgent(script, { degraded: true });
     if (!created.ok) throw new Error(created.error.message);
     expect(await created.value.ask('Apply the plan', ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
-    expect(await created.value.ask('Keep Grandpa comfortable, it will be 36 degrees', ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
+    expect(await created.value.ask('Keep Leo comfortable, it will be 36 degrees', ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
     expect(await created.value.ask("What's my battery level?", ctx)).toMatchObject({ ok: true, value: { status: script.status } });
   });
 });

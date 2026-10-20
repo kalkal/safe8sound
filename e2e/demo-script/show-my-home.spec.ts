@@ -32,7 +32,7 @@ for (const width of [375, 1280]) {
     await expect(region.getByRole('listitem', { name: 'Second bedroom' })).toContainText('Waiting: switched off by you');
 
     // A plan applied by touch in its card: the second bedroom is pre-cooled too.
-    await ask(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+    await ask(page, "It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
     await expect(page.getByRole('region', { name: 'My home' })).toHaveCount(0);
     await page.frameLocator('iframe[title="Plan card"]').getByRole('button', { name: 'Apply plan' }).click();
     await showMyHome(page);

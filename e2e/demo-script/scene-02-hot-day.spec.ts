@@ -8,7 +8,7 @@ import { expectVoiceMatchesCards } from '../voice-screen.js';
 
 test('scene 2: a hot day → plan card with ribbon, reserve line and receipt → Apply through the host', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
   await page.getByRole('button', { name: 'Ask' }).click();
 
   const card = page.frameLocator('iframe[title="Plan card"]');

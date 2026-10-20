@@ -17,7 +17,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
     if (theme === 'light') await page.getByRole('button', { name: 'Light theme' }).click();
-    await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+    await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
     await page.getByRole('button', { name: 'Ask', exact: true }).click();
 
     const card = page.frameLocator('iframe[title="Plan card"]');

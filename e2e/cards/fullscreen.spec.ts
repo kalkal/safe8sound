@@ -7,7 +7,7 @@ import { expect, test } from '../no-network.js';
 test('a card goes full screen on request and back with "Back to the conversation" or Escape, at 375 px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/');
-  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
   await page.getByRole('button', { name: 'Ask' }).click();
 
   const card = page.frameLocator('iframe[title="Plan card"]');
@@ -39,7 +39,7 @@ test('a card goes full screen on request and back with "Back to the conversation
 test('full screen is modal: Tab stays in the card, keyboard Enter goes in and back, Escape on the page closes it (#206 review)', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/');
-  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
   await page.getByRole('button', { name: 'Ask' }).click();
   const card = page.frameLocator('iframe[title="Plan card"]');
   const ask = page.getByLabel('Ask a question');

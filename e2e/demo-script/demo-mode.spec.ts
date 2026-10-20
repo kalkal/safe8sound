@@ -35,7 +35,7 @@ test('a tap on the page and a tap inside a card each leave a mark; the question 
       }
     }).observe(document.body, { childList: true });
   })()`);
-  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
   const ask = page.getByRole('button', { name: 'Ask' });
   const button = await ask.boundingBox();
   await ask.click();
@@ -44,7 +44,7 @@ test('a tap on the page and a tap inside a card each leave a mark; the question 
   // shift a few pixels once the answer starts, so the check allows less than a sixth of the mark).
   const markX = await page.evaluate(() => (globalThis as { __tapX?: number[] }).__tapX?.[0]);
   expect(button && markX !== undefined && Math.abs(markX - (button.x + button.width / 2))).toBeLessThan(8);
-  await expect(page.getByTestId('demo-caption')).toHaveText('You said: “It\'s going to be 36 degrees tomorrow. Keep Grandpa comfortable.”');
+  await expect(page.getByTestId('demo-caption')).toHaveText('You said: “It\'s going to be 36 degrees tomorrow. Keep Leo comfortable.”');
 
   const card = page.frameLocator('iframe[title="Plan card"]');
   // The card attaches its listener a render after it shows its button: wait for it before the tap.

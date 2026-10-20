@@ -13,7 +13,7 @@ const ask = async (page: Page, words: string) => {
   await page.getByRole('button', { name: 'Ask', exact: true }).click();
 };
 
-const HOT_DAY = "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.";
+const HOT_DAY = "It's going to be 36 degrees tomorrow. Keep Leo comfortable.";
 
 test('no Back button and no steps on the screen, at rest or with an answer', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });

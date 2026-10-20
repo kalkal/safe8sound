@@ -19,6 +19,7 @@ export const itIT = {
   'examples.battery': 'Livello della batteria',
   'examples.hotDay': 'Una giornata calda',
   'examples.safeRoom': 'Leo sta bene?',
+  'examples.everyoneSafe': 'Stanno tutti bene?',
   'examples.howLong': 'Quanto dura?',
   'examples.powerBack': 'È tornata la corrente?',
   'examples.showPlan': 'Mostra il piano',

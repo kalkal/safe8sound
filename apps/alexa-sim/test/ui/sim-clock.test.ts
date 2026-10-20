@@ -85,7 +85,7 @@ describe('isPowerCut', () => {
       'Will there be a blackout tonight?',
       'Prepare the house for a power cut',
       'What if the power goes out?',
-      'If the power is out, keep Grandpa cool',
+      'If the power is out, keep Leo cool',
       'A power cut tomorrow would be bad',
       'Se manca la corrente cosa faccio?',
       "C'è un blackout?",

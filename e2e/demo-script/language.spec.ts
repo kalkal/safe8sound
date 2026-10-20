@@ -13,7 +13,7 @@ test('Italiano changes the page and the cards, and is remembered after a reload'
   await expect(page.locator('html')).toHaveAttribute('lang', 'it');
   await page.keyboard.press('Escape');
 
-  await page.getByLabel('Fai una domanda').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await page.getByLabel('Fai una domanda').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
   await page.getByRole('button', { name: 'Chiedi' }).click();
   const card = page.frameLocator('iframe[title="Scheda del piano"]');
   await expect(card.getByRole('region', { name: 'Piano' }).getByText('Confortevole almeno fino alle')).toBeVisible();

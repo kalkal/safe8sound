@@ -5,12 +5,12 @@ import { openRemote, routeSandboxTools } from '../remote-session.js';
 import { expectScreenSettled } from '../screen-settled.js';
 import { showCard } from '../surface.js';
 
-// Owner, 12 Oct (dev site, 1920 × 1080): under "I can keep Grandpa's room under 27 degrees…", with the battery and the
+// Owner, 12 Oct (dev site, 1920 × 1080): under "I can keep Leo's room under 27 degrees…", with the battery and the
 // Preferences / Plan tabs above it, the plan's safety check was a 0.4-scale thumbnail in a large empty frame, and the
 // page itself scrolled. Every page of every card under an answer stays readable: never below the readable scale, and
 // on the large screens never cut either. Where even that does not fit (a small Echo), the card offers full screen.
 
-const OWNER_TEXT = "I can keep Grandpa's room under 27 degrees and still hold 6 kWh for a storm. Shall I start?";
+const OWNER_TEXT = "I can keep Leo's room under 27 degrees and still hold 6 kWh for a storm. Shall I start?";
 
 /** The owner's answer: the words, the battery and two cards (Preferences, Plan), as the remote agent sends it. */
 async function askAsTheOwnerDid(page: Page, italian = false): Promise<void> {
@@ -28,7 +28,7 @@ async function askAsTheOwnerDid(page: Page, italian = false): Promise<void> {
   await page.route('**/sim-api/v1/turns', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) }));
   await routeSandboxTools(page);
   await openRemote(page, italian);
-  await page.getByLabel(italian ? 'Fai una domanda' : 'Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await page.getByLabel(italian ? 'Fai una domanda' : 'Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
   await page.getByRole('button', { name: italian ? 'Chiedi' : 'Ask' }).click();
   await expect(page.getByTestId('battery-soc')).toHaveText('100%');
 }
@@ -129,7 +129,7 @@ for (const [width, height, large] of [
   test(`at ${String(width)} × ${String(height)} the scripted hot-day plan is readable on every page, its safety check included`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto('/');
-    await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+    await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
     await page.getByRole('button', { name: 'Ask' }).click();
     const card = page.frameLocator('iframe[title="Plan card"]');
     await expect(card.getByTestId('plan-horizon')).toBeVisible();

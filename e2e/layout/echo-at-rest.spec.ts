@@ -63,7 +63,7 @@ test("an answer dims the sky, shows its words large and never the person's own w
 test('a plan waiting for "Apply plan" or "Not now" never leaves the screen by itself', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
   await page.getByRole('button', { name: 'Ask', exact: true }).click();
   await expect(page.frameLocator('iframe[title="Plan card"]').getByRole('button', { name: 'Apply plan' })).toBeVisible();
   await page.clock.fastForward(5 * 60_000);

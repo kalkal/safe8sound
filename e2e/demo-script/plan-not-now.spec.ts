@@ -25,7 +25,7 @@ async function recordCardMessages(page: Page): Promise<void> {
 const cardMethods = (page: Page) => page.evaluate(() => (globalThis as unknown as { cardMethods: string[] }).cardMethods);
 
 for (const { name, question, apply } of [
-  { name: 'a hot-day plan', question: "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.", apply: 'Apply plan' },
+  { name: 'a hot-day plan', question: "It's going to be 36 degrees tomorrow. Keep Leo comfortable.", apply: 'Apply plan' },
   { name: 'a last resort', question: 'Last resort for a hot night', apply: 'Apply the last-resort plan' },
 ]) {
   test(`"Not now" on ${name}: the card says the plan was not applied, and no tool is called`, async ({ page }) => {
@@ -67,7 +67,7 @@ for (const [width, height] of [
   test(`at ${String(width)} × ${String(height)} the folded plan line and its badge stay inside the frame`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto('/');
-    await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+    await page.getByLabel('Ask a question').fill("It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
     await page.getByRole('button', { name: 'Ask' }).click();
     const card = page.frameLocator('iframe[title="Plan card"]');
     const plan = card.getByRole('region', { name: 'Plan' });

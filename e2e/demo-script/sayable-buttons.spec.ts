@@ -62,7 +62,7 @@ test('labels that ask Alexa: the safe-room chip and the plan card button, said a
   await page.goto('/');
   await type(page, 'Is Leo safe?');
   await expect(page.locator('iframe[title="Safe room card"]')).toBeVisible();
-  await type(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await type(page, "It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
   await expect(page.locator('iframe[title="Plan card"]')).toBeVisible();
   await type(page, 'Apply plan');
   await expect(page.getByTestId('answer').getByTestId('answer-caption')).toContainText('the plan is applied');

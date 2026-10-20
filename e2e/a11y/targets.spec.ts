@@ -31,7 +31,7 @@ async function expectAllTargetsLarge(page: Page) {
 }
 
 const SCENES = [
-  { name: 'the hot-day plan', question: "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.", frame: 'Plan card' },
+  { name: 'the hot-day plan', question: "It's going to be 36 degrees tomorrow. Keep Leo comfortable.", frame: 'Plan card' },
   { name: 'the storm', question: "The power's out", frame: 'Safe room card' },
   { name: 'the preferences', question: 'Show my preferences', frame: 'Preferences card' },
 ] as const;

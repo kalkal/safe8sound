@@ -20,6 +20,7 @@ export const enUS = {
   'examples.hotDay': 'A hot day',
   // With the grid down (#268): what matters during a storm.
   'examples.safeRoom': 'Is Leo safe?',
+  'examples.everyoneSafe': 'Is everyone safe?',
   'examples.howLong': 'How long will it last?',
   'examples.powerBack': 'Is the power back?',
   // Owner, 19 Oct (B): the storm answer shows the safe room; its plan comes on screen when asked.

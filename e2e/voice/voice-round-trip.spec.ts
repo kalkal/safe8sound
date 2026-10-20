@@ -93,7 +93,7 @@ test('in Follow Up an example picked closes the mic and fills the box, as typing
 
 test('voice and touch together: a hot-day plan asked by voice is applied by touch in its card', async ({ page }) => {
   await page.getByRole('button', { name: 'Speak', exact: true }).click();
-  await speak(page, "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.");
+  await speak(page, "It's going to be 36 degrees tomorrow. Keep Leo comfortable.");
   await voice(page, (d) => {
     d.startAudio();
     d.finishAudio();

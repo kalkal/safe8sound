@@ -20,10 +20,10 @@ test('scripted: choosing the storm scenario swaps the hot-day examples for the s
 
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toHaveCount(0);
   await examples(page).getByRole('button', { name: 'Is Leo safe?' }).click();
-  await expect(page.getByLabel('Ask a question')).toHaveValue('How is Grandpa doing in the safe room?');
+  await expect(page.getByLabel('Ask a question')).toHaveValue('Is Leo safe?');
   await page.getByRole('button', { name: 'Ask' }).click();
   // Its own scene, the safe room (review of #301: a "not" assertion could never fail).
-  await expect(page.getByTestId('answer').last()).toContainText('Grandpa is in his bedroom');
+  await expect(page.getByTestId('answer').last()).toContainText("Leo's room is at 26.8 degrees");
   for (const name of ['How long will it last?', 'Is the power back?']) await expect(examples(page).getByRole('button', { name })).toBeVisible();
 
   // An answer that ends the storm wins over the Storm scenario: the day examples come back (review of #301).

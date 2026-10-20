@@ -22,7 +22,7 @@ test('an example fills the question, never sends it; Ask does', async ({ page })
   // By keyboard: Tab reaches the examples, Enter fills the field.
   await examples.getByRole('button', { name: 'Is Leo safe?' }).focus();
   await page.keyboard.press('Enter');
-  await expect(field).toHaveValue('How is Grandpa doing in the safe room?');
+  await expect(field).toHaveValue('Is Leo safe?');
 
   // No sideways scroll at 375 px (the e2e tsconfig has no DOM types: the page is typed by hand).
   const width = await page.evaluate(() => (globalThis as unknown as { document: { documentElement: { scrollWidth: number } } }).document.documentElement.scrollWidth);
