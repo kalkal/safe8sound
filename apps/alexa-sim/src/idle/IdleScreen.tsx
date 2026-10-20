@@ -41,7 +41,7 @@ export interface ScreenTopProps {
   /** Messages to Ana not seen yet: the bell's dot. */
   unseen: number;
   onSeen: () => void;
-  /** What the menu lists (until the settings page, only "Show my home"). */
+  /** What the menu lists: "Show my home" and (#432 S5) "Settings". */
   menu: ReactNode;
   /** The menu button, so the focus can come back to it when what it opened closes. */
   menuRef?: RefObject<HTMLButtonElement | null>;

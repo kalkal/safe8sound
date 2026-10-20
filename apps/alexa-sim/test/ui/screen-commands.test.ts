@@ -43,11 +43,11 @@ describe('matchScreenCommand (every button sayable)', () => {
   });
 
   it('the answer pager is sayable while listening too (a spoken "Next answer" is no turn), not while a turn runs, failed, or the home is open', () => {
-    const on = { thinking: false, failed: false, homeOpen: false, hasAnswers: true };
+    const on = { thinking: false, failed: false, pageOpen: false, hasAnswers: true };
     expect(pagerSayable(on)).toBe(true);
     expect(pagerSayable({ ...on, thinking: true })).toBe(false);
     expect(pagerSayable({ ...on, failed: true })).toBe(false);
-    expect(pagerSayable({ ...on, homeOpen: true })).toBe(false);
+    expect(pagerSayable({ ...on, pageOpen: true })).toBe(false);
     expect(pagerSayable({ ...on, hasAnswers: false })).toBe(false);
   });
 

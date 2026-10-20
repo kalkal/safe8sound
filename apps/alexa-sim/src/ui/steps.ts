@@ -40,16 +40,16 @@ export function stepOf({ homeOpen, cards = [], applied }: StepScreen): Step {
   return 'conversation';
 }
 
-export type BackAction = 'close_home' | 'previous_answer' | 'start';
+export type BackAction = 'close_page' | 'previous_answer' | 'start';
 
 /**
- * What Back does: closes the home (back to what was under it), shows the answer before, or from the first answer the
+ * What Back does: closes the page open on the screen, the home or the settings (back to what was under it), shows the answer before, or from the first answer the
  * first screen. Nothing while a turn runs or failed (Cancel / Try again act there), nor on the first screen. While
  * listening it works, so a spoken "Go back" is a command, never a turn (review of #350, as pagerSayable in #347).
  */
-export function backAction({ thinking, failed, homeOpen, answerIndex }: { thinking: boolean; failed: boolean; homeOpen: boolean; answerIndex: number }): BackAction | undefined {
+export function backAction({ thinking, failed, pageOpen, answerIndex }: { thinking: boolean; failed: boolean; pageOpen: boolean; answerIndex: number }): BackAction | undefined {
   if (thinking || failed) return undefined;
-  if (homeOpen) return 'close_home';
+  if (pageOpen) return 'close_page';
   if (answerIndex > 0) return 'previous_answer';
   if (answerIndex === 0) return 'start';
   return undefined;

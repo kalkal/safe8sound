@@ -337,6 +337,23 @@
     }
   }
 
+  /* #432 S5: the line that opens Leo's home settings on Ana's phone, then the page in place of the messages. The
+     phone beside the Echo is as tall as the device: the line keeps its own height, never the row's. */
+  .phone-manage {
+    align-self: start;
+    justify-self: start;
+  }
+
+  .phone-settings {
+    display: grid;
+    align-self: start;
+    gap: var(--space-2);
+
+    & > .link-button {
+      justify-self: start;
+    }
+  }
+
   /* The family's replies (#24): one row of touch targets that wraps on a narrow phone. */
   .phone-replies {
     display: flex;

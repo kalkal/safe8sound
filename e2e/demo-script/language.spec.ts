@@ -1,7 +1,7 @@
 import { expect, test } from '../no-network.js';
 import { openUserSettings } from '../surface.js';
 
-// #263: the language switch. English by default; Italiano in the settings drawer changes the page and the cards
+// #263: the language switch. English by default; Italiano in the settings page changes the page and the cards
 // (through hostContext.locale) at once, and the choice is remembered on this browser. The scripted answers stay in
 // English: only the real agent answers in the chosen language.
 

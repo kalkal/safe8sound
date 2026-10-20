@@ -1,4 +1,4 @@
-/* #402: the temperatures and limits section of the settings drawer. Semantic tokens only. */
+/* #402: the temperatures and limits section of the settings page. Semantic tokens only. */
 @layer surfaces {
   .limits {
     display: grid;

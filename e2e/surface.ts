@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { CATALOGS, type Locale } from '../packages/i18n/src/index.js';
+import { CATALOGS, PRODUCT_NAME, type Locale } from '../packages/i18n/src/index.js';
 
 // How the specs reach the screen (separation of the device layout, #432). The device look is a layout that another can
 // replace, so a spec never names a layout's own classes. It reads the screen through the test ids every layout writes:
@@ -28,17 +28,25 @@ export async function openDemoControls(page: Page, locale: Locale = 'en-US'): Pr
 /** What the demo plays now ("Reference home (Italy) · Heat wave"): on the button below the wide layout, in the panel on it. */
 export const demoControlsSummary = (page: Page): Locator => page.getByTestId('demo-controls-summary').filter({ visible: true }).first();
 
-/** The person's own settings (language, safe room, temperatures and limits, units): "Settings" opens them. */
+/**
+ * The person's own settings (#432 S5: who we protect, language, safe room, temperatures and limits, units): a page of
+ * the Echo's screen, "Settings" in the screen's menu. `userSettings` is the page on the Echo (Ana's phone has its own,
+ * `openPhoneSettings`); `openUserSettings` opens it from the menu unless it is open already and returns it.
+ */
+const settingsTitle = (locale: Locale): string => CATALOGS[locale]['settings.page.title'].replace('{product}', PRODUCT_NAME);
 export const settingsButton = (root: Root, locale: Locale = 'en-US'): Locator => root.getByRole('button', { name: CATALOGS[locale]['settings.open'], exact: true });
-export const userSettings = (page: Page, locale: Locale = 'en-US'): Locator => page.getByRole('dialog', { name: CATALOGS[locale]['settings.open'] });
+export const userSettings = (page: Page, locale: Locale = 'en-US'): Locator => slot(page, 'content').getByRole('region', { name: settingsTitle(locale) });
 export async function openUserSettings(page: Page, locale: Locale = 'en-US'): Promise<Locator> {
+  const settings = userSettings(page, locale);
+  if (await settings.isVisible()) return settings;
+  await menuButton(page, locale).click();
   await settingsButton(page, locale).click();
-  return userSettings(page, locale);
+  return settings;
 }
 
 /**
- * The screen's menu (#432 S6), top left like the real Echo Show's: its list holds "Show my home" (the settings join it
- * with S5). `homeButton` opens the menu if it is closed and returns the button ("Show my home" or "Hide my home").
+ * The screen's menu (#432 S6), top left like the real Echo Show's: its list holds "Show my home" and (S5) "Settings".
+ * `homeButton` opens the menu if it is closed and returns the button ("Show my home" or "Hide my home").
  */
 export const menuButton = (root: Root, locale: Locale = 'en-US'): Locator => root.getByRole('button', { name: CATALOGS[locale]['screen.menu'], exact: true });
 export async function homeButton(page: Page, locale: Locale = 'en-US'): Promise<Locator> {
@@ -55,6 +63,13 @@ export async function openPhone(page: Page, locale: Locale = 'en-US'): Promise<L
   const phone = phoneRegion(page, locale);
   if (!(await phone.isVisible())) await page.getByRole('button', { name: new RegExp(`^${CATALOGS[locale]['phone.open']}`) }).click();
   return phone;
+}
+/** #432 S5: Leo's home settings on Ana's phone, the same page as the Echo's: "Manage Leo's home settings" opens it. */
+export async function openPhoneSettings(page: Page, locale: Locale = 'en-US'): Promise<Locator> {
+  const phone = await openPhone(page, locale);
+  const settings = phone.getByRole('region', { name: settingsTitle(locale) });
+  if (!(await settings.isVisible())) await phone.getByRole('button', { name: CATALOGS[locale]['phone.manageSettings'] }).click();
+  return settings;
 }
 
 /** Reads Ana's phone as a person does where it is a sheet (a phone): opens it, reads, closes it again (Escape). */

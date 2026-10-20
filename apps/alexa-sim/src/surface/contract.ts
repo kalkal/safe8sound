@@ -15,7 +15,8 @@ export const DEFAULT_LAYOUT: LayoutId = 'alexa-echo-show';
 /** The named places a layout fills. `screen` is the device's screen (the conversation's three bands today). */
 export interface SurfaceSlots {
   readonly screen: ReactNode;
-  /** Above the screen: the person's own controls (settings, language) and the button that opens the demo controls. */
+  /** Above the screen: the page's language and theme, Ana's phone and the button that opens the demo controls (the
+   * person's settings are a page of the screen, #432 S5). */
   readonly topBar?: ReactNode;
   /** The judges' demo controls, outside the screen (a column on a wide screen); removable by config. */
   readonly demoControls?: ReactNode;

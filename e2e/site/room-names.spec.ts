@@ -3,13 +3,13 @@ import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE } from './chain.js';
 import { demoControlsSummary, openUserSettings, showMyHome } from '../surface.js';
 
-// #422: a sandbox names its rooms as the home profile does, "Leo's room", on the home card and in the settings drawer,
+// #422: a sandbox names its rooms as the home profile does, "Leo's room", on the home card and in the settings page,
 // as the voice and the safe room card do. Same chain as the site: the AWS build, the real local sim-api, agent (fake
 // model) and MCP server.
 
 test.use({ baseURL: AWS_SITE_URL });
 
-test("the home card and the settings drawer name the safe room Leo's room, never Bedroom 1", async ({ page }) => {
+test("the home card and the settings page name the safe room Leo's room, never Bedroom 1", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');

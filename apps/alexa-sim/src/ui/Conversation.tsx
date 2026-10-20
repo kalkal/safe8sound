@@ -51,12 +51,12 @@ export interface ConversationProps {
   commands?: readonly ScreenCommand[];
   /** Three bands (owner, 10 Oct): what the header band shows (title, theme, the home button). */
   head?: ReactNode;
-  /** The home, when open: shown in the content band in place of the answer. */
-  homeView?: ReactNode;
+  /** A page of the screen when open (the home, #432 S5 the settings): shown in the content band in place of the answer. */
+  pageView?: ReactNode;
   /** The idle screen's own content (the cold reserve clock, owner 11 Oct), under the first screen's hint. */
   idle?: ReactNode;
-  /** Back (idea 5) with the home open: closes it, back to what was under it. */
-  onCloseHome?: () => void;
+  /** Back (idea 5) with a page open: closes it, back to what was under it. */
+  onClosePage?: () => void;
   /** The steps (idea 5): the turns whose plan was applied from its card, at "Confirm". */
   appliedTurns?: ReadonlySet<string>;
   /**
@@ -98,9 +98,9 @@ export function Conversation({
   examples,
   commands = [],
   head,
-  homeView,
+  pageView,
   idle,
-  onCloseHome,
+  onClosePage,
   appliedTurns,
   prepareTurn,
   simNow,
@@ -266,36 +266,37 @@ export function Conversation({
   const thinking = snapshot.matches('thinking');
   // A turn on its way (or failed): the content band shows it, not an older answer.
   const busy = thinking || listening || snapshot.matches('failed');
-  const homeShown = homeView !== undefined && homeView !== null && !busy;
+  const pageShown = pageView !== undefined && pageView !== null && !busy;
   // Nothing asked yet, or Back from the first answer (idea 5): the content band explains what to ask.
-  const firstScreen = !busy && !homeShown && shownTurn === undefined && (history.turns.length > 0 || !snapshot.matches('speaking'));
+  const firstScreen = !busy && !pageShown && shownTurn === undefined && (history.turns.length > 0 || !snapshot.matches('speaking'));
   const step = (delta: 1 | -1) => {
     setHistory((previous) => stepAnswer(previous, delta));
   };
   // "Back" always there and the path of the steps (idea 5).
-  const homeOpen = homeView !== undefined && homeView !== null;
+  const pageOpen = pageView !== undefined && pageView !== null;
   // The step is what is on screen: the card shown, not the answer's other cards behind "Show the plan" (review of #458:
   // a storm answer's hidden plan kept the idle screen from coming back).
   const cardOnScreen = busy || shown.data?.ok !== true ? undefined : shownCard(shown.data.value.cards ?? [], cardShown);
   const where = stepOf({
-    homeOpen: homeShown,
+    // A page in the content band is the home step (the settings page too: no step of its own).
+    homeOpen: pageShown,
     cards: cardOnScreen === undefined ? undefined : [cardOnScreen],
     applied: shownTurn !== undefined && appliedTurns?.has(shownTurn) === true,
   });
-  const back = backAction({ thinking, failed: snapshot.matches('failed'), homeOpen, answerIndex: history.index });
+  const back = backAction({ thinking, failed: snapshot.matches('failed'), pageOpen, answerIndex: history.index });
   const goBack =
     back === undefined
       ? undefined
       : () => {
           // The voice stops reading the answer that is leaving the screen (review of #350).
           if (snapshot.matches('speaking')) send({ type: 'CANCEL' });
-          if (back === 'close_home') onCloseHome?.();
+          if (back === 'close_page') onClosePage?.();
           else if (back === 'previous_answer') step(-1);
           else setHistory(backToStart);
         };
   // The answer pager's buttons, while it is on screen, then the header's (home, theme) from the frame.
   commandsRef.current = [
-    ...(pagerSayable({ thinking, failed: snapshot.matches('failed'), homeOpen: homeView !== undefined && homeView !== null, hasAnswers: position !== undefined })
+    ...(pagerSayable({ thinking, failed: snapshot.matches('failed'), pageOpen, hasAnswers: position !== undefined })
       ? [
           {
             id: 'previous_answer',
@@ -315,7 +316,7 @@ export function Conversation({
       : []),
     ...(goBack === undefined ? [] : [{ id: 'back', phrases: [t('nav.back'), t('nav.backUtterance')], run: goBack }]),
     // The other cards of the answer on screen, said or typed ("Show the plan"); the home has its own panel ("Show my home").
-    ...(busy || homeShown || shownTurn === undefined || shown.data?.ok !== true
+    ...(busy || pageShown || shownTurn === undefined || shown.data?.ok !== true
       ? []
       : otherKinds(shown.data.value.cards ?? [], cardShown)
           .filter((kind) => kind !== 'home')
@@ -338,10 +339,10 @@ export function Conversation({
   // Back to the idle screen a while after the answer (or the home) was last touched (#432 S6): never while the voice
   // reads it, nor while a plan waits for "Apply plan" or "Not now" (its step is the plan, not yet confirmed).
   useIdleReturn({
-    active: idleReturnMs !== undefined && (homeShown || (!busy && shownTurn !== undefined)) && !speaking && !followUp && !replaying && where !== 'plan',
+    active: idleReturnMs !== undefined && (pageShown || (!busy && shownTurn !== undefined)) && !speaking && !followUp && !replaying && where !== 'plan',
     delayMs: idleReturnMs ?? 0,
     onReturn: () => {
-      if (homeOpen) onCloseHome?.();
+      if (pageOpen) onClosePage?.();
       setHistory(backToStart);
     },
   });
@@ -351,7 +352,7 @@ export function Conversation({
   // so they are drawn outside the device, in the host the page gives (actionsHost); without one, under the screen.
   const actions = (
     <>
-      {(!busy && !homeShown && ((moment?.earlier === true && shown.data?.ok === true) || position !== undefined)) && (
+      {(!busy && !pageShown && ((moment?.earlier === true && shown.data?.ok === true) || position !== undefined)) && (
         <div className="ask-bar-where">
           {/* An answer given before the clock last moved says so, with its simulated time (the answer carries the same
               words for screen readers, AnswerCard). */}
@@ -447,7 +448,7 @@ export function Conversation({
     </>
   );
   // Under the bar, small: the voice notices, and for the judges why one card shows (owner, 19 Oct, B).
-  const severalCards = !busy && !homeShown && shown.data?.ok === true && (shown.data.value.cards?.length ?? 0) > 1;
+  const severalCards = !busy && !pageShown && shown.data?.ok === true && (shown.data.value.cards?.length ?? 0) > 1;
   const notes = (
     <div className="ask-bar-notes">
       {severalCards && <p className="notice ask-bar-one-card">{t('demoControls.oneCard')}</p>}
@@ -515,12 +516,12 @@ export function Conversation({
         )}
         {/* Status and alert announce themselves; the answer needs a live region that exists before it appears. */}
         <div aria-live="polite">
-          {!busy && !homeShown && shown.data?.ok === true && shownTurn !== undefined && (
+          {!busy && !pageShown && shown.data?.ok === true && shownTurn !== undefined && (
             // One answer, one state: Previous / Next never carry a tab or a frame from another answer.
             <AnswerCard key={shownTurn} answer={shown.data.value} timeZone={timeZone} turnId={shownTurn} show={cardShown} {...(moment?.earlier === true ? { earlierAt: moment.time } : {})} />
           )}
         </div>
-        {homeShown && homeView}
+        {pageShown && pageView}
         {firstScreen && (
           <p className="welcome" data-testid="welcome-hint">
             {greeting ?? t('chat.hint')}

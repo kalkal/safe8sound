@@ -65,6 +65,4 @@ export const BUGS = {
    * server lets start_storm_mode open a storm again after "power back" on the same day.
    */
   stormAgain: fakeModel('A question about the storm after the power is back prepares storm mode again and tells Ana again.'),
-  /** The user's settings live in the judges' demo drawer: the Echo has no settings page of its own yet (owner, 18 Oct). */
-  echoSettings: 'The user settings are not inside the Echo yet (separation of demo controls and settings, 18 Oct).',
 } as const;

@@ -3,9 +3,9 @@ import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 import { demoControlsSummary, openDemoControls, openUserSettings, showMyHome } from '../surface.js';
 
-// °F everywhere (owner decision, 9 Oct): the judge picks °F in the settings drawer and every card follows: the home
-// floor plan and the safe room in the storm (the plan card is covered by its unit tests); a card already on screen
-// follows the switch back to °C too.
+// °F everywhere (owner decision, 9 Oct): the judge picks °F in the settings page and every card follows: the home
+// floor plan and the safe room in the storm (the plan card is covered by its unit tests); the same card, back on screen
+// after the settings page (#432 S5: a page of the screen, in the card's place), follows the switch back to °C too.
 
 const ask = async (page: Page, question: string) => {
   await page.getByLabel('Ask a question').fill(question);
@@ -38,12 +38,15 @@ test('Houston starts in °F: choosing the place switches the unit, and the judge
   const rooms = homeCard.getByRole('list', { name: 'Rooms' });
   await expect(rooms).toContainText('°F');
 
+  // The settings page takes the home's place on the screen: the home is opened again after it.
   await pickUnits(page, '°C');
+  await showMyHome(page);
+  await toCardPage(homeCard, 2);
   await expect(rooms).toContainText('°C');
   await expect(rooms).not.toContainText('°F');
 });
 
-test('°F in the drawer: the floor plan and the safe room follow, and a card on screen goes back to °C', async ({ page }) => {
+test('°F in the settings: the floor plan and the safe room follow, and a card on screen goes back to °C', async ({ page }) => {
   await page.goto('/');
   await pickUnits(page, '°F');
 
@@ -60,7 +63,8 @@ test('°F in the drawer: the floor plan and the safe room follow, and a card on 
   await toCardPage(safeRoom, 2);
   await expect(safeRoom.getByRole('list', { name: 'In the safe room' })).toContainText('Now: 80.2 °F');
 
-  // A card already on screen follows the switch back to °C.
+  // The answer's card, back on screen after the settings page, follows the switch back to °C.
   await pickUnits(page, '°C');
+  await toCardPage(safeRoom, 2);
   await expect(safeRoom.getByRole('list', { name: 'In the safe room' })).toContainText('Now: 26.8 °C');
 });

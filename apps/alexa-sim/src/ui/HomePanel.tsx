@@ -15,6 +15,8 @@ export interface HomePanelProps {
   /** Called each time the panel opens: the remote home is read then. */
   onOpen?: () => void;
   onRetry?: () => void;
+  /** Each time the home opens, tapped or said, before the demo code too (#432 S5: the settings page then closes). */
+  onShow?: () => void;
   /** Escape closed the home while its button is not on the page (#432 S6: it sits in the screen's closed menu). */
   onFocusLost?: () => void;
 }
@@ -23,7 +25,7 @@ export interface HomePanelProps {
  * Three bands (owner, 10 Oct): the button goes in the header band (#432 S6: in the screen's menu), the home in the
  * content band, in place of the answer. `view` is null while the home is closed.
  */
-export function useHomePanel({ status, renderCard, load = 'idle', onOpen: onOpenProp, onRetry, onFocusLost }: HomePanelProps): { button: ReactElement; view: ReactElement | null; open: () => void; close: () => void } {
+export function useHomePanel({ status, renderCard, load = 'idle', onOpen: onOpenProp, onShow, onRetry, onFocusLost }: HomePanelProps): { button: ReactElement; view: ReactElement | null; open: () => void; close: () => void } {
   const [open, setOpen] = useState(false);
   // Before the demo code there is no home to read (owner, 18 Oct): no read, so no failure to show.
   const onOpen = load === 'locked' ? undefined : onOpenProp;
@@ -46,7 +48,10 @@ export function useHomePanel({ status, renderCard, load = 'idle', onOpen: onOpen
       aria-controls={panelId}
       onKeyDown={onKeyDown}
       onClick={() => {
-        if (!open) onOpen?.();
+        if (!open) {
+          onShow?.();
+          onOpen?.();
+        }
         setOpen(!open);
       }}
     >
@@ -82,6 +87,7 @@ export function useHomePanel({ status, renderCard, load = 'idle', onOpen: onOpen
   // Every button sayable (idea 4): saying "Show my home" does what tapping it does, and reads the home once.
   const show = () => {
     if (open) return;
+    onShow?.();
     onOpen?.();
     setOpen(true);
   };

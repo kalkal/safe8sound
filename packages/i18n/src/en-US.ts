@@ -142,6 +142,13 @@ export const enUS = {
   'settings.limits.save': 'Save',
   'settings.limits.unsaved': 'Not saved yet: press Save.',
   'settings.limits.rateLimited': "Not saved: this demo allows a limited number of changes per day, and today's are used up. Try again tomorrow.",
+  // #432 S5: the settings as a page of the Echo's screen (and of Ana's phone). Leo's age is the demo home's text.
+  'settings.page.title': "{product} settings · Leo's home",
+  'settings.page.hide': 'Hide settings',
+  'settings.protect.title': 'Who we protect',
+  'settings.protect.leo': 'Leo, 82, grandfather',
+  'settings.protect.ana': 'Ana, daughter, gets the alerts on her phone',
+  'settings.savedFor': "Saved for Leo's home · used on the Echo and on Ana's phone",
   // The judges' demo controls (#432, brief 1 and 3b): outside the Echo, clearly a simulation.
   'demoControls.title': 'Demo controls · simulation',
   'demoControls.open': 'Demo controls',
@@ -481,6 +488,7 @@ export const enUS = {
   'phone.empty': 'No messages from {product} yet.',
   // The empty phone says when the family will hear from it (owner decision, 10 Oct).
   'phone.whenTold': 'Ana gets a message when a storm is expected, when it starts, when the home steps down to its essential settings, when the emergency plan is applied, and when the power is back.',
+  'phone.manageSettings': "Manage Leo's home settings",
   'phone.list': 'Notifications',
   'phone.storm_started': 'Power outage (storm) at home',
   'phone.essential_level': 'Essential settings on',

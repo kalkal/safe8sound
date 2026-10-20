@@ -1,4 +1,4 @@
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Locator, Page } from '@playwright/test';
 import { PRODUCT_NAME } from '../../../packages/i18n/src/index.js';
 import { expect, test } from '../../no-network.js';
 import { ask } from '../../support/ask.js';
@@ -12,7 +12,7 @@ import { sizeOfProject, type Size } from '../../support/sizes.js';
 import { worldOf } from '../../support/world.js';
 import { expectVoiceMatchesCards } from '../../voice-screen.js';
 import { SITE_URL, expectFakeModelSays } from '../../support/target.js';
-import { readPhone } from '../../surface.js';
+import { menuButton, openPhoneSettings, openUserSettings, readPhone } from '../../surface.js';
 
 // The user's journey (owner, 18 Oct: "the tests must simulate a judge and a user, without mixing them"): the person at
 // home uses the product only, the Echo screen, its answers and cards, and Ana's phone; never a demo control (the
@@ -29,6 +29,7 @@ import { readPhone } from '../../surface.js';
 test.use({ baseURL: SITE_URL });
 
 const SLOW = { timeout: 20_000 };
+const QUICK = { timeout: 5_000 };
 
 test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9'] }, () => {
   let size: Size;
@@ -120,12 +121,33 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
     await expectFakeModelSays(ui.answerText, /\d/);
   });
 
-  test('A4. [settings inside the Echo] the person opens the settings on the Echo itself', { tag: '@outcome:O8' }, async () => {
-    await check(page, BUGS.echoSettings, async () => {
-      await ui.echo.getByRole('button', { name: 'Settings' }).click({ timeout: 5_000 });
-      await expect(page.getByRole('region', { name: /settings · Leo's home/i })).toBeVisible({ timeout: 5_000 });
+  test('A4. the person opens the settings on the Echo itself, and Ana the same settings on her phone', { tag: '@outcome:O8' }, async () => {
+    // #432 S5: "Settings" in the screen's menu, a page of the screen: who we protect, then the person's own settings.
+    const settings = await openUserSettings(page);
+    await expect(settings).toBeVisible(QUICK);
+    await expect(settings.getByRole('region', { name: 'Who we protect' })).toContainText('Leo, 82, grandfather');
+    await expect(settings.getByRole('radiogroup', { name: 'Language' })).toBeVisible();
+    // O8 C1: one set of settings. A step on the Echo (not saved) shows on Ana's phone, and her step back shows here.
+    const comfort = (root: Locator) => root.getByRole('group', { name: 'Comfort temperature' }).locator('output');
+    await expect(comfort(settings)).toHaveText(/°C$/, SLOW);
+    const saved = (await comfort(settings).textContent()) ?? '';
+    await settings.getByRole('button', { name: 'Lower: Comfort temperature' }).click();
+    await expect(comfort(settings)).not.toHaveText(saved);
+    const lowered = (await comfort(settings).textContent()) ?? '';
+    await page.keyboard.press('Escape');
+    await expect(settings).toBeHidden(QUICK);
+    await expect(menuButton(page)).toBeFocused();
+    await readPhone(page, async () => {
+      const onPhone = await openPhoneSettings(page);
+      await expect(onPhone.getByRole('region', { name: 'Who we protect' })).toBeVisible(QUICK);
+      await expect(comfort(onPhone)).toHaveText(lowered);
+      await onPhone.getByRole('button', { name: 'Raise: Comfort temperature' }).click();
+      await expect(comfort(onPhone)).toHaveText(saved);
+      await ui.phone.getByRole('button', { name: 'Back' }).click();
+      await expect(onPhone).toBeHidden(QUICK);
     });
-    if (await page.getByRole('region', { name: /settings · Leo's home/i }).isVisible()) await page.keyboard.press('Escape');
+    await expect(comfort(await openUserSettings(page))).toHaveText(saved);
+    await page.keyboard.press('Escape');
   });
 
   test('A5. a storm coming: storm mode prepared, Ana told at 12:00, in °C', { tag: '@outcome:O6' }, async () => {

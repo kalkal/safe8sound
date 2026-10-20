@@ -49,21 +49,21 @@ describe('backAction', () => {
   const screen = { thinking: false, failed: false };
 
   it('nothing while a turn runs or failed (Cancel / Try again act there)', () => {
-    expect(backAction({ ...screen, thinking: true, homeOpen: true, answerIndex: 2 })).toBeUndefined();
-    expect(backAction({ ...screen, failed: true, homeOpen: false, answerIndex: 2 })).toBeUndefined();
+    expect(backAction({ ...screen, thinking: true, pageOpen: true, answerIndex: 2 })).toBeUndefined();
+    expect(backAction({ ...screen, failed: true, pageOpen: false, answerIndex: 2 })).toBeUndefined();
   });
 
-  it('the home open: it closes, back to what was under it', () => {
-    expect(backAction({ ...screen, homeOpen: true, answerIndex: -1 })).toBe('close_home');
-    expect(backAction({ ...screen, homeOpen: true, answerIndex: 1 })).toBe('close_home');
+  it('a page open (the home, the settings): it closes, back to what was under it', () => {
+    expect(backAction({ ...screen, pageOpen: true, answerIndex: -1 })).toBe('close_page');
+    expect(backAction({ ...screen, pageOpen: true, answerIndex: 1 })).toBe('close_page');
   });
 
   it('an answer: the one before it, and from the first answer the first screen', () => {
-    expect(backAction({ ...screen, homeOpen: false, answerIndex: 2 })).toBe('previous_answer');
-    expect(backAction({ ...screen, homeOpen: false, answerIndex: 0 })).toBe('start');
+    expect(backAction({ ...screen, pageOpen: false, answerIndex: 2 })).toBe('previous_answer');
+    expect(backAction({ ...screen, pageOpen: false, answerIndex: 0 })).toBe('start');
   });
 
   it('the first screen: nowhere to go back to', () => {
-    expect(backAction({ ...screen, homeOpen: false, answerIndex: -1 })).toBeUndefined();
+    expect(backAction({ ...screen, pageOpen: false, answerIndex: -1 })).toBeUndefined();
   });
 });

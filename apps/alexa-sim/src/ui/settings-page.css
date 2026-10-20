@@ -1,0 +1,66 @@
+/* #432 S5: the person's own settings as a page of the Echo's screen and of Ana's phone (SettingsPage). A card over the
+   dimmed sky, like the answers' cards, so the text keeps its contrast in both themes; the content band scrolls it
+   where it is taller than the screen. Semantic tokens only. */
+@layer surfaces {
+  .settings-page-host {
+    display: contents;
+  }
+
+  .settings-page {
+    display: grid;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+    color: var(--text-primary);
+
+    & h2 {
+      margin: 0;
+      font-size: var(--font-size-lead);
+    }
+
+    & .muted {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+
+    &:focus-visible {
+      outline: var(--border-thin) solid var(--accent);
+    }
+  }
+
+  /* Who we protect: read only, one row per person with the drawn avatar, large enough to read from a distance. */
+  .settings-protect {
+    display: grid;
+    gap: var(--space-2);
+
+    & h3 {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: var(--font-size-body);
+    }
+
+    & ul {
+      display: grid;
+      gap: var(--space-2);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    & li {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-card);
+      background: var(--surface-card-raised);
+      font-size: var(--font-size-lead);
+    }
+  }
+
+  .settings-avatar {
+    inline-size: 3.5rem;
+    block-size: 3.5rem;
+  }
+}

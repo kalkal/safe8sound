@@ -15,6 +15,29 @@ describe('PhonePanel: the family phone, simulated (surface C)', () => {
     expect(screen.getByText('No messages from Safe-8-Sound yet.')).toBeTruthy();
   });
 
+  // #432 S5: Ana manages Leo's home settings from her phone: the same page as the Echo's, Back to her messages.
+  it('"Manage Leo\'s home settings" opens the settings in place of the messages; Back brings the messages again', () => {
+    const feed = createScriptedPhone();
+    feed.deliver([phoneMessage('storm-started')]);
+    render(<PhonePanel feed={feed} timeZone="Europe/Rome" settings={<section aria-label="the settings page">page</section>} />);
+    const phone = screen.getByRole('region', { name: "Your daughter's phone (simulated)" });
+    expect(within(phone).queryByRole('region', { name: 'the settings page' })).toBeNull();
+    fireEvent.click(within(phone).getByRole('button', { name: "Manage Leo's home settings" }));
+    expect(within(phone).getByRole('region', { name: 'the settings page' })).toBeTruthy();
+    expect(within(phone).queryByRole('list', { name: 'Notifications' })).toBeNull();
+    // The tapped line is gone: the focus goes to Back, never lost on the page.
+    expect(document.activeElement).toBe(within(phone).getByRole('button', { name: 'Back' }));
+    fireEvent.click(within(phone).getByRole('button', { name: 'Back' }));
+    expect(within(phone).queryByRole('region', { name: 'the settings page' })).toBeNull();
+    expect(within(phone).getByRole('list', { name: 'Notifications' })).toBeTruthy();
+    expect(within(phone).getByRole('button', { name: "Manage Leo's home settings" })).toBe(document.activeElement);
+  });
+
+  it('without settings (the phone alone, ?view=phone) there is no settings line', () => {
+    render(<PhonePanel feed={createScriptedPhone()} timeZone="Europe/Rome" />);
+    expect(screen.queryByRole('button', { name: "Manage Leo's home settings" })).toBeNull();
+  });
+
   it('the empty phone says, in one fixed line, when Ana will hear from it; the line goes with the first message', () => {
     const line = 'Ana gets a message when a storm is expected, when it starts, when the home steps down to its essential settings, when the emergency plan is applied, and when the power is back.';
     const feed = createScriptedPhone();

@@ -1,7 +1,7 @@
 import { formatTemp, type InboxMessage, type PhoneReply, type TempUnit } from '@cold-reserve/contracts';
 import { PRODUCT_NAME } from '@cold-reserve/i18n';
 import { IconFrame, MessageDot, SmartphoneOutline } from '@cold-reserve/ui-cards/icons';
-import { useId, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { t } from '../ui/text.js';
 import type { PhoneFeed, PhoneReplyResult } from './phone-feed.js';
 
@@ -79,16 +79,71 @@ function PhoneIcon({ alert }: { alert: boolean }) {
   );
 }
 
-/** `units`: the temperature unit the person chose (°F everywhere, owner decision, 9 Oct); °C by default. */
-export function PhonePanel({ feed, timeZone, units = 'C' }: { feed: PhoneFeed; timeZone: string; units?: TempUnit }) {
+/**
+ * `units`: the temperature unit the person chose (°F everywhere, owner decision, 9 Oct); °C by default. `settings`
+ * (#432 S5): Leo's home settings, the same page as the Echo's on the same model; a line opens it in place of the
+ * messages, Back brings them again. None for the phone alone (?view=phone), which has no preferences to show.
+ */
+export function PhonePanel({ feed, timeZone, units = 'C', settings }: { feed: PhoneFeed; timeZone: string; units?: TempUnit; settings?: ReactNode }) {
   const messages = useSyncExternalStore(feed.subscribe, feed.messages);
   const titleId = useId();
+  const [onSettings, setOnSettings] = useState(false);
+  const manageRef = useRef<HTMLButtonElement>(null);
+  const backRef = useRef<HTMLButtonElement>(null);
+  // The tapped button goes away with the view it opened: the focus moves to the other one, never lost on the page.
+  const tapped = useRef(false);
+  useEffect(() => {
+    if (!tapped.current) return;
+    tapped.current = false;
+    (onSettings ? backRef : manageRef).current?.focus();
+  }, [onSettings]);
   return (
     <section className="phone" aria-labelledby={titleId}>
       <h2 id={titleId}>
         <PhoneIcon alert={messages.length > 0} />
         {t('phone.title')}
       </h2>
+      {settings !== undefined && onSettings ? (
+        <div className="phone-settings">
+          <button
+            ref={backRef}
+            type="button"
+            className="link-button"
+            onClick={() => {
+              tapped.current = true;
+              setOnSettings(false);
+            }}
+          >
+            {t('nav.back')}
+          </button>
+          {settings}
+        </div>
+      ) : (
+        <>
+          {settings !== undefined && (
+            <button
+              ref={manageRef}
+              type="button"
+              className="chip-button phone-manage"
+              onClick={() => {
+                tapped.current = true;
+                setOnSettings(true);
+              }}
+            >
+              {t('phone.manageSettings')}
+            </button>
+          )}
+          <PhoneMessages feed={feed} messages={messages} timeZone={timeZone} units={units} />
+        </>
+      )}
+    </section>
+  );
+}
+
+/** The messages to Ana, newest first, with the replies once there is something to answer to. */
+function PhoneMessages({ feed, messages, timeZone, units }: { feed: PhoneFeed; messages: readonly InboxMessage[]; timeZone: string; units: TempUnit }) {
+  return (
+    <>
       {messages.length === 0 && (
         <>
           <p className="muted">{t('phone.empty')}</p>
@@ -104,6 +159,6 @@ export function PhonePanel({ feed, timeZone, units = 'C' }: { feed: PhoneFeed; t
           </li>
         ))}
       </ol>
-    </section>
+    </>
   );
 }

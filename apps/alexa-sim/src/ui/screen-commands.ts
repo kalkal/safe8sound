@@ -40,7 +40,8 @@ export function runScreenCommand(text: string, turnId: string, commands: readonl
 
 /**
  * Previous / Next answer are sayable whenever an answer is there to step to, listening included (review of #347):
- * otherwise a spoken "Next answer" would become a turn. Not while a turn runs or failed, nor with the home open.
+ * otherwise a spoken "Next answer" would become a turn. Not while a turn runs or failed, nor with a page
+ * (the home, the settings) open.
  */
-export const pagerSayable = (screen: { thinking: boolean; failed: boolean; homeOpen: boolean; hasAnswers: boolean }): boolean =>
-  !screen.thinking && !screen.failed && !screen.homeOpen && screen.hasAnswers;
+export const pagerSayable = (screen: { thinking: boolean; failed: boolean; pageOpen: boolean; hasAnswers: boolean }): boolean =>
+  !screen.thinking && !screen.failed && !screen.pageOpen && screen.hasAnswers;

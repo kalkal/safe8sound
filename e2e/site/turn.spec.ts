@@ -1,7 +1,7 @@
 import { expect, test } from '../no-network.js';
 import { AWS_SITE_URL, DEMO_CODE, SIM_API_URL } from './chain.js';
 import { toCardPage } from '../card-pages.js';
-import { demoControlsSummary, openDemoControls, openUserSettings, settingsButton, showMyHome } from '../surface.js';
+import { demoControlsSummary, menuButton, openDemoControls, openUserSettings, showMyHome } from '../surface.js';
 
 // K1 (#244 review): the AWS build of the site, its /api through the very CloudFront Function the distribution runs
 // (a stand-in for CloudFront), and a REAL local sim-api configured as on AWS (no allowed origin) in front of the real
@@ -55,7 +55,8 @@ test('B2: the demo controls save to the visitor sandbox through /api and show wh
   await settings.getByRole('radiogroup', { name: 'Temperature units' }).getByText('°C').click();
   await expect(settings.getByRole('radio', { name: '°C' })).toBeChecked({ timeout: 20_000 });
   await page.keyboard.press('Escape');
-  await expect(settingsButton(page)).toBeFocused();
+  // #432 S5: the settings are a page of the screen, opened from its menu: the focus goes back to the menu.
+  await expect(menuButton(page)).toBeFocused();
 });
 
 test('the privacy line about the access logs is readable at phone width, before the code is entered (#244)', async ({ page }) => {

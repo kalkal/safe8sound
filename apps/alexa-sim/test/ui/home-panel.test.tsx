@@ -77,6 +77,18 @@ describe('HomePanel', () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
+  // #432 S5: one page of the screen at a time; opening the home closes the settings, before the demo code too.
+  it('onShow runs at each opening, tapped or said, even before the demo code (no read then)', () => {
+    const onShow = vi.fn();
+    const onOpen = vi.fn();
+    render(<HomePanel status={homeCalm()} renderCard={frame} load="locked" onOpen={onOpen} onShow={onShow} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));
+    expect(onShow).toHaveBeenCalledTimes(1);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide my home' }));
+    expect(onShow).toHaveBeenCalledTimes(1);
+  });
+
   it('Escape closes it and gives the focus back to the button', () => {
     render(<HomePanel status={homeCalm()} renderCard={frame} />);
     fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));

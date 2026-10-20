@@ -34,7 +34,8 @@ import { SimClock } from './ui/SimClock.js';
 import { POWER_CUT_QUESTION, clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
 import { isAppliedPlan } from './ui/steps.js';
 import { SHIPPED_PLACES, skyOfScenario } from './ui/demo-settings.js';
-import { SettingsControl } from './ui/SettingsDrawer.js';
+import { SettingsPage, useSettingsPage } from './ui/SettingsPage.js';
+import { useSettingsModel } from './ui/settings-model.js';
 import { DemoControlsOpener, DemoControlsPanel, WIDE_CONTROLS, jumpText, useDemoControlsSheet } from './demo-controls/DemoControlsPanel.js';
 import { messagesBetween } from './demo-controls/timeline.js';
 import { useMediaQuery } from './ui/use-media-query.js';
@@ -168,7 +169,13 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const focusMenu = useCallback(() => {
     menuRef.current?.focus();
   }, []);
-  const homePanel = useHomePanel({ status: home, renderCard: (status) => <HomeCard status={status} />, load: needsCode ? 'locked' : homeLoad, onOpen: loadHome, onRetry: loadHome, onFocusLost: focusMenu });
+  // #432 S5: the settings are the screen's other page, one page at a time. The settings page is made further down (its
+  // model needs the demo settings and the preferences); this ref closes it from here.
+  const closeSettingsRef = useRef<() => void>(() => undefined);
+  const closeSettings = useCallback(() => {
+    closeSettingsRef.current();
+  }, []);
+  const homePanel = useHomePanel({ status: home, renderCard: (status) => <HomeCard status={status} />, load: needsCode ? 'locked' : homeLoad, onOpen: loadHome, onShow: closeSettings, onRetry: loadHome, onFocusLost: focusMenu });
   // The home opened before the code (its note asks for it): once the code is accepted it is read at once.
   const homeOpenRef = useRef(false);
   homeOpenRef.current = homePanel.view !== null;
@@ -205,10 +212,11 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       if (homeFor(answer.cards ?? [], undefined, homeMode) !== undefined) setHomeTold(true);
       const shownPlan = planIdOf(answer.cards);
       if (shownPlan !== undefined) setPlanId(shownPlan);
-      // A new answer takes the content band: the home closes (its button says so).
+      // A new answer takes the content band: the home or the settings close (their buttons say so).
       closeHome();
+      closeSettings();
     },
-    [homeTimeZone, homeMode, closeHome],
+    [homeTimeZone, homeMode, closeHome, closeSettings],
   );
   // The steps (idea 5): the turns whose plan was applied from its card are at "Confirm"; a last resort's first step
   // (still "proposed", waiting for the second yes) is not (review of #350).
@@ -230,7 +238,6 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     key: `${demoSettings?.scenarioId ?? ''}/${demoSettings?.locationId ?? ''}`,
   });
   const { locale, chooseLocale: onLocale } = useLocaleSetting();
-  // The badge is always there: without demo settings it opens the language row only (#284).
   // The example buttons follow the home (#268). Remote mode: the home read from sim-api wins over the scenario.
   // Scripted mode: the scenario decides (its home starts calm whatever the scenario) until an answer says what the
   // home is (a storm starting, or the power coming back); that answer then wins (review of #301).
@@ -273,7 +280,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const notices = useNotices(phone);
   // What the screen shows, for the layout: the sky is dimmed only behind an answer.
   const [screenState, setScreenState] = useState<ScreenState>('idle');
-  // A change from the drawer starts another day (or place): what the clock said about the old one goes.
+  // A change from the demo controls or the settings starts another day (or place): what the clock said about the old one goes.
   const onDrawerChange = useCallback(
     (change: SetScenarioInput) => {
       clearNote();
@@ -281,6 +288,18 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [clearNote, onSettingsChange],
   );
+  // #432 S5: the person's own settings, one model for the Echo's page and Ana's phone (same data, same unsaved draft).
+  // Without demo settings the page holds who we protect and the language only (#284).
+  const settingsModel = useSettingsModel({ settings: demoSettings, onChange: onDrawerChange, limits, onLimit });
+  const settingsView = <SettingsPage model={settingsModel} locale={locale} onLocale={onLocale} />;
+  const settingsPage = useSettingsPage({ model: settingsModel, render: () => settingsView, onShow: closeHome, onFocusLost: focusMenu });
+  closeSettingsRef.current = settingsPage.close;
+  // Back, or the idle screen coming back, closes the page on screen, whichever it is.
+  const closeSettingsPage = settingsPage.close;
+  const closePage = useCallback(() => {
+    closeHome();
+    closeSettingsPage();
+  }, [closeHome, closeSettingsPage]);
   // The judges' demo controls (#432): a column beside the Echo in a window twice as wide as it is tall (owner, 19 Oct:
   // 1920 × 950), a sheet behind the dashed button of the top bar elsewhere; removable by config (the real home keeps only
   // its own controls). The simulated clock and its jump stay under the Echo, big (#391), so the time is always in view.
@@ -309,8 +328,8 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const phoneBeside = useMediaQuery(PHONE_BESIDE);
   const phoneSheet = usePhoneSheet({ beside: phoneBeside, messages: phoneMessages, peekMs: config.phonePeekMs });
   // The title sits above the device, always in view (contest rule: "Simulated Alexa+ add-on" in plain words); the
-  // screen itself has no app title, like the real Echo Show (#432 S6). The theme switch waits there for the settings
-  // page (S5).
+  // screen itself has no app title, like the real Echo Show (#432 S6). The theme switch stays there: the settings page
+  // holds the person's own settings only (brief of 18 Oct, point 2).
   const themeToggle = (
     <button
       type="button"
@@ -340,7 +359,6 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       <DemoControlsOpener sheet={sheet} settings={demoSettings} hidden={!demoShown || wide} />
       <PhoneOpener sheet={phoneSheet} beside={phoneBeside} count={phoneCount} />
       <PhonePeek sheet={phoneSheet} timeZone={homeTimeZone} />
-      <SettingsControl settings={demoSettings} onChange={onDrawerChange} locale={locale} onLocale={onLocale} limits={limits} onLimit={onLimit} />
       {themeToggle}
       {/* The language icon at the top (owner, 10 Oct), at the end of the row. */}
       <LanguageToggle locale={locale} onLocale={onLocale} />
@@ -352,7 +370,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
   const phonePanel = (
     <ErrorBoundary>
-      <PhonePanel feed={phone} timeZone={homeTimeZone} units={demoSettings?.units ?? 'C'} />
+      <PhonePanel feed={phone} timeZone={homeTimeZone} units={demoSettings?.units ?? 'C'} settings={settingsView} />
     </ErrorBoundary>
   );
   // The device layout from config (#432): the Alexa Echo Show unless configured; the judges' site always has it.
@@ -389,6 +407,8 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                     : []),
                   { id: 'home_show', phrases: [t('home.show')], run: homePanel.open },
                   { id: 'home_hide', phrases: [t('home.hide')], run: homePanel.close },
+                  { id: 'settings_show', phrases: [t('settings.open')], run: settingsPage.open },
+                  { id: 'settings_hide', phrases: [t('settings.page.hide')], run: settingsPage.close },
                   { id: 'theme_light', phrases: [t('theme.toggle')], run: () => {
                       setTheme('light');
                     } },
@@ -399,9 +419,9 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                       setTheme('dark');
                     } },
                 ]}
-                head={<ScreenTop now={clock?.now} sky={sky} unseen={notices.unseen} onSeen={notices.markSeen} menu={homePanel.button} menuRef={menuRef} />}
-                homeView={homePanel.view}
-                onCloseHome={homePanel.close}
+                head={<ScreenTop now={clock?.now} sky={sky} unseen={notices.unseen} onSeen={notices.markSeen} menu={<>{homePanel.button}{settingsPage.button}</>} menuRef={menuRef} />}
+                pageView={settingsPage.view ?? homePanel.view}
+                onClosePage={closePage}
                 appliedTurns={appliedTurns}
                 prepareTurn={prepareTurn}
                 {...(hasSandbox && clock !== undefined ? { simNow: clock.now } : {})}

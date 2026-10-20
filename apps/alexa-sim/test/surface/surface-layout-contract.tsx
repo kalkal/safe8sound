@@ -8,7 +8,7 @@ import type { LayoutId, SurfaceLayout } from '../../src/surface/contract.js';
 
 const slots = {
   screen: <button type="button">Ask</button>,
-  topBar: <button type="button">Settings</button>,
+  topBar: <button type="button">Language</button>,
   demoControls: <button type="button">Demo controls</button>,
   clock: <div role="group" aria-label="Simulated time" />,
   askBar: <button type="button">Speak</button>,
@@ -26,7 +26,7 @@ export function describeSurfaceLayoutContract(id: LayoutId, Layout: SurfaceLayou
       const viewport = screen.getByTestId('screen-viewport');
       expect(within(main).getByRole('button', { name: 'Ask' })).toBeTruthy();
       expect(viewport.contains(main)).toBe(true);
-      for (const outside of [screen.getByRole('button', { name: 'Settings' }), screen.getByRole('button', { name: 'Demo controls' }), screen.getByRole('group', { name: 'Simulated time' }), screen.getByRole('region', { name: 'Phone' }), screen.getByRole('button', { name: 'Speak' })]) {
+      for (const outside of [screen.getByRole('button', { name: 'Language' }), screen.getByRole('button', { name: 'Demo controls' }), screen.getByRole('group', { name: 'Simulated time' }), screen.getByRole('region', { name: 'Phone' }), screen.getByRole('button', { name: 'Speak' })]) {
         expect(viewport.contains(outside)).toBe(false);
       }
       expect(screen.getAllByRole('button')).toHaveLength(4);

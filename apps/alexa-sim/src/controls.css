@@ -807,8 +807,8 @@
       flex: none;
     }
 
-    /* Five buttons on one row, each a whole target, the row never wrapping under the screen. The row breaks on the
-       widest each button may be (3 targets + 6.5rem + 5.25rem + the gaps fit 351 px), so the longer Italian words give
+    /* Four buttons on one row, each a whole target, the row never wrapping under the screen. The row breaks on the
+       widest each button may be (3 targets + 6.5rem + the gaps fit 351 px), so the longer Italian words give
        way with an ellipsis rather than push the language icon onto a second line; the demo controls take what is left. */
     .echo-top {
       column-gap: var(--space-1);
@@ -825,19 +825,12 @@
       padding-inline: 0;
     }
 
-    .echo-top > :is(.phone-open, .settings-open) {
+    .echo-top > .phone-open {
       flex: 0 1 auto;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-
-    .echo-top > .phone-open {
       max-inline-size: 6.5rem;
-    }
-
-    .echo-top > .settings-open {
-      max-inline-size: 5.25rem;
     }
 
     .echo-top > .demo-controls-open {
