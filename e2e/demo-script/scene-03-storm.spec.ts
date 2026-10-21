@@ -53,7 +53,8 @@ test('scene 3: power out → safe room and the night, the daughter is told; Esse
   await ask(page, 'Is the power back?');
   const notes = phone.getByRole('list', { name: 'Notifications' }).getByRole('heading');
   await expect(notes).toHaveText(['Power is back at home', 'Essential settings on', 'Power outage (storm) at home']);
-  await expect(phone.getByRole('article', { name: 'Power is back at home' })).toContainText('power came back at home at 5:48');
+  // 24 hours in every language since #473, as the cards write the time (#504).
+  await expect(phone.getByRole('article', { name: 'Power is back at home' })).toContainText('power came back at home at 05:48');
 });
 
 test('reduced motion: an element that really animates stops, in the card frame and on the page', async ({ page }) => {
