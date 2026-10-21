@@ -253,3 +253,8 @@ follow its design; the code is ours, without the ASK SDK, the agent, AgentCore o
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+The kalkal mark (docs/brand/kalkal-mark.svg and kalkal-mark@2x.png):
+the letters "kal" are outlines from Noto Serif Bold and 唯一 from Noto Serif JP Bold
+(https://fonts.google.com/noto), licensed under the SIL Open Font License 1.1
+(https://openfontlicense.org). The outlines are part of the drawing; no font file is included.

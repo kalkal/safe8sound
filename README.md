@@ -1,5 +1,7 @@
 # Safe-8-Sound
 
+<a href="https://github.com/kalkal"><img src="docs/brand/kalkal-mark.svg" alt="kalkal" height="56"></a>
+
 Licensed under the [GNU AGPL v3.0 only](LICENSE), Copyright 2026 kalkal. Third-party code and data keep their own licenses, listed in [NOTICE](NOTICE). Weather data by [Open-Meteo.com](https://open-meteo.com/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
 
 When the heat comes or the power goes out, someone at home needs one room that stays safe: a grandparent, a baby, a person who works from home. Safe-8-Sound is a voice assistant that spends a home battery on that room first, says in plain words how many hours of comfort are left, and lets a set of deterministic checks, not the language model, decide what is allowed.
