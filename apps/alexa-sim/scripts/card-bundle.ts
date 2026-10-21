@@ -42,3 +42,19 @@ export function cardBundleProblem(bundle: string, sources: readonly string[]): s
   }
   return undefined;
 }
+
+/**
+ * What the bundle is built from, relative to the repository root: the card package (its code, its build, its
+ * dependencies), the packages it imports, and the lockfile, so a dependency update rebuilds it too.
+ */
+export const CARD_BUNDLE_SOURCES = [
+  'packages/ui-cards/src',
+  'packages/ui-cards/scripts',
+  'packages/ui-cards/vite.card.config.ts',
+  'packages/ui-cards/package.json',
+  'packages/contracts/src',
+  'packages/i18n/src',
+  'packages/design-tokens/src',
+  'packages/design-tokens/generated',
+  'pnpm-lock.yaml',
+] as const;

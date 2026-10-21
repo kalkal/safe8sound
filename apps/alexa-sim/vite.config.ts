@@ -6,7 +6,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { cloudFrontStandIn } from './vite.cloudfront-preview.js';
 import { siteTimingEnv } from './scripts/turn-timing.js';
 import { phoneProxy, requirePhoneProxy } from './vite.phone-proxy.js';
-import { cardBundleProblem } from './scripts/card-bundle.js';
+import { CARD_BUNDLE_SOURCES, cardBundleProblem } from './scripts/card-bundle.js';
 
 /** The headers the built site is served with (scripts/site-headers.ts), so `vite preview` applies the AWS CSP too. */
 function previewHeaders(outDir: string): Record<string, string> {
@@ -28,15 +28,10 @@ function cardBundleFresh(): Plugin {
     name: 'card-bundle-fresh',
     buildStart() {
       if (process.env['VITEST'] !== undefined) return;
-      const problem = cardBundleProblem(at('../../packages/ui-cards/dist/card-app.js'), [
-        at('../../packages/ui-cards/src'),
-        at('../../packages/ui-cards/scripts'),
-        at('../../packages/ui-cards/vite.card.config.ts'),
-        at('../../packages/contracts/src'),
-        at('../../packages/i18n/src'),
-        at('../../packages/design-tokens/src'),
-        at('../../packages/design-tokens/generated'),
-      ]);
+      const problem = cardBundleProblem(
+        at('../../packages/ui-cards/dist/card-app.js'),
+        CARD_BUNDLE_SOURCES.map((source) => at(`../../${source}`)),
+      );
       if (problem !== undefined) this.error(problem);
     },
   };

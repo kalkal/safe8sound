@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CARD_BUNDLE_FIX, cardBundleProblem } from '../scripts/card-bundle.js';
+import { CARD_BUNDLE_FIX, CARD_BUNDLE_SOURCES, cardBundleProblem } from '../scripts/card-bundle.js';
 
 // #503: the simulator inlines the card bundle (packages/ui-cards/dist/card-app.js, never committed). A bundle older than
 // its sources once kept the Home card empty (its strict schema refused a field added since): the simulator's Vite config
@@ -56,5 +56,11 @@ describe('the card bundle is never older than its sources (#503)', () => {
 
   it('the fix is the one command that builds it', () => {
     expect(CARD_BUNDLE_FIX).toBe('pnpm --filter @cold-reserve/ui-cards build:card');
+  });
+
+  it('watches the card package, its dependencies and the lockfile: a dependency update rebuilds the bundle too', () => {
+    expect(CARD_BUNDLE_SOURCES).toEqual(
+      expect.arrayContaining(['packages/ui-cards/src', 'packages/ui-cards/package.json', 'pnpm-lock.yaml', 'packages/contracts/src', 'packages/i18n/src']),
+    );
   });
 });
