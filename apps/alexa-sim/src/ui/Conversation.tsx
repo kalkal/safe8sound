@@ -25,6 +25,7 @@ import { DemoOverlay } from './DemoOverlay.js';
 import { ExampleQuestions, type ExampleQuestion } from './ExampleQuestions.js';
 import { Spinner } from './Spinner.js';
 import { t } from './text.js';
+import { failedTurnText, mayHaveGoneThrough, type FailedTurnFinding } from './failed-turn.js';
 import { useIdleReturn } from './idle-return.js';
 import { VoiceBar, voiceBarState } from './VoiceBar.js';
 import type { ScreenState } from '../surface/contract.js';
@@ -64,6 +65,11 @@ export interface ConversationProps {
    * down. A failure fails the turn, honestly, and Retry runs it again.
    */
   prepareTurn?: (question: string, context: AskContext) => Promise<Result<void, ErrorEnvelope>>;
+  /**
+   * #477: after a turn that failed in a way that may have let its tools run (a timeout, a busy service), reads the home and
+   * the phone again (never the model) and says what it finds; without it the failure keeps its words.
+   */
+  readAfterFailure?: (turnId: string) => Promise<FailedTurnFinding>;
   /**
    * The simulated time now (local ISO, the home's zone), when there is a simulated clock: each answer is labelled with
    * the time it came, and marked as earlier once the clock has moved on (owner, 18 Oct).
@@ -105,6 +111,7 @@ export function Conversation({
   onClosePage,
   appliedTurns,
   prepareTurn,
+  readAfterFailure,
   simNow,
   playthrough = 0,
   idleReturnMs,
@@ -177,6 +184,23 @@ export function Conversation({
   const [snapshot, send] = useMachine(machine, { input: { replyTimeoutMs: turnBudgetMs, voice: voice.settings } });
   sendRef.current = send;
   const { question, turnId, error, canRetry, micAvailable, speakReplies } = snapshot.context;
+  // #477: what the reads after a failed turn found, for that turn only (a new turn starts from the words of today).
+  const [afterFailure, setAfterFailure] = useState<{ turnId: string; finding: FailedTurnFinding } | undefined>(undefined);
+  // Only a timeout or a busy service may have let the tools run (review of #491): a refusal or a wait is never read again.
+  const failedTurn = snapshot.matches('failed') && error !== null && mayHaveGoneThrough(error.code) && turnId !== null ? turnId : undefined;
+  const readAfterFailureRef = useRef(readAfterFailure);
+  readAfterFailureRef.current = readAfterFailure;
+  useEffect(() => {
+    const read = readAfterFailureRef.current;
+    if (failedTurn === undefined || read === undefined) return undefined;
+    let wanted = true;
+    void read(failedTurn).then((finding) => {
+      if (wanted) setAfterFailure({ turnId: failedTurn, finding });
+    });
+    return () => {
+      wanted = false;
+    };
+  }, [failedTurn]);
   const privacy = privacyNotice({ micAvailable, speakReplies, studioVoice: voice.studioVoice });
   const notice = voiceNotice(snapshot.context);
   const listening = snapshot.matches('listening');
@@ -565,7 +589,7 @@ export function Conversation({
         {/* A refused demo session is explained by the gate alone, not as a failed answer (review of #140). */}
         {snapshot.matches('failed') && error !== null && error.category !== 'unauthorized' && (
           <div className="failure" role="alert">
-            <p>{t(error.code === 'agent_timeout' ? 'chat.errorTimeout' : error.retryable ? 'chat.errorTransient' : 'chat.errorOther')}</p>
+            <p>{error.retryable ? failedTurnText(afterFailure?.turnId === turnId ? afterFailure.finding : { kind: 'nothing' }, error.code) : t('chat.errorOther')}</p>
             {canRetry && (
               <button
                 type="button"

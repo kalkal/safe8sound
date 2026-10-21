@@ -7,7 +7,7 @@ import { LAYOUTS } from './surface/registry.js';
 // The parts of the screen every layout shows, right after the layouts' own styles, where they always were.
 import './ui/screen-parts.css';
 import './controls.css';
-import { ok, type ErrorEnvelope, type HomeStatus, type Result, type ScenarioId, type SetScenarioInput } from '@cold-reserve/contracts';
+import { ok, type ErrorEnvelope, type HomeStatus, type InboxMessage, type Result, type ScenarioId, type SetScenarioInput } from '@cold-reserve/contracts';
 import { setLocale } from '@cold-reserve/i18n';
 import { cardThemeFor, installTapMarks } from '@cold-reserve/ui-cards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -28,6 +28,7 @@ import { PHONE_BESIDE, PhoneOpener, PhonePeek, PhoneSheet, usePhoneSheet } from 
 import { CardFrame } from './host/CardFrame.js';
 import { examplesFor, isGridDown } from './ui/ExampleQuestions.js';
 import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
+import { readPhoneAgain, whatChangedAfter, type FailedTurnFinding } from './ui/failed-turn.js';
 import { useHomePanel } from './ui/HomePanel.js';
 import { ReserveClock } from './ui/ReserveClock.js';
 import { SimClock } from './ui/SimClock.js';
@@ -273,8 +274,15 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // are read through a ref: the turn may start before this render's settings are drawn.
   const settingsRef = useRef(demoSettings);
   settingsRef.current = demoSettings;
+  // #477: the phone, the home and the home's time as they were when the turn started, to tell after a failure what changed.
+  const beforeTurn = useRef<{ phone: readonly InboxMessage[]; home: HomeStatus | undefined; at: string | undefined }>({ phone: [], home: undefined, at: undefined });
+  const homeNow = useRef(home);
+  homeNow.current = home;
+  const clockNow = useRef(clock?.now);
+  clockNow.current = clock?.now;
   const prepareTurn = useCallback(
     async (question: string, context: AskContext): Promise<Result<void, ErrorEnvelope>> => {
+      beforeTurn.current = { phone: phone.messages(), home: homeNow.current, at: clockNow.current };
       const settings = settingsRef.current;
       // Not a sandbox (the shared demo home): nothing simulated to change, the agent answers as it is.
       if (!isPowerCut(question) || settings === undefined) return ok(undefined);
@@ -286,6 +294,22 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       return ok(undefined);
     },
     [cutPower, onSettingsChange],
+  );
+  // #477: after a failed turn, reads only (the home in remote mode, Ana's phone), never the model: what changed is said.
+  // The read carries the failed turn's id, and the finding is logged with it, so the turn's logs and this one meet.
+  const readAfterFailure = useCallback(
+    async (turnId: string): Promise<FailedTurnFinding> => {
+      const [homeRead, phoneAfter] = await Promise.all([
+        homeMode === 'remote' ? fetchHome(agent, { correlationId: turnId }) : Promise.resolve(undefined),
+        readPhoneAgain(phone),
+      ]);
+      if (homeRead?.ok === true) setHome(homeRead.value);
+      const before = beforeTurn.current;
+      const finding = whatChangedAfter({ phoneBefore: before.phone, phoneAfter, homeBefore: before.home, homeAfter: homeRead?.ok === true ? homeRead.value : undefined, since: before.at });
+      log({ level: 'info', code: 'turn_after_failure', correlationId: turnId, details: { finding: finding.kind } });
+      return finding;
+    },
+    [agent, homeMode],
   );
   const idleReading = { agent, enabled: scripted || sessionToken !== undefined, scenarioId: demoSettings?.scenarioId, gridDown, now: clock?.now };
   const reserve = useReserve(idleReading);
@@ -442,6 +466,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                 onClosePage={closePage}
                 appliedTurns={appliedTurns}
                 prepareTurn={prepareTurn}
+                readAfterFailure={readAfterFailure}
                 {...(hasSandbox && clock !== undefined ? { simNow: clock.now } : {})}
                 playthrough={playthrough}
                 idle={

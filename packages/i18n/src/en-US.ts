@@ -33,6 +33,12 @@ export const enUS = {
   'chat.degraded': "I can't reach the assistant right now, so this is a scripted answer.",
   'chat.errorTransient': "I can't answer right now. Try again in a moment.",
   'chat.errorTimeout': 'That took too long. Please try again.',
+  // #477: a failed turn whose action may have gone through says so (owner's choice, 20 Oct: robust over specific), its
+  // words starting from what happened (review of #491).
+  'chat.failedPrefixTimeout': 'That took too long',
+  'chat.failedPrefixUnavailable': "I couldn't finish the answer",
+  'chat.mayHaveGoneThroughTold': '{prefix}, but it may have gone through: Ana was told at {time}.',
+  'chat.mayHaveGoneThroughHome': '{prefix}, but it may have gone through: the home has changed — see the card.',
   'chat.errorOther': 'Something went wrong with this answer. Try asking in a different way.',
   'chat.retry': 'Try again',
   // One answer at a time (owner's choice, 10 Oct): the labels are what a person would say.
