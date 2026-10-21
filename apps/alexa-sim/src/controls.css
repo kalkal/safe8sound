@@ -912,16 +912,25 @@
     }
   }
 
-  /* On a phone the top bar is two lines (the title, then the buttons): the notice comes under both, never over a button. */
-  @media (width < 48rem) {
-    .phone-peek {
-      inset-block-start: calc(var(--target-min) * 2 + var(--space-1));
-    }
-  }
-
   .phone-peek-avatar {
     inline-size: 2.5rem;
     block-size: 2.5rem;
+  }
+
+  /* On a phone the screen's own buttons (the menu, the bell) start right under the top bar: a notice there took their
+     taps for 8 s after the storm. It comes down over the top bar instead, like a phone's own notice, and ends above the
+     screen; its button opens Ana's phone like the one of the bar it covers (e2e/layout/phone-peek.spec.ts). */
+  @media (width < 48rem) {
+    .phone-peek {
+      inset-block-start: var(--space-1);
+      gap: var(--space-2);
+      padding: var(--space-1) var(--space-2);
+    }
+
+    .phone-peek-avatar {
+      inline-size: 2rem;
+      block-size: 2rem;
+    }
   }
 
   .demo-power-cut {
