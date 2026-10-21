@@ -1,6 +1,5 @@
 import { join } from 'node:path';
 import { test, type Page } from '@playwright/test';
-import { FAKE_MODEL } from './target.js';
 
 // Before and after (owner rule, 18 Oct): each known bug is a step of its own in a journey, named in brackets. A step
 // that fails today is marked `test.fail()` (the "before"); when its fix lands it passes, the run turns red on
@@ -41,12 +40,6 @@ export const probing = PROBE;
 const TALLER_THAN_THE_WINDOW: ReadonlySet<string> = new Set<string>();
 
 /**
- * A bug of the fake model's answers: marked on the local chain only. Against a deployed site the real model answers,
- * and the step checks it as it should be.
- */
-const fakeModel = (bug: string): string | undefined => (FAKE_MODEL ? bug : undefined);
-
-/**
  * The known bugs and why they fail today (the owner's findings of 18 Oct, docs and screenshots in the PR); undefined:
  * it passes today. Fixed by #431 (marks taken off): the clock bar at the desktop sizes, the drawer's chosen state and
  * its confirmation, the drawer as a modal, "Restart the day" reading the clock again, the home read after the code,
@@ -60,9 +53,9 @@ export const BUGS = {
    */
   oneScreen: (size: { readonly id: string }): string | undefined => (TALLER_THAN_THE_WINDOW.has(size.id) ? 'The page is taller than the window at this size.' : undefined),
   /**
-   * "Is the storm over?" after the power is back prepares storm mode again and Ana gets one more message. Two bugs: the
-   * fake model sends every sentence with "storm" to start_storm_mode (apps/agent/src/evals/fake-world.ts), and the
-   * server lets start_storm_mode open a storm again after "power back" on the same day.
+   * Fixed 21 Oct: "Is the storm over?" after the power is back used to prepare storm mode again and tell Ana once more
+   * (the server let start_storm_mode open a storm after "power back"). With the grid up and no storm forecast the tool now
+   * refuses and tells no one, so the check passes and stays as a guard.
    */
-  stormAgain: fakeModel('A question about the storm after the power is back prepares storm mode again and tells Ana again.'),
+  stormAgain: undefined as string | undefined,
 } as const;

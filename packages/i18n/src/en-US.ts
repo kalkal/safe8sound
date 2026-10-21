@@ -271,6 +271,11 @@ export const enUS = {
     '{product} notice for {name}: a storm is expected and the home is ready for a power cut. {room} is at {temp}; if the power goes out, the battery keeps it safe {untilSafe}. {action} Next message: if the power goes out.',
   'storm.preparedWithin':
     '{product} notice for {name}: a storm is expected and the home is ready for a power cut. {room} is at {temp}; if the power goes out, it stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. {action} Next message: if the power goes out.',
+  // 21 Oct: the person at home asked for it with no storm in the forecast: said as that, never as a forecast storm.
+  'storm.preparedAtRequest':
+    '{product} notice for {name}: the home is ready for a power cut, prepared at the request of the person at home (the forecast shows no storm). {room} is at {temp}; if the power goes out, the battery keeps it safe {untilSafe}. {action} Next message: if the power goes out.',
+  'storm.preparedAtRequestWithin':
+    '{product} notice for {name}: the home is ready for a power cut, prepared at the request of the person at home (the forecast shows no storm). {room} is at {temp}; if the power goes out, it stays within its limits until about {withinUntil} (battery until {safeUntil}), then gets warmer. {action} Next message: if the power goes out.',
   // #390: what the family is asked to do, never "no action" with the safe room above its limit; a time on a later day says so.
   'storm.action.none': 'No action is needed now.',
   'storm.action.check': '{room} is above its {limit} limit: please check on them.',
@@ -524,7 +529,7 @@ export const enUS = {
   'phone.essential_level': 'Essential settings on',
   'phone.power_back': 'Power is back at home',
   'phone.last_resort_applied': 'Home battery low: please check in',
-  'phone.storm_prepared': 'Storm expected: the home is ready',
+  'phone.storm_prepared': 'Home ready for a storm',
   // The family's replies (queue item 3, #24): a closed set, by touch.
   'phone.replies': 'Reply',
   'phone.onMyWay': "I'm on my way",

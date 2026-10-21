@@ -14,7 +14,7 @@ describe('start_storm_mode', () => {
       effectiveMode: 'prepare',
       reserveUnlocked: false,
       reason: 'grid_still_up',
-      session: { phase: 'prepare', trigger: 'user', safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], notifications: [{ transition: 'storm_prepared', contactRole: 'daughter', delivered: true }] },
+      session: { phase: 'prepare', trigger: 'forecast', safeRoomId: 'bedroom-1', occupantRoles: ['grandpa'], notifications: [{ transition: 'storm_prepared', contactRole: 'daughter', delivered: true }] },
     });
     expect((await w.inbox()).map((m) => m.transition)).toEqual(['storm_prepared']);
     // Once per storm: asking again tells no one more.
@@ -106,9 +106,10 @@ describe('start_storm_mode', () => {
     await startStormMode(w.deps, { mode: 'prepare' }, w.ctx); // the grid is back: the window starts
     w.advanceTo(19 + (stormConfig().stableGridMinutes + 1) / 60);
     const out = await startStormMode(w.deps, { mode: 'prepare' }, w.ctx);
-    // The request itself then opens a new preparation, as asked: a new storm, so its own forecast message (#390).
-    expect((await w.inbox()).map((m) => m.transition)).toEqual(['storm_prepared', 'power_back', 'storm_started']);
-    expect(out.ok && out.value).toMatchObject({ effectiveMode: 'prepare', reason: 'requested', session: { phase: 'prepare', notifications: [{ transition: 'storm_prepared' }] } });
+    // The storm has ended and none is left in the forecast: the request starts no new preparation without the person's confirmation and tells no one more
+    // (21 Oct: what the person says cannot make a storm; before, it opened a new storm with its own forecast message, #390).
+    expect((await w.inbox()).map((m) => m.transition)).toEqual(['power_back', 'storm_started']);
+    expect(!out.ok && out.error).toMatchObject({ code: 'confirmation_required', details: { field: 'confirmed' } });
   });
 
   it('saves the session in the store', async () => {

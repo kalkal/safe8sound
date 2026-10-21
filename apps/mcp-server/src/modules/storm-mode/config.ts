@@ -9,6 +9,8 @@ export const StormModeConfigSchema = z.strictObject({
   $comment: z.string().optional(),
   schemaVersion: z.literal(1),
   capHours: z.number().positive().max(72),
+  /** A storm is prepared or started on request only when the forecast gives it at least this chance (0 to 1), or one is open, or the grid is down. */
+  minStormProbability: z.number().min(0).max(1),
   stableGridMinutes: positiveInt(120),
   minIntervalMinutes: positiveInt(24 * 60),
   /** A family phone may reply again after this many seconds, per role (queue item 3, #24). */

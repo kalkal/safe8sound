@@ -25,7 +25,10 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
         description:
           'Prepares the home for a storm ("prepare"), or makes storm mode active ("active"). Active needs the grid measured down: ' +
           'with the grid up it only prepares, and the storm reserve stays locked. It also checks the grid first: a storm that began or ended ' +
-          'is recorded and the registered family is told. Returns the safe hours of the safe room.',
+          'is recorded and the registered family is told. With the grid up, no storm open and none in the forecast it starts nothing and ' +
+          'tells no one, whatever the person said: it answers that the forecast shows no storm, and you ask the person if they want the home ' +
+          'ready anyway; only after their yes, call it again with confirmed true (the family is then told it was at their request). ' +
+          'Returns the safe hours of the safe room.',
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         input: StartStormModeInputSchema,
         output: StartStormModeOutputSchema,

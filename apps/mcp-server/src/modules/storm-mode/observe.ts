@@ -160,6 +160,8 @@ export function messageFields(o: Observed, session: StormSession | undefined): S
     // #390: the limit in force at the reading: above it the family is asked to check, never told "no action".
     limitC: o.limitNow.limitC,
     timeZone: o.home.profile.location.tz,
+    // A preparation the person asked for with no storm in the forecast is said as that (21 Oct); only its first message is about it.
+    ...(session?.trigger === 'user' ? { preparedAtRequest: true } : {}),
   };
 }
 

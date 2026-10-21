@@ -1,4 +1,5 @@
 import { tool, type ToolList } from '@strands-agents/sdk';
+import { stormNotForecastMessage } from '@cold-reserve/contracts';
 import { z } from 'zod';
 import type { FakePolicy } from '../fake-model.js';
 import { PLAN_TOOLS } from '../prompts.js';
@@ -26,6 +27,8 @@ const REFUSED_PLAN = 'The safety check refused the plan you proposed: the plan t
 
 function summaryOf(name: (typeof PLAN_TOOLS)[number], input: Record<string, unknown>): string {
   if (name === 'plan_comfort' && typeof input['setpointC'] === 'number' && input['setpointC'] < 22) return REFUSED_PLAN;
+  // The home's state wins over the person's words (21 Oct): "active" with the grid up and no storm forecast is refused as the tool does.
+  if (name === 'start_storm_mode' && input['confirmed'] !== true && input['mode'] === 'active') return `Error: ${stormNotForecastMessage()}`;
   return SUMMARIES[name];
 }
 
@@ -46,6 +49,10 @@ const RULES: readonly [RegExp, (typeof PLAN_TOOLS)[number], Record<string, unkno
   [/living.room/, 'plan_comfort', { goal: 'cool', roomIds: ['living'] }],
   [/\bcool|comfortable|heatwave/, 'plan_comfort', { goal: 'cool' }],
   [/weather|forecast/, 'get_energy_forecast', {}],
+  // The person says yes to "shall I get the home ready anyway?": the call carries the confirmation (21 Oct).
+  [/ready anyway|get the home ready/, 'start_storm_mode', { mode: 'prepare', confirmed: true }],
+  // The person says the power went out; the home says the grid is on: the model asks for "active" and is asked to confirm (21 Oct).
+  [/power (?:just )?(?:went|is) out|lost power/, 'start_storm_mode', { mode: 'active' }],
   [/storm/, 'start_storm_mode', { mode: 'prepare' }],
   // A person by role or by the home's fictional name (#271): Leo is the grandpa.
   [/grandpa|grandma|\bleo\b/, 'get_safe_room_status', {}],
@@ -67,6 +74,9 @@ export const referencePolicy: FakePolicy = (call) => {
     if (emergency !== undefined) return { text: `Call ${emergency} now if ${pronoun(said)} may be unwell. Then I can help with the room.` };
     // A tool error reaches the model as "Error: <text>": the person hears the text, never the prefix.
     const spoken = result.replace(/^Error: /, '');
+    // The tool says what to ask: the model asks it, in the tool's own words.
+    const asks = /Ask the person: "([^"]+)"/.exec(spoken)?.[1];
+    if (asks !== undefined) return { text: asks };
     const first = spoken.split(/(?<=[.;])\s/)[0] ?? spoken;
     // A proposed plan is said and then asked about: apply_plan waits for the person's yes (#230).
     return { text: !result.startsWith('Error: ') && /\bproposed\b/i.test(first) ? `${first} Shall I apply it?` : first };

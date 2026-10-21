@@ -69,7 +69,7 @@ export function startSummary(o: StartOutput, room: RoomLabel = noName, capHours?
   // #390: preparing a storm tells the family too (once per storm), as the storm start does.
   const transition = o.effectiveMode === 'active' ? 'storm_started' : 'storm_prepared';
   const told = o.session.notifications.filter((n) => n.transition === transition && n.delivered);
-  const what = o.effectiveMode === 'active' ? 'the storm started' : 'a storm is expected';
+  const what = o.effectiveMode === 'active' ? 'the storm started' : o.session.trigger === 'user' ? "the home was prepared at the person's request, with no storm in the forecast" : 'a storm is expected';
   const family = told.length > 0 ? `Family told that ${what}: ${told.map((n) => `${n.contactRole} (${n.channel})`).join(', ')}.` : 'No family message was sent.';
   return `${state} The safe room${nameOf(room, o.session.safeRoomId)} is covered for ${hoursText(o.safeHours, capHours)}, ${untilWords(o.safeHours, capHours)} ${untilText(o.safeUntil, o.safeUntil, o.safeHours)}. ${family}${devicesText(o)}`;
 }

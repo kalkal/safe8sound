@@ -1,5 +1,6 @@
 import {
   celsius,
+  stormNotForecastMessage,
   err,
   ok,
   toolError,
@@ -46,8 +47,45 @@ export async function startStormMode(deps: StormModeDeps, input: StartStormModeI
   if (!read.ok) return read;
   const observed = await detect(deps, read.value, readingEvent(read.value));
   if (!observed.ok) return observed;
+  // What the person says cannot make a forecast (the owner's manual test, 21 Oct): with the grid up, no storm open and none in
+  // the forecast, nothing starts until the person confirms (they may know before the forecast does). Then the family hears
+  // that the home was prepared at their request (trigger "user"), never that a storm is forecast. The grid measured down,
+  // an open storm and a forecast storm (trigger "forecast") need no confirmation.
+  const home = observed.value;
+  const open = home.session !== undefined && home.session.phase !== 'ended';
+  const maxStormProb = Math.max(0, ...home.home.forecast().hourly.map((h) => h.stormProb));
+  const forecastStorm = maxStormProb >= deps.config.minStormProbability;
+  const unforecast = home.snapshot.gridAvailable && !open && !forecastStorm;
+  if (unforecast && input.confirmed !== true) {
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'info',
+      component: 'mcp-server',
+      message: 'A storm was asked for with the grid on and none forecast: nothing was started until the person confirms.',
+      correlationId: ctx.correlationId,
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      category: 'validation',
+      details: { event: 'storm_not_forecast', mode: input.mode, maxStormProb, ...homeDetail(ctx.homeId) },
+    });
+    // The reading above can itself end a storm (power back, the family told) in this same call: the text says so.
+    const endedAStorm = read.value.session !== undefined && read.value.session.phase !== 'ended' && home.session?.phase === 'ended';
+    return err(toolError('confirmation_required', stormNotForecastMessage(endedAStorm), { details: { field: 'confirmed' } }));
+  }
+  if (unforecast) {
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'info',
+      component: 'mcp-server',
+      message: 'A preparation was confirmed with the grid on and no storm forecast: the family is told it was at the request of the person at home.',
+      correlationId: ctx.correlationId,
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      category: 'validation',
+      details: { event: 'storm_confirmed_anyway', mode: input.mode, maxStormProb, ...homeDetail(ctx.homeId) },
+    });
+  }
   const at = new Date(observed.value.nowMs).toISOString();
-  const o = await detect(deps, observed.value, { type: 'request', mode: input.mode, trigger: 'user', at, gridAvailable: observed.value.snapshot.gridAvailable });
+  const trigger = forecastStorm ? 'forecast' : 'user';
+  const o = await detect(deps, observed.value, { type: 'request', mode: input.mode, trigger, at, gridAvailable: observed.value.snapshot.gridAvailable });
   if (!o.ok) return o;
   const session = o.value.session;
   if (session === undefined || session.phase === 'ended') return err(toolError('unexpected_error', 'The storm request left no open session.'));

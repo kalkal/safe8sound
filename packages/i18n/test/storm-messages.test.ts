@@ -127,6 +127,22 @@ describe('storm family messages (Mileti: source, hazard, place, status, time, wh
     expect(it.ok && it.value).toContain('almeno fino alle 15:00 di domani.');
   });
 
+  it('21 Oct: a preparation the person asked for with no storm in the forecast says so, never that a storm is expected', () => {
+    const atMs = Date.parse('2026-07-17T10:00:00Z');
+    const r = stormMessage('en-US', 'storm_prepared', 'Ana', { ...fields, atMs, safeUntilMs: atMs + 24 * 3_600_000, safeUntilCapped: true, preparedAtRequest: true });
+    expect(r.ok && r.value).toContain('the home is ready for a power cut, prepared at the request of the person at home (the forecast shows no storm).');
+    expect(r.ok && r.value).not.toMatch(/storm is expected/i);
+    const within = stormMessage('en-US', 'storm_prepared', 'Ana', { ...fields, atMs, safeUntilMs: atMs + 3 * 3_600_000, withinLimitsUntilMs: atMs + 5 * 3_600_000, preparedAtRequest: true });
+    expect(within.ok && within.value).toContain('prepared at the request of the person at home');
+    expect(within.ok && within.value).toContain('stays within its limits until about');
+    const it = stormMessage('it-IT', 'storm_prepared', 'Ana', { ...fields, atMs, safeUntilMs: atMs + 24 * 3_600_000, safeUntilCapped: true, preparedAtRequest: true });
+    expect(it.ok && it.value).toContain('preparata su richiesta di chi è in casa (le previsioni non danno temporali)');
+    // The other transitions never change with the flag.
+    const plain = stormMessage('en-US', 'storm_started', 'Ana', { ...fields, atMs, safeUntilMs: atMs + 3_600_000 });
+    const flagged = stormMessage('en-US', 'storm_started', 'Ana', { ...fields, atMs, safeUntilMs: atMs + 3_600_000, preparedAtRequest: true });
+    expect(flagged).toEqual(plain);
+  });
+
   it('#390: a storm expected and the home prepared: the hazard ahead, the room, what the battery would do if the power goes out', () => {
     const atMs = Date.parse('2026-07-17T10:00:00Z'); // noon in Rome
     const r = stormMessage('en-US', 'storm_prepared', 'Ana', { ...fields, atMs, safeUntilMs: atMs + 24 * 3_600_000, safeUntilCapped: true });

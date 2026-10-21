@@ -1,6 +1,8 @@
 // Rules on the words the assistant says (found on the real site, 20 Oct): one place for the evals of the agent and for the
 // journeys that read the real model's answers. Light and robust: patterns for a kind of mistake, never an exact sentence.
 
+import { STORM_NOT_FORECAST_START } from '@cold-reserve/contracts';
+
 export interface AnswerRule {
   readonly id: string;
   /** What is wrong, for the report. */
@@ -53,10 +55,27 @@ export function refusalNamesUnaskedNumber(answer: string, question: string): boo
   return !askedNumbers(question).some((asked) => asked === value || (inFahrenheit && Math.abs(((asked - 32) * 5) / 9 - value) <= 0.1));
 }
 
-/** The ids of the rules the text breaks, in order. With the question, also the rules that compare the answer with it. */
-export function answerRuleViolations(text: string, question?: string): string[] {
+const ASKS_TO_GET_READY = /\?/;
+const SAYS_NOTHING_STARTED = /\b(?:nothing (?:was|has been) started|no storm (?:was|has been) started|no storm (?:is|was) (?:forecast|expected)|the forecast (?:i read )?(?:shows|reads|says) no storm|not (?:started|prepared)|did(?: not|n['’]t) (?:start|prepare)|no one (?:was|has been) told|nobody (?:was|has been) told|(?:haven['’]t|have not|did not|didn['’]t) (?:told|notified|informed))\b/i;
+const CLAIMS_IT_DID = /\b(?:i(?:['’]ve| have)? (?:prepared|started|told|notified|informed|alerted)|(?:storm mode is|the home is) (?:ready|prepared|active)|(?:the )?family (?:was|has been|is) (?:told|notified|informed)|(?:a )?storm is (?:expected|forecast|coming))\b/i;
+
+/**
+ * A storm-mode request the home did not start (grid on, no storm forecast, 21 Oct: the model said "I told the family a storm is
+ * expected" after the owner said the power went out): the answer must say the forecast shows no storm or that nothing was
+ * started, ask whether to get the home ready anyway, and never claim it started, told anyone or that a storm is coming.
+ */
+export function ignoresStormRefusal(answer: string, toolResults: readonly string[]): boolean {
+  if (!toolResults.some((r) => r.includes(STORM_NOT_FORECAST_START))) return false;
+  const honest = SAYS_NOTHING_STARTED.test(answer) && ASKS_TO_GET_READY.test(answer);
+  return !honest || CLAIMS_IT_DID.test(answer.replace(SAYS_NOTHING_STARTED, ''));
+}
+
+/** The ids of the rules the text breaks, in order. With the question and the tool results, also the rules that compare the answer with them. */
+export function answerRuleViolations(text: string, question?: string, toolResults: readonly string[] = []): string[] {
   const broken = ANSWER_RULES.filter((r) => r.pattern.test(text)).map((r) => r.id);
-  return question !== undefined && refusalNamesUnaskedNumber(text, question) ? [...broken, 'refusal-names-unasked-number'] : broken;
+  if (question !== undefined && refusalNamesUnaskedNumber(text, question)) broken.push('refusal-names-unasked-number');
+  if (ignoresStormRefusal(text, toolResults)) broken.push('ignores-storm-refusal');
+  return broken;
 }
 
 /**

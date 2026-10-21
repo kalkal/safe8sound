@@ -1,4 +1,4 @@
-import { ErrorEnvelopeSchema, HomeIdSchema, NotifyFamilyOutputSchema, SafeRoomStatusSchema, StartStormModeOutputSchema } from '@cold-reserve/contracts';
+import { ErrorEnvelopeSchema, HomeIdSchema, NotifyFamilyOutputSchema, SafeRoomStatusSchema, StartStormModeOutputSchema, stormNotForecastMessage } from '@cold-reserve/contracts';
 import { demoProfile } from '@cold-reserve/source-simulator';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -111,10 +111,15 @@ describe('storm blackout (seeded): prepare, the grid drops, the family is told, 
       const back = await call('start_storm_mode', { mode: 'prepare' });
       expect(StartStormModeOutputSchema.parse(back.structuredContent).effectiveMode).toBe('active'); // not yet stable
       atHour(18.6 + 11 / 60);
-      await call('start_storm_mode', { mode: 'prepare' });
-      // The last request, after power back, prepares a new storm as asked: its own forecast message (#390), newest first.
-      expect((await inbox()).map((m) => m.transition)).toEqual(['storm_prepared', 'power_back', 'essential_level', 'storm_started', 'storm_prepared']);
-      expect((await inbox())[1]?.text).toContain(`power came back at home at ${clock(gridBackMs)}.`);
+      // This request ends the storm ("power is back"). With the grid up and no storm left in the forecast it opens no new one
+      // and asks for the person's confirmation: an error result as a value that the SDK client returns (it does not throw),
+      // so the agent hands the model the question (21 Oct: what the person says cannot make a storm).
+      const refused = await call('start_storm_mode', { mode: 'prepare' });
+      expect(refused).toMatchObject({ isError: true, structuredContent: { code: 'confirmation_required', details: { field: 'confirmed' } } });
+      expect(textOf(refused)).toBe(stormNotForecastMessage(true));
+      // newest first
+      expect((await inbox()).map((m) => m.transition)).toEqual(['power_back', 'essential_level', 'storm_started', 'storm_prepared']);
+      expect((await inbox())[0]?.text).toContain(`power came back at home at ${clock(gridBackMs)}.`);
     } finally {
       await client.close();
       await server.close();

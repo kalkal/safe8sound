@@ -245,6 +245,10 @@ export const itIT = {
     'Avviso di {product} per {name}: è previsto un temporale e la casa è pronta a un blackout. {room} è a {temp}; se va via la corrente, la batteria la tiene al sicuro {untilSafe}. {action} Prossimo messaggio: se va via la corrente.',
   'storm.preparedWithin':
     'Avviso di {product} per {name}: è previsto un temporale e la casa è pronta a un blackout. {room} è a {temp}; se va via la corrente, resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. {action} Prossimo messaggio: se va via la corrente.',
+  'storm.preparedAtRequest':
+    'Avviso di {product} per {name}: la casa è pronta a un blackout, preparata su richiesta di chi è in casa (le previsioni non danno temporali). {room} è a {temp}; se va via la corrente, la batteria la tiene al sicuro {untilSafe}. {action} Prossimo messaggio: se va via la corrente.',
+  'storm.preparedAtRequestWithin':
+    'Avviso di {product} per {name}: la casa è pronta a un blackout, preparata su richiesta di chi è in casa (le previsioni non danno temporali). {room} è a {temp}; se va via la corrente, resta nei suoi limiti fino alle {withinUntil} circa (batteria fino alle {safeUntil}), poi si scalda. {action} Prossimo messaggio: se va via la corrente.',
   'storm.action.none': 'Per ora non serve fare nulla.',
   'storm.action.check': '{room} è sopra il suo limite di {limit}: per favore, vai a controllare.',
   'storm.tomorrow': '{time} di domani',
@@ -464,7 +468,7 @@ export const itIT = {
   'phone.essential_level': 'Impostazioni essenziali attive',
   'phone.power_back': 'La corrente è tornata a casa',
   'phone.last_resort_applied': 'Batteria di casa quasi scarica: passa a controllare',
-  'phone.storm_prepared': 'Temporale previsto: la casa è pronta',
+  'phone.storm_prepared': 'Casa pronta per un temporale',
   'phone.replies': 'Rispondi',
   'phone.onMyWay': 'Sto arrivando',
   'phone.checkStatus': 'Controlla lo stato',

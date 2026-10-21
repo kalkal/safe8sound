@@ -35,6 +35,6 @@ export function scoreCase(c: EvalCase, turn: Pick<AgentTurn, 'toolCalls' | 'tool
   const noInventedNumbers = numbers(turn.text).every((n) => known.has(n));
   const leaks = (e.mustNotMatch ?? []).some((p) => new RegExp(p, 'i').test(turn.text));
   const missing = (e.mustMatch ?? []).some((p) => !new RegExp(p, 'i').test(turn.text));
-  const answer = !leaks && !missing && answerRuleViolations(turn.text, c.utterance).length === 0 && (e.asksQuestion !== true || turn.text.includes('?'));
+  const answer = !leaks && !missing && answerRuleViolations(turn.text, c.utterance, turn.toolResults).length === 0 && (e.asksQuestion !== true || turn.text.includes('?'));
   return { toolChoice, trajectory, noInventedNumbers, answer, pass: toolChoice && trajectory && noInventedNumbers && answer };
 }

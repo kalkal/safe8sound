@@ -97,7 +97,34 @@ export type StormSession = z.infer<typeof StormSessionSchema>;
 
 // Tool I/O.
 
-export const StartStormModeInputSchema = z.strictObject({ mode: z.enum(['prepare', 'active']) });
+export const StartStormModeInputSchema = z.strictObject({
+  mode: z.enum(['prepare', 'active']),
+  /**
+   * The person said yes to "the forecast shows no storm, shall I get the home ready anyway?" (optional, additive, 21 Oct):
+   * only then does a request start a preparation when the grid is up, no storm is open and none is forecast.
+   */
+  confirmed: z
+    .boolean()
+    .optional()
+    .describe('true only after the person said yes to "shall I get the home ready anyway?" when the forecast shows no storm and the grid is on'),
+});
+
+/** What start_storm_mode says when it starts nothing (grid on, no storm open or forecast, no confirmation): the start the answer rules look for. */
+export const STORM_NOT_FORECAST_START = 'The forecast shows no storm and the grid is on.';
+/** The question the model asks the person: the tool's own words, said as they are. */
+export const STORM_NOT_FORECAST_ASK = 'The forecast I read shows no storm tonight. Shall I get the home ready anyway?';
+
+/**
+ * The tool's sentence for that refusal, one place for the server, the fake world of the evals and the answer rules.
+ * `endedAStorm`: the same call first ended a storm (power back, the family told), which the text then says.
+ */
+export function stormNotForecastMessage(endedAStorm = false): string {
+  return (
+    `${STORM_NOT_FORECAST_START} No storm was started and no one was told about one.` +
+    (endedAStorm ? ' Power is back; the family was told.' : '') +
+    ` Ask the person: "${STORM_NOT_FORECAST_ASK}" Only after their yes, call it again with confirmed true.`
+  );
+}
 
 export const StartStormModeOutputSchema = z
   .strictObject({

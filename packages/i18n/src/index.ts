@@ -82,6 +82,8 @@ export interface StormMessageFields {
   readonly limitC?: number;
   /** The home's time zone, for the times in the message. */
   readonly timeZone: string;
+  /** The preparation was asked for by the person with no storm in the forecast: said so, never as a forecast storm (21 Oct). */
+  readonly preparedAtRequest?: boolean;
 }
 
 /** "06:40": 24 hours in every language, as the cards write the time (a message and a card on one screen never disagree). */
@@ -99,8 +101,10 @@ const STORM_WITHIN_KEYS = {
   storm_prepared: 'storm.preparedWithin',
 } as const satisfies Partial<Record<SendableTransition, MessageKey>>;
 
-const keyOf = (transition: SendableTransition, within: boolean): MessageKey =>
-  within && transition !== 'power_back' ? STORM_WITHIN_KEYS[transition] : STORM_KEYS[transition];
+const keyOf = (transition: SendableTransition, within: boolean, atRequest = false): MessageKey => {
+  if (atRequest && transition === 'storm_prepared') return within ? 'storm.preparedAtRequestWithin' : 'storm.preparedAtRequest';
+  return within && transition !== 'power_back' ? STORM_WITHIN_KEYS[transition] : STORM_KEYS[transition];
+};
 
 /** The local calendar day of an instant in a zone. */
 const dayOf = (ms: number, timeZone: string) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
@@ -126,7 +130,7 @@ function renderStorm(locale: Locale, transition: SendableTransition, addressee: 
   const within = fields.withinLimitsUntilMs;
   const action = actionOf(locale, fields);
   if (!action.ok) return action;
-  return format(locale, keyOf(transition, within !== undefined), {
+  return format(locale, keyOf(transition, within !== undefined, fields.preparedAtRequest === true), {
     ...(within === undefined ? {} : { withinUntil: untilTime(locale, within, fields) }),
     action: action.value,
     name: addressee,
