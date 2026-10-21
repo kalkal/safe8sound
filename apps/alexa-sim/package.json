@@ -2,6 +2,7 @@
   "name": "@cold-reserve/alexa-sim",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "React web app simulating Alexa+ (XState, TanStack Query, MCP Apps host).",
   "type": "module",
   "exports": {

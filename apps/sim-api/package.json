@@ -2,6 +2,7 @@
   "name": "@cold-reserve/sim-api",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Demo auth, hard caps, kill switch, agent proxy, Polly, scripted fallback.",
   "type": "module",
   "exports": {

@@ -2,6 +2,7 @@
   "name": "@cold-reserve/design-tokens",
   "private": true,
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "description": "The single source of the visual style: W3C DTCG tokens.json -> CSS custom properties (light-dark) + typed token names.",
   "type": "module",
   "exports": {

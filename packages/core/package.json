@@ -2,6 +2,7 @@
   "name": "@cold-reserve/core",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Pure domain: thermal, energy, reserve, safe hours, level, season, planner. No I/O.",
   "type": "module",
   "exports": {

@@ -2,6 +2,7 @@
   "name": "@cold-reserve/weather-openmeteo",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "WeatherAdapter: Open-Meteo forecast read from the cache.",
   "type": "module",
   "exports": {

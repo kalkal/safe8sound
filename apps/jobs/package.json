@@ -2,6 +2,7 @@
   "name": "@cold-reserve/jobs",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Scheduled Lambdas: weather fetch, storm tick, weekly export, synthetic check.",
   "type": "module",
   "exports": {

@@ -2,6 +2,7 @@
   "name": "@cold-reserve/notifier-inapp",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Notifier for the simulated in-app phone (templates only).",
   "type": "module",
   "exports": {

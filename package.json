@@ -2,6 +2,7 @@
   "name": "cold-reserve",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Voice agent that turns a home battery into a comfort reserve.",
   "type": "module",
   "packageManager": "pnpm@12.6.0",

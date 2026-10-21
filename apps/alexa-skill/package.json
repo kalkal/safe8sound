@@ -2,6 +2,7 @@
   "name": "@cold-reserve/alexa-skill",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Thin bridge from a classic Alexa custom skill to the MCP server: fixed English answers, no model.",
   "type": "module",
   "exports": {

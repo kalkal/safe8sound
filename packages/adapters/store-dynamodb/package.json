@@ -2,6 +2,7 @@
   "name": "@cold-reserve/store-dynamodb",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "StateStore on the single DynamoDB table.",
   "type": "module",
   "exports": {

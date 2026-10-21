@@ -1,3 +1,7 @@
+Safe-8-Sound
+Copyright 2026 kalkal. Licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only), see LICENSE.
+Third-party code keeps its own license: the notices below apply to the parts they name.
+
 Third-party data in this repository
 
 Weather data for Turin and Houston (packages/adapters/source-simulator/locations/turin*.json, houston*.json):

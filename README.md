@@ -1,5 +1,7 @@
 # Safe-8-Sound
 
+Licensed under the [GNU AGPL v3.0 only](LICENSE), Copyright 2026 kalkal. Third-party code and data keep their own licenses, listed in [NOTICE](NOTICE). Weather data by [Open-Meteo.com](https://open-meteo.com/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
+
 When the heat comes or the power goes out, someone at home needs one room that stays safe: a grandparent, a baby, a person who works from home. Safe-8-Sound is a voice assistant that spends a home battery on that room first, says in plain words how many hours of comfort are left, and lets a set of deterministic checks, not the language model, decide what is allowed.
 
 Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server (spec 2025-11-25, Streamable HTTP), a web simulator of the Alexa+ experience, and an agent that talks to the server.
@@ -189,12 +191,12 @@ spikes/           throwaway spike code, outside the workspace
 ## Status
 | Milestone | Due |
 |---|---|
-| [M0 · Plan checks and spikes](https://github.com/kalkal/safe-8-sound/milestone/1) | 2026-09-29 |
-| [M1 · Hello home (real home + fallback)](https://github.com/kalkal/safe-8-sound/milestone/2) | 2026-10-05 |
-| [M2 · Cold reserve (plan, guard, pacing)](https://github.com/kalkal/safe-8-sound/milestone/3) | 2026-10-10 |
-| [M3 · Storm mode](https://github.com/kalkal/safe-8-sound/milestone/4) | 2026-10-14 |
-| [M4 · Voice and Alexa](https://github.com/kalkal/safe-8-sound/milestone/5) | 2026-10-18 |
-| [M5 · Real home extensions](https://github.com/kalkal/safe-8-sound/milestone/6) | 2026-10-18 |
-| [M6 · Submission](https://github.com/kalkal/safe-8-sound/milestone/7) | 2026-10-23 |
+| M0 · Plan checks and spikes | 2026-09-29 |
+| M1 · Hello home (real home + fallback) | 2026-10-05 |
+| M2 · Cold reserve (plan, guard, pacing) | 2026-10-10 |
+| M3 · Storm mode | 2026-10-14 |
+| M4 · Voice and Alexa | 2026-10-18 |
+| M5 · Real home extensions | 2026-10-18 |
+| M6 · Submission | 2026-10-23 |
 
-All work is tracked in [issues](https://github.com/kalkal/safe-8-sound/issues).
+Work was tracked in a private working repository.

@@ -2,6 +2,7 @@
   "name": "@cold-reserve/hvac-homeassistant",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "HvacAdapter over the Home Assistant climate domain (read-only).",
   "type": "module",
   "exports": {

@@ -2,6 +2,7 @@
   "name": "@cold-reserve/guard",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Composable guard constraints; every check returns a GuaranteeResult.",
   "type": "module",
   "exports": {

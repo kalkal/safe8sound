@@ -2,6 +2,7 @@
   "name": "@cold-reserve/i18n",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Message catalogs for every user-facing string.",
   "type": "module",
   "exports": {

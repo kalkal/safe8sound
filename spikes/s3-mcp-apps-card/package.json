@@ -2,6 +2,7 @@
   "name": "spike-s3-mcp-apps-card",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Throwaway spike S3: MCP Apps card (ui://) rendered in a React host through the ext-apps AppBridge, styled only by DTCG tokens. Not part of the workspace.",
   "type": "module",
   "engines": {

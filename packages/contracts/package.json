@@ -2,6 +2,7 @@
   "name": "@cold-reserve/contracts",
   "private": true,
   "version": "1.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Shared Zod schemas, branded units, error codes and envelopes (leaf package: depends on Zod only).",
   "type": "module",
   "exports": {

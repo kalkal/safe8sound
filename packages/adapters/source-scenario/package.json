@@ -2,6 +2,7 @@
   "name": "@cold-reserve/source-scenario",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Scenario strategy on top of the last real snapshot; origin simulated.",
   "type": "module",
   "exports": {

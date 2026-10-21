@@ -2,6 +2,7 @@
   "name": "spike-s1-mcp-server",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Throwaway spike S1: stateless MCP server over Streamable HTTP (spec 2025-11-25). Not part of the workspace.",
   "type": "module",
   "engines": {

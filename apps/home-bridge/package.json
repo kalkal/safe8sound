@@ -2,6 +2,7 @@
   "name": "@cold-reserve/home-bridge",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "description": "Runs at home: outbound only, read-only, 24 h buffer.",
   "type": "module",
   "exports": {
