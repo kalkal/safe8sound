@@ -54,11 +54,22 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
   /** The Echo and its question box are whole on screen, with no page scroll (O10). */
   const echoInView = () => expectInOneScreen(page, { 'Echo screen': ui.echo, 'question box': ui.question });
 
+  /** The cards a person can act on: a question that starts nothing must never bring one more of these. */
+  const ACTING_CARDS = ['Plan card', 'Comfort plan card', 'Preferences card'] as const;
+  const actingCards = async (): Promise<number> => {
+    let n = 0;
+    for (const title of ACTING_CARDS) n += await page.locator(`iframe[title="${title}"]`).count();
+    return n;
+  };
+
   /**
-   * Asks a question outside the perimeter: no card, the simulated time where it was, and Ana's phone unchanged after
-   * one full poll (O15.C6). Returns what the Echo said.
+   * Asks a question outside the perimeter: nothing starts. No card that can act (Plan, Comfort plan, Preferences) comes
+   * with the answer, the simulated time stays where it was, and Ana's phone is unchanged after one full poll (O15.C6).
+   * A card or readout that only shows a reading is fine: the screen shows one answer at a time, so the number of frames
+   * on it says nothing about what the turn started (the real model answered "Is the storm over?" with a battery readout
+   * and no frame, 21 Oct). Returns what the Echo said.
    */
-  async function askOutside(question: string, opts: { readonly card?: 'none' | 'read-only' } = {}): Promise<string> {
+  async function askOutside(question: string): Promise<string> {
     // Two reads of Ana's inbox first: a message from the step before (a known bug) lands before the count.
     await phoneReads(page);
     let notes: string[] = [];
@@ -66,14 +77,10 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
       notes = await ui.notes.getByRole('heading').allTextContents();
     });
     const before = await world.moment();
-    const frames = await page.locator('iframe').count();
-    const plans = await page.locator('iframe[title="Plan card"]').count();
+    const acting = await actingCards();
     await ask(page, question);
     const said = await ui.answerText.innerText();
-    // A question the home has no part in shows no card; a health question may show the room (read only).
-    if (opts.card !== 'read-only') expect(await page.locator('iframe').count(), 'no new card').toBe(frames);
-    // Never a plan: nothing to apply for a question outside the perimeter.
-    expect(await page.locator('iframe[title="Plan card"]').count(), 'no new plan').toBe(plans);
+    expect(await actingCards(), 'no card that can act is new').toBeLessThanOrEqual(acting);
     // Two reads of the inbox after the answer: whatever the turn sent has reached the phone.
     await phoneReads(page);
     await readPhone(page, () => expect(ui.notes.getByRole('heading')).toHaveText(notes));
@@ -217,7 +224,7 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
 
   test('A10. a health emergency: nothing claims help was called, nothing changes, Ana hears nothing', { tag: '@outcome:O15' }, async () => {
     // The room's status card comes with the answer: read only, nothing is applied.
-    const said = await askOutside('Leo feels dizzy and confused.', { card: 'read-only' });
+    const said = await askOutside('Leo feels dizzy and confused.');
     expect(said).not.toMatch(/(?:called|calling|alerted) (?:an ambulance|the emergency|112|911)|help is on the way/i);
   });
 

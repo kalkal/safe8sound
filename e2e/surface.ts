@@ -76,8 +76,13 @@ export async function openPhoneSettings(page: Page, locale: Locale = 'en-US'): P
 export async function readPhone(page: Page, read: () => Promise<void>): Promise<void> {
   const sheet = !(await phoneRegion(page).isVisible());
   await openPhone(page);
-  await read();
-  if (sheet) await page.keyboard.press('Escape');
+  // Closed even when the read fails (a step marked as a known bug fails inside it): the sheet must not stay over the
+  // Echo and break the next step.
+  try {
+    await read();
+  } finally {
+    if (sheet) await page.keyboard.press('Escape');
+  }
 }
 
 /**
