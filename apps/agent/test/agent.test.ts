@@ -4,6 +4,7 @@ import { ModelError, tool } from '@strands-agents/sdk';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createAgent } from '../src/agent.js';
+import type { AgentLogEntry } from '../src/log.js';
 import type { AgentConfig } from '../src/config.js';
 import { FakeModel } from '../src/fake-model.js';
 import { blockedConnections } from './no-network.js';
@@ -47,6 +48,37 @@ describe('createAgent on the Strands loop with the fake model', () => {
     await agent.ask('Hi');
     expect(model.getConfig().maxTokens).toBe(400);
     expect(model.calls[0]?.systemPrompt).toContain(PRODUCT_NAME);
+  });
+
+  it('logs each tool call with the few input fields that say what the model asked for, never free text (21 Oct: was the forecast sent as a setpoint?)', async () => {
+    const logs: AgentLogEntry[] = [];
+    const planner = tool({ name: 'plan_comfort', description: 'Test-only planner.', inputSchema: z.looseObject({}), callback: () => 'Plan p-1 proposed.' });
+    const model = new FakeModel((call) =>
+      call.toolResults.length === 0
+        ? { toolUse: { name: 'plan_comfort', input: { goal: 'cool', setpointC: 26.5, roomIds: ['bedroom-1', 'living'], note: 'my daughter Ana lives at 12 Elm Street' } } }
+        : { text: 'Done.' },
+    );
+    await answered(createAgent({ config: CONFIG, model, tools: [planner], log: (e) => logs.push(e) }).ask('Keep Leo cool.', { correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60' }));
+    const line = logs.find((l) => l.details?.['event'] === 'tool_call');
+    expect(line).toMatchObject({
+      level: 'info',
+      component: 'agent',
+      message: 'tool_call',
+      correlationId: '0b6f3c1e-5a0d-4f7e-9d0a-2b1c3d4e5f60',
+      details: { event: 'tool_call', tool: 'plan_comfort', goal: 'cool', setpointC: 26.5, rooms: 2 },
+    });
+    // Only whitelisted fields: nothing the model wrote in free text reaches a log line.
+    expect(JSON.stringify(line)).not.toMatch(/Elm Street|Ana|bedroom-1/);
+  });
+
+  it('logs a goal, a mode or a tool the tools do not define as "other", never the model’s own text', async () => {
+    const logs: AgentLogEntry[] = [];
+    const odd = tool({ name: 'get_home_status', description: 'Test-only.', inputSchema: z.looseObject({}), callback: () => 'ok' });
+    const model = new FakeModel((call) => (call.toolResults.length === 0 ? { toolUse: { name: 'get_home_status', input: { goal: 'call-me-on-0155512345', mode: 'ana-lives-at-elm-street' } } } : { text: 'Done.' }));
+    await answered(createAgent({ config: CONFIG, model, tools: [odd], log: (e) => logs.push(e) }).ask('Hi', { correlationId: 'turn-9' }));
+    const line = logs.find((l) => l.details?.['event'] === 'tool_call');
+    expect(line?.details).toMatchObject({ tool: 'get_home_status', goal: 'other', mode: 'other' });
+    expect(JSON.stringify(line)).not.toMatch(/0155512345|elm-street/);
   });
 
   it('runs a tool call and answers with its result', async () => {

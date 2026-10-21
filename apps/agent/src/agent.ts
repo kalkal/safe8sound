@@ -1,9 +1,9 @@
 import { AfterToolCallEvent, Agent, BeforeInvocationEvent, BeforeToolCallEvent, SlidingWindowConversationManager, type Model, type ToolList } from '@strands-agents/sdk';
-import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { PlanGoalSchema, err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
 import type { AgentConfig } from './config.js';
 import { classifyFailure } from './failure.js';
 import { logLine, type AgentLogEntry } from './log.js';
-import { buildSystemPrompt } from './prompts.js';
+import { PLAN_TOOLS, buildSystemPrompt } from './prompts.js';
 
 export interface AgentTurn {
   readonly text: string;
@@ -15,6 +15,34 @@ export interface AgentTurn {
 }
 
 export type { AgentLogEntry } from './log.js';
+
+/**
+ * One info line per tool call with the few input fields that say what the model asked for (21 Oct: was the forecast sent as a
+ * setpoint?). A whitelist, never the model's free text: the tool, the goal or mode, the setpoint, whether it was confirmed, and
+ * how many rooms it named.
+ */
+function toolCallLine(tool: string, input: unknown, correlationId: string | undefined): AgentLogEntry {
+  const fields = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {};
+  // Only values the tools define: anything else the model sent is logged as "other", never its own text.
+  const known = (key: string, values: readonly string[]) => (typeof fields[key] === 'string' ? { [key]: values.includes(fields[key]) ? fields[key] : 'other' } : {});
+  const num = (key: string) => (typeof fields[key] === 'number' && Number.isFinite(fields[key]) ? { [key]: fields[key] } : {});
+  return {
+    ts: new Date().toISOString(),
+    level: 'info',
+    component: 'agent',
+    message: 'tool_call',
+    correlationId: correlationId ?? 'none',
+    details: {
+      event: 'tool_call',
+      tool: (PLAN_TOOLS as readonly string[]).includes(tool) ? tool : 'other',
+      ...known('goal', PlanGoalSchema.options),
+      ...known('mode', ['prepare', 'active']),
+      ...num('setpointC'),
+      ...(typeof fields['confirmed'] === 'boolean' ? { confirmed: fields['confirmed'] } : {}),
+      ...(Array.isArray(fields['roomIds']) ? { rooms: fields['roomIds'].length } : {}),
+    },
+  };
+}
 
 export interface ColdReserveAgent {
   /** Expected failures (model or MCP server unreachable) come back as values. */
@@ -44,6 +72,8 @@ export function createAgent(deps: { config: AgentConfig; model: Model; tools: To
 
   let ran: string[] = [];
   let results: string[] = [];
+  /** The turn the tool calls belong to, for their log lines. */
+  let turnId: string | undefined;
   agent.addHook(BeforeInvocationEvent, () => {
     ran = [];
     results = [];
@@ -57,11 +87,13 @@ export function createAgent(deps: { config: AgentConfig; model: Model; tools: To
       return;
     }
     ran.push(event.toolUse.name);
+    deps.log?.(toolCallLine(event.toolUse.name, event.toolUse.input, turnId));
   });
 
   return {
     async ask(question, opts = {}) {
       const { correlationId } = opts;
+      turnId = correlationId;
       const budgetMs = opts.deadlineMs ?? config.turnDeadlineMs;
       if (budgetMs <= 0) {
         const timeout = toolError('agent_timeout', 'The assistant took too long to answer. Try again in a moment.');

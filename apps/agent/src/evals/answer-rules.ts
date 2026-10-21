@@ -70,11 +70,26 @@ export function ignoresStormRefusal(answer: string, toolResults: readonly string
   return !honest || CLAIMS_IT_DID.test(answer.replace(SAYS_NOTHING_STARTED, ''));
 }
 
+/** A plan result that opens with the guard's refusal of the proposal (the card's own sentence; the fake world words it "...refused the plan you proposed"). */
+const PLAN_REFUSED = /^(?:Error: )?The safety check refused the (?:proposed plan|plan you proposed)/;
+
+/**
+ * A plan the guard refused (21 Oct: the voice said the plan and "9 hours" over a card that said "0 of 6" and never said the
+ * refusal): the first sentence of the answer names it, as the prompt asks ("say that first").
+ */
+export function refusalNotSaidFirst(answer: string, toolResults: readonly string[]): boolean {
+  if (!toolResults.some((r) => PLAN_REFUSED.test(r))) return false;
+  // A point between two digits ("21.5") does not end the sentence.
+  const first = /^(?:[^.?!]|\.(?=\d))*[.?!]/.exec(answer.trim())?.[0] ?? answer;
+  return !/\brefus/i.test(first);
+}
+
 /** The ids of the rules the text breaks, in order. With the question and the tool results, also the rules that compare the answer with them. */
 export function answerRuleViolations(text: string, question?: string, toolResults: readonly string[] = []): string[] {
   const broken = ANSWER_RULES.filter((r) => r.pattern.test(text)).map((r) => r.id);
   if (question !== undefined && refusalNamesUnaskedNumber(text, question)) broken.push('refusal-names-unasked-number');
   if (ignoresStormRefusal(text, toolResults)) broken.push('ignores-storm-refusal');
+  if (refusalNotSaidFirst(text, toolResults)) broken.push('refusal-not-said-first');
   return broken;
 }
 

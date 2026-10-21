@@ -1,7 +1,7 @@
 import { DATA_GROUPS, epochMs, formatTemp, isFullyLive, tempGap, type ApplyPlanOutput, type TempUnit, type CounterfactualLine, type DataOrigin, type LevelStep, type Plan, type ReserveOutlook } from '@cold-reserve/contracts';
 import { localIso, localTimeText } from '@cold-reserve/core';
 import { isHeldUnderFloor, stormKeptClause, up1 } from '@cold-reserve/guard';
-import { lastResortAdvice } from '@cold-reserve/i18n';
+import { format, lastResortAdvice } from '@cold-reserve/i18n';
 import { roomTimeLeads } from './family-alert.js';
 
 // The text content of each tool result. The agent (Strands) reads only this text, not structuredContent
@@ -204,9 +204,11 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
     lr === undefined
       ? `Proposed plan: ${level} level until ${localTimeText(p.horizonAt)}`
       : `Proposed last-resort plan: the safe room alone, ${lastResortHead(lr, p.horizonAt)}`;
-  // A refused proposal (#202): the first words say so and that this plan holds, so the model offers it at once.
-  const refused =
-    p.refusedProposal === undefined ? [] : [`The safety check refused the plan you proposed: ${p.refusedProposal.message} This plan holds instead and is ready to apply.`];
+  // A refused proposal (#202): the first words say so and that this plan holds, so the model offers it at once. The sentence is the
+  // card's own (the same catalog key), so the voice and the screen say the same (21 Oct: a voice said 9 night hours over a card
+  // saying 0 of 6).
+  const refusal = p.refusedProposal === undefined ? undefined : format('en-US', 'plan.refusedProposal', { message: p.refusedProposal.message });
+  const refused = p.refusedProposal === undefined ? [] : [`${refusal?.ok === true ? refusal.value : `The safety check refused the proposed plan: ${p.refusedProposal.message} This plan holds instead.`} It is ready to apply.`];
   const parts = [
     ...refused,
     `${head} (${commanded}), built on ${dataText(p.sourceOrigin)}.`,
@@ -220,14 +222,16 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   // With a crossing time the window says the one end time; the night's hours (grace minutes counted) stay in
   // nightRecovery for the card, never a second duration in the text (#272 review).
   const n = p.nightRecovery;
-  if (n !== undefined && lr?.limitCrossedAt === undefined) parts.push(nightText(n, opts));
+  // A refused proposal gives no night-hours figure for the plan that holds: the card says what the refusal found, and the model
+  // would round or mix the two (21 Oct).
+  if (n !== undefined && lr?.limitCrossedAt === undefined && p.refusedProposal === undefined) parts.push(nightText(n, opts));
   for (const w of p.warnings ?? []) parts.push(`Warning: ${w.message}`);
   const c = p.counterfactual;
   if (c !== undefined) {
     const { noPlan, naive, plan } = c.scenarios;
     // Next to a last resort's crossing time, no second duration for the room's threshold (#299): the night hours
     // (grace minutes counted) stay in the structured counterfactual for the card.
-    const nightHours = lr?.limitCrossedAt === undefined;
+    const nightHours = lr?.limitCrossedAt === undefined && p.refusedProposal === undefined;
     parts.push(
       `Without the plan the safe room${opts.roomNames?.[c.roomId] === undefined ? '' : `, ${opts.roomNames[c.roomId]},`} would peak at ${lineText(noPlan, opts.timeZone, nightHours, opts.unit ?? 'C')}; ` +
         `with the naive plan (air conditioning until the battery dies) at ${lineText(naive, opts.timeZone, nightHours, opts.unit ?? 'C')}; ` +

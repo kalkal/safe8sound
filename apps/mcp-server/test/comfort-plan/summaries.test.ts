@@ -7,6 +7,7 @@ import { applyPlan } from '../../src/modules/comfort-plan/apply-plan.js';
 import { planComfort } from '../../src/modules/comfort-plan/plan-comfort.js';
 import { reserveOutlook } from '../../src/modules/comfort-plan/reserve-outlook.js';
 import { localIso, localTimeText } from '@cold-reserve/core';
+import { format } from '@cold-reserve/i18n';
 import { REAL, guardConfig, world } from './support.js';
 
 // The agent (Strands) reads only the text content of a tool result, not structuredContent (F7): every
@@ -563,13 +564,29 @@ describe('what the model reads', () => {
     expect(outlookSummary(down.value)).toMatch(/^On the battery alone: about /);
   });
 
+  it('a refused proposal gives no bare night-hours figure for the plan that holds: the model read 8.75 as "9" over a card saying "0 of 6" (21 Oct)', async () => {
+    const w = world('heatwave', 14);
+    const r = await planComfort(w.deps, { goal: 'cool' }, w.ctx);
+    if (!r.ok) throw new Error(r.error.message);
+    const refused = { ...r.value, refusedProposal: { code: 'night_recovery_unmet' as const, message: 'The plan keeps the safe room at or below 24 °C for 0 of the 6 night hours it can reach.' } };
+    // (the refusal's own sentence, the card's words, may say them; the plan that holds may not)
+    const text = planSummary(refused, NIGHT).replace(refused.refusedProposal.message, '');
+    expect(text).not.toMatch(/night hours|hours at or below|Night recovery/);
+    expect(text).not.toMatch(/\d+(?:\.\d+)? hours at or below/);
+    // The same plan without a refusal still says them.
+    expect(planSummary(r.value, NIGHT)).toMatch(/Night recovery .*hours at or below 24 °C/);
+    expect(planSummary(r.value, NIGHT)).toMatch(/night hours at or below the threshold/);
+  });
+
   it('a refused proposal: the first words say the guard refused it and why, then that this plan holds and is ready to apply (#202)', async () => {
     const w = world('heatwave', 14);
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(22), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
     if (!r.ok) throw new Error(r.error.message);
     const text = planSummary(r.value, NIGHT);
     expect(r.value.refusedProposal?.message).toMatch(/Nearest allowed: 6000 W\.$/);
-    expect(text.startsWith(`The safety check refused the plan you proposed: ${r.value.refusedProposal?.message ?? ''} This plan holds instead and is ready to apply. Proposed plan: `)).toBe(true);
+    // The card's own sentence (the i18n catalog key the card uses), then that the plan is ready to apply (21 Oct: the voice and the card say the same).
+    const sentence = format('en-US', 'plan.refusedProposal', { message: r.value.refusedProposal?.message ?? '' });
+    expect(sentence.ok && text.startsWith(`${sentence.value} It is ready to apply. Proposed plan: `)).toBe(true);
     // Never sends the model back to propose again: the plan that holds is already here.
     expect(text).not.toMatch(/call plan_comfort again/);
   });

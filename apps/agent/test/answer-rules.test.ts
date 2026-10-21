@@ -52,6 +52,26 @@ describe('answerRuleViolations', () => {
     expect(answerRuleViolations('The safety check refused 36 degrees.')).toEqual([]);
   });
 
+  describe('a plan the guard refused (21 Oct: the voice said "9 hours" over a card saying "0 of 6" and never said the refusal)', () => {
+    const refused = ['The safety check refused the proposed plan: The plan keeps the safe room at or below 24 °C for 0 of the 6 night hours it can reach. This plan holds instead. It is ready to apply. Proposed plan: comfort level until 08:00.'];
+    const asked = "It's going to be 36 degrees tomorrow, keep Leo cool.";
+
+    it('the first sentence names the refusal', () => {
+      expect(answerRuleViolations('The safety check refused that; this plan holds instead: Leo’s room under 26.5 degrees until 08:00. Shall I start it?', asked, refused)).toEqual([]);
+      expect(answerRuleViolations('I can’t keep it that cool, so I made a plan that holds. Shall I start it?', asked, refused)).toEqual(['refusal-not-said-first']);
+      // the sentence of the real failure: the plan said, the refusal never
+      expect(answerRuleViolations('I can keep Leo’s room under 26.5 degrees and give the safe room 9 hours at or below 24 degrees at night. Shall I start it?', asked, refused)).toEqual(['refusal-not-said-first']);
+      // a point between two digits does not end the first sentence ("21.5")
+      expect(answerRuleViolations('I can’t hold 21.5 degrees: the safety check refused it. This plan holds instead. Shall I start it?', asked, refused)).toEqual([]);
+      // said, but not first
+      expect(answerRuleViolations('Leo’s room stays under 26.5 degrees. The safety check refused your first idea. Shall I start it?', asked, refused)).toEqual(['refusal-not-said-first']);
+    });
+
+    it('is not applied without a refusal in the tool results', () => {
+      expect(answerRuleViolations('Leo’s room stays under 26.5 degrees. Shall I start it?', asked, ['Proposed plan: comfort level until 08:00.'])).toEqual([]);
+    });
+  });
+
   describe('a storm-mode request with no storm in the forecast (21 Oct)', () => {
     const noStorm = [`Error: ${stormNotForecastMessage()}`, `Error: ${stormNotForecastMessage(true)}`];
     const said = 'The power went out.';

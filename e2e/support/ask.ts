@@ -17,7 +17,7 @@ export async function ask(page: Page, question: string): Promise<void> {
   const turn = page.waitForResponse((res) => res.request().method() === 'POST' && new URL(res.url()).pathname.endsWith('/v1/turns'), ANSWER_TIMEOUT);
   await page.getByLabel('Ask a question').fill(question);
   await page.getByRole('button', { name: 'Ask' }).click();
-  const reply = (await (await turn).json().catch(() => undefined)) as { text?: unknown } | undefined;
+  const reply = (await (await turn).json().catch(() => undefined)) as { text?: unknown; cards?: unknown } | undefined;
   await expect(slot(page, 'content').getByTestId('answer').last()).toBeVisible(ANSWER_TIMEOUT);
   const where = page.getByRole('navigation', { name: 'Answers' }).getByText(/^Answer \d+ of \d+$/);
   if ((await where.count()) > 0) await expect(where).toHaveText(/^Answer (\d+) of \1$/, ANSWER_TIMEOUT);
@@ -26,7 +26,20 @@ export async function ask(page: Page, question: string): Promise<void> {
   if (typeof reply?.text === 'string') await expect(caption).toContainText(reply.text.slice(0, 30), ANSWER_TIMEOUT);
   else await expect(caption).not.toBeEmpty(ANSWER_TIMEOUT);
   // On the real model only (the fake one says what the tests expect): the rules on the words.
-  if (!FAKE_MODEL && typeof reply?.text === 'string') await checkRealAnswer(page, question, reply.text);
+  if (!FAKE_MODEL && typeof reply?.text === 'string') await checkRealAnswer(page, question, reply.text, refusalsOf(reply.cards));
+}
+
+/**
+ * What the tools told the model that the page can see: a plan card that carries the guard's refusal of the proposal (the page never
+ * has the tool's text, so the sentence is the one the summary and the card share).
+ */
+function refusalsOf(cards: unknown): string[] {
+  if (!Array.isArray(cards)) return [];
+  return cards.flatMap((c: unknown) => {
+    const card = c as { tool?: unknown; result?: { refusedProposal?: { message?: unknown } } } | null;
+    const message = card?.tool === 'plan_comfort' ? card.result?.refusedProposal?.message : undefined;
+    return typeof message === 'string' ? [`The safety check refused the proposed plan: ${message}`] : [];
+  });
 }
 
 /** The words of the cards in the newest answer (they are in frames): what they say about the plan, for the rules below. */
@@ -45,10 +58,10 @@ async function cardsText(page: Page): Promise<string> {
  * and no request to confirm a plan a card shows as applied. Every answer is kept in e2e-results/answers.jsonl (the words
  * only, never the demo code); a broken rule fails the step at its end (soft), with the words and the screen.
  */
-export async function checkRealAnswer(page: Page, question: string, text: string): Promise<void> {
+export async function checkRealAnswer(page: Page, question: string, text: string, toolResults: readonly string[] = []): Promise<void> {
   mkdirSync('e2e-results', { recursive: true });
   appendFileSync('e2e-results/answers.jsonl', JSON.stringify({ at: new Date().toISOString(), question, answer: text }) + String.fromCharCode(10));
-  const broken = answerRuleViolations(text, question);
+  const broken = answerRuleViolations(text, question, toolResults);
   const contradicts = asksToConfirmAnAppliedPlan(text, await cardsText(page));
   if (broken.length > 0 || contradicts) {
     await test.info().attach('answer-breaks-a-rule', { body: await page.screenshot(), contentType: 'image/png' });
