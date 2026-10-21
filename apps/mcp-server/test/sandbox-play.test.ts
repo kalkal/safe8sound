@@ -48,7 +48,7 @@ describe('withHousehold', () => {
 describe('refreshFrom: one settings read per request (C2b)', () => {
   const A = HomeIdSchema.parse('demo#00000000000000aa');
   const settings = SandboxSettingsSchema.parse({ version: 2, updatedAt: '2026-10-04T10:00:00Z', scenarioId: 'heatwave', locationId: 'reference', units: 'C', household: 'older-man' });
-  const play = (version?: number): SandboxPlay => ({ entry: {} as SandboxPlay['entry'], forecast: () => ({}) as ReturnType<SandboxPlay['forecast']>, units: 'C', place: 'reference', scenario: {} as SandboxPlay['scenario'], startMs: 0, ...(version === undefined ? {} : { version }) });
+  const play = (version?: number): SandboxPlay => ({ entry: {} as SandboxPlay['entry'], forecast: () => ({}) as ReturnType<SandboxPlay['forecast']>, units: 'C', household: 'older-man', place: 'reference', scenario: {} as SandboxPlay['scenario'], startMs: 0, ...(version === undefined ? {} : { version }) });
   const storeWith = (read: Awaited<ReturnType<StateStore['getSandboxSettings']>>): StateStoreFactory => () => ({ getSandboxSettings: () => Promise.resolve(read) }) as unknown as StateStore;
   const clock = fixedClock(Date.parse('2026-10-19T07:00:00Z'));
 
@@ -107,7 +107,7 @@ describe('refreshFrom: a new sandbox stores its start at its first request (#449
   const A = HomeIdSchema.parse('demo#00000000000000aa');
   const clock = fixedClock(Date.parse('2026-10-19T07:00:00Z'));
   const firstStart = { scenarioId: 'clear-day', locationId: 'reference', units: 'C', household: 'older-man', scenarioStartedAt: '2026-10-19T06:00:00.000Z' } as const;
-  const fresh = (): SandboxPlay => ({ entry: {} as SandboxPlay['entry'], forecast: () => ({}) as ReturnType<SandboxPlay['forecast']>, units: 'C', place: 'reference', scenario: {} as SandboxPlay['scenario'], startMs: 0, firstStart });
+  const fresh = (): SandboxPlay => ({ entry: {} as SandboxPlay['entry'], forecast: () => ({}) as ReturnType<SandboxPlay['forecast']>, units: 'C', household: 'older-man', place: 'reference', scenario: {} as SandboxPlay['scenario'], startMs: 0, firstStart });
   const notFound = err(toolError('settings_not_found', 'None.'));
   const storeOf = (put: Awaited<ReturnType<StateStore['putSandboxSettings']>>, reads: Awaited<ReturnType<StateStore['getSandboxSettings']>>[]) => {
     const puts: [SandboxSettings, number | undefined][] = [];

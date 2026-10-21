@@ -284,3 +284,54 @@ describe('ScriptedAgent: the storm scene and the family phone (#24)', () => {
     expect(phone.messages()).toEqual([]);
   });
 });
+
+// Who is at home names the rooms (owner, 21 Oct): with no one at risk nothing the scripted home says or shows names Leo;
+// the answers name the safe room chosen in Settings. The rule itself is core's roomNameOf; this is the wiring.
+describe('ScriptedAgent room names follow the household and the chosen safe room', () => {
+  const ask = async (a: ReturnType<typeof agent>, q: string) => JSON.stringify(await a.ask(q, ctx));
+  const scene = async (a: ReturnType<typeof agent>) =>
+    (await Promise.all(['Is everyone safe?', 'Power cut', "It's going to be 36 degrees tomorrow", 'Is grandpa safe?'].map((q) => ask(a, q)))).join(' ') +
+    JSON.stringify(await a.callTool('get_safe_room_status', {}, ctx));
+
+  it("says Leo's room with the older man at home (the default)", async () => {
+    expect(await ask(agent(), 'Is everyone safe?')).toContain("Leo's room is at 26.8 degrees");
+  });
+
+  it('names no Leo with no one at risk, and keeps the room ids', async () => {
+    const phone = createScriptedPhone();
+    const created = createScriptedAgent(script, { phone });
+    if (!created.ok) throw new Error(created.error.message);
+    await created.value.callTool('set_scenario', { household: 'no-one-at-risk' }, ctx);
+    const said = (await scene(created.value)) + JSON.stringify(phone.messages());
+    expect(said).not.toMatch(/Leo/);
+    expect(said).toContain('The Bedroom is at 26.8 degrees');
+    expect(said).toContain('bedroom-1');
+  });
+
+  it('names the safe room chosen in Settings, in the words and in the cards of the same answer', async () => {
+    const a = agent();
+    expect((await a.callTool('set_preferences', { safeRoomId: 'study', confirmed: true }, ctx)).isError).not.toBe(true);
+    const safe = await a.ask('Is everyone safe?', ctx);
+    if (!safe.ok) throw new Error(safe.error.message);
+    expect(safe.value.text).toContain('The Study is at 26.8 degrees');
+    const room = safe.value.cards?.find((c) => c.tool === 'get_safe_room_status');
+    expect(room?.tool === 'get_safe_room_status' && [room.result.safeRoomId, room.result.safeRoomName]).toEqual(['study', 'Study']);
+    // The hot-day plan pre-cools the room its words name: the Study, never bedroom-1 (Leo's room or Bedroom).
+    const hot = await a.ask("It's going to be 36 degrees tomorrow", ctx);
+    if (!hot.ok) throw new Error(hot.error.message);
+    expect(hot.value.text).toContain('pre-cool the Study');
+    const cards = JSON.stringify(hot.value.cards);
+    expect(cards).toContain('"study"');
+    expect(cards).not.toMatch(/bedroom-1|Leo's room/);
+    // The last resort and the step down to Essential name the same room as their cards.
+    expect(await ask(a, 'Last resort')).toContain("I can't keep the Study within the night limit");
+    expect(await ask(a, 'Switch to essential')).toContain('so the Study stays comfortable until sunrise');
+    // Applied from its card, the plan stays on the Study.
+    const plan = hot.value.cards?.find((c) => c.tool === 'plan_comfort');
+    const planId = plan?.tool === 'plan_comfort' && 'id' in plan.result ? plan.result.id : '';
+    const applied = await a.callTool('apply_plan', { planId }, ctx);
+    expect(applied.isError).not.toBe(true);
+    expect(JSON.stringify(applied.structuredContent)).toContain('"study"');
+    expect(JSON.stringify(applied.structuredContent)).not.toMatch(/bedroom-1/);
+  });
+});

@@ -34,6 +34,8 @@ export interface SandboxPlay {
   readonly version?: number;
   /** The temperature unit the visitor chose (#306): the tool texts follow it. */
   readonly units: TempUnit;
+  /** Who is at home (C2b): it names the rooms (owner, 21 Oct), with no one at risk nothing says Leo. */
+  readonly household: Household;
   /** The place the visitor chose (#376): the last-resort card names the number to call there. */
   readonly place: LocationId;
   /** The scenario played and the instant it starts (its start hour included): the judges' clock reads its day (#311). */

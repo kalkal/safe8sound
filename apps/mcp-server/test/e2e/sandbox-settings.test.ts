@@ -78,6 +78,23 @@ describe('sandbox settings on the local entry', () => {
     expect(JSON.stringify(logger.lines)).not.toContain(A);
   });
 
+  it("with no one at risk nothing a sandbox says names Leo; the room ids stay and the other sandbox keeps Leo's room (owner, 21 Oct)", async () => {
+    const local = createLocalApp(ENV, { wallClock: settableClock(WALL), logger: memoryLogger() });
+    if (!local.ok) throw new Error(local.error.message);
+    const open = await serve(local.value.app);
+    const a = await open(A);
+    const b = await open(B);
+    const said = async (call: typeof a.call) =>
+      JSON.stringify(await Promise.all([...['get_safe_room_status', 'get_home_status', 'get_preferences'].map((t) => call(t)), call('plan_comfort', { goal: 'cool' })]));
+    expect(await said(a.call)).toContain("Leo's room");
+    expect((await a.call('set_scenario', { household: 'no-one-at-risk' })).isError).not.toBe(true);
+    const after = await said(a.call);
+    expect(after).not.toMatch(/Leo/);
+    expect(after).toContain('bedroom-1');
+    expect(SafeRoomStatusSchema.parse((await a.call('get_safe_room_status')).structuredContent).safeRoomName).toBe('Bedroom');
+    expect(await said(b.call)).toContain("Leo's room");
+  });
+
   it('a visitor who chooses °F reads the plan in °F at the next call; the other sandbox keeps °C (#306)', async () => {
     const local = createLocalApp(ENV, { wallClock: settableClock(WALL), logger: memoryLogger() });
     if (!local.ok) throw new Error(local.error.message);

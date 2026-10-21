@@ -1,9 +1,11 @@
-import { err, ok, toolError, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { HouseholdSchema, err, ok, toolError, type ErrorEnvelope, type Household, type Result } from '@cold-reserve/contracts';
+import { theRoom } from '@cold-reserve/core';
 import { z } from 'zod';
 import type { Agent, AgentAnswer } from './agent.js';
 import { log as defaultLog, type Log } from '../log.js';
 import { PHONE_FIXTURE_NAMES, phoneMessage } from '../phone/phone-fixtures.js';
 import type { ScriptedPhone } from '../phone/phone-feed.js';
+import { demoRoomNames } from './demo-rooms.js';
 import { SCRIPT_FIXTURES, SCRIPT_FIXTURE_NAMES } from './script-fixtures.js';
 import { createScriptedClock } from './scripted-clock.js';
 import { createScriptedPlans, createScriptedPreferences, refuseAction, scriptedToolCall } from './scripted-tools.js';
@@ -90,24 +92,37 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
   let previous: string | undefined;
   // The simulated clock of the scripted home: the storm night's moments, the phone told on the way.
   const preferences = createScriptedPreferences();
+  // Who is at home (set_scenario, as the sandbox's settings) and the safe room chosen in Settings name the room in every
+  // text, card and family message (owner, 21 Oct): with no one at risk nothing says Leo.
+  let household: Household = 'older-man';
+  const room = () => ({ household, safeRoomId: preferences.read()?.preferences.safeRoomId ?? 'bedroom-1' });
+  const message = (fixture: Parameters<typeof phoneMessage>[0]) => phoneMessage(fixture, room());
   // The plan the scripted home runs (owner, 21 Oct): a tap on Apply or "apply the plan" starts it; the storm replaces it.
   const plans = createScriptedPlans();
-  const clock = createScriptedClock(options.phone === undefined ? {} : { phone: options.phone });
+  const clock = createScriptedClock({ message, ...(options.phone === undefined ? {} : { phone: options.phone }) });
+  /** The script's {safeRoom} as a noun phrase ("Leo's room", "the Study"), {SafeRoom} at the start of a sentence. */
+  const withRoom = (text: string): string => {
+    const { safeRoomId } = room();
+    const phrase = theRoom(demoRoomNames(household)[safeRoomId] ?? safeRoomId);
+    return text.replaceAll('{safeRoom}', phrase).replaceAll('{SafeRoom}', phrase.charAt(0).toUpperCase() + phrase.slice(1));
+  };
 
   return ok({
     canCallTools: options.degraded !== true,
     callTool: (name, args, context) => {
       if (options.degraded === true) return Promise.resolve(refuseAction());
+      const chosen = name === 'set_scenario' ? HouseholdSchema.safeParse(args['household']) : undefined;
+      if (chosen?.success === true) household = chosen.data;
       const clocked = clock.call(name, args);
       if (clocked !== undefined) return Promise.resolve(clocked);
-      const result = scriptedToolCall(name, args, script.status?.ts, preferences, plans);
+      const result = scriptedToolCall(name, args, script.status?.ts, preferences, plans, room());
       // The card says the family was told (familyAlert.sent): the scripted phone gets that message, as the server sends it.
       const alert = result.structuredContent?.['familyAlert'];
       const sent = typeof alert === 'object' && alert !== null && 'sent' in alert && typeof alert.sent === 'number' ? alert.sent : 0;
       if (result.isError !== true && sent > 0 && options.phone !== undefined) {
-        const message = phoneMessage('last-resort');
-        options.phone.deliver([message]);
-        (options.log ?? defaultLog)({ level: 'info', code: 'phone_delivered', correlationId: context.correlationId, details: { transition: message.transition } });
+        const sent = message('last-resort');
+        options.phone.deliver([sent]);
+        (options.log ?? defaultLog)({ level: 'info', code: 'phone_delivered', correlationId: context.correlationId, details: { transition: sent.transition } });
       }
       return Promise.resolve(result);
     },
@@ -120,13 +135,13 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
       if (entry === undefined) return Promise.resolve(ok({ text: fallback }));
       const { status } = script;
       const answer: AgentAnswer =
-        entry.withStatus && status !== undefined ? { text: entry.text.replaceAll('{soc}', String(status.batterySocPct)), status } : { text: entry.text };
-      if (entry.cards !== undefined) answer.cards = entry.cards.map((card) => SCRIPT_FIXTURES[card.fixture]());
+        entry.withStatus && status !== undefined ? { text: withRoom(entry.text).replaceAll('{soc}', String(status.batterySocPct)), status } : { text: withRoom(entry.text) };
+      if (entry.cards !== undefined) answer.cards = entry.cards.map((card) => SCRIPT_FIXTURES[card.fixture](household, room().safeRoomId));
       // The plan the scripted home runs: a plan applied by voice starts it, the storm replaces it (owner, 21 Oct).
       for (const card of answer.cards ?? []) if (card.tool === 'apply_plan') plans.apply(card.result.plan);
       if (entry.id === 'storm-start') plans.clear();
       if (entry.phone !== undefined && options.phone !== undefined) {
-        const messages = entry.phone.map((m) => phoneMessage(m.fixture));
+        const messages = entry.phone.map((m) => message(m.fixture));
         options.phone.deliver(messages);
         for (const m of messages) (options.log ?? defaultLog)({ level: 'info', code: 'phone_delivered', correlationId: context.correlationId, details: { transition: m.transition } });
       }

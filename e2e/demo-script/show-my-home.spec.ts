@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
-import { homeButton, menuButton, showMyHome } from '../surface.js';
+import { homeButton, menuButton, openUserSettings, showMyHome } from '../surface.js';
 
 // "Show my home" (#204): behind one button the floor plan with the rooms, their temperatures, the battery, the solar
 // and the grid, all SIMULATED. It follows the scene: a plan applied, the storm. Keyboard: Escape closes it.
@@ -54,3 +54,26 @@ for (const width of [375, 1280]) {
     await expect(menuButton(page)).toBeFocused();
   });
 }
+
+test('the safe room chosen in Settings is the one the home protects at rest, and the answer, its card and the home name in the storm (review of #493)', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/');
+  const settings = await openUserSettings(page);
+  await settings.getByRole('radiogroup', { name: 'Safe room' }).getByText('Study', { exact: true }).click();
+  await settings.getByRole('button', { name: 'Save' }).click();
+  await expect(settings.getByRole('button', { name: 'Saved ✓' })).toBeVisible();
+  // At rest: the home the scripted page shows on its own protects the Study.
+  await showMyHome(page);
+  await toCardPage(homeCard(page), 2);
+  await expect(homeCard(page).getByRole('listitem', { name: 'Study' })).toContainText('Served');
+  await expect(homeCard(page).getByRole('listitem', { name: "Leo's room" })).not.toContainText('Served');
+  // In the storm: the answer, its safe room card and the home name the Study.
+  await ask(page, 'Power cut');
+  await expect(page.getByTestId('answer').last().getByTestId('answer-caption')).toContainText('the Study is at 26.8 degrees');
+  await expect(page.frameLocator('iframe[title="Safe room card"]').getByRole('heading').first()).toContainText('Study');
+  await showMyHome(page);
+  await toCardPage(homeCard(page), 2);
+  await expect(homeCard(page).getByRole('listitem', { name: 'Study' })).toContainText('Served');
+  await expect(homeCard(page).getByRole('listitem', { name: "Leo's room" })).not.toContainText('Served');
+});
+

@@ -33,7 +33,11 @@ export const demoControlsSummary = (page: Page): Locator => page.getByTestId('de
  * the Echo's screen, "Settings" in the screen's menu. `userSettings` is the page on the Echo (Ana's phone has its own,
  * `openPhoneSettings`); `openUserSettings` opens it from the menu unless it is open already and returns it.
  */
-const settingsTitle = (locale: Locale): string => CATALOGS[locale]['settings.page.title'].replace('{product}', PRODUCT_NAME);
+// Titled for Leo's home, or for your home when no one at risk is at home (owner, 21 Oct): either is the page.
+const settingsTitle = (locale: Locale): RegExp => {
+  const titles = (['settings.page.title', 'settings.page.titleHome'] as const).map((key) => CATALOGS[locale][key].replace('{product}', PRODUCT_NAME));
+  return new RegExp(`^(?:${titles.map((title) => title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`);
+};
 export const settingsButton = (root: Root, locale: Locale = 'en-US'): Locator => root.getByRole('button', { name: CATALOGS[locale]['settings.open'], exact: true });
 export const userSettings = (page: Page, locale: Locale = 'en-US'): Locator => slot(page, 'content').getByRole('region', { name: settingsTitle(locale) });
 export async function openUserSettings(page: Page, locale: Locale = 'en-US'): Promise<Locator> {

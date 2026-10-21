@@ -19,7 +19,7 @@
     {
       "id": "hot-day-plan",
       "patterns": ["36 degrees", "hot tomorrow", "heatwave", "hot day", "keep grandpa", "keep leo", "keep the home comfortable"],
-      "text": "Today hits 36. I'll pre-cool Leo's room with solar and keep 6 kWh for storms. Shall I apply it?",
+      "text": "Today hits 36. I'll pre-cool {safeRoom} with solar and keep 6 kWh for storms. Shall I apply it?",
       "withStatus": false,
       "cards": [
         {
@@ -81,7 +81,7 @@
     {
       "id": "last-resort",
       "patterns": ["last resort", "hot night"],
-      "text": "I can't keep the bedroom within the night limit. Last resort: it stays within its limits until 22:00, then goes up to 26.1 degrees by 03:00. To apply it, tap Apply the last-resort plan on the card.",
+      "text": "I can't keep {safeRoom} within the night limit. Last resort: it stays within its limits until 22:00, then goes up to 26.1 degrees by 03:00. To apply it, tap Apply the last-resort plan on the card.",
       "withStatus": false,
       "cards": [
         {
@@ -123,7 +123,7 @@
     {
       "id": "storm-start",
       "patterns": ["power is out", "power s out", "power cut", "blackout", "storm is here"],
-      "text": "Power's out. I've switched to the safe room: Leo's room is at 26.8 degrees, comfortable at least until 06:40, and I've let your daughter know.",
+      "text": "Power's out. I've switched to the safe room: {safeRoom} is at 26.8 degrees, comfortable at least until 06:40, and I've let your daughter know.",
       "withStatus": false,
       "cards": [
         { "tool": "get_safe_room_status", "fixture": "safe-room-storm" },
@@ -135,14 +135,14 @@
     {
       "id": "safe-room",
       "patterns": ["how is grandpa", "how s grandpa", "is grandpa safe", "is leo safe", "how is leo", "leo sta bene", "is everyone safe", "safe room"],
-      "text": "Leo's room is at 26.8 degrees. The battery keeps it comfortable at least until 06:40.",
+      "text": "{SafeRoom} is at 26.8 degrees. The battery keeps it comfortable at least until 06:40.",
       "withStatus": false,
       "cards": [{ "tool": "get_safe_room_status", "fixture": "safe-room-storm" }]
     },
     {
       "id": "storm-essential",
       "patterns": ["switch to essential", "go to essential"],
-      "text": "I'm switching to Essential so the bedroom stays comfortable until sunrise. I've let your daughter know.",
+      "text": "I'm switching to Essential so {safeRoom} stays comfortable until sunrise. I've let your daughter know.",
       "withStatus": false,
       "cards": [{ "tool": "plan_comfort", "fixture": "storm-plan" }],
       "phone": [{ "fixture": "essential" }]

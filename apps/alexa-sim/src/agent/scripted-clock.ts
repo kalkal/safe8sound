@@ -1,4 +1,4 @@
-import { toolError, type Milestone, type MilestoneKind, type ScenarioId } from '@cold-reserve/contracts';
+import { toolError, type InboxMessage, type Milestone, type MilestoneKind, type ScenarioId } from '@cold-reserve/contracts';
 import { PHONE_FIXTURES, phoneMessage, type PhoneFixture } from '../phone/phone-fixtures.js';
 import type { ScriptedPhone } from '../phone/phone-feed.js';
 import { toolErrorResult, type ToolCallResult } from './agent.js';
@@ -25,7 +25,10 @@ export interface ScriptedClock {
   readonly call: (name: string, args: Record<string, unknown>) => ToolCallResult | undefined;
 }
 
-export function createScriptedClock(o: { readonly phone?: ScriptedPhone; readonly startScenario?: ScenarioId } = {}): ScriptedClock {
+export function createScriptedClock(
+  o: { readonly phone?: ScriptedPhone; readonly startScenario?: ScenarioId; readonly message?: (fixture: PhoneFixture) => InboxMessage } = {},
+): ScriptedClock {
+  const message = o.message ?? ((fixture: PhoneFixture) => phoneMessage(fixture));
   let scenario: ScenarioId = o.startScenario ?? 'heatwave';
   /** How many of the storm night's moments are behind now. */
   let passed = 0;
@@ -62,7 +65,7 @@ export function createScriptedClock(o: { readonly phone?: ScriptedPhone; readonl
       const crossed = STORM_NIGHT.slice(passed, passed + index + 1);
       passed += index + 1;
       version += 1;
-      o.phone?.deliver(crossed.map((m) => phoneMessage(m.fixture)));
+      o.phone?.deliver(crossed.map((m) => message(m.fixture)));
       return success({ now: now(), settingsVersion: version }, `The sandbox's time is now ${now()}.`);
     },
   };

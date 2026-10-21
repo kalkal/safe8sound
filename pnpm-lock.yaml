@@ -264,6 +264,9 @@ importers:
       '@cold-reserve/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@cold-reserve/source-simulator':
+        specifier: workspace:*
+        version: link:../../packages/adapters/source-simulator
       '@cold-reserve/ui-cards':
         specifier: workspace:*
         version: link:../../packages/ui-cards

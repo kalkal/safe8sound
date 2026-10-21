@@ -12,7 +12,7 @@ describe('wireModules', () => {
     const wired = wireModules({ store: memoryStateStoreFactory({ backing: createMemoryBacking(), clock: { now: () => NOW_MS } }), clock: fixedClock(NOW_MS) });
     if (!wired.ok) throw new Error(wired.error.message);
     expect(() => wired.value.comfortPlan.storeFor(homeId('demo'))).toThrow('wireModules: a home was used before bind(app)');
-    wired.value.bind({ homeClock: () => undefined, homeUnits: () => 'C' } as unknown as App);
+    wired.value.bind({ homeClock: () => undefined, homeUnits: () => 'C', homeHousehold: () => 'older-man' } as unknown as App);
     expect(() => wired.value.comfortPlan.storeFor(homeId('demo'))).not.toThrow();
   });
 });

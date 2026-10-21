@@ -1,5 +1,6 @@
-import { GetPreferencesOutputSchema, SafetyThresholdsSchema, SetPreferencesInputSchema, SetPreferencesOutputSchema, effectiveHeatSafety, toolError, type ConfigChange, type GetPreferencesOutput, type PublicPreferences } from '@cold-reserve/contracts';
+import { GetPreferencesOutputSchema, SafetyThresholdsSchema, SetPreferencesInputSchema, SetPreferencesOutputSchema, effectiveHeatSafety, toolError, type ConfigChange, type GetPreferencesOutput, type Household, type PublicPreferences } from '@cold-reserve/contracts';
 import { toolErrorResult, type ToolCallResult } from './agent.js';
+import { demoRoomNames } from './demo-rooms.js';
 import { SCRIPT_FIXTURES, SCRIPTED_LAST_RESORT_TOKEN, demoSafeRoom } from './script-fixtures.js';
 
 // Card actions on the scripted home: the same shapes the MCP tools return, from the script fixtures.
@@ -10,10 +11,13 @@ const success = (structuredContent: Record<string, unknown>, text: string): Tool
 export const refuseAction = (): ToolCallResult =>
   toolErrorResult(toolError('agent_unavailable', "I can't reach the assistant right now, so nothing was changed."));
 
-function applyPlan(args: Record<string, unknown>): ToolCallResult {
-  const lastResort = SCRIPT_FIXTURES['last-resort-plan']();
-  if (lastResort.tool === 'plan_comfort' && 'id' in lastResort.result && args['planId'] === lastResort.result.id) return applyLastResort(args['lastResortToken']);
-  const applied = SCRIPT_FIXTURES['hot-day-applied']();
+/** Who is at home and the safe room chosen in Settings: the applied plan is on the room the proposal named. */
+type ScriptedRoom = { readonly household: Household; readonly safeRoomId: string };
+
+function applyPlan(args: Record<string, unknown>, room: ScriptedRoom): ToolCallResult {
+  const lastResort = SCRIPT_FIXTURES['last-resort-plan'](room.household, room.safeRoomId);
+  if (lastResort.tool === 'plan_comfort' && 'id' in lastResort.result && args['planId'] === lastResort.result.id) return applyLastResort(args['lastResortToken'], room);
+  const applied = SCRIPT_FIXTURES['hot-day-applied'](room.household, room.safeRoomId);
   if (applied.tool !== 'apply_plan' || args['planId'] !== applied.result.plan.id) {
     return toolErrorResult(toolError('plan_not_found', 'That plan is not known: ask for a new one.'));
   }
@@ -21,13 +25,13 @@ function applyPlan(args: Record<string, unknown>): ToolCallResult {
 }
 
 /** A last resort in two steps (#160): the first yes returns a confirmation, the second sends it back. */
-function applyLastResort(token: unknown): ToolCallResult {
+function applyLastResort(token: unknown, room: ScriptedRoom): ToolCallResult {
   if (token === undefined) {
-    const pending = SCRIPT_FIXTURES['last-resort-pending']();
+    const pending = SCRIPT_FIXTURES['last-resort-pending'](room.household, room.safeRoomId);
     return success(pending.result, 'Not applied yet: this is a last resort. Tap "Yes, apply it now" on its card to apply it.');
   }
   if (token !== SCRIPTED_LAST_RESORT_TOKEN) return toolErrorResult(toolError('last_resort_token_invalid', 'That confirmation is not valid: ask for the plan again.'));
-  return success(SCRIPT_FIXTURES['last-resort-applied']().result, 'The last-resort plan is applied.');
+  return success(SCRIPT_FIXTURES['last-resort-applied'](room.household, room.safeRoomId).result, 'The last-resort plan is applied.');
 }
 
 /** The plan the scripted home runs (owner, 21 Oct: the rest tile says "Plan active"): applied by a tap or by voice, until
@@ -67,9 +71,13 @@ export function createScriptedPreferences(): ScriptedPreferences {
   };
 }
 
-function getPreferences(store: ScriptedPreferences): ToolCallResult {
+function getPreferences(store: ScriptedPreferences, household: Household): ToolCallResult {
   const view = store.read();
-  return view === undefined ? toolErrorResult(toolError('invalid_input', 'The preferences cannot be read.')) : success(GetPreferencesOutputSchema.parse(view), 'Preferences.');
+  if (view === undefined) return toolErrorResult(toolError('invalid_input', 'The preferences cannot be read.'));
+  // The safe room choices named for who is at home, as the server's get_preferences names them (owner, 21 Oct).
+  const names = demoRoomNames(household);
+  const rooms = view.rooms?.map((r) => ({ ...r, name: names[r.id] ?? r.name }));
+  return success(GetPreferencesOutputSchema.parse(rooms === undefined ? view : { ...view, rooms }), 'Preferences.');
 }
 
 // TODO(#330): this scripted save skips the server's preference rules (core updatePreferences: the safety limits, heating
@@ -129,9 +137,10 @@ export function scriptedToolCall(
   at: string | undefined,
   preferences: ScriptedPreferences = createScriptedPreferences(),
   plans: ScriptedPlans = createScriptedPlans(),
+  room: ScriptedRoom = { household: 'older-man', safeRoomId: 'bedroom-1' },
 ): ToolCallResult {
   if (name === 'apply_plan') {
-    const result = applyPlan(args);
+    const result = applyPlan(args, room);
     const plan = result.structuredContent?.['plan'] as { id?: unknown; horizonAt?: unknown } | undefined;
     if (result.isError !== true && typeof plan?.id === 'string' && typeof plan.horizonAt === 'string') plans.apply({ id: plan.id, horizonAt: plan.horizonAt });
     return result;
@@ -145,9 +154,9 @@ export function scriptedToolCall(
   if (name === 'get_safe_room_status') {
     // The plan the scripted home runs (owner, 21 Oct), as the server says it.
     const active = plans.active();
-    return success({ ...demoSafeRoom(), ...(active === undefined ? {} : { activePlan: active }) }, 'Safe room.');
+    return success({ ...demoSafeRoom(room.household, room.safeRoomId), ...(active === undefined ? {} : { activePlan: active }) }, 'Safe room.');
   }
   if (name === 'set_preferences') return setPreferences(args, at, preferences);
-  if (name === 'get_preferences') return getPreferences(preferences);
+  if (name === 'get_preferences') return getPreferences(preferences, room.household);
   return toolErrorResult(toolError('invalid_input', `The simulator does not run ${name}.`));
 }

@@ -1,6 +1,6 @@
 import type { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { HomeIdSchema, SandboxHomeIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Result, type TempUnit } from '@cold-reserve/contracts';
+import { HomeIdSchema, SandboxHomeIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Household, type Result, type TempUnit } from '@cold-reserve/contracts';
 import { seededRng, type Clock, type StateStoreFactory } from '@cold-reserve/core';
 import { demoProfile, demoStoryProfile } from '@cold-reserve/source-simulator';
 import {
@@ -25,8 +25,8 @@ import type { CapabilityModule } from './registry.js';
 /** Any sandbox id: the defaults are the same for every visitor sandbox. */
 const SANDBOX_PROBE = HomeIdSchema.parse('demo#0000000000000000');
 
-export function profileFor(homeId: HomeId): HomeProfile | undefined {
-  return homeId === 'demo' || SandboxHomeIdSchema.safeParse(homeId).success ? demoStoryProfile() : undefined;
+export function profileFor(homeId: HomeId, household: Household = 'older-man'): HomeProfile | undefined {
+  return homeId === 'demo' || SandboxHomeIdSchema.safeParse(homeId).success ? demoStoryProfile(household) : undefined;
 }
 
 export interface ComposeOptions {
@@ -37,6 +37,8 @@ export interface ComposeOptions {
   readonly clockFor?: (homeId: HomeId) => Clock | undefined;
   /** A home's temperature unit for the texts (#306), known once the app is built: bound late like clockFor. */
   readonly unitsFor?: (homeId: HomeId) => TempUnit;
+  /** Who is at home in a sandbox (owner, 21 Oct): it names the rooms; bound late like clockFor. Absent: Leo's home. */
+  readonly householdFor?: (homeId: HomeId) => Household;
 }
 
 export function composeModules(opts: ComposeOptions): Result<CapabilityModule[], ErrorEnvelope> {
@@ -47,11 +49,12 @@ export function composeModules(opts: ComposeOptions): Result<CapabilityModule[],
   const sandboxDefaults = defaultPreferencesFor(opts.preferences, demoProfile(), SANDBOX_PROBE);
   if (!sandboxDefaults.ok) return sandboxDefaults;
 
+  const roomsOf = (homeId: HomeId) => profileFor(homeId, opts.householdFor?.(homeId))?.rooms ?? [];
   const preferences = preferencesModule({
     storeFor: opts.storeFor,
     limits: opts.preferences.limits,
-    roomIdsFor: (homeId) => profileFor(homeId)?.rooms.map((room) => room.id) ?? [],
-    roomNameFor: (homeId, roomId) => profileFor(homeId)?.rooms.find((room) => room.id === roomId)?.name,
+    roomIdsFor: (homeId) => roomsOf(homeId).map((room) => room.id),
+    roomNameFor: (homeId, roomId) => roomsOf(homeId).find((room) => room.id === roomId)?.name,
     defaultsFor: (homeId) => (SandboxHomeIdSchema.safeParse(homeId).success ? sandboxDefaults.value : demoDefaults.value),
     clock: opts.clock,
     ...(opts.clockFor === undefined ? {} : { clockFor: opts.clockFor }),

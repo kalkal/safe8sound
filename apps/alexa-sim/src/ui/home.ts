@@ -1,4 +1,4 @@
-import { HomeStatusSchema, err, ok, toolError, type ErrorEnvelope, type HomeStatus, type Result } from '@cold-reserve/contracts';
+import { HomeStatusSchema, err, ok, toolError, type ErrorEnvelope, type HomeStatus, type Household, type Result } from '@cold-reserve/contracts';
 import { homeCalm, homeInStorm } from '@cold-reserve/ui-cards';
 import type { Agent, AskContext } from '../agent/agent.js';
 import { withDemoHomeNames } from '../agent/script-fixtures.js';
@@ -15,17 +15,43 @@ export function initialHome(mode: HomeMode): HomeStatus | undefined {
   return mode === 'scripted' ? withDemoHomeNames(homeCalm()) : undefined;
 }
 
-export function homeFor(cards: readonly CardSlot[], previous: HomeStatus | undefined, mode: HomeMode): HomeStatus | undefined {
+/** The scripted home's safe room: the one chosen in Settings (bedroom-1 until the settings are read). */
+const STORY_ROOM = 'bedroom-1';
+
+/**
+ * The scripted home is on the safe room chosen in Settings, the room the answers name, and its rooms are named for who is
+ * at home (owner, 21 Oct): Leo's room only while he is there.
+ */
+export function homeFor(
+  cards: readonly CardSlot[],
+  previous: HomeStatus | undefined,
+  mode: HomeMode,
+  household: Household = 'older-man',
+  safeRoomId: string = STORY_ROOM,
+): HomeStatus | undefined {
   const reported = cards.find((c) => c.tool === 'get_home_status');
   if (reported?.tool === 'get_home_status') return reported.result;
   if (mode === 'remote') return previous;
   for (const card of cards) {
-    if (card.tool === 'get_safe_room_status' && card.result.stormPhase === 'active') return withDemoHomeNames(homeInStorm());
-    if (card.tool === 'plan_comfort' && 'id' in card.result && card.result.gridAvailable === false) return withDemoHomeNames(homeInStorm());
-    if (card.tool === 'get_safe_room_status' && card.result.stormPhase === 'ended') return withDemoHomeNames(homeCalm());
+    if (card.tool === 'get_safe_room_status' && card.result.stormPhase === 'active') return withDemoHomeNames(homeInStorm(), household, safeRoomId);
+    if (card.tool === 'plan_comfort' && 'id' in card.result && card.result.gridAvailable === false) return withDemoHomeNames(homeInStorm(), household, safeRoomId);
+    if (card.tool === 'get_safe_room_status' && card.result.stormPhase === 'ended') return withDemoHomeNames(homeCalm(), household, safeRoomId);
   }
   return previous;
 }
+
+/**
+ * The scripted home shown again after "Who is at home" or the safe room changes: rebuilt from its fixture (calm or in the
+ * storm) on the chosen safe room and named for the household, a plan already applied kept applied.
+ */
+export function homeNamedFor(home: HomeStatus | undefined, mode: HomeMode, household: Household, safeRoomId: string = STORY_ROOM): HomeStatus | undefined {
+  if (mode !== 'scripted' || home === undefined) return home;
+  const rebuilt = withDemoHomeNames(home.gridAvailable ? homeCalm() : homeInStorm(), household, safeRoomId);
+  return home.gridAvailable && wasApplied(home) ? homeAfterApply(rebuilt, mode) : rebuilt;
+}
+
+/** A calm scripted home after a plan was applied: the second bedroom pre-cooled (homeAfterApply). */
+const wasApplied = (home: HomeStatus): boolean => home.rooms.some((r) => r.roomId === 'bedroom-2' && r.state === 'served') && !homeCalm().rooms.some((r) => r.roomId === 'bedroom-2' && r.state === 'served');
 
 /** A plan applied on the scripted home pre-cools the second bedroom too; a remote home waits for its next status. */
 export function homeAfterApply(previous: HomeStatus | undefined, mode: HomeMode): HomeStatus | undefined {

@@ -142,6 +142,8 @@ export function SettingsPage({ model, locale, onLocale, announce = true }: Setti
   // One radio name per view: two views open at once (the Echo's page and the phone's) are two groups, not one.
   const names = useId();
   const { settings, units, shown, view, refusal } = model;
+  // Leo's home only while he is at home (homeFaceOf); with no one at risk the page names your home (owner, 21 Oct).
+  const named = homeFaceOf(settings?.household).named;
   const rowsOf = (...ids: LimitId[]) =>
     (view?.rows ?? [])
       .filter((r: LimitRow) => ids.includes(r.id))
@@ -160,7 +162,7 @@ export function SettingsPage({ model, locale, onLocale, announce = true }: Setti
 
   return (
     <section className="settings-page" aria-labelledby={titleId} tabIndex={-1} data-testid="settings-page">
-      <h2 id={titleId}>{t('settings.page.title')}</h2>
+      <h2 id={titleId}>{t(named ? 'settings.page.title' : 'settings.page.titleHome')}</h2>
       <WhoWeProtect household={model.settings?.household} />
       {settings !== undefined && (
         <p className="notice settings-applied" role={announce ? 'status' : undefined} data-testid="settings-applied" data-failed={model.unitFailed}>
@@ -244,7 +246,7 @@ export function SettingsPage({ model, locale, onLocale, announce = true }: Setti
           {t('settings.languageNote')}
         </p>
       )}
-      <p className="muted settings-saved-for">{t('settings.savedFor')}</p>
+      <p className="muted settings-saved-for">{t(named ? 'settings.savedFor' : 'settings.savedForHome')}</p>
     </section>
   );
 }

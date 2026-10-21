@@ -167,12 +167,15 @@ export const enUS = {
   'settings.limits.rateLimited': "Not saved: this demo allows a limited number of changes per day, and today's are used up. Try again tomorrow.",
   // #432 S5: the settings as a page of the Echo's screen (and of Ana's phone). Leo's age is the demo home's text.
   'settings.page.title': "{product} settings · Leo's home",
+  // With no one at risk at home nothing names Leo (owner, 21 Oct).
+  'settings.page.titleHome': '{product} settings · Your home',
   'settings.page.hide': 'Hide settings',
   'settings.protect.title': 'Who we protect',
   'settings.protect.leo': 'Leo, 82, grandfather',
   'settings.protect.noOne': 'No one at risk at home: the home keeps everyone comfortable',
   'settings.protect.ana': 'Ana, daughter, gets the alerts on her phone',
   'settings.savedFor': "Saved for Leo's home · used on the Echo and on Ana's phone",
+  'settings.savedForHome': "Saved for your home · used on the Echo and on Ana's phone",
   // The judges' demo controls (#432, brief 1 and 3b): outside the Echo, clearly a simulation.
   'demoControls.title': 'Demo controls · simulation',
   'demoControls.open': 'Demo controls',
@@ -186,6 +189,7 @@ export const enUS = {
   'demoControls.oneCard': 'Like a real Echo Show, Alexa shows one card per answer. Ask “Show the plan” or “Show my home” to see the others.',
   'demoControls.powerCut': 'Power cut',
   'demoControls.powerCutHint': "Cuts the simulated grid and says “The power's out” for Leo.",
+  'demoControls.powerCutHintHome': "Cuts the simulated grid and says “The power's out”.",
   'demoControls.day': 'The day',
   'demoControls.now': 'now',
   'demoControls.next': 'Next: {time} · {moment}',

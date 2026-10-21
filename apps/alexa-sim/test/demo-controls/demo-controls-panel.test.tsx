@@ -253,3 +253,30 @@ describe('DemoControlsPanel while a change is saved', () => {
     expect(within(panelOf()).getByRole('button', { name: 'Restart the day' })).toHaveProperty('disabled', true);
   });
 });
+
+describe('the power cut hint follows who is at home (owner, 21 Oct)', () => {
+  it('says the line for Leo with him at home, and no name with no one at risk', () => {
+    const hint = (household: 'older-man' | 'no-one-at-risk') => {
+      const Panel = () => (
+        <DemoControlsPanel
+          sheet={useDemoControlsSheet()}
+          wide
+          settings={{ ...scriptedDemoSettings(), household }}
+          availablePlaces={['reference']}
+          onChange={vi.fn(() => Promise.resolve(true))}
+          stops={stops}
+          now={at('12:00')}
+          onPowerCut={vi.fn()}
+        />
+      );
+      const { container, unmount } = render(<Panel />);
+      const text = container.textContent;
+      unmount();
+      return text;
+    };
+    expect(hint('older-man')).toContain("says “The power's out” for Leo.");
+    expect(hint('no-one-at-risk')).toContain("Cuts the simulated grid and says “The power's out”.");
+    expect(hint('no-one-at-risk')).not.toMatch(/Leo/);
+  });
+});
+

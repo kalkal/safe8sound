@@ -6,7 +6,8 @@
   "description": "HomeDataSource from the seeded simulator.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./demo-home.json": "./data/demo-home.json"
   },
   "dependencies": {
     "@cold-reserve/contracts": "workspace:*",

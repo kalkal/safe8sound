@@ -1,5 +1,6 @@
-import { InboxMessageSchema, type InboxMessage, type SendableTransition } from '@cold-reserve/contracts';
+import { InboxMessageSchema, type Household, type InboxMessage, type SendableTransition } from '@cold-reserve/contracts';
 import { stormMessage } from '@cold-reserve/i18n';
+import { demoRoomNames } from '../agent/demo-rooms.js';
 
 // The family messages of the storm scene (Saturday night, storm-blackout), rendered by the real
 // i18n templates exactly as the server's notifier would, then parsed by the inbox contract.
@@ -20,10 +21,17 @@ export const PHONE_FIXTURES = {
 export type PhoneFixture = keyof typeof PHONE_FIXTURES;
 export const PHONE_FIXTURE_NAMES = Object.keys(PHONE_FIXTURES) as [PhoneFixture, ...PhoneFixture[]];
 
-export function phoneMessage(name: PhoneFixture): InboxMessage {
+/** Which room the message is about: the safe room chosen in Settings, named for who is at home (owner, 21 Oct). */
+export interface PhoneRoom {
+  readonly household?: Household;
+  readonly safeRoomId?: string;
+}
+
+export function phoneMessage(name: PhoneFixture, room: PhoneRoom = {}): InboxMessage {
+  const safeRoomId = room.safeRoomId ?? 'bedroom-1';
   const f: { transition: SendableTransition; at: string; tempC: number; safeUntil?: string; powerBackAt?: string } = PHONE_FIXTURES[name];
   const text = stormMessage('en-US', f.transition, NAME, {
-    roomName: "Leo's room",
+    roomName: demoRoomNames(room.household ?? 'older-man')[safeRoomId] ?? safeRoomId,
     tempC: f.tempC,
     atMs: ms(f.at),
     timeZone: ZONE,

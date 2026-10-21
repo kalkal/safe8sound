@@ -73,7 +73,8 @@ describe('examplesFor', () => {
         if (example.label !== 'examples.hotDay') continue;
         const reply = await created.value.ask(example.question, { correlationId: 'c1' });
         if (!reply.ok) throw new Error(reply.error.message);
-        expect(reply.value.text).toBe(plan?.text);
+        // The plan's own text, up to the room it names (core's roomNameOf, tested there).
+        expect(reply.value.text.startsWith(plan?.text.split('{')[0] ?? ' '), example.question).toBe(true);
       }
     }
     // The chip says today, so the plan's words do (never "Tomorrow").

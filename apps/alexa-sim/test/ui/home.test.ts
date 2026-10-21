@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { withDemoHomeNames } from '../../src/agent/script-fixtures.js';
 import type { CardSlot } from '../../src/agent/wire.js';
 import type { Agent } from '../../src/agent/agent.js';
-import { fetchHome, homeAfterApply, homeFor, initialHome } from '../../src/ui/home.js';
+import { fetchHome, homeAfterApply, homeFor, homeNamedFor, initialHome } from '../../src/ui/home.js';
 
 // "Show my home" (#204): the panel shows the home the answers describe. A get_home_status result is shown as it is,
 // in any mode. The scripted home also follows the scene (storm, power back, a plan applied); the remote home never
@@ -28,6 +28,20 @@ describe('homeFor', () => {
   it('scripted: the storm turns the home to the storm home, power back to the calm one', () => {
     expect(homeFor([storm], homeCalm(), 'scripted')).toEqual(withDemoHomeNames(homeInStorm()));
     expect(homeFor([calm], homeInStorm(), 'scripted')).toEqual(withDemoHomeNames(homeCalm()));
+  });
+
+  it('scripted: the home is named for who is at home: no Leo with no one at risk, the room ids unchanged (owner, 21 Oct)', () => {
+    const home = homeFor([storm], homeCalm(), 'scripted', 'no-one-at-risk');
+    expect(JSON.stringify(home)).not.toMatch(/Leo/);
+    expect(home?.rooms.map((r) => r.roomId)).toEqual(homeInStorm().rooms.map((r) => r.roomId));
+    expect(home?.rooms.find((r) => r.roomId === 'bedroom-1')?.name).toBe('Bedroom');
+  });
+
+  it('scripted: the home panel protects the safe room chosen in Settings, the room the answers name (review of #493)', () => {
+    const served = (home: ReturnType<typeof homeFor>) => home?.rooms.filter((r) => r.state === 'served').map((r) => [r.roomId, r.name, r.tempC]);
+    expect(served(homeFor([storm], homeCalm(), 'scripted', 'older-man', 'study'))).toEqual([['study', 'Study', 26.8]]);
+    expect(served(homeFor([storm], homeCalm(), 'scripted', 'older-man'))).toEqual([['bedroom-1', "Leo's room", 26.8]]);
+    expect(homeNamedFor(withDemoHomeNames(homeInStorm()), 'scripted', 'no-one-at-risk', 'study')?.rooms.find((r) => r.state === 'served')?.roomId).toBe('study');
   });
 
   it('remote: no fixture ever replaces what the home really said', () => {

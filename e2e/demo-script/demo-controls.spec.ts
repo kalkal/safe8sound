@@ -107,4 +107,13 @@ test('"Who is at home": an older man or no one at risk; with no one at risk the 
   await expect(screen.getByTestId('tile-safe-room')).toContainText('Safe room');
   await expect(screen).not.toContainText('Leo');
   await expect(page.getByRole('button', { name: 'Manage home settings' })).toBeVisible();
+  // The rooms follow who is at home (owner, 21 Oct): the scripted answer names the bedroom, the hint and the settings no one.
+  await expect(panel).toContainText("Cuts the simulated grid and says “The power's out”.");
+  await page.getByLabel('Ask a question').fill('Is everyone safe?');
+  await page.getByRole('button', { name: 'Ask' }).click();
+  await expect(page.getByTestId('answer').last().getByTestId('answer-caption')).toContainText('The Bedroom is at 26.8 degrees');
+  const settings = await openUserSettings(page);
+  await expect(settings.getByRole('heading', { name: / settings · Your home$/ })).toBeVisible();
+  await expect(settings).toContainText('Saved for your home');
+  await expect(page.getByTestId('echo-screen')).not.toContainText('Leo');
 });

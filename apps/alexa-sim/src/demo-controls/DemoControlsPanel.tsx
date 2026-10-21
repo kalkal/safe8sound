@@ -1,7 +1,7 @@
 import type { LocationId, Milestone, MilestoneKind, SetScenarioInput } from '@cold-reserve/contracts';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ChipGroup } from '../ui/ChipGroup.js';
-import { HOUSEHOLDS, PLACES, SCENARIOS, nothingAheadText, skyOfScenario, type DemoSettingsView } from '../ui/demo-settings.js';
+import { HOUSEHOLDS, PLACES, SCENARIOS, homeFaceOf, nothingAheadText, skyOfScenario, type DemoSettingsView } from '../ui/demo-settings.js';
 import { clockTime } from '../ui/sim-clock.js';
 import { t } from '../ui/text.js';
 import { useModal } from '../ui/use-modal.js';
@@ -147,7 +147,7 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
           >
             {t('demoControls.powerCut')}
           </button>
-          <p className="muted">{t('demoControls.powerCutHint')}</p>
+          <p className="muted">{t(homeFaceOf(settings.household).named ? 'demoControls.powerCutHint' : 'demoControls.powerCutHintHome')}</p>
         </div>
       )}
       {line !== undefined && <DayTimeline line={line} scenarioId={settings.scenarioId} />}

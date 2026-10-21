@@ -1,4 +1,4 @@
-import { HomeIdSchema, HomeProfileSchema, SandboxHomeIdSchema, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type Result, type SandboxSettings, type TempUnit } from '@cold-reserve/contracts';
+import { HomeIdSchema, HomeProfileSchema, SandboxHomeIdSchema, defaultUnitOf, err, ok, pct, toolError, type ErrorEnvelope, type HomeId, type Household, type Result, type SandboxSettings, type TempUnit } from '@cold-reserve/contracts';
 import { darkWindow, type Clock, type HomeDataSource, type StateStoreFactory } from '@cold-reserve/core';
 import { FallbackSource } from '@cold-reserve/source-fallback';
 import { SimulatorSource, builtInPlace, builtInScenario, defaultSimParams, demoProfile, demoStoryProfile, profileAtPlace } from '@cold-reserve/source-simulator';
@@ -71,6 +71,8 @@ export interface App {
   readonly homeClock: (homeId: HomeId) => Clock | undefined;
   /** A home's temperature unit for the tool texts (#306): the sandbox's choice; °C for the real home and demo. */
   readonly homeUnits: (homeId: HomeId) => TempUnit;
+  /** Who is at home in a sandbox, for the room names of what is composed before the app (owner, 21 Oct); demo: Leo. */
+  readonly homeHousehold: (homeId: HomeId) => Household;
   /**
    * Admits a visitor sandbox and brings it up to date with its saved settings, as an MCP request does (#267): a
    * phone read in a fresh container then reads the inbox of the sandbox's own playthrough.
@@ -166,13 +168,15 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
       ...(choices.advancedMs === undefined ? {} : { advancedMs: choices.advancedMs }),
     });
     if (!homeClock.ok) return homeClock;
-    const profile = profileAtPlace(demo, place);
+    // Who is at home names the rooms (owner, 21 Oct): with no one at risk nothing says Leo; the ids never change.
+    const profile = profileAtPlace(demoStoryProfile(choices.household), place);
     const sim = new SimulatorSource({ profile: HomeProfileSchema.parse({ ...profile, homeId }), scenario: sandboxScenario, params, clock: homeClock.value });
     const since = new Date(playFromMs + startHMs).toISOString();
     return ok({
       entry: { source: sim, profile, readOnly: false, levelSince: since, clock: homeClock.value },
       forecast: () => sim.forecast(),
       units: choices.units,
+      household: choices.household,
       place: choices.locationId,
       scenario: sandboxScenario,
       startMs: playFromMs + startHMs,
@@ -343,6 +347,7 @@ export function createApp(env: Readonly<Record<string, string | undefined>>, opt
     ...(stormDeps === undefined ? {} : { familyReply: (input, ctx) => familyReply(atHome(stormDeps, ctx.homeId), input, ctx) }),
     homeClock: (homeId) => homeFor(homeId)?.clock,
     homeUnits: (homeId) => sandboxFor(homeId)?.units ?? 'C',
+    homeHousehold: (homeId) => sandboxFor(homeId)?.household ?? sandboxDefaults.household,
     admitSandbox: async (homeId, correlationId) => {
       const admitted = watched.admit(homeId);
       if (!admitted.ok) return admitted;

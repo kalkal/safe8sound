@@ -12,3 +12,13 @@ export const HOUSEHOLD_CHOICES: readonly PlayedHousehold[] = ['older-man', 'no-o
 
 /** The household a sandbox plays: a saved 'older-woman' is the older man. */
 export const playedHousehold = (household: Household): PlayedHousehold => (household === 'older-woman' ? 'older-man' : household);
+
+/** The bedroom the demo story protects: Leo's while he is at home (#192). Its id never changes. */
+export const STORY_SAFE_ROOM_ID = 'bedroom-1';
+
+/**
+ * The one place for a demo room's display name (owner, 21 Oct): with Leo at home the protected bedroom is "Leo's room";
+ * with no one at risk nothing says Leo, and every room keeps its base name (demo-home.json).
+ */
+export const roomNameOf = (room: { readonly id: string; readonly name: string }, household: Household): string =>
+  room.id === STORY_SAFE_ROOM_ID && playedHousehold(household) === 'older-man' ? "Leo's room" : room.name;

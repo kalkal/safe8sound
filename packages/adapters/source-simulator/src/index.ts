@@ -1,5 +1,6 @@
 /** HomeDataSource from the seeded simulator, with the built-in scenarios and the demo home. */
-import { HomeProfileSchema, ScenarioIdSchema, type ErrorEnvelope, type HomeProfile, type LocationId, type Result, type ScenarioId } from '@cold-reserve/contracts';
+import { HomeProfileSchema, ScenarioIdSchema, type ErrorEnvelope, type HomeProfile, type Household, type LocationId, type Result, type ScenarioId } from '@cold-reserve/contracts';
+import { roomNameOf } from '@cold-reserve/core';
 import demoHome from '../data/demo-home.json' with { type: 'json' };
 import simulatorParams from '../data/simulator-params.json' with { type: 'json' };
 import clearDay from '../scenarios/clear-day.json' with { type: 'json' };
@@ -44,10 +45,13 @@ function orThrow<T>(r: Result<T, ErrorEnvelope>): T {
 /** The demo home: the real plant from spike S6, with example rooms. Placeholder location. */
 export const demoProfile = (): HomeProfile => HomeProfileSchema.parse(demoHome);
 
-/** The demo and sandbox homes (invented): the safe room is the grandpa Leo's room (#192). Never used for the real home (R17). */
-export const demoStoryProfile = (): HomeProfile => {
+/**
+ * The demo and sandbox homes (invented), their rooms named for who is at home by core's roomNameOf: the grandpa Leo's
+ * room by default (#192), the base names with no one at risk (owner, 21 Oct). Never used for the real home (R17).
+ */
+export const demoStoryProfile = (household: Household = 'older-man'): HomeProfile => {
   const p = demoProfile();
-  return { ...p, rooms: p.rooms.map((r) => (r.id === 'bedroom-1' ? { ...r, name: "Leo's room" } : r)) };
+  return { ...p, rooms: p.rooms.map((r) => ({ ...r, name: roomNameOf(r, household) })) };
 };
 
 export const defaultSimParams = (): SimulatorParams => orThrow(parseSimParams(simulatorParams));

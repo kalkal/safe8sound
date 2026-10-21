@@ -96,6 +96,14 @@ describe('the settings page', () => {
     expect(people[0]?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
 
+  it('with no one at risk the page is titled for your home and says it is saved for your home, never Leo (owner, 21 Oct)', () => {
+    render(<Harness settings={{ ...scriptedDemoSettings(), household: 'no-one-at-risk' }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    const page = screen.getByRole('region', { name: 'Safe-8-Sound settings · Your home' });
+    expect(page.textContent).toContain("Saved for your home · used on the Echo and on Ana's phone");
+    expect(page.textContent).not.toMatch(/Leo/);
+  });
+
   it('holds only the person\'s own settings, never a demo control, and says where they are saved', () => {
     const { button } = setup();
     fireEvent.click(button);

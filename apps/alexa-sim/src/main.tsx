@@ -29,7 +29,7 @@ import { PhonePanel } from './phone/PhonePanel.js';
 import { PHONE_BESIDE, PhoneOpener, PhonePeek, PhoneSheet, usePhoneSheet } from './phone/PhoneSheet.js';
 import { CardFrame } from './host/CardFrame.js';
 import { examplesFor, isGridDown } from './ui/ExampleQuestions.js';
-import { fetchHome, homeAfterApply, homeFor, initialHome } from './ui/home.js';
+import { fetchHome, homeAfterApply, homeFor, homeNamedFor, initialHome } from './ui/home.js';
 import { readPhoneAgain, whatChangedAfter, type FailedTurnFinding } from './ui/failed-turn.js';
 import { useHomePanel } from './ui/HomePanel.js';
 import { ReserveClock } from './ui/ReserveClock.js';
@@ -219,6 +219,21 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const homeTimeZone = demoSettings?.timeZone ?? config.homeTimeZone;
   // The home's face on the Echo (owner, 20 Oct, B): Leo, or a small house when no one at risk is at home.
   const homeFace = homeFaceOf(demoSettings?.household);
+  // Who is at home names the rooms (owner, 21 Oct): the scripted home panel follows a change at once.
+  const household = demoSettings?.household ?? 'older-man';
+  // #402: the preferences and the limits they move inside (state/use-preferences), read with the sandbox and again when
+  // its day, place or household changes (who is at home names the safe room choices, owner 21 Oct). One instance for
+  // every view of the settings.
+  const { limits, saveLimit: onLimit } = usePreferences({
+    agent,
+    enabled: scripted || sessionToken !== undefined,
+    key: `${demoSettings?.scenarioId ?? ''}/${demoSettings?.locationId ?? ''}/${household}`,
+  });
+  // The scripted home panel protects the safe room chosen in Settings, the room the scripted answers name.
+  const safeRoomId = limits?.preferences.safeRoomId ?? 'bedroom-1';
+  useEffect(() => {
+    setHome((previous) => homeNamedFor(previous, homeMode, household, safeRoomId));
+  }, [homeMode, household, safeRoomId]);
   const homeAvatar = homeFace.avatar;
   // The plan on screen (time pack): the simulated clock lists its own moments too (the essential level, the emergency plan).
   const [planId, setPlanId] = useState<string | undefined>(undefined);
@@ -236,15 +251,15 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
       const moved = (answer.cards ?? []).some((card) => card.tool === 'apply_plan' || (card.tool === 'get_safe_room_status' && card.result.stormPhase !== undefined));
       if (moved) setPlanMoves((n) => n + 1);
       setSky((previous) => skyFor(answer.cards ?? [], homeTimeZone, previous));
-      setHome((previous) => homeFor(answer.cards ?? [], previous, homeMode));
-      if (homeFor(answer.cards ?? [], undefined, homeMode) !== undefined) setHomeTold(true);
+      setHome((previous) => homeFor(answer.cards ?? [], previous, homeMode, household, safeRoomId));
+      if (homeFor(answer.cards ?? [], undefined, homeMode, household, safeRoomId) !== undefined) setHomeTold(true);
       const shownPlan = planIdOf(answer.cards);
       if (shownPlan !== undefined) setPlanId(shownPlan);
       // A new answer takes the content band: the home or the settings close (their buttons say so).
       closeHome();
       closeSettings();
     },
-    [homeTimeZone, homeMode, closeHome, closeSettings],
+    [homeTimeZone, homeMode, household, safeRoomId, closeHome, closeSettings],
   );
   const onCardCall = useCallback((turnId: string, card: ToolCard, event: FrameEvent) => {
     setCardActions((previous) => recordCall(previous, turnId, card, event));
@@ -261,13 +276,6 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [homeMode, loadHome],
   );
-  // #402: the preferences and the limits they move inside (state/use-preferences), read with the sandbox and again when
-  // its day or place changes. One instance for every view of the settings.
-  const { limits, saveLimit: onLimit } = usePreferences({
-    agent,
-    enabled: scripted || sessionToken !== undefined,
-    key: `${demoSettings?.scenarioId ?? ''}/${demoSettings?.locationId ?? ''}`,
-  });
   const { locale, chooseLocale: onLocale } = useLocaleSetting();
   // The example buttons follow the home (#268). Remote mode: the home read from sim-api wins over the scenario.
   // Scripted mode: the scenario decides (its home starts calm whatever the scenario) until an answer says what the

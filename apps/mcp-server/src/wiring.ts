@@ -29,11 +29,12 @@ export function wireModules(o: { readonly store: StateStoreFactory; readonly clo
   };
   let homeClock: App['homeClock'] = unbound;
   let homeUnits: App['homeUnits'] = unbound;
+  let homeHousehold: App['homeHousehold'] = unbound;
   const storeFor = withPlaythrough(o.store, (homeId) => homeClock(homeId));
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) return preferences;
   const { clock } = o;
-  const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId), unitsFor: (homeId) => homeUnits(homeId) });
+  const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId), unitsFor: (homeId) => homeUnits(homeId), householdFor: (homeId) => homeHousehold(homeId) });
   if (!modules.ok) return modules;
   // The family phone's notifier and inbox (#24) live in the same store; comfort-plan alerts go through the same notifier.
   const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock });
@@ -47,6 +48,7 @@ export function wireModules(o: { readonly store: StateStoreFactory; readonly clo
     bind: (app) => {
       homeClock = app.homeClock;
       homeUnits = app.homeUnits;
+      homeHousehold = app.homeHousehold;
     },
   });
 }
