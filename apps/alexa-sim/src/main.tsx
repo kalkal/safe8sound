@@ -35,6 +35,7 @@ import { SimClock } from './ui/SimClock.js';
 import { POWER_CUT_QUESTION, clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
 import { isAppliedPlan } from './ui/steps.js';
 import { SHIPPED_PLACES, closedNoticeOf, homeFaceOf, skyOfScenario } from './ui/demo-settings.js';
+import { outdoorNow, topBarWords } from './ui/top-bar.js';
 import { SettingsPage, settingsAnnounce, useSettingsPage } from './ui/SettingsPage.js';
 import { useSettingsModel } from './ui/settings-model.js';
 import { DemoControlsOpener, DemoControlsPanel, WIDE_CONTROLS, jumpText, useDemoControlsSheet } from './demo-controls/DemoControlsPanel.js';
@@ -203,11 +204,10 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     onRetry: loadHome,
     onFocusLost: focusMenu,
   });
-  // The home opened before the code (its note asks for it): once the code is accepted it is read at once.
-  const homeOpenRef = useRef(false);
-  homeOpenRef.current = homePanel.view !== null;
+  // Once the code is accepted the home is read at once (one read call): the home opened before the code shows it, and the
+  // top bar says the temperature outside (owner, 20 Oct, choice C). Each move of the clock reads it again (readWhatFollows).
   useEffect(() => {
-    if (sessionToken !== undefined && homeOpenRef.current) loadHome();
+    if (sessionToken !== undefined) loadHome();
   }, [sessionToken, loadHome]);
   const closeHome = homePanel.close;
   const onSettingsChange = demo.change;
@@ -461,7 +461,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                       setTheme('dark');
                     } },
                 ]}
-                head={<ScreenTop now={clock?.now} sky={sky} unseen={notices.unseen} onSeen={notices.markSeen} menu={<>{homePanel.button}{settingsPage.button}</>} avatar={homeAvatar} menuRef={menuRef} />}
+                head={<ScreenTop now={clock?.now} sky={sky} unseen={notices.unseen} onSeen={notices.markSeen} menu={<>{homePanel.button}{settingsPage.button}</>} avatar={homeAvatar} menuRef={menuRef} words={demoSettings === undefined ? undefined : topBarWords({ locationId: demoSettings.locationId, now: clock?.now, timeZone: homeTimeZone, outdoorTempC: outdoorNow({ home, load: needsCode ? 'locked' : homeLoad, mode: homeMode }), units: demoSettings.units })} />}
                 pageView={settingsPage.view ?? homePanel.view}
                 onClosePage={closePage}
                 appliedTurns={appliedTurns}

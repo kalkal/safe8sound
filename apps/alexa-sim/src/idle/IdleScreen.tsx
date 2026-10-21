@@ -1,11 +1,12 @@
 import type { InboxMessage, Milestone, SafeRoomStatus } from '@cold-reserve/contracts';
 import { homeClock, roomLabel, safeRoomHeadline } from '@cold-reserve/ui-cards';
 import { Avatar, type AvatarKind } from '@cold-reserve/ui-cards/avatars';
-import { BellOutline, IconFrame, MenuOutline, MessageDot, WeatherOutline } from '@cold-reserve/ui-cards/icons';
+import { BellOutline, IconFrame, MapPinOutline, MenuOutline, MessageDot, WeatherOutline } from '@cold-reserve/ui-cards/icons';
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
 import type { PhoneFeed } from '../phone/phone-feed.js';
 import { clockTime } from '../ui/sim-clock.js';
 import type { Sky } from '../ui/sky.js';
+import type { TopBarWords } from '../ui/top-bar.js';
 import { t } from '../ui/text.js';
 
 // The realistic Echo Show screen (#432 S6; owner 18 Oct; architettura/confronto-echo-show §1.1, §1.7). The top row
@@ -47,9 +48,14 @@ export interface ScreenTopProps {
   avatar: AvatarKind;
   /** The menu button, so the focus can come back to it when what it opened closes. */
   menuRef?: RefObject<HTMLButtonElement | null>;
+  /**
+   * Where and when we are (owner, 20 Oct, choice C; topBarWords): the place, the day of the scenario and the temperature
+   * outside; none without a sandbox.
+   */
+  words?: TopBarWords | undefined;
 }
 
-export function ScreenTop({ now, sky, unseen, onSeen, menu, avatar, menuRef }: ScreenTopProps) {
+export function ScreenTop({ now, sky, unseen, onSeen, menu, avatar, menuRef, words }: ScreenTopProps) {
   return (
     <>
       <div className="screen-icons">
@@ -63,11 +69,41 @@ export function ScreenTop({ now, sky, unseen, onSeen, menu, avatar, menuRef }: S
       </div>
       {now !== undefined && (
         <p className="screen-clock">
+          {/* Where we are (owner, 20 Oct: "when I say we are in Houston, something on the screen must change"): the long
+              name, and the short one a phone shows instead (screen-parts.css). */}
+          {words !== undefined && (
+            <span className="screen-place" data-testid="screen-place">
+              <IconFrame className="screen-weather-svg">
+                <MapPinOutline />
+              </IconFrame>
+              <span className="screen-place-name">{words.place}</span>
+              {/* A phone (screen-parts.css): the short place, the short day under it (owner, 21 Oct, alternative 1); only one
+                  of the long and the short is shown, so a screen reader reads one of them. */}
+              <span className="screen-place-short">
+                <span>{words.placeShort}</span>
+                {words.dateShort !== undefined && (
+                  <small className="screen-date-short" data-testid="screen-date-short">
+                    {words.dateShort}
+                  </small>
+                )}
+              </span>
+            </span>
+          )}
+          {/* When: the day of the scenario ("Fri 5 July"), so a judge sees it is summer; it gives way on a phone. */}
+          {words?.date !== undefined && (
+            <span className="screen-date" data-testid="screen-date">
+              {words.date}
+            </span>
+          )}
+          {/* The weather: the temperature outside where it is known, its word for screen readers; else the word. */}
           <span className="screen-weather">
             <IconFrame className="screen-weather-svg">
               <WeatherOutline sky={sky} />
             </IconFrame>
-            <span data-testid="screen-weather">{t(`screen.weather.${sky}`)}</span>
+            <span data-testid="screen-weather" className={words?.outdoor === undefined ? undefined : 'visually-hidden'}>
+              {t(`screen.weather.${sky}`)}
+            </span>
+            {words?.outdoor !== undefined && <span data-testid="screen-outdoor">{words.outdoor}</span>}
           </span>
           <span className="screen-time" data-testid="screen-time">
             {clockTime(now)}

@@ -41,6 +41,8 @@ export const SnapshotSchema = z.strictObject({
   /** Measured (or switched off by a scenario). The only thing that unlocks the storm reserve. */
   gridAvailable: z.boolean(),
   rooms: z.array(RoomReadingSchema).refine((rooms) => uniqueBy(rooms, (r) => r.id), { message: 'Room ids must be unique' }),
+  /** The temperature outside at the reading, when the source knows it (additive, owner 20 Oct: the Echo's top bar). */
+  outdoorTempC: CelsiusSchema.optional(),
   origin: DataOriginSchema,
   homeLink: HomeLinkSchema,
   lastLiveAt: IsoDateTimeSchema.optional(),

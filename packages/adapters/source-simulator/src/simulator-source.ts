@@ -93,6 +93,8 @@ export class SimulatorSource implements HomeDataSource {
       rooms,
       origin: resolveOrigin([], { id: scenario.id, simulatedGroups: scenario.simulatedGroups }),
       homeLink: 'ok',
+      // The weather outside at that moment, from the same inputs the physics reads (the Echo's top bar, owner 20 Oct).
+      outdoorTempC: celsius(round(inputs.outC, 1)),
     };
   }
 

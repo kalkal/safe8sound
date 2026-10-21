@@ -122,6 +122,11 @@ exports[`tools/list of the production registry > matches the snapshot (names, an
                 ],
                 "type": "object",
               },
+              "outdoorTempC": {
+                "maximum": 80,
+                "minimum": -60,
+                "type": "number",
+              },
               "pvW": {
                 "type": "number",
               },

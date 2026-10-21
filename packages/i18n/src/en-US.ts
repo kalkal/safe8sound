@@ -111,6 +111,10 @@ export const enUS = {
   'settings.place.reference': 'Reference home (Italy)',
   'settings.place.turin': 'Turin, Italy',
   'settings.place.houston': 'Houston, Texas',
+  // The Echo's top bar on a phone (owner, 20 Oct, choice C): the place in one short word or two.
+  'settings.placeShort.reference': 'Reference home',
+  'settings.placeShort.turin': 'Turin',
+  'settings.placeShort.houston': 'Houston',
   'settings.notYet': 'Not available yet',
   'settings.units': 'Temperature units',
   'settings.units.C': '°C',

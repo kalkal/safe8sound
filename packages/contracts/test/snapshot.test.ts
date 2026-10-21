@@ -17,6 +17,11 @@ describe('SnapshotSchema', () => {
     expect(snapshot.homeLink).toBe('ok');
   });
 
+  it('carries the outdoor temperature when the source knows it (optional, additive)', () => {
+    expect(SnapshotSchema.safeParse({ ...exampleSnapshot(), outdoorTempC: 26.1 }).success).toBe(true);
+    expect(SnapshotSchema.safeParse({ ...exampleSnapshot(), outdoorTempC: -90 }).success).toBe(false);
+  });
+
   it('rejects a state of charge outside 0-100', () => {
     expect(SnapshotSchema.safeParse({ ...exampleSnapshot(), batterySocPct: 101 }).success).toBe(false);
   });

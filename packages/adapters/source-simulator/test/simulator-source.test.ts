@@ -2,7 +2,7 @@ import { ForecastSchema, HomeProfileSchema, SnapshotSchema, epochMs } from '@col
 import { fixedClock } from '@cold-reserve/core';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { SCENARIO_IDS, builtInScenario, defaultSimParams, demoProfile, type ScenarioId } from '../src/index.js';
+import { SCENARIO_IDS, builtInScenario, defaultSimParams, demoProfile, inputsAt, type ScenarioId } from '../src/index.js';
 import { SimulatorSource } from '../src/simulator-source.js';
 
 const profile = demoProfile();
@@ -25,6 +25,17 @@ describe('SimulatorSource', () => {
     expect(SnapshotSchema.safeParse(r.value).success).toBe(true);
     expect(r.value.origin).toEqual({ energy: 'simulated', rooms: 'simulated', weather: 'simulated', scenario: 'clear-day' });
     expect(r.value.homeId).toBe(profile.homeId);
+  });
+
+  // The Echo's top bar says the weather outside (owner, 20 Oct): the snapshot carries the scenario's own outdoor
+  // temperature at that moment (inputsAt, the one source the physics reads too), rounded to 0.1 °C.
+  it('carries the outdoor temperature the scenario plays at that moment', () => {
+    const { sim, start, scenario } = source('heatwave');
+    for (const h of [0, 6, 13]) {
+      const at = start + h * HOUR;
+      const expected = Math.round(inputsAt(scenario, h * 3600).outC * 10) / 10;
+      expect(sim.snapshotAt(at).outdoorTempC).toBe(expected);
+    }
   });
 
   it.each(SCENARIO_IDS)('%s: every second of the scenario gives a valid snapshot', (id) => {

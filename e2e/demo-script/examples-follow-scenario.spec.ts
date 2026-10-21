@@ -43,9 +43,12 @@ test('remote: the home read from sim-api decides; grid down shows the storm exam
     // Not a sandbox here: no demo settings.
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isError: true, content: [{ type: 'text', text: 'No settings.' }] }) });
   });
+  // The home is read right after Start (the top bar's temperature, #487): its grid decides the examples at once.
   await openRemote(page);
-  await expect(examples(page).getByRole('button', { name: 'A hot day' })).toBeVisible();
+  await expect(examples(page).getByRole('button', { name: 'Is Leo safe?' })).toBeVisible();
+  await expect(examples(page).getByRole('button', { name: 'A hot day' })).toHaveCount(0);
 
+  // Opening the home reads it again: still the storm.
   await showMyHome(page);
   await expect(examples(page).getByRole('button', { name: 'Is Leo safe?' })).toBeVisible();
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toHaveCount(0);

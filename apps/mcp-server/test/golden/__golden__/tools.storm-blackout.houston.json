@@ -105,7 +105,8 @@
         "weather": "simulated",
         "scenario": "storm-blackout"
       },
-      "homeLink": "ok"
+      "homeLink": "ok",
+      "outdoorTempC": 29.1
     }
   },
   {
@@ -472,7 +473,8 @@
         "weather": "simulated",
         "scenario": "storm-blackout"
       },
-      "homeLink": "ok"
+      "homeLink": "ok",
+      "outdoorTempC": 27
     }
   },
   {
@@ -1233,7 +1235,8 @@
         "weather": "simulated",
         "scenario": "storm-blackout"
       },
-      "homeLink": "ok"
+      "homeLink": "ok",
+      "outdoorTempC": 26
     }
   },
   {
@@ -1817,7 +1820,8 @@
         "weather": "simulated",
         "scenario": "storm-blackout"
       },
-      "homeLink": "ok"
+      "homeLink": "ok",
+      "outdoorTempC": 24.6
     }
   },
   {
@@ -2239,7 +2243,8 @@
         "weather": "simulated",
         "scenario": "storm-blackout"
       },
-      "homeLink": "ok"
+      "homeLink": "ok",
+      "outdoorTempC": 24
     }
   },
   {

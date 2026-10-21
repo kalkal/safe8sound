@@ -27,6 +27,13 @@ describe('HomeStatusSchema', () => {
     expect(HomeStatusSchema.safeParse(valid()).success).toBe(true);
   });
 
+  // The Echo's top bar says the weather outside (owner, 20 Oct, choice C; additive, approved in review): optional, so
+  // every status without it still parses; a temperature out of range does not.
+  it('accepts the outdoor temperature, and a status without it', () => {
+    expect(HomeStatusSchema.safeParse({ ...valid(), outdoorTempC: 32.1 }).success).toBe(true);
+    expect(HomeStatusSchema.safeParse({ ...valid(), outdoorTempC: 120 }).success).toBe(false);
+  });
+
   it('accepts lastLiveAt when the home fell back to the simulator', () => {
     const status = { ...valid(), homeLink: 'stale', lastLiveAt: '2026-07-15T13:30:00.000Z' };
     expect(HomeStatusSchema.safeParse(status).success).toBe(true);

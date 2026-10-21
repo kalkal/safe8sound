@@ -37,6 +37,13 @@ describe('get_home_status on the demo home (simulator, clear-day, fixed seed)', 
     expect(result.content[0]?.text).toMatch(/simulated/i);
   });
 
+  // The Echo's top bar says the weather outside (owner, 20 Oct): the status copies the snapshot's outdoor temperature.
+  it('carries the outdoor temperature of the scenario moment, from the snapshot', async () => {
+    const status = HomeStatusSchema.parse((await toolResult(await post(app().handler, callTool('get_home_status', {})))).structuredContent);
+    expect(status.outdoorTempC).toBeGreaterThan(20);
+    expect(status.outdoorTempC).toBeLessThan(45);
+  });
+
   it('#422: names each room for the cards from the home profile; the real home names no one', async () => {
     const statusOf = async (headers: Record<string, string> = {}) => HomeStatusSchema.parse((await toolResult(await post(app().handler, callTool('get_home_status', {}), headers))).structuredContent);
     const demo = await statusOf();

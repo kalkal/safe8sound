@@ -1,5 +1,6 @@
 import { expect, test } from '../no-network.js';
 import { homeButton, menuButton, openDemoControls, slot } from '../surface.js';
+import { openRemote } from '../remote-session.js';
 
 // The realistic Echo Show screen (#432 S6, owner 18 Oct; outcomes O1 and O12). At rest the sky is the whole screen, with
 // the time and the weather top right and the menu and the bell top left, and translucent tiles: Leo's room with the
@@ -102,3 +103,77 @@ test("after the storm's answer the idle screen comes back a minute later: the pl
   await page.clock.fastForward(60_000);
   await expect(screenOf(page)).toHaveAttribute('data-screen', 'idle');
 });
+
+// Where and when we are (owner, 20 Oct, choice C: "when I say we are in Houston something on the screen must change";
+// "you can't tell if it's winter and cold or summer and hot"): the top bar says the place and the day of the scenario
+// beside the time, and the temperature outside from a fresh read of the home; choosing Houston changes the place. On a
+// phone the short place, without the day. The scripted home is a fixed picture, so it shows no temperature (review of
+// #487). Outcome O1 (the judge knows what it is and where it plays).
+for (const [width, height] of [[1904, 870], [375, 812]] as const) {
+  test(`${String(width)} × ${String(height)}: the top bar says where and when we are, and follows the place`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/');
+    const place = page.getByTestId('screen-place');
+    await expect(place).toBeVisible();
+    await expect(page.getByTestId('screen-outdoor')).toHaveCount(0);
+    if (width >= 768) {
+      await expect(place).toHaveText(/^Reference home \(Italy\)/);
+      await expect(page.getByTestId('screen-date')).toHaveText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} July$/);
+      await expect(page.getByTestId('screen-date')).toBeVisible();
+    } else {
+      await expect(place.getByText('Reference home', { exact: true })).toBeVisible();
+      // The day stays in view on a phone, short, under the place (owner, 21 Oct, alternative 1).
+      await expect(page.getByTestId('screen-date')).toBeHidden();
+      await expect(page.getByTestId('screen-date-short')).toHaveText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} Jul$/);
+      await expect(page.getByTestId('screen-date-short')).toBeVisible();
+    }
+    await expect(page.getByTestId('screen-time')).toBeInViewport({ ratio: 1 });
+
+    const panel = await openDemoControls(page);
+    await panel.getByText('Houston, Texas').click();
+    if (width < 1600) await page.keyboard.press('Escape');
+    await expect(width >= 768 ? place.getByText('Houston, Texas', { exact: true }) : place.getByText('Houston', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('screen-time')).toBeInViewport({ ratio: 1 });
+  });
+
+  test(`${String(width)} × ${String(height)}: a sandbox in Houston shows the temperature outside in °F, read with the home`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.route('**/sim-api/v1/tools/call', (route) => {
+      const { name } = route.request().postDataJSON() as { name: string };
+      const answer = (structuredContent: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: 'ok' }], structuredContent }) });
+      if (name === 'get_demo_settings') {
+        return answer({
+          settings: { version: 1, updatedAt: '2024-07-05T12:00:00-05:00', scenarioId: 'heatwave', locationId: 'houston', units: 'F', household: 'older-man' },
+          place: { id: 'houston', label: 'Houston, Texas', tz: 'America/Chicago' },
+        });
+      }
+      if (name === 'get_milestones') return answer({ now: '2024-07-05T12:00:00-05:00', day: { from: '2024-07-05T12:00:00-05:00', to: '2024-07-06T12:00:00-05:00' }, milestones: [] });
+      if (name === 'get_home_status') {
+        return answer({
+          homeId: 'demo',
+          ts: '2024-07-05T12:00:00-05:00',
+          batterySocPct: 78,
+          pvW: 3200,
+          loadW: 1300,
+          gridW: -1100,
+          gridAvailable: true,
+          level: 'comfort',
+          levelReason: 'weather',
+          levelChangedAt: '2024-07-05T08:00:00-05:00',
+          controlAvailability: 'ok',
+          rooms: [{ roomId: 'bedroom-1', name: "Leo's room", tempC: 24.6, occupants: ['grandpa'], state: 'served' }],
+          origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated', scenario: 'heatwave' },
+          homeLink: 'ok',
+          outdoorTempC: 32.1,
+        });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isError: true, content: [{ type: 'text', text: 'No.' }] }) });
+    });
+    await openRemote(page);
+    await expect(page.getByTestId('screen-outdoor')).toHaveText('89.8 °F');
+    await expect(page.getByTestId('screen-outdoor')).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId('screen-time')).toBeInViewport({ ratio: 1 });
+    if (width >= 768) await expect(page.getByTestId('screen-date')).toHaveText('Fri 5 July');
+    else await expect(page.getByTestId('screen-date-short')).toHaveText('Fri 5 Jul');
+  });
+}

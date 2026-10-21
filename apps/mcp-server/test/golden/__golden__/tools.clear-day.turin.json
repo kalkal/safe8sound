@@ -105,7 +105,8 @@
         "weather": "simulated",
         "scenario": "clear-day"
       },
-      "homeLink": "ok"
+      "homeLink": "ok",
+      "outdoorTempC": 29.3
     }
   },
   {

@@ -108,6 +108,8 @@ export function energyStatusModule(deps: EnergyStatusDeps): CapabilityModule {
             origin: snapshot.origin,
             homeLink: snapshot.homeLink,
             ...(snapshot.lastLiveAt === undefined ? {} : { lastLiveAt: snapshot.lastLiveAt }),
+            // The weather outside (the Echo's top bar, owner 20 Oct), as the source gave it; its origin is origin.weather.
+            ...(snapshot.outdoorTempC === undefined ? {} : { outdoorTempC: snapshot.outdoorTempC }),
           });
         },
       }),

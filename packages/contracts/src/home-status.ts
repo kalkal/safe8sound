@@ -44,5 +44,7 @@ export const HomeStatusSchema = z.strictObject({
   origin: DataOriginSchema,
   homeLink: HomeLinkSchema,
   lastLiveAt: IsoDateTimeSchema.optional(),
+  /** The temperature outside, copied from the snapshot (its origin is origin.weather); additive, owner 20 Oct. */
+  outdoorTempC: CelsiusSchema.optional(),
 });
 export type HomeStatus = z.infer<typeof HomeStatusSchema>;

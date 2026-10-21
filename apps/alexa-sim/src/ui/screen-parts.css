@@ -182,6 +182,10 @@
     align-items: center;
     gap: var(--space-3);
     margin: 0 0 0 auto;
+    /* Never wider than its row (a phone): the place gives way first (review of #487). */
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    box-sizing: border-box;
     padding: var(--space-1) var(--space-4);
     border-radius: var(--radius-pill);
     background: var(--surface-tile);
@@ -200,11 +204,89 @@
     block-size: calc(var(--font-size-clock) * 0.9);
   }
 
-  .screen-weather {
+  .screen-weather,
+  .screen-place {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
     font-size: var(--font-size-lead);
+  }
+
+  /* Where and when (owner, 20 Oct, choice C): the place, the day and the temperature outside beside the time, the same
+     size as the weather. The place gives way first where the row is short: its name ends in "…". */
+  .screen-place {
+    min-inline-size: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+
+    & .screen-place-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .screen-date {
+    font-size: var(--font-size-lead);
+    white-space: nowrap;
+  }
+
+  .screen-place-short {
+    display: none;
+  }
+
+  /* A phone: the short place and the temperature beside the time; the day and the home's face give way (owner, 20 Oct:
+     keep the face if it fits, else drop it from the bar at phone width only; at 375 px it does not fit). */
+  @media (width < 48rem) {
+    .screen-clock {
+      gap: var(--space-2);
+      padding-inline: var(--space-3);
+    }
+
+    .screen-place .screen-weather-svg {
+      inline-size: 1.2em;
+      block-size: 1.2em;
+    }
+
+    .screen-clock .screen-profile {
+      display: none;
+    }
+
+    .screen-weather {
+      white-space: nowrap;
+    }
+
+    /* The degrees say the weather: their icon gives its room to the place ("Houston", not "H…"). */
+    .screen-clock:has([data-testid="screen-outdoor"]) .screen-weather .screen-weather-svg {
+      display: none;
+    }
+
+    .screen-place {
+      & .screen-place-name {
+        display: none;
+      }
+
+      /* The short place and, under it, the short day (owner, 21 Oct, alternative 1): the season is in view on a phone too. */
+      & .screen-place-short {
+        display: grid;
+        min-inline-size: 0;
+        line-height: 1.15;
+
+        & > * {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      }
+
+      & .screen-date-short {
+        font-size: var(--font-size-min);
+      }
+    }
+
+    .screen-date {
+      display: none;
+    }
   }
 
   /* The tiles at rest, each a translucent box over the sky: on a phone one under the other; on a landscape screen

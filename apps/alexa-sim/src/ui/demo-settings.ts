@@ -70,9 +70,19 @@ export function nothingAheadText(scenarioId: ScenarioId | undefined, otherwise: 
   return t(scenarioId === 'clear-day' ? 'clock.nothingClearDay' : otherwise);
 }
 
+/** The place in words, in the page's language at render time (#284), never a label kept from another language: the one
+ *  name of the sandbox's place on screen ("Houston, Texas"). */
+export function placeName(locationId: LocationId): string {
+  return t(`settings.place.${locationId}`);
+}
+
+/** The same place in a short word or two, for the top bar on a phone (owner, 20 Oct): "Houston", "Torino". */
+export function placeShortName(locationId: LocationId): string {
+  return t(`settings.placeShort.${locationId}`);
+}
+
 export function badgeText(view: DemoSettingsView): string {
-  // The place in the page's language at render time (#284), never a label kept from another language.
-  return t('settings.badge', { place: t(`settings.place.${view.locationId}`), scenario: t(`settings.scenario.${view.scenarioId}`) });
+  return t('settings.badge', { place: placeName(view.locationId), scenario: t(`settings.scenario.${view.scenarioId}`) });
 }
 
 /**

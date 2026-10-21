@@ -182,6 +182,17 @@ export interface LastResortAdvice {
   readonly notMedical: string;
 }
 
+/**
+ * "Fri 5 July" / "ven 5 luglio": the day of the scenario for the Echo's top bar (owner, 20 Oct, choice C), on the home's
+ * own clock, in the page's language, never the year (the places play days of different years); `short` under the place
+ * on a phone ("Fri 5 Jul", owner, 21 Oct). The words come from Intl, so every language says its own.
+ */
+export function dateWords(ms: number, timeZone: string, locale: Locale, form: 'long' | 'short' = 'long'): string {
+  const parts = new Intl.DateTimeFormat(locale, { timeZone, weekday: 'short', day: 'numeric', month: form }).formatToParts(ms);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('weekday').replace(/\.$/, '')} ${part('day')} ${part('month').replace(/\.$/, '')}`;
+}
+
 /** The emergency number follows the place, not the language (#366): the US 911 in Houston, the European 112 elsewhere (Turin, the reference home). */
 export const emergencyNumberOf = (place: LocationId): string => (place === 'houston' ? '911' : '112');
 

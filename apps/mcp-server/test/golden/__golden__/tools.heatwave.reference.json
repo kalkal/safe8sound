@@ -104,7 +104,8 @@
         "weather": "simulated",
         "scenario": "heatwave"
       },
-      "homeLink": "ok"
+      "homeLink": "ok",
+      "outdoorTempC": 37.5
     }
   },
   {
@@ -981,7 +982,8 @@
         "weather": "simulated",
         "scenario": "heatwave"
       },
-      "homeLink": "ok"
+      "homeLink": "ok",
+      "outdoorTempC": 31.5
     }
   },
   {

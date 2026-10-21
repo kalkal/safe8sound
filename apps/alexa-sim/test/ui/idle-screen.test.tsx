@@ -29,6 +29,27 @@ describe('ScreenTop', () => {
     expect(screen.queryByRole('button', { name: 'Show my home' })).toBeNull();
   });
 
+  // Where and when we are (owner, 20 Oct, choice C): the place, the day and the temperature outside beside the time; the
+  // weather word stays for screen readers. On a phone the short place shows and the day gives way (CSS).
+  it('says the place, the day and the temperature outside beside the time', () => {
+    const words = { place: 'Houston, Texas', placeShort: 'Houston', date: 'Fri 5 July', dateShort: 'Fri 5 Jul', outdoor: '89.8 °F' };
+    render(<ScreenTop now="2024-07-05T12:00:00-05:00" sky="hot" unseen={0} onSeen={() => undefined} menu={null} avatar="older-man" words={words} />);
+    // The long place for wide screens; on a phone the short place with the short day under it (owner, 21 Oct, alternative 1).
+    expect(screen.getByTestId('screen-place').textContent).toBe('Houston, TexasHoustonFri 5 Jul');
+    expect(screen.getByTestId('screen-date-short').textContent).toBe('Fri 5 Jul');
+    expect(screen.getByTestId('screen-date').textContent).toBe('Fri 5 July');
+    expect(screen.getByTestId('screen-outdoor').textContent).toBe('89.8 °F');
+    expect(screen.getByTestId('screen-weather').textContent).toBe('Hot');
+    expect(screen.getByTestId('screen-time').textContent).toBe('12:00');
+  });
+
+  it('without the outdoor temperature (not read yet) the weather word shows, as before', () => {
+    render(<ScreenTop now="2024-07-05T12:00:00-05:00" sky="hot" unseen={0} onSeen={() => undefined} menu={null} avatar="older-man" words={{ place: 'Houston, Texas', placeShort: 'Houston' }} />);
+    expect(screen.queryByTestId('screen-outdoor')).toBeNull();
+    expect(screen.queryByTestId('screen-date')).toBeNull();
+    expect(screen.getByTestId('screen-weather').className).not.toContain('visually-hidden');
+  });
+
   it('names each sky as weather, in both languages', () => {
     const words = (['mild', 'hot', 'dusk', 'storm'] as const).map((sky) => {
       render(<ScreenTop avatar="older-man" now="2026-07-17T12:00:00+02:00" sky={sky} unseen={0} onSeen={() => undefined} menu={null} />);

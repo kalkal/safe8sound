@@ -24,6 +24,7 @@ export function homeInStorm(): HomeStatus {
     ],
     origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated', scenario: 'storm-blackout' },
     homeLink: 'ok',
+    outdoorTempC: 24,
   });
 }
 
@@ -52,5 +53,6 @@ export function homeCalm(): HomeStatus {
     ],
     origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated', scenario: 'heatwave' },
     homeLink: 'ok',
+    outdoorTempC: 37,
   });
 }
