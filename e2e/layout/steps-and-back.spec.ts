@@ -3,10 +3,12 @@ import type { FakeVoiceDriver } from '../../apps/alexa-sim/src/voice/fake-voice.
 import { expect, test } from '../no-network.js';
 import { menuButton, showMyHome } from '../surface.js';
 
-// Back (idea 5, after Alexa's backstack), said or typed, never drawn: a real Echo Show has no Back button nor steps on
-// its home screen, so ours has none either (#432 S6, owner C, 19 Oct). "Back", "Go back", "Alexa, back." and
-// "Torna indietro" return to the screen before (the home closes, the answer before, then the first screen), and are
-// never asked to Alexa; the idle screen also comes back by itself a minute after an answer (echo-at-rest.spec).
+// Back (idea 5, after Alexa's backstack), said or typed: a real Echo Show has no Back button nor steps on its home
+// screen, so ours has none there either (#432 S6, owner C, 19 Oct); the settings page alone draws one at its top left
+// (owner, 21 Oct: after saving she could not find the way out; e2e/demo-script/settings-back.spec.ts). "Back", "Go
+// back", "Alexa, back." and "Torna indietro" return to the screen before (the home closes, the answer before, then the
+// first screen), and are never asked to Alexa; the idle screen also comes back by itself a minute after an answer
+// (echo-at-rest.spec).
 
 const ask = async (page: Page, words: string) => {
   await page.getByLabel('Ask a question').fill(words);

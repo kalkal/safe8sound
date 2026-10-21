@@ -6,6 +6,34 @@
     display: contents;
   }
 
+  /* A field that takes the focus scrolls into view below the sticky Back, never under it (review of #497). */
+  .band-content:has(.settings-back) {
+    scroll-padding-block-start: calc(var(--target-min) + var(--space-2));
+  }
+
+  /* Back, always at the top left of the page (owner, 21 Oct): it stays in view while the page scrolls in the content band,
+     a 48 px target on the card's raised surface in both themes. */
+  .settings-back {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    gap: var(--space-2);
+    padding-inline: var(--space-3) var(--space-4);
+
+    & .settings-back-svg {
+      inline-size: 1.25em;
+      block-size: 1.25em;
+      fill: none;
+      stroke: currentcolor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  }
+
   .settings-page {
     display: grid;
     gap: var(--space-4);

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, ty
 import { LOCALES, isLocale, type Locale } from '@cold-reserve/i18n';
 import { roomLabel } from '@cold-reserve/ui-cards';
 import { Avatar } from '@cold-reserve/ui-cards/avatars';
-import { IconFrame, SnowflakeOutline } from '@cold-reserve/ui-cards/icons';
+import { BackChevron, IconFrame, SnowflakeOutline } from '@cold-reserve/ui-cards/icons';
 import type { LimitId, LimitRefusal, LimitRow } from './limits.js';
 import type { SettingsModel } from './settings-model.js';
 import { ChipGroup } from './ChipGroup.js';
@@ -282,11 +282,15 @@ export function useSettingsPage({ model, render, onShow, onFocusLost }: UseSetti
     focusOnOpen.current = false;
     hostRef.current?.querySelector<HTMLElement>('.settings-page')?.focus();
   }, [open]);
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== 'Escape' || !open) return;
+  // Escape and the Back at the top of the page leave it the same way: closed, the focus back where it was opened from.
+  const leavePage = () => {
     close();
     if (buttonRef.current === null) onFocusLost?.();
     else buttonRef.current.focus();
+  };
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || !open) return;
+    leavePage();
   };
   const button = (
     <button
@@ -310,6 +314,14 @@ export function useSettingsPage({ model, render, onShow, onFocusLost }: UseSetti
   );
   const view = open ? (
     <div ref={hostRef} className="settings-page-host" onKeyDown={onKeyDown}>
+      {/* Always at the top left, first on the page (owner, 21 Oct: after saving she could not find the way out; the Echo
+          Show's back arrow sits there): it leaves the page as Escape does. */}
+      <button type="button" className="chip-button settings-back" data-testid="settings-back" onClick={leavePage}>
+        <IconFrame className="settings-back-svg">
+          <BackChevron />
+        </IconFrame>
+        {t('nav.back')}
+      </button>
       {render()}
     </div>
   ) : null;

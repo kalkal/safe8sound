@@ -113,6 +113,30 @@ describe('the settings page', () => {
     expect(document.activeElement).toBe(button);
   });
 
+  // The owner, 21 Oct, on the dev site: after saving she could not find how to leave the page. A Back always at the top
+  // left of the page, first in it (like the Echo Show's back arrow), closes it as Escape does: one close, the focus back
+  // where the page was opened from.
+  it('"Back" at the top left closes the page like Escape, and the focus goes back to its button', () => {
+    const { button } = setup();
+    fireEvent.click(button);
+    const page = screen.getByRole('region', { name: TITLE });
+    const back = screen.getByRole('button', { name: 'Back' });
+    // First in the page: before its title, so it is the first thing reached and seen.
+    expect(back.compareDocumentPosition(page) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(back.getAttribute('data-testid')).toBe('settings-back');
+    fireEvent.click(back);
+    expect(screen.queryByRole('region', { name: TITLE })).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('"Back" in Italian is "Indietro"', () => {
+    setLocale('it-IT');
+    render(<Harness settings={scriptedDemoSettings()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Impostazioni' }));
+    expect(screen.getByRole('button', { name: 'Indietro' })).toBeTruthy();
+    setLocale('en-US');
+  });
+
   it('Escape with the button gone (it sits in the closed menu) hands the focus back to the caller', () => {
     const onFocusLost = vi.fn();
     function MenuClosed() {
