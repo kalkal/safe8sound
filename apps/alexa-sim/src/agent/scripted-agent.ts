@@ -27,17 +27,25 @@ const ScriptSchema = z
           withStatus: z.boolean(),
           /** Tool results to show as cards, by fixture name (see script-fixtures.ts). */
           cards: z.array(z.strictObject({ tool: z.enum(TOOL_NAMES), fixture: z.enum(SCRIPT_FIXTURE_NAMES) })).max(4).optional(),
+          /** The entries whose proposal a bare yes ("yes", "ok", "sì") right after them confirms with this answer. */
+          confirms: z.array(z.string().regex(/^[a-z0-9-]{1,40}$/)).max(4).optional(),
           /** Family messages the scene sends with this answer, by fixture name (the phone, #24). */
           phone: z.array(z.strictObject({ fixture: z.enum(PHONE_FIXTURE_NAMES) })).max(3).optional(),
         }),
       )
       .min(1),
+    /** The bare confirmations: a whole answer, never a word inside a question; they mean yes only right after a proposal. */
+    yes: z.array(z.string().min(1).max(40)).max(20).optional(),
     fallback: z.string().min(1).max(600),
     /** Degraded mode: what to say for anything but a status question. Honest: nothing was done. */
     degradedFallback: z.string().min(1).max(600),
   })
   .superRefine((script, ctx) => {
+    const ids = new Set(script.entries.map((entry) => entry.id));
     script.entries.forEach((entry, i) => {
+      for (const id of entry.confirms ?? []) {
+        if (!ids.has(id)) ctx.addIssue({ code: 'custom', path: ['entries', i, 'confirms'], message: `No entry "${id}" to confirm` });
+      }
       if ((entry.withStatus || entry.text.includes('{soc}')) && script.status === undefined) {
         ctx.addIssue({ code: 'custom', path: ['entries', i], message: 'This entry needs the script status' });
       }
@@ -77,6 +85,9 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
     .filter((entry) => options.degraded !== true || (entry.withStatus && entry.cards === undefined && entry.phone === undefined))
     .map((entry) => ({ ...entry, patterns: entry.patterns.map(normalise) }));
   const fallback = options.degraded === true ? script.degradedFallback : script.fallback;
+  const yes = new Set((script.yes ?? []).map(normalise));
+  /** The entry that gave the last answer: a bare yes confirms only what was just proposed. */
+  let previous: string | undefined;
   // The simulated clock of the scripted home: the storm night's moments, the phone told on the way.
   const preferences = createScriptedPreferences();
   const clock = createScriptedClock(options.phone === undefined ? {} : { phone: options.phone });
@@ -100,7 +111,10 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
     },
     ask: (question, context) => {
       const q = normalise(question);
-      const entry = entries.find((e) => e.patterns.some((p) => q.includes(p)));
+      const after = previous;
+      const confirmed = after !== undefined && yes.has(q) ? entries.find((e) => e.confirms?.includes(after) === true) : undefined;
+      const entry = confirmed ?? entries.find((e) => e.patterns.some((p) => q.includes(p)));
+      previous = entry?.id;
       if (entry === undefined) return Promise.resolve(ok({ text: fallback }));
       const { status } = script;
       const answer: AgentAnswer =

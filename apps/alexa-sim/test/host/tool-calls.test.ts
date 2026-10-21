@@ -136,6 +136,41 @@ describe('the second yes to a last resort by touch (#160, decision B)', () => {
     // The token is never logged.
     expect(JSON.stringify(log.mock.calls)).not.toContain(token);
   });
+
+  it('a second yes that never reached an answer keeps its token: the same tap can be retried, once at a time', async () => {
+    const callTool = vi.fn<Agent['callTool']>().mockResolvedValueOnce(firstAnswer).mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(appliedAnswer);
+    const confirmation = createFrameConfirmation();
+    const deps = { agent: agentWith(callTool), turnId: 'turn-9', log: vi.fn(), confirmation };
+    const secondYes = { name: 'apply_plan', arguments: { planId: 'plan_LastResort01', lastResortToken: token } };
+    await answerCardCall({ name: 'apply_plan', arguments: { planId: 'plan_LastResort01' } }, card, deps);
+
+    const lost = await answerCardCall(secondYes, card, deps);
+    expect(lost).toMatchObject({ isError: true, structuredContent: { code: 'unexpected_error' } });
+    // The network failed, not the person: the retry reaches the server (its idempotency is the real barrier).
+    expect(await answerCardCall(secondYes, card, deps)).toBe(appliedAnswer);
+    expect(callTool).toHaveBeenCalledTimes(3);
+    // Applied: now the token is spent.
+    expect(await answerCardCall(secondYes, card, deps)).toMatchObject({ isError: true, structuredContent: { code: 'invalid_input' } });
+    expect(callTool).toHaveBeenCalledTimes(3);
+  });
+
+  it('while the second yes is in flight, a double tap never reaches the server', async () => {
+    let answer: (value: Awaited<ReturnType<Agent['callTool']>>) => void = () => undefined;
+    const callTool = vi
+      .fn<Agent['callTool']>()
+      .mockResolvedValueOnce(firstAnswer)
+      .mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+    const confirmation = createFrameConfirmation();
+    const deps = { agent: agentWith(callTool), turnId: 'turn-10', log: vi.fn(), confirmation };
+    const secondYes = { name: 'apply_plan', arguments: { planId: 'plan_LastResort01', lastResortToken: token } };
+    await answerCardCall({ name: 'apply_plan', arguments: { planId: 'plan_LastResort01' } }, card, deps);
+
+    const first = answerCardCall(secondYes, card, deps);
+    expect(await answerCardCall(secondYes, card, deps)).toMatchObject({ isError: true, structuredContent: { code: 'invalid_input' } });
+    answer(appliedAnswer);
+    expect(await first).toBe(appliedAnswer);
+    expect(callTool).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('the confirmation card from a voice turn (#215 review): its own token, once', () => {

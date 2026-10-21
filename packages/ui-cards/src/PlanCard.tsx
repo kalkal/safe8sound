@@ -1,6 +1,7 @@
 import { epochMs, formatTemp, tempGap, type LastResortAction, type LocationId, type Plan } from '@cold-reserve/contracts';
-import { Fragment, useId, useState, type ReactElement } from 'react';
+import { Fragment, useId, type ReactElement, type ReactNode } from 'react';
 import { getLocale, lastResortAdvice } from '@cold-reserve/i18n';
+import { canAct, type CardAction } from './card-action.js';
 import { CardShell } from './CardShell.js';
 import { homeClock, isSimulated, lastResortHeadline, levelSpans, pacingGeometry } from './plan-model.js';
 import { getPlace } from './place-context.js';
@@ -18,18 +19,22 @@ export interface PlanCardProps {
   onDismiss?: () => void;
   /** Pages the host of the card adds after the plan's own (the safety check), each with its key. */
   extraPages?: readonly ReactElement[];
+  /** Where the card's action stands, as the host says (card-action); ready when it says nothing. */
+  action?: CardAction;
+  /** What became of the plan (the second step of a last resort, advice), said in place of Apply and Not now; null: nothing. */
+  outcome?: ReactNode;
 }
 
 /** The hot-day plan (screen S1/plan, Signature mockup): estimate first, then the ribbon and the charge line. */
-export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss, extraPages = [] }: PlanCardProps) {
+export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss, extraPages = [], action = { phase: 'ready' }, outcome }: PlanCardProps) {
   // The guard never modifies a plan: a rejected one can be read, never applied.
   // Apply only when the host can run it (onApply given), the plan is proposed and every guarantee passes.
   const applicable = onApply !== undefined && plan.status === 'proposed' && plan.guarantees.every((g) => g.ok);
   // A last resort (#160) has its own button: the first of two steps, never the plain Apply.
   const lastResort = plan.lastResort;
   const lastResortApplicable = onApply !== undefined && plan.status === 'proposed' && lastResort !== undefined;
-  // One tap, one call: the buttons wait for the answer, which replaces this card.
-  const [sending, setSending] = useState(false);
+  // The host says where the action stands (card-action): on its way, or expired, Apply and Not now have nothing to do.
+  const off = !canAct(action);
   // One giant number per view, pages instead of scrolling (owner, 10 Oct): page 1 is the headline and the one accent
   // button; then the levels and the notes, the battery line, and whatever the host adds (the safety check).
   const first = (
@@ -54,43 +59,44 @@ export function PlanCard({ plan, timeZone, batteryUsableWh, onApply, onDismiss, 
       ) : (
         <LastResortHero lastResort={lastResort} horizonAt={plan.horizonAt} timeZone={timeZone} />
       )}
-      {applicable && (
-        <div className="plan-actions">
-          <p className="muted">{t('plan.validUntil', { time: homeClock(plan.expiresAt, timeZone) })}</p>
-          <button
-            type="button"
-            className="button-primary"
-            disabled={sending}
-            onClick={() => {
-              setSending(true);
-              onApply(plan.id);
-            }}
-          >
-            {t('plan.apply')}
-          </button>
-          <button type="button" className="button-secondary" onClick={() => onDismiss?.()}>
-            {t('plan.dismiss')}
-          </button>
-        </div>
-      )}
-      {lastResortApplicable && (
-        <div className="plan-actions">
-          <p className="muted">{t('plan.validUntil', { time: homeClock(plan.expiresAt, timeZone) })}</p>
-          <button
-            type="button"
-            className="button-primary"
-            disabled={sending}
-            onClick={() => {
-              setSending(true);
-              onApply(plan.id);
-            }}
-          >
-            {t('plan.applyLastResort')}
-          </button>
-          <button type="button" className="button-secondary" onClick={() => onDismiss?.()}>
-            {t('plan.dismiss')}
-          </button>
-        </div>
+      {outcome !== undefined ? (
+        outcome !== null && (
+          <div className="plan-actions" aria-busy={action.phase === 'busy' || undefined}>
+            {outcome}
+          </div>
+        )
+      ) : (
+        (applicable || lastResortApplicable) && (
+          <div className="plan-actions" aria-busy={action.phase === 'busy' || undefined}>
+            {action.phase === 'expired' ? (
+              <p className="muted" role="status">
+                {t('plan.expired')}
+              </p>
+            ) : (
+              <p className="muted">{t('plan.validUntil', { time: homeClock(plan.expiresAt, timeZone) })}</p>
+            )}
+            <button
+              type="button"
+              className="button-primary"
+              disabled={off}
+              onClick={() => {
+                if (!off) onApply(plan.id);
+              }}
+            >
+              {t(lastResortApplicable ? 'plan.applyLastResort' : 'plan.apply')}
+            </button>
+            <button
+              type="button"
+              className="button-secondary"
+              disabled={off}
+              onClick={() => {
+                if (!off) onDismiss?.();
+              }}
+            >
+              {t('plan.dismiss')}
+            </button>
+          </div>
+        )
       )}
     </Fragment>
   );

@@ -17,6 +17,8 @@ import type { Agent, AgentAnswer, AskContext } from './agent/agent.js';
 import { buildAgent, buildSession, type DemoSession } from './agent/index.js';
 import { parseConfig, type SimConfig } from './config.js';
 import { cardDocument } from './host/card-documents.js';
+import { NO_ACTIONS, answeredOnCard, recordAnswer, recordCall, type CardActions, type FrameEvent } from './host/card-actions.js';
+import type { CardSlot, ToolCard } from './agent/wire.js';
 import { CardHostProvider } from './host/card-host.js';
 import { Conversation } from './ui/Conversation.js';
 import { addLogSink, configErrorEvent, log, logUnhandled } from './log.js';
@@ -33,7 +35,6 @@ import { useHomePanel } from './ui/HomePanel.js';
 import { ReserveClock } from './ui/ReserveClock.js';
 import { SimClock } from './ui/SimClock.js';
 import { POWER_CUT_QUESTION, clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
-import { isAppliedPlan } from './ui/steps.js';
 import { SHIPPED_PLACES, closedNoticeOf, homeFaceOf, skyOfScenario } from './ui/demo-settings.js';
 import { outdoorNow, topBarWords } from './ui/top-bar.js';
 import { SettingsPage, settingsAnnounce, useSettingsPage } from './ui/SettingsPage.js';
@@ -220,8 +221,13 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const homeAvatar = homeFace.avatar;
   // The plan on screen (time pack): the simulated clock lists its own moments too (the essential level, the emergency plan).
   const [planId, setPlanId] = useState<string | undefined>(undefined);
+  // Where each card's action stands (host/card-actions): busy and expired per card of a turn, applied per plan; above the
+  // frames, so a card shown again by Previous gets it back, and a plan applied by voice is applied on its card too.
+  const [cardActions, setCardActions] = useState<CardActions>(NO_ACTIONS);
+  const planNowRef = useRef<string | undefined>(undefined);
   const onAnswer = useCallback(
-    (answer: AgentAnswer) => {
+    (answer: AgentAnswer, turnId: string) => {
+      setCardActions((previous) => recordAnswer(previous, turnId, answer.cards, planNowRef.current));
       setSky((previous) => skyFor(answer.cards ?? [], homeTimeZone, previous));
       setHome((previous) => homeFor(answer.cards ?? [], previous, homeMode));
       if (homeFor(answer.cards ?? [], undefined, homeMode) !== undefined) setHomeTold(true);
@@ -233,13 +239,15 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     },
     [homeTimeZone, homeMode, closeHome, closeSettings],
   );
-  // The steps (idea 5): the turns whose plan was applied from its card are at "Confirm"; a last resort's first step
-  // (still "proposed", waiting for the second yes) is not (review of #350).
-  const [appliedTurns, setAppliedTurns] = useState<ReadonlySet<string>>(() => new Set());
+  const onCardCall = useCallback((turnId: string, card: ToolCard, event: FrameEvent) => {
+    setCardActions((previous) => recordCall(previous, turnId, card, event));
+  }, []);
+  // The steps (idea 5) and "Done — plan applied": an answer that asked is answered once its plan is applied, by tap or
+  // by voice; a last resort's first step (still "proposed", waiting for the second yes) is not (review of #350).
+  const answeredOnCardOf = useCallback((turnId: string, cards: readonly CardSlot[] | undefined) => answeredOnCard(cardActions, turnId, cards), [cardActions]);
   const onCardAction = useCallback(
-    (name: string, turnId: string, result: unknown) => {
+    (name: string) => {
       if (name !== 'apply_plan') return;
-      if (isAppliedPlan(result)) setAppliedTurns((previous) => new Set(previous).add(turnId));
       setHome((previous) => homeAfterApply(previous, homeMode));
       loadHome();
     },
@@ -269,6 +277,10 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // The simulated clock (state/use-sim-clock), for every visitor of a sandbox (or the scripted home).
   const hasSandbox = demoSettings !== undefined;
   const { clock, busy: clockBusy, note: clockNote, stops, skip: onSkip, cutPower, clearNote } = useSimClock({ agent, enabled: hasSandbox, scenario: demoSettings?.scenarioId, planId, playthrough, afterMove: readWhatFollows });
+  // Plans expire on the clock they are made on: the sandbox's. The scripted home's plans are dated by its script, not by
+  // its clock, so there only the server's plan_expired says it (host/card-actions).
+  const planNow = homeMode === 'remote' ? clock?.now : undefined;
+  planNowRef.current = planNow;
   // "Power cut" (time pack, 12 Oct): before the question reaches the agent, the simulated grid goes down (the storm
   // scenario, at its storm start), so the assistant answers a real outage and storm mode starts. The latest settings
   // are read through a ref: the turn may start before this render's settings are drawn.
@@ -432,7 +444,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
         // The judges' question bar under the Echo (#432 S6, owner I = a): the conversation draws its field here.
         askBar: <div className="ask-bar-host" ref={setAskHost} />,
         screen: (
-          <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', place: demoSettings?.locationId, onCardAction }}>
+          <CardHostProvider value={{ agent, documentFor: cardDocument, theme, timeZone: homeTimeZone, demo: config.demo, units: demoSettings?.units ?? 'C', place: demoSettings?.locationId, onCardAction, actions: cardActions, onCardCall, planNow }}>
             <QueryClientProvider client={queryClient}>
               <Conversation
                 agent={agent}
@@ -464,7 +476,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                 head={<ScreenTop now={clock?.now} sky={sky} unseen={notices.unseen} onSeen={notices.markSeen} menu={<>{homePanel.button}{settingsPage.button}</>} avatar={homeAvatar} menuRef={menuRef} words={demoSettings === undefined ? undefined : topBarWords({ locationId: demoSettings.locationId, now: clock?.now, timeZone: homeTimeZone, outdoorTempC: outdoorNow({ home, load: needsCode ? 'locked' : homeLoad, mode: homeMode }), units: demoSettings.units })} />}
                 pageView={settingsPage.view ?? homePanel.view}
                 onClosePage={closePage}
-                appliedTurns={appliedTurns}
+                answeredOnCard={answeredOnCardOf}
                 prepareTurn={prepareTurn}
                 readAfterFailure={readAfterFailure}
                 {...(hasSandbox && clock !== undefined ? { simNow: clock.now } : {})}

@@ -31,5 +31,6 @@ export { UNITS_CONTEXT_KEY, getTempUnit, setTempUnit, unitOfContext } from './te
 export { homeCalm, homeInStorm } from './home-fixtures.js';
 export { advisoryPlan, hotDayPlan, inverterRefusal, lastResortBatteryPlan, lastResortPlan, planThatHolds, rejectedPlan, safeRoomAboveNightLimit, safeRoomBatteryFirst, safeRoomCalm, safeRoomInStorm, stormPlan, stormReserveRefusal, surplusPlan } from './fixtures.js';
 export { PLACE_CONTEXT_KEY, getPlace, placeOfContext, setPlace } from './place-context.js';
+export { ACTION_CONTEXT_KEY, actionOfContext, canAct, type CardAction } from './card-action.js';
 export { homeClock, lastResortHeadline, levelSpans, pacingGeometry, type LastResortHeadline } from './plan-model.js';
 export { cardThemeFor, type CardTheme } from './theme.js';

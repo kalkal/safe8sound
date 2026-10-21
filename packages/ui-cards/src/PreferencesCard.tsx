@@ -20,6 +20,8 @@ export interface PreferencesCardProps {
   origin?: DataOriginValue;
   /** Receives a confirmed set_preferences input with only what changed. */
   onSave?: (change: SetPreferencesInput) => void;
+  /** A save is on its way, as the host says (card-action): Save and Cancel have nothing to do. */
+  busy?: boolean;
 }
 
 /** "bedroom-1" → "Bedroom 1": ids and roles are plain words in the contract. */
@@ -67,13 +69,12 @@ function StepButton(props: { label: string; unavailable: boolean; onPress: () =>
  * Preferences in one screen (plan §11.2 p.14): setpoint with − / +, safe room, room priority, reserve
  * read-only in hours, contacts by role and channel only (never names or handles). Cooling season for now.
  */
-export function PreferencesCard({ view, rooms, outlook, origin, onSave }: PreferencesCardProps) {
+export function PreferencesCard({ view, rooms, outlook, origin, onSave, busy = false }: PreferencesCardProps) {
   const { preferences, hardLimits: limits } = view;
   const [draft, setDraft] = useState<Draft>(preferences);
   // A plain number while editing: the contract schema brands it again on save.
   const [cooling, setCooling] = useState<number>(preferences.comfortC.cooling);
   const [problem, setProblem] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const contactsId = useId();
   const badge = origin ?? outlook?.origin.energy;
   const moveButtons = useRef(new Map<string, HTMLButtonElement>());
@@ -100,18 +101,31 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave }: Prefer
     pendingFocus.current = `${room}:${direction}`;
     setDraft({ ...draft, roomPriority: order });
   };
+  // What differs from what is saved: Save and Cancel only when there is something (a command with nothing to do is off).
+  const change = {
+    ...(cooling !== preferences.comfortC.cooling && { comfortC: { cooling } }),
+    ...(draft.safeRoomId !== preferences.safeRoomId && { safeRoomId: draft.safeRoomId }),
+    ...(!sameOrder(draft.roomPriority, preferences.roomPriority) && { roomPriority: draft.roomPriority }),
+  };
+  const off = busy || Object.keys(change).length === 0;
   const save = () => {
+    if (off) return;
     const reason = saveProblem(draft, cooling);
     setProblem(reason === null ? null : t('prefs.invalid', { reason }));
-    if (reason !== null) return;
-    const change = {
-      ...(cooling !== preferences.comfortC.cooling && { comfortC: { cooling } }),
-      ...(draft.safeRoomId !== preferences.safeRoomId && { safeRoomId: draft.safeRoomId }),
-      ...(!sameOrder(draft.roomPriority, preferences.roomPriority) && { roomPriority: draft.roomPriority }),
-    };
-    setNotice(Object.keys(change).length === 0 ? t('prefs.nothingToSave') : null);
-    if (Object.keys(change).length > 0) onSave?.(SetPreferencesInputSchema.parse({ ...change, confirmed: true }));
+    if (reason === null) onSave?.(SetPreferencesInputSchema.parse({ ...change, confirmed: true }));
   };
+  const cancel = () => {
+    if (off) return;
+    setDraft(preferences);
+    setCooling(preferences.comfortC.cooling);
+    setProblem(null);
+  };
+  // Saved (the host's answer is the new saved values): the draft starts again from them. A failed save changes
+  // nothing here, so the draft survives it.
+  useEffect(() => {
+    setDraft(preferences);
+    setCooling(preferences.comfortC.cooling);
+  }, [preferences]);
 
   return (
     <CardShell
@@ -224,16 +238,16 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave }: Prefer
       ]}
     >
       {problem !== null && <p role="alert">{problem}</p>}
-      {notice !== null && (
-        <p className="muted" role="status">
-          {notice}
-        </p>
-      )}
-      <div className="plan-actions">
+      <div className="plan-actions" aria-busy={busy || undefined}>
         {onSave !== undefined && (
-          <button type="button" className="button-primary" onClick={save}>
-            {t('prefs.save')}
-          </button>
+          <>
+            <button type="button" className="button-primary" disabled={off} onClick={save}>
+              {t('prefs.save')}
+            </button>
+            <button type="button" className="button-secondary" disabled={off} onClick={cancel}>
+              {t('prefs.cancel')}
+            </button>
+          </>
         )}
         <p className="muted">{t('prefs.voiceHint')}</p>
       </div>

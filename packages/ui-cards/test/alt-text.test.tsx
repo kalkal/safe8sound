@@ -30,16 +30,16 @@ const STATES: Array<[string, CardState]> = [
 
 describe('alt text of the card pictures', () => {
   it('finds the pictures it checks: the charge line and the ice cubes', () => {
-    const plan = render(<CardApp state={{ kind: 'plan', data: hotDayPlan() }} timeZone="Europe/Rome" canAct onCallTool={() => undefined} />);
+    const plan = render(<CardApp state={{ kind: 'plan', data: hotDayPlan() }} timeZone="Europe/Rome" canAct onCallTool={() => Promise.resolve()} />);
     expect(plan.container.querySelectorAll('[role="img"]').length).toBeGreaterThan(0);
     cleanup();
-    const storm = render(<CardApp state={{ kind: 'storm', data: safeRoomInStorm() }} timeZone="Europe/Rome" canAct onCallTool={() => undefined} />);
+    const storm = render(<CardApp state={{ kind: 'storm', data: safeRoomInStorm() }} timeZone="Europe/Rome" canAct onCallTool={() => Promise.resolve()} />);
     expect(storm.container.querySelectorAll('[role="img"]').length).toBeGreaterThan(0);
   });
 
   for (const [name, state] of STATES) {
     it(`${name}: every picture is described in 1 to 125 characters`, () => {
-      const { container } = render(<CardApp state={state} timeZone="Europe/Rome" canAct onCallTool={() => undefined} />);
+      const { container } = render(<CardApp state={state} timeZone="Europe/Rome" canAct onCallTool={() => Promise.resolve()} />);
       for (const img of container.querySelectorAll('[role="img"], svg:not([aria-hidden="true"]), img')) {
         const label = img.getAttribute('aria-label') ?? img.getAttribute('alt') ?? '';
         expect(label.length, `${name}: ${img.outerHTML.slice(0, 80)}`).toBeGreaterThan(0);

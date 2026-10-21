@@ -279,10 +279,7 @@ describe('PlanCard', () => {
       const apply = screen.getByRole('button', { name: 'Apply the last-resort plan' });
       fireEvent.click(apply);
       expect(onApply).toHaveBeenCalledWith('plan_LastResort01');
-      // One tap, one call: the button waits for the answer.
-      expect((apply as HTMLButtonElement).disabled).toBe(true);
-      fireEvent.click(apply);
-      expect(onApply).toHaveBeenCalledTimes(1);
+      // One tap, one call is the card app's rule (one place, card-app-view); the plan card shows what the host says.
     });
 
     it('a plain rejected plan still has no button', () => {

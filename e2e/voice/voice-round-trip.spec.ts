@@ -101,7 +101,8 @@ test('voice and touch together: a hot-day plan asked by voice is applied by touc
   const card = page.frameLocator('iframe[title="Plan card"]');
   await expectScreenSettled(page);
   await card.getByRole('button', { name: 'Apply plan' }).click();
-  await expect(card.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
+  // Said once, under the answer: the card never repeats it (owner, 21 Oct).
+  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
 });
 
 test('one reprompt after a miss, then text is suggested', async ({ page }) => {

@@ -11,7 +11,9 @@ import {
   parseSaveResult,
   renderCardHtml,
   safeTimeZone,
+  type CardState,
 } from '../src/app/card-kinds.js';
+import { afterCall } from '../src/app/card-calls.js';
 import { hotDayPlan, inverterRefusal, stormPlan, safeRoomCalm, safeRoomInStorm } from '../src/fixtures.js';
 import { homeInStorm } from '../src/home-fixtures.js';
 
@@ -158,5 +160,37 @@ describe('parseSaveResult: the set_preferences answer, shown to the person', () 
     expect(parseSaveResult({ isError: true, content: [], structuredContent: envelope })).toEqual({ ok: false, error: 'safety.cooling.maxC must stay between 24 and 30 C.' });
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect(parseSaveResult({ content: [], structuredContent: { nope: 1 } })).toEqual({ ok: false, error: 'This card could not be shown.' });
+  });
+});
+
+describe('afterCall: what a card shows once the host answered its call (or never did)', () => {
+  const plan: CardState = { kind: 'plan', data: hotDayPlan() };
+  const applied = { plan: { ...hotDayPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] };
+
+  it('an applied plan becomes the answer to this frame’s own tap', () => {
+    expect(afterCall(plan, 'apply_plan', { content: [], structuredContent: applied })).toEqual({ state: { kind: 'applied', data: applied, fromThisFrame: true } });
+  });
+
+  it('a refusal keeps the card and its buttons, with one line saying why (never a card turned into an error)', () => {
+    const expired = toolError('plan_expired', 'This plan has expired; ask for a new one.');
+    expect(afterCall(plan, 'apply_plan', { isError: true, content: [], structuredContent: expired })).toEqual({ state: plan, notice: { ok: false, text: 'This plan has expired; ask for a new one.' } });
+  });
+
+  it('a call that got no answer keeps the card, and says to try again', () => {
+    expect(afterCall(plan, 'apply_plan', undefined)).toEqual({ state: plan, notice: { ok: false, text: 'No answer came back: try again.' } });
+    const prefs: CardState = { kind: 'preferences', data: { preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) } };
+    expect(afterCall(prefs, 'set_preferences', undefined)).toEqual({ state: prefs, notice: { ok: false, text: 'No answer came back: try again.' } });
+  });
+
+  it('saved preferences become the card’s saved values; a refused save keeps the card as it is', () => {
+    const view = toPublicPreferences(PreferencesSchema.parse(examplePreferences()));
+    const prefs: CardState = { kind: 'preferences', data: { preferences: view, isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) } };
+    const saved = { ...view, safeRoomId: 'living' };
+    expect(afterCall(prefs, 'set_preferences', { content: [], structuredContent: { preferences: saved, changes: [] } })).toEqual({
+      state: { ...prefs, data: { ...prefs.data, preferences: saved } },
+      notice: { ok: true, text: 'Preferences saved.' },
+    });
+    const refused = toolError('safety_threshold_out_of_range', 'safety.cooling.maxC must stay between 24 and 30 C.');
+    expect(afterCall(prefs, 'set_preferences', { isError: true, content: [], structuredContent: refused })).toEqual({ state: prefs, notice: { ok: false, text: 'safety.cooling.maxC must stay between 24 and 30 C.' } });
   });
 });

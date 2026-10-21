@@ -14,10 +14,11 @@ export type CardToolCall =
 /**
  * The second yes to a last resort by touch (#160; it deliberately updates the #168 rule that a card could
  * never send a token): the host keeps the token the first step returned to this same frame, and accepts only
- * that token, once, for that plan. The token is never shown or logged.
+ * that token, once, for that plan. The token is never shown or logged. `sending`: a second yes is on its way; the
+ * token is spent only when the server answers, so a call the network lost can be tapped again.
  */
 export interface FrameConfirmation {
-  pending: { planId: string; token: string } | undefined;
+  pending: { planId: string; token: string; sending?: boolean } | undefined;
 }
 
 export const createFrameConfirmation = (): FrameConfirmation => ({ pending: undefined });
@@ -31,12 +32,25 @@ export function confirmationFor(card: ToolCard): FrameConfirmation {
   return { pending: { planId: card.result.plan.id, token: card.result.confirmation.token } };
 }
 
-/** The second yes: only the token this frame holds, for its plan, once (a replay never reaches the server). */
+/** The second yes: only the token this frame holds, for its plan, one call at a time (a replay never reaches the server). */
 function acceptsToken(planId: string, token: string, confirmation: FrameConfirmation | undefined): boolean {
   const pending = confirmation?.pending;
-  if (pending === undefined || pending.planId !== planId || pending.token !== token) return false;
-  if (confirmation !== undefined) confirmation.pending = undefined;
+  if (pending === undefined || pending.planId !== planId || pending.token !== token || pending.sending === true) return false;
+  pending.sending = true;
   return true;
+}
+
+/**
+ * After a second yes: an answer from the server spends the token (applied, or refused for good); a call that never
+ * got one (thrown, or a retryable error) keeps it for the next tap.
+ */
+function settleToken(confirmation: FrameConfirmation | undefined, result: ToolCallResult | undefined): void {
+  const pending = confirmation?.pending;
+  if (confirmation === undefined || pending?.sending !== true) return;
+  const envelope = result?.isError === true ? ErrorEnvelopeSchema.safeParse(result.structuredContent) : undefined;
+  const lost = result === undefined || (envelope?.success === true && envelope.data.retryable);
+  if (lost) pending.sending = false;
+  else confirmation.pending = undefined;
 }
 
 const refuse = (message: string): Result<never, ErrorEnvelope> => err(toolError('invalid_input', message, { details: { field: 'name' } }));
@@ -98,6 +112,7 @@ export async function answerCardCall(
   }
   try {
     const result = await agent.callTool(call.value.name, call.value.args, { correlationId: turnId });
+    settleToken(confirmation, result);
     if (result.isError === true) {
       // The card shows the answer as it is; the log keeps the code for the turn.
       const envelope = ErrorEnvelopeSchema.safeParse(result.structuredContent);
@@ -110,6 +125,7 @@ export async function answerCardCall(
     }
     return result;
   } catch (error) {
+    settleToken(confirmation, undefined);
     log({ level: 'error', code: 'unexpected_error', correlationId: turnId, error, details: { tool: params.name } });
     return toolErrorResult(toolError('unexpected_error', 'Something went wrong: nothing was changed.'));
   }

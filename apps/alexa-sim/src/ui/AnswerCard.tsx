@@ -14,9 +14,11 @@ export interface AnswerCardProps {
   earlierAt?: string;
   /** The turn that produced the answer: the correlation id of its cards. */
   turnId: string;
+  /** Its plan was applied from its card: the question the words asked is answered (host/card-actions). */
+  applied?: boolean;
 }
 
-export function AnswerCard({ answer, timeZone, turnId, earlierAt, show }: AnswerCardProps) {
+export function AnswerCard({ answer, timeZone, turnId, earlierAt, show, applied = false }: AnswerCardProps) {
   const { status } = answer;
   // An empty list of cards is no card: the words then keep the screen (never an empty Echo screen after an answer).
   const cards = answer.cards !== undefined && answer.cards.length > 0 ? answer.cards : undefined;
@@ -39,6 +41,12 @@ export function AnswerCard({ answer, timeZone, turnId, earlierAt, show }: Answer
         <p className="answer-text" id="answer-words-text" data-testid="answer-caption">
           {answer.text}
         </p>
+        {/* The words may still ask "Do you want me to start this plan?": once applied on its card, they say it is done. */}
+        {applied && (
+          <p className="muted" data-testid="answer-done">
+            {t('answers.planApplied')}
+          </p>
+        )}
         {cards !== undefined && (
           <button
             type="button"

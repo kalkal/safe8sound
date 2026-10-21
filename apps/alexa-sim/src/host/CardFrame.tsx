@@ -1,6 +1,6 @@
 import { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge';
 import type { LocationId, TempUnit } from '@cold-reserve/contracts';
-import { CARD_KINDS, CARD_WAITING_MIN_PX, DEMO_CONTEXT_KEY, PLACE_CONTEXT_KEY, UNITS_CONTEXT_KEY, type CardKind } from '@cold-reserve/ui-cards';
+import { ACTION_CONTEXT_KEY, CARD_KINDS, CARD_WAITING_MIN_PX, DEMO_CONTEXT_KEY, PLACE_CONTEXT_KEY, UNITS_CONTEXT_KEY, type CardAction, type CardKind } from '@cold-reserve/ui-cards';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { getLocale, subscribeLocale, type Locale } from '@cold-reserve/i18n';
 import type { ToolCard } from '../agent/wire.js';
@@ -9,6 +9,7 @@ import { t } from '../ui/text.js';
 import { useCardHost } from './card-host.js';
 import { FrameTransport } from './frame-guard.js';
 import { makeRestInert } from './inert.js';
+import { actionOf, cardActionFor } from './card-actions.js';
 import { answerCardCall, confirmationFor } from './tool-calls.js';
 
 // One MCP Apps card (plan §9.3–9.4): a sandboxed srcdoc iframe without allow-same-origin, the host's
@@ -33,6 +34,7 @@ export function hostContextFor({
   locale,
   units = 'C',
   place,
+  action,
   maxHeight,
 }: {
   theme: 'dark' | 'light';
@@ -42,6 +44,8 @@ export function hostContextFor({
   locale: Locale;
   units?: TempUnit;
   place?: LocationId | undefined;
+  /** Where the frame's action stands (card-action); always said, so a card shown again knows its plan is applied. */
+  action?: CardAction;
   maxHeight?: number;
 }) {
   return {
@@ -59,6 +63,7 @@ export function hostContextFor({
     [UNITS_CONTEXT_KEY]: units,
     // #376: the place the judge chose, for the number to call on a last resort; nothing when the page knows none.
     ...(place === undefined ? {} : { [PLACE_CONTEXT_KEY]: place }),
+    [ACTION_CONTEXT_KEY]: action ?? { phase: 'ready' },
   };
 }
 
@@ -76,15 +81,21 @@ export function CardFrame({ card, turnId }: { card: ToolCard; turnId: string }) 
 }
 
 function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind; turnId: string }) {
-  const { agent, documentFor, theme, timeZone, demo = false, units = 'C', place, onCardAction } = useCardHost();
+  const { agent, documentFor, theme, timeZone, demo = false, units = 'C', place, onCardAction, actions, onCardCall, planNow } = useCardHost();
   const onCardActionRef = useRef(onCardAction);
   onCardActionRef.current = onCardAction;
+  const onCardCallRef = useRef(onCardCall);
+  onCardCallRef.current = onCardCall;
+  const planNowRef = useRef(planNow);
+  planNowRef.current = planNow;
+  // One message to the card: where its action stands (busy, applied, expired), never kept by the card itself.
+  const action = cardActionFor(card, actionOf(actions, turnId, card), planNow);
   const document = useMemo(() => documentFor(kind), [documentFor, kind]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
   const locale = useSyncExternalStore(subscribeLocale, getLocale);
-  const contextRef = useRef<{ theme: 'dark' | 'light'; timeZone: string; demo: boolean; locale: Locale; units: TempUnit; place: LocationId | undefined; maxHeight?: number }>({ theme, timeZone, demo, locale, units, place });
-  contextRef.current = { theme, timeZone, demo, locale, units, place };
+  const contextRef = useRef<{ theme: 'dark' | 'light'; timeZone: string; demo: boolean; locale: Locale; units: TempUnit; place: LocationId | undefined; action: CardAction; maxHeight?: number }>({ theme, timeZone, demo, locale, units, place, action });
+  contextRef.current = { theme, timeZone, demo, locale, units, place, action };
   const [height, setHeight] = useState(INITIAL_HEIGHT_PX);
   const [failed, setFailed] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -118,7 +129,9 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
     // Each frame keeps its own last-resort confirmation: a token never crosses frames.
     const confirmation = confirmationFor(card);
     bridge.oncalltool = async ({ name, arguments: args }) => {
+      onCardCallRef.current?.(turnId, card, { type: 'started' });
       const result = await answerCardCall({ name, arguments: args }, card, { agent, turnId, log, confirmation });
+      onCardCallRef.current?.(turnId, card, { type: 'answered', result, at: planNowRef.current });
       if (result.isError !== true) onCardActionRef.current?.(name, turnId, result.structuredContent);
       return result;
     };
@@ -210,9 +223,11 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
   const maxHeight = fullscreen || !Number.isFinite(room) ? undefined : Math.max(0, room);
   // Also in the first hostContext: a frame measured before its bridge connected (a card behind its tab) still fits.
   if (maxHeight !== undefined) contextRef.current.maxHeight = maxHeight;
+  const actionKey = JSON.stringify(action);
   useEffect(() => {
-    bridgeRef.current?.setHostContext(hostContextFor({ theme, timeZone, fullscreen, demo, locale, units, place, ...(maxHeight === undefined ? {} : { maxHeight }) }));
-  }, [theme, timeZone, fullscreen, demo, locale, units, place, maxHeight]);
+    bridgeRef.current?.setHostContext(hostContextFor({ theme, timeZone, fullscreen, demo, locale, units, place, action: contextRef.current.action, ...(maxHeight === undefined ? {} : { maxHeight }) }));
+    // The action as a value (actionKey): a new object saying the same sends nothing new.
+  }, [theme, timeZone, fullscreen, demo, locale, units, place, maxHeight, actionKey]);
 
   if (!document.ok || failed) return <p role="alert">{t('surface.failed')}</p>;
   // The wrapper is always there, so the frame is never remounted (that would reload the card).

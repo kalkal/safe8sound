@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { fromPromise } from 'xstate';
 import type { Agent, AgentAnswer, DemoSession } from '../agent/index.js';
 import type { AskContext } from '../agent/agent.js';
+import type { CardSlot } from '../agent/wire.js';
 import type { VoiceConfig } from '../config.js';
 import { conversationMachine, type AskInput, type AskOutput, type ConversationEvent } from '../machine.js';
 import { log, voiceFailureEvent } from '../log.js';
@@ -45,7 +46,7 @@ export interface ConversationProps {
   /** Demo mode for recording the video (`?demo=1`): "You said" caption and the light bar. */
   demo?: boolean;
   /** Each answer as it arrives: the frame reads its cards for the sky. */
-  onAnswer?: (answer: AgentAnswer) => void;
+  onAnswer?: (answer: AgentAnswer, turnId: string) => void;
   /** The example buttons for the home's state (#268): storm examples with the grid down. */
   examples?: readonly ExampleQuestion[];
   /** Every button sayable (idea 4): the header's buttons (home, theme), run when their label is said or typed. */
@@ -59,7 +60,8 @@ export interface ConversationProps {
   /** Back (idea 5) with a page open: closes it, back to what was under it. */
   onClosePage?: () => void;
   /** The steps (idea 5): the turns whose plan was applied from its card, at "Confirm". */
-  appliedTurns?: ReadonlySet<string>;
+  /** An answer that asked whose plan is now applied, by tap or by voice (host/card-actions). */
+  answeredOnCard?: (turnId: string, cards: readonly CardSlot[] | undefined) => boolean;
   /**
    * Runs before the question goes to the agent (time pack, 12 Oct): "Power cut" first makes the simulated grid go
    * down. A failure fails the turn, honestly, and Retry runs it again.
@@ -109,7 +111,7 @@ export function Conversation({
   pageView,
   idle,
   onClosePage,
-  appliedTurns,
+  answeredOnCard,
   prepareTurn,
   readAfterFailure,
   simNow,
@@ -218,8 +220,8 @@ export function Conversation({
   const turn = useQuery<TurnResult>({ queryKey: turnKey(turnId), queryFn: skipToken });
   const answer = turn.data?.ok === true ? turn.data.value : undefined;
   useEffect(() => {
-    if (answer !== undefined) onAnswer?.(answer);
-  }, [answer, onAnswer]);
+    if (answer !== undefined && turnId !== null) onAnswer?.(answer, turnId);
+  }, [answer, onAnswer, turnId]);
   // One answer at a time (owner's choice, 10 Oct): every answered turn is kept for Previous / Next.
   const [history, setHistory] = useState(emptyHistory);
   // The simulated time of each answer (owner, 18 Oct): once the clock moves on, an older answer says it is earlier.
@@ -323,11 +325,13 @@ export function Conversation({
   // The step is what is on screen: the card shown, not the answer's other cards behind "Show the plan" (review of #458:
   // a storm answer's hidden plan kept the idle screen from coming back).
   const cardOnScreen = busy || shown.data?.ok !== true ? undefined : shownCard(shown.data.value.cards ?? [], cardShown);
+  // Its question was answered on a card, or by voice in a later turn: the steps say Confirm, the words say Done.
+  const shownAnswered = shownTurn !== undefined && shown.data?.ok === true && answeredOnCard?.(shownTurn, shown.data.value.cards) === true;
   const where = stepOf({
     // A page in the content band is the home step (the settings page too: no step of its own).
     homeOpen: pageShown,
     cards: cardOnScreen === undefined ? undefined : [cardOnScreen],
-    applied: shownTurn !== undefined && appliedTurns?.has(shownTurn) === true,
+    applied: shownAnswered,
   });
   const back = backAction({ thinking, failed: snapshot.matches('failed'), pageOpen, answerIndex: history.index });
   const goBack =
@@ -576,7 +580,7 @@ export function Conversation({
         <div aria-live="polite">
           {!busy && !pageShown && shown.data?.ok === true && shownTurn !== undefined && (
             // One answer, one state: Previous / Next never carry a tab or a frame from another answer.
-            <AnswerCard key={shownTurn} answer={shown.data.value} timeZone={timeZone} turnId={shownTurn} show={cardShown} {...(moment?.earlier === true ? { earlierAt: moment.time } : {})} />
+            <AnswerCard key={shownTurn} answer={shown.data.value} timeZone={timeZone} turnId={shownTurn} show={cardShown} applied={shownAnswered} {...(moment?.earlier === true ? { earlierAt: moment.time } : {})} />
           )}
         </div>
         {pageShown && pageView}

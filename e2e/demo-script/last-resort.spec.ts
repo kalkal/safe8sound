@@ -35,7 +35,8 @@ test('last resort: honest headline, two taps to apply, the family is told', asyn
   await expect(card.locator('body')).not.toContainText('lr_');
 
   await card.getByRole('button', { name: 'Yes, apply it now' }).click();
-  await expect(card.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
+  // Said once, under the answer: the card never repeats it (owner, 21 Oct).
+  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
   await expect(card.getByText('1 registered family contact was alerted.')).toBeVisible();
   await expect(card.getByRole('button', { name: 'Yes, apply it now' })).toHaveCount(0);
   // What the card says happens: the message reaches Ana's phone (review of #316).
@@ -62,6 +63,7 @@ test('a spoken first yes brings the confirmation card: one tap applies it, never
   await expect(confirm.locator('body')).not.toContainText('lr_');
 
   await confirm.getByRole('button', { name: 'Yes, apply it now' }).click();
-  await expect(confirm.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
+  // Said once, under the answer: the card never repeats it (owner, 21 Oct).
+  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
   await expect(confirm.getByText('1 registered family contact was alerted.')).toBeVisible();
 });

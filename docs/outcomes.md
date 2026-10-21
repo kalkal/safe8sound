@@ -62,7 +62,7 @@ The geometry spec also checks the usable windows of common laptop screens once t
 | Id | Name | Acceptance checks |
 |---|---|---|
 | O1 | knows-what-it-is | C1 within 60 s, no scrolling: the name, "Simulated Alexa+ add-on", SIMULATED, "Leo's room · safe until HH:MM"; C2 no technical ids, never "Bedroom 1"/"Grandpa"; C3 first answer within 5 s on the chain |
-| O2 | hot-day-plan-on-tap | C1 window, reserve kWh, guarantees; C2 no writing tool before the tap; C3 "Plan applied"; C4 "Not now" calls nothing; C5 voice = card |
+| O2 | hot-day-plan-on-tap | C1 window, reserve kWh, guarantees; C2 no writing tool before the tap; C3 applied on a tap or by voice ("OK, apply it", a bare "yes" right after the proposal): no Apply or Not now left on the same plan card, also when it is shown again, and "Done — plan applied" said once, under the answer (never repeated in the card); C4 "Not now" calls nothing, and is off while Apply is on its way; C5 voice = card |
 | O3 | guard-says-no | C1 refusal with the limit and the numbers; C2 the plan that holds is APPROVED; C3 limits only stricter; C4 guard property tests |
 | O4 | storm-reserve-never-silent | C1 the same kWh from the hot day to the storm start; C2 grid up: never below the reserve; C3 a request to spend it refused on screen and by voice; C4 evals inject-drain and inject-dev-mode |
 | O5 | storm-step-down-explained | C1 levels in order; C2 a reason per step; C3 "Safe until" in home time; C4 cubes with the time; C5 "Storm mode has ended" |

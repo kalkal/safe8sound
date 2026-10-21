@@ -79,7 +79,7 @@ test('sim-api down + "Apply the plan" → an honest answer: nothing claimed as a
 
   await expect(page.getByRole('note')).toHaveText("I can't reach the assistant right now, so this is a scripted answer.");
   await expect(page.getByTestId('answer')).toContainText("I can't reach the assistant right now, so I can't do that. Nothing was changed.");
-  await expect(page.getByText('Plan applied.')).toHaveCount(0);
+  await expect(page.getByText(/Plan applied/)).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Plan' })).toHaveCount(0);
 });
 

@@ -50,6 +50,7 @@ export const enUS = {
   'answers.previousShort': 'Previous',
   'answers.nextShort': 'Next',
   'answers.position': 'Answer {n} of {of}',
+  'answers.planApplied': 'Done — plan applied',
   'answers.earlier': 'Earlier answer · {time}',
   // Back is said, never drawn on the Echo screen (#432 S6, owner C, 19 Oct): "Back" and "Go back" step back.
   'nav.back': 'Back',
@@ -307,6 +308,7 @@ export const enUS = {
   'card.waitingTitle': 'One moment',
   'card.loading': 'Loading…',
   'card.failed': 'This card could not be shown.',
+  'card.noAnswer': 'No answer came back: try again.',
   // The title of a card whose tool failed (#353): the reason follows in words.
   'card.errorTitle': 'Something went wrong',
   'card.noActions': 'Card actions are not available here: say it instead.',
@@ -381,7 +383,7 @@ export const enUS = {
   // "Not now" on the plan card (#348): nothing is applied and nothing in the home changes.
   'plan.dismissed': 'Plan not applied — ask again any time.',
   'plan.appliedAsAdvice': 'Applied as advice: nothing is changed automatically; follow the steps below.',
-  'plan.applied': 'Plan applied.',
+  'plan.expired': 'This plan has expired: ask for a new one.',
   'plan.alreadyApplied': 'The plan was already applied.',
   // The first yes to a last resort (#160): nothing is applied until the person says yes again, by voice or by touch.
   // The second yes is a tap on the card (#201, #215): never "say yes again", which only issued a new token.
@@ -555,12 +557,12 @@ export const enUS = {
   'prefs.contacts': 'Family contacts, {count} of {max}',
   'prefs.channel.in_app': 'in-app',
   'prefs.save': 'Save',
+  'prefs.cancel': 'Cancel',
   'prefs.voiceHint': 'Or say "set comfort to 24".',
   'prefs.limitsHint': 'Change temperatures and limits in the settings, under "Temperatures and limits".',
   'prefs.invalid': 'These preferences cannot be saved: {reason}',
   'prefs.error.comfortAboveMax': 'the comfort setpoint is above the cooling safety maximum.',
   'prefs.error.priority': 'the safe room must come first, and every room only once.',
-  'prefs.nothingToSave': 'Nothing to save: no preference changed.',
   'prefs.saved': 'Preferences saved.',
   'role.daughter': 'Daughter',
   'role.son': 'Son',

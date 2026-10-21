@@ -34,4 +34,13 @@ describe('AnswerCard', () => {
     render(<AnswerCard answer={{ text: 'Power is back.' }} timeZone="Europe/Rome" turnId="t1" />);
     expect(screen.queryByTestId('answer-when')).toBeNull();
   });
+
+  it('a question the person answered on the card says so under it: "Do you want me to start this plan?" is never left open', () => {
+    render(<AnswerCard answer={{ text: 'Do you want me to start this plan?' }} timeZone="Europe/Rome" turnId="t1" applied />);
+    expect(screen.getByTestId('answer-caption').textContent).toBe('Do you want me to start this plan?');
+    expect(screen.getByTestId('answer-done').textContent).toBe('Done — plan applied');
+    cleanup();
+    render(<AnswerCard answer={{ text: 'Do you want me to start this plan?' }} timeZone="Europe/Rome" turnId="t1" />);
+    expect(screen.queryByTestId('answer-done')).toBeNull();
+  });
 });

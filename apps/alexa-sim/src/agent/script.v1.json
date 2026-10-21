@@ -31,6 +31,7 @@
     {
       "id": "apply-last-resort",
       "patterns": ["apply the last resort", "apply the last-resort plan", "yes apply the last resort"],
+      "confirms": ["last-resort"],
       "text": "Not applied yet: this is a last resort. To apply it, tap Yes, apply it now on its card.",
       "withStatus": false,
       "cards": [
@@ -43,6 +44,7 @@
     {
       "id": "apply-plan",
       "patterns": ["apply the plan", "apply plan", "apply it", "yes apply"],
+      "confirms": ["hot-day-plan"],
       "text": "Done: the plan is applied. I'll tell you if the level changes.",
       "withStatus": false,
       "cards": [
@@ -154,6 +156,7 @@
       "phone": [{ "fixture": "power-back" }]
     }
   ],
+  "yes": ["yes", "yes please", "ok", "okay", "sure", "go ahead", "do it", "si", "sì", "va bene", "ok go ahead"],
   "fallback": "In scripted mode I can only answer a few questions. Try asking: what's my battery level?",
   "degradedFallback": "I can't reach the assistant right now, so I can't do that. Nothing was changed. You can still ask for your battery level."
 }

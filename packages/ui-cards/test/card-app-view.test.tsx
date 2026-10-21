@@ -3,18 +3,133 @@ import { PreferencesSchema, ReserveOutlookSchema, SafetyHardLimitsSchema, toPubl
 import { examplePreferences, exampleReserveOutlook, exampleSafetyLimits } from '@cold-reserve/contracts/fixtures';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CARD_WAITING_MIN_PX, CardApp } from '../src/app/CardApp.js';
+import { CARD_WAITING_MIN_PX, CardApp, type CardAppProps } from '../src/app/CardApp.js';
+import type { CardAction } from '../src/card-action.js';
 import type { CardState } from '../src/app/card-kinds.js';
 import { advisoryPlan, hotDayPlan, inverterRefusal, lastResortPlan, safeRoomInStorm } from '../src/fixtures.js';
 import { homeInStorm } from '../src/home-fixtures.js';
 
 afterEach(cleanup);
 
-const show = (state: CardState, notice?: { ok: boolean; text: string }, canAct = true) => {
-  const onCallTool = vi.fn();
-  render(<CardApp state={state} timeZone="Europe/Rome" canAct={canAct} onCallTool={onCallTool} {...(notice !== undefined && { notice })} />);
+/** The host's call never answers in these tests: one tap, one call, until the answer. */
+const pendingCall = () => vi.fn<CardAppProps['onCallTool']>(() => new Promise<void>(() => undefined));
+
+const show = (state: CardState, notice?: { ok: boolean; text: string }, canAct = true, action?: CardAction) => {
+  const onCallTool = pendingCall();
+  render(<CardApp state={state} timeZone="Europe/Rome" canAct={canAct} onCallTool={onCallTool} {...(notice !== undefined && { notice })} {...(action !== undefined && { action })} />);
   return onCallTool;
 };
+
+const firstYes = (token: string) => ({ plan: lastResortPlan(), alreadyApplied: false, advisoryOnly: false, manualInstructions: [], confirmation: { token, expiresAt: '2026-07-15T15:10:00+02:00' } });
+const button = (name: string) => screen.getByRole<HTMLButtonElement>('button', { name });
+
+describe('CardApp: the host says where the action stands, the card only shows it (busy, applied, expired)', () => {
+  it.each([
+    ['a plan', hotDayPlan, 'Apply plan'],
+    ['a last resort', lastResortPlan, 'Apply the last-resort plan'],
+  ] as const)('while Apply is on its way, Apply and Not now on %s are both off: "Not now" never says postponed on a plan being applied', (_, plan, applyLabel) => {
+    const onCallTool = show({ kind: 'plan', data: plan() }, undefined, true, { phase: 'busy' });
+    expect(button(applyLabel).disabled).toBe(true);
+    expect(button('Not now').disabled).toBe(true);
+    fireEvent.click(button('Not now'));
+    expect(screen.queryByTestId('plan-dismissed')).toBeNull();
+    expect(onCallTool).not.toHaveBeenCalled();
+  });
+
+  it('a double tap on Apply is one call, and Not now does nothing before the host says busy', () => {
+    const onCallTool = show({ kind: 'plan', data: hotDayPlan() });
+    fireEvent.click(button('Apply plan'));
+    fireEvent.click(button('Apply plan'));
+    fireEvent.click(button('Not now'));
+    expect(onCallTool).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('plan-dismissed')).toBeNull();
+  });
+
+  it('a plan card shown again after its plan was applied (Previous) offers neither Apply nor Not now, and never repeats "Plan applied" (the answer says it, owner 21 Oct)', () => {
+    show({ kind: 'plan', data: hotDayPlan() }, undefined, true, { phase: 'applied', at: '2026-07-15T14:05:00+02:00' });
+    expect(document.body.textContent).not.toMatch(/Plan applied/);
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Apply plan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Not now' })).toBeNull();
+    expect(screen.getByTestId('plan-horizon').textContent).toBe('07:00');
+  });
+
+  it('an expired plan says so; Apply and Not now are off', () => {
+    const onCallTool = show({ kind: 'plan', data: hotDayPlan() }, undefined, true, { phase: 'expired' });
+    expect(screen.getByRole('status').textContent).toBe('This plan has expired: ask for a new one.');
+    expect(button('Apply plan').disabled).toBe(true);
+    expect(button('Not now').disabled).toBe(true);
+    fireEvent.click(button('Apply plan'));
+    expect(onCallTool).not.toHaveBeenCalled();
+  });
+
+  it('the plan applied by this frame stays the one plan card, with no "Plan applied" line of its own; focus goes to its title', () => {
+    show({ kind: 'applied', data: { plan: { ...hotDayPlan(), status: 'applied' }, alreadyApplied: false, advisoryOnly: false, manualInstructions: [] }, fromThisFrame: true }, undefined, true, {
+      phase: 'applied',
+      at: '2026-07-15T14:05:00+02:00',
+    });
+    expect(document.body.textContent).not.toMatch(/Plan applied/);
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(1);
+    // The button the person tapped is gone: focus is never dropped, it goes to the card's title.
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2, name: 'Plan' }));
+  });
+
+  it('the second yes to a last resort waits for its answer, and is off once its confirmation expired', () => {
+    const token = `lr_${'Q'.repeat(32)}`;
+    show({ kind: 'applied', data: firstYes(token), fromThisFrame: true }, undefined, true, { phase: 'busy' });
+    expect(button('Yes, apply it now').disabled).toBe(true);
+    cleanup();
+    const onCallTool = show({ kind: 'applied', data: firstYes(token), fromThisFrame: true }, undefined, true, { phase: 'expired' });
+    expect(button('Yes, apply it now').disabled).toBe(true);
+    expect(screen.getByText('This plan has expired: ask for a new one.')).toBeTruthy();
+    fireEvent.click(button('Yes, apply it now'));
+    expect(onCallTool).not.toHaveBeenCalled();
+  });
+
+  it('a failed save keeps the draft and Save, with one line saying what went wrong; a double tap is one save', () => {
+    const view = { preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };
+    const state: CardState = { kind: 'preferences', data: view };
+    const onCallTool = pendingCall();
+    const { rerender } = render(<CardApp state={state} timeZone="Europe/Rome" canAct onCallTool={onCallTool} />);
+    fireEvent.click(button('Cooler'));
+    fireEvent.click(button('Save'));
+    fireEvent.click(button('Save'));
+    expect(onCallTool).toHaveBeenCalledTimes(1);
+    rerender(<CardApp state={state} timeZone="Europe/Rome" canAct onCallTool={onCallTool} action={{ phase: 'busy' }} />);
+    expect(button('Save').disabled).toBe(true);
+    rerender(<CardApp state={state} timeZone="Europe/Rome" canAct onCallTool={onCallTool} notice={{ ok: false, text: 'No answer came back: try again.' }} />);
+    expect(screen.getByRole('alert').textContent).toBe('No answer came back: try again.');
+    expect(screen.getByTestId('comfort-value').textContent).toBe('24.5 °C');
+    expect(button('Save').disabled).toBe(false);
+  });
+
+  it('a last resort whose second yes succeeded, shown again (Previous), says applied: no "not applied yet", no second-yes button', () => {
+    const token = `lr_${'Q'.repeat(32)}`;
+    show({ kind: 'applied', data: firstYes(token) }, undefined, true, { phase: 'applied', at: '2026-07-15T14:05:00+02:00' });
+    expect(document.body.textContent).not.toMatch(/Plan applied/);
+    expect(document.body.textContent).not.toContain('Not applied yet');
+    expect(screen.queryByRole('button', { name: 'Yes, apply it now' })).toBeNull();
+  });
+
+  it('says busy to assistive technology while a call is on its way', () => {
+    show({ kind: 'plan', data: hotDayPlan() }, undefined, true, { phase: 'busy' });
+    expect(button('Apply plan').closest('[aria-busy="true"]')).not.toBeNull();
+    cleanup();
+    show({ kind: 'plan', data: hotDayPlan() });
+    expect(button('Apply plan').closest('[aria-busy="true"]')).toBeNull();
+    cleanup();
+    const view = { preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };
+    show({ kind: 'preferences', data: view }, undefined, true, { phase: 'busy' });
+    expect(button('Save').closest('[aria-busy="true"]')).not.toBeNull();
+  });
+
+  it('a failed call keeps the plan and its buttons, with one line saying what went wrong', () => {
+    show({ kind: 'plan', data: hotDayPlan() }, { ok: false, text: 'No answer came back: try again.' });
+    expect(screen.getByRole('alert').textContent).toBe('No answer came back: try again.');
+    expect(button('Apply plan').disabled).toBe(false);
+    expect(button('Not now').disabled).toBe(false);
+  });
+});
 
 describe('CardApp: what the person sees inside the ui:// frame', () => {
   it('an applied plan keeps its safety check in sight, like every plan (owner feedback, 6 Oct)', () => {
@@ -99,8 +214,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     const yes = screen.getByRole('button', { name: 'Yes, apply it now' });
     fireEvent.click(yes);
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: 'plan_LastResort01', lastResortToken: token });
-    // One tap, one call: the button waits for the answer.
-    expect((yes as HTMLButtonElement).disabled).toBe(true);
+    // One tap, one call: a second tap before the answer reaches nobody (the host then says busy).
     fireEvent.click(yes);
     expect(onCallTool).toHaveBeenCalledTimes(1);
   });

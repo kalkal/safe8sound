@@ -26,5 +26,6 @@ test('a refused proposal: the storm reserve said by voice and card, the plan tha
   const plan = card.getByRole('region', { name: 'Plan' });
   await toCardPage(card, 1);
   await plan.getByRole('button', { name: 'Apply plan' }).click();
-  await expect(card.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
+  // Said once, under the answer: the card never repeats it (owner, 21 Oct).
+  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
 });

@@ -1,4 +1,4 @@
-import { DEMO_CONTEXT_KEY, PLACE_CONTEXT_KEY, UNITS_CONTEXT_KEY } from '@cold-reserve/ui-cards';
+import { ACTION_CONTEXT_KEY, DEMO_CONTEXT_KEY, PLACE_CONTEXT_KEY, UNITS_CONTEXT_KEY } from '@cold-reserve/ui-cards';
 import { describe, expect, it } from 'vitest';
 import { hostContextFor } from '../../src/host/CardFrame.js';
 
@@ -14,6 +14,7 @@ describe('the hostContext a card frame receives', () => {
       availableDisplayModes: ['inline', 'fullscreen'],
       locale: 'en-US',
       [UNITS_CONTEXT_KEY]: 'C',
+      [ACTION_CONTEXT_KEY]: { phase: 'ready' },
     });
     // #263: the cards speak the page's language, through the standard hostContext.locale.
     expect(hostContextFor({ ...base, locale: 'it-IT', demo: false })).toMatchObject({ locale: 'it-IT' });
@@ -29,6 +30,14 @@ describe('the hostContext a card frame receives', () => {
     const base = { theme: 'dark' as const, timeZone: 'Europe/Rome', fullscreen: false, locale: 'en-US' as const, demo: false };
     expect(hostContextFor({ ...base, units: 'F' })).toMatchObject({ [UNITS_CONTEXT_KEY]: 'F' });
     expect(hostContextFor({ ...base, units: 'C' })).toMatchObject({ [UNITS_CONTEXT_KEY]: 'C' });
+  });
+});
+
+describe('where the card action stands, in one message (busy, applied, expired)', () => {
+  it('always says it, so a card shown again knows its plan is applied', () => {
+    const base = { theme: 'dark' as const, timeZone: 'Europe/Rome', fullscreen: false, locale: 'en-US' as const, demo: false };
+    expect(hostContextFor({ ...base, action: { phase: 'applied', at: '2026-07-15T14:05:00+02:00' } })).toMatchObject({ [ACTION_CONTEXT_KEY]: { phase: 'applied', at: '2026-07-15T14:05:00+02:00' } });
+    expect(hostContextFor(base)).toMatchObject({ [ACTION_CONTEXT_KEY]: { phase: 'ready' } });
   });
 });
 

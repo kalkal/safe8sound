@@ -114,6 +114,40 @@ describe('ScriptedAgent', () => {
     expect(card?.tool === 'apply_plan' ? card.result.plan.status : undefined).toBe('applied');
   });
 
+  describe('a bare yes answers the plan just proposed, and only that (owner, 21 Oct)', () => {
+    const HOT_DAY = "It's going to be 36 degrees tomorrow. Keep Grandpa comfortable.";
+    const toolOf = (reply: Awaited<ReturnType<ReturnType<typeof agent>['ask']>>) => (reply.ok ? reply.value.cards?.[0] : undefined);
+
+    it.each(['yes', 'Yes.', 'ok', 'OK!', 'okay', 'sure', 'go ahead', 'do it', 'sì', 'si', 'va bene'])('"%s" right after a proposed plan applies it, as "apply it" does', async (yes) => {
+      const a = agent();
+      await a.ask(HOT_DAY, ctx);
+      const card = toolOf(await a.ask(yes, ctx));
+      expect(card?.tool).toBe('apply_plan');
+      expect(card?.tool === 'apply_plan' ? card.result.plan.status : undefined).toBe('applied');
+    });
+
+    it('"yes" after a last resort is its first yes only: nothing applied, the card asks for the second', async () => {
+      const a = agent();
+      await a.ask('Last resort for a hot night', ctx);
+      const card = toolOf(await a.ask('yes', ctx));
+      expect(card?.tool === 'apply_plan' ? card.result.confirmation?.token : undefined).toBe(SCRIPTED_LAST_RESORT_TOKEN);
+    });
+
+    it('a bare yes with no plan just proposed, or after another answer, applies nothing', async () => {
+      const a = agent();
+      expect(await a.ask('yes', ctx)).toEqual({ ok: true, value: { text: script.fallback } });
+      await a.ask(HOT_DAY, ctx);
+      await a.ask("What's my battery level?", ctx);
+      expect(await a.ask('yes', ctx)).toEqual({ ok: true, value: { text: script.fallback } });
+    });
+
+    it('only the whole answer counts: a question that merely contains "ok" or "yes" is not a yes', async () => {
+      const a = agent();
+      await a.ask(HOT_DAY, ctx);
+      expect(toolOf(await a.ask('Is the storm reserve ok, yes or no?', ctx))?.tool).not.toBe('apply_plan');
+    });
+  });
+
   it('every button sayable (idea 4): the plan card button and the safe-room chip, said as shown, get their answer', async () => {
     const a = agent();
     const apply = await a.ask(CATALOGS['en-US']['plan.apply'], ctx);

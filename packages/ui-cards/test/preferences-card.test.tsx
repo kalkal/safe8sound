@@ -140,11 +140,40 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
     expect(input).toEqual({ comfortC: { cooling: 24.5 }, roomPriority: ['bedroom-1', 'study', 'living'], confirmed: true });
   });
 
-  it('says there is nothing to save when nothing changed', () => {
+  it('Save is off while nothing differs from what is saved, and on once something does', () => {
     const onSave = setup();
+    expect((button('Save') as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(button('Save'));
     expect(onSave).not.toHaveBeenCalled();
-    expect(screen.getByRole('status').textContent).toBe('Nothing to save: no preference changed.');
+    fireEvent.click(button('Cooler'));
+    expect((button('Save') as HTMLButtonElement).disabled).toBe(false);
+    // Back to the saved value: nothing to save again.
+    fireEvent.click(button('Warmer'));
+    expect((button('Save') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('Cancel puts the draft back to what is saved, and is off when there is nothing to cancel', () => {
+    const onSave = setup();
+    expect((button('Cancel') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(button('Cooler'));
+    expect(screen.getByTestId('comfort-value').textContent).toBe('24.5 °C');
+    fireEvent.click(button('Cancel'));
+    expect(screen.getByTestId('comfort-value').textContent).toBe('25 °C');
+    expect((button('Save') as HTMLButtonElement).disabled).toBe(true);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('while a save is on its way, Save and Cancel are off', () => {
+    const valid = PreferencesSchema.parse(examplePreferences());
+    const view = { preferences: toPublicPreferences(valid), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };
+    const onSave = vi.fn();
+    const { rerender } = render(<PreferencesCard view={view} rooms={rooms} onSave={onSave} />);
+    fireEvent.click(button('Cooler'));
+    rerender(<PreferencesCard view={view} rooms={rooms} onSave={onSave} busy />);
+    expect((button('Save') as HTMLButtonElement).disabled).toBe(true);
+    expect((button('Cancel') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(button('Save'));
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it('refuses to save preferences the contract rejects, and says why in words', () => {
