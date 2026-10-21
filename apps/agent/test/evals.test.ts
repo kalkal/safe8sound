@@ -25,9 +25,9 @@ const byId = (id: string) => {
 };
 
 describe('eval suite v1 (plan §10.2: 20 utterances, threshold 90%)', () => {
-  it('has 34 cases with unique ids and a 0.9 threshold (20 from plan §10.2, plus the 20 Oct cases (room name, 24-hour times, one question, refusal first, exact night hours), #273 "Is the power back?", #274 scene 2b, a °F setpoint (#306), #271 "Keep Leo safe" and no invented name, and the #438 health cases)', () => {
-    expect(EVAL_SUITE.cases).toHaveLength(34);
-    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(34);
+  it('has 35 cases with unique ids and a 0.9 threshold (20 from plan §10.2, plus the 20 Oct cases (room name, 24-hour times, one question, refusal first, exact night hours), #273 "Is the power back?", #274 scene 2b, a °F setpoint (#306), #271 "Keep Leo safe" and no invented name, and the #438 health cases)', () => {
+    expect(EVAL_SUITE.cases).toHaveLength(35);
+    expect(new Set(EVAL_SUITE.cases.map((c) => c.id)).size).toBe(35);
     expect(EVAL_SUITE.threshold).toBe(0.9);
   });
 
@@ -148,9 +148,9 @@ describe('#438 review: the fake model hears a health worry about a person only',
 describe('runEvals on the Strands loop with the fake model (no Bedrock: cost rule)', () => {
   it('scores the reference policy at or above the threshold', async () => {
     const report = await runEvals(EVAL_SUITE, () => createAgent({ config: CONFIG, model: new FakeModel(referencePolicy), tools: stubTools() }));
-    expect(report.results).toHaveLength(34);
+    expect(report.results).toHaveLength(35);
     // The 0.9 threshold hides a failing case: the cases added on 20 Oct must each pass on the reference policy.
-    const NEW = ['status-room-name', 'hot-times-24h', 'hot-plan-asks-once', 'hot-refused-says-so', 'hot-night-hours-exact', 'every-room-real-ids'];
+    const NEW = ['status-room-name', 'hot-times-24h', 'hot-plan-asks-once', 'hot-refused-says-so', 'hot-night-hours-exact', 'every-room-real-ids', 'hot-forecast-not-setpoint'];
     expect(report.results.filter((r) => NEW.includes(r.id) && !r.pass).map((r) => r.id)).toEqual([]);
     expect(report.passRate).toBeGreaterThanOrEqual(0.9);
     expect(report.passed).toBe(true);

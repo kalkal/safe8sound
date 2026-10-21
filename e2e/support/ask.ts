@@ -48,7 +48,7 @@ async function cardsText(page: Page): Promise<string> {
 export async function checkRealAnswer(page: Page, question: string, text: string): Promise<void> {
   mkdirSync('e2e-results', { recursive: true });
   appendFileSync('e2e-results/answers.jsonl', JSON.stringify({ at: new Date().toISOString(), question, answer: text }) + String.fromCharCode(10));
-  const broken = answerRuleViolations(text);
+  const broken = answerRuleViolations(text, question);
   const contradicts = asksToConfirmAnAppliedPlan(text, await cardsText(page));
   if (broken.length > 0 || contradicts) {
     await test.info().attach('answer-breaks-a-rule', { body: await page.screenshot(), contentType: 'image/png' });

@@ -26,9 +26,37 @@ export const ANSWER_RULES: readonly AnswerRule[] = [
   },
 ];
 
-/** The ids of the rules the text breaks, in order. */
-export function answerRuleViolations(text: string): string[] {
-  return ANSWER_RULES.filter((r) => r.pattern.test(text)).map((r) => r.id);
+/**
+ * A refusal that names a temperature the person never asked for ("The safety check refused 36 degrees" to someone who said
+ * "It's going to be 36 degrees tomorrow, keep Leo cool": the forecast taken as a setpoint, 21 Oct). The number is the person's
+ * own ask only when their question puts it after a verb that sets or wants a temperature ("set every room to 21 degrees",
+ * "lower every room to 21", "can I have 21 degrees in every room"). Only a number straight after the word counts as the
+ * refused one: "refused that plan: Leo's room would reach 31 degrees" names a result, not the person's ask. In a question in
+ * °F the refusal may say the °C equivalent ("refused 22.2 °C" for "set the study to 72 degrees Fahrenheit").
+ */
+const REFUSED_NUMBER = /\brefus(?:ed|es)\s+(?:to\s+set\s+|the\s+|a\s+)?(\d+(?:\.\d+)?)\s?(?:degrees|°)/i;
+const SETTING_VERBS = /\b(?:set|cool|heat|warm|keep|make|put|turn|lower|raise|drop|bring|have|want|need|get|hold)\b(?:[^.?!]|\.(?=\d))*/gi;
+const FAHRENHEIT = /°\s?F\b|\bfahrenheit\b|\bdegrees F\b/i;
+
+/** The numbers a question puts after a verb that sets or wants a temperature. */
+function askedNumbers(question: string): number[] {
+  const numbers: number[] = [];
+  for (const part of question.matchAll(SETTING_VERBS)) for (const n of part[0].matchAll(/\d+(?:\.\d+)?/g)) numbers.push(Number(n[0]));
+  return numbers;
+}
+
+export function refusalNamesUnaskedNumber(answer: string, question: string): boolean {
+  const named = REFUSED_NUMBER.exec(answer)?.[1];
+  if (named === undefined) return false;
+  const value = Number(named);
+  const inFahrenheit = FAHRENHEIT.test(question);
+  return !askedNumbers(question).some((asked) => asked === value || (inFahrenheit && Math.abs(((asked - 32) * 5) / 9 - value) <= 0.1));
+}
+
+/** The ids of the rules the text breaks, in order. With the question, also the rules that compare the answer with it. */
+export function answerRuleViolations(text: string, question?: string): string[] {
+  const broken = ANSWER_RULES.filter((r) => r.pattern.test(text)).map((r) => r.id);
+  return question !== undefined && refusalNamesUnaskedNumber(text, question) ? [...broken, 'refusal-names-unasked-number'] : broken;
 }
 
 /**

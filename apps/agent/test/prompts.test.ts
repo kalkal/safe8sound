@@ -10,7 +10,7 @@ describe('system prompt (versioned, short: cost rule)', () => {
   const prompt = buildSystemPrompt();
 
   it('is versioned and matches the snapshot, so every change shows up in review', () => {
-    expect(PROMPT_VERSION).toBe('v6');
+    expect(PROMPT_VERSION).toBe('v7');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -55,9 +55,9 @@ describe('system prompt (versioned, short: cost rule)', () => {
     expect(prompt).not.toContain('{product}');
   });
 
-  it('stays short: at most 4,300 characters including the few-shot dialogues', () => {
-    // 4,000 until v5 (3,5xx); v6 adds one rule and one example with the real status line (4,285): the limit moves to 4,300, no further.
-    expect(prompt.length).toBeLessThanOrEqual(4300);
+  it('stays short: at most 4,500 characters including the few-shot dialogues', () => {
+    // 4,000 until v5 (3,5xx); v6 one rule and one example (4,285); v7 one more rule and the hot day asked as a forecast: the limit moves to 4,500, no further.
+    expect(prompt.length).toBeLessThanOrEqual(4500);
   });
 
   it.each([
@@ -97,12 +97,13 @@ describe('few-shot dialogues (plan §4: hot day, storm, "is Leo safe?")', () => 
 describe('the examples of each prompt version never change under it (20 Oct: v5 once edited the examples of v1 to v4 in place)', () => {
   const read = async (name: string) => JSON.parse((await (await import('node:fs/promises')).readFile(new URL('../prompts/' + name, import.meta.url), 'utf8'))) as unknown;
 
-  it('v1 to v4 use few-shot.v1.json, v5 few-shot.v5.json, v6 few-shot.v6.json', async () => {
-    const [v1, v5, v6] = await Promise.all([read('few-shot.v1.json'), read('few-shot.v5.json'), read('few-shot.v6.json')]);
+  it('v1 to v4 use few-shot.v1.json, v5 few-shot.v5.json, v6 few-shot.v6.json, v7 few-shot.v7.json', async () => {
+    const [v1, v5, v6, v7] = await Promise.all([read('few-shot.v1.json'), read('few-shot.v5.json'), read('few-shot.v6.json'), read('few-shot.v7.json')]);
     for (const v of ['v1', 'v2', 'v3', 'v4'] as const) expect(FEW_SHOT_BY_VERSION[v]).toEqual(v1);
     expect(FEW_SHOT_BY_VERSION.v5).toEqual(v5);
     expect(FEW_SHOT_BY_VERSION.v6).toEqual(v6);
-    expect(Object.keys(FEW_SHOT_BY_VERSION)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6']);
+    expect(FEW_SHOT_BY_VERSION.v7).toEqual(v7);
+    expect(Object.keys(FEW_SHOT_BY_VERSION)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7']);
   });
 
   it('freezes what each file says, so an edit in place is a failing test', () => {
@@ -117,6 +118,11 @@ describe('the examples of each prompt version never change under it (20 Oct: v5 
     // v6: v5 and the every-room example.
     expect(FEW_SHOT_BY_VERSION.v6.slice(0, 3)).toEqual(FEW_SHOT_BY_VERSION.v5);
     expect(FEW_SHOT_BY_VERSION.v6.map((d) => d.id)).toEqual(['hot-day', 'storm', 'check-on-grandpa', 'every-room']);
+    expect(FEW_SHOT_BY_VERSION.v6[0]?.user).toBe('Keep Leo comfortable today.');
+    // v7: v6 with the hot day asked as the real person said it, a forecast.
+    expect(FEW_SHOT_BY_VERSION.v7.slice(1)).toEqual(FEW_SHOT_BY_VERSION.v6.slice(1));
+    expect(FEW_SHOT_BY_VERSION.v7[0]?.user).toBe("It's going to be 36 degrees tomorrow, keep Leo cool.");
+    expect(FEW_SHOT_BY_VERSION.v7[0]?.toolCalls[0]?.input).toEqual({ goal: 'cool' });
   });
 
   it('builds each version with its own examples', () => {
@@ -126,6 +132,17 @@ describe('the examples of each prompt version never change under it (20 Oct: v5 
     expect(buildSystemPrompt('v5')).not.toContain('until 7 am');
     expect(buildSystemPrompt('v5')).not.toContain('every-room');
     expect(buildSystemPrompt('v6')).toContain('Set every room to 21 degrees.');
+    expect(buildSystemPrompt('v7')).toContain('36 degrees tomorrow, keep Leo cool.');
+    expect(buildSystemPrompt('v6')).not.toContain('36 degrees tomorrow, keep Leo cool.');
+  });
+});
+
+describe('prompt v7 (21 Oct, the real model took the forecast "36 degrees tomorrow" as a setpoint and the guard refused it)', () => {
+  it('says a forecast is never a setpoint and what a hot-day plan keeps', () => {
+    expect(buildSystemPrompt('v7')).toContain(`A forecast or outdoor temperature is never a setpoint, only a room temperature they name is; on a hot day call plan_comfort with only the goal: the plan keeps the room at the safe limit.`);
+    expect(buildSystemPrompt('v6')).not.toContain('never a setpoint');
+    // the v6 rule about every room stays in v7
+    expect(buildSystemPrompt('v7')).toContain('For every or all rooms');
   });
 });
 
@@ -143,7 +160,7 @@ describe('the system prompt inside the code (G1a: it must survive the CJS bundle
     const read = async (version: string) => (await readFile(new URL(`../prompts/system.${version}.md`, import.meta.url), 'utf8')).trim();
     const { SYSTEM_PROMPTS } = await import('../src/prompts.generated.js');
     // A new version is a new file (#215 review): the old ones stay, unchanged, next to it.
-    expect(Object.keys(SYSTEM_PROMPTS)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6']);
+    expect(Object.keys(SYSTEM_PROMPTS)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7']);
     for (const [version, text] of Object.entries(SYSTEM_PROMPTS)) expect(text).toBe(await read(version));
     expect(SYSTEM_PROMPT_TEMPLATE).toBe(await read(PROMPT_VERSION));
   });

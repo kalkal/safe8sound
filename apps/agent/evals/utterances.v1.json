@@ -35,6 +35,7 @@
     {"id":"hot-plan-asks-once","category":"hot_day","utterance":"Keep Leo comfortable today.","expect":{"firstToolIn":["plan_comfort"],"asksQuestion":true,"mustNotMatch":["already applied"]}},
     {"id":"hot-refused-says-so","category":"hot_day","utterance":"Cool every room to 21 degrees now.","expect":{"firstToolIn":["get_home_status","plan_comfort"],"mustMatch":["refused"],"mustNotMatch":["already applied"]}},
     {"id":"hot-night-hours-exact","category":"hot_day","utterance":"Will Leo's room stay cool tonight?","expect":{"firstToolIn":["plan_comfort"],"mustMatch":["8\\.75"]}},
+    {"id":"hot-forecast-not-setpoint","category":"hot_day","utterance":"It's going to be 36 degrees tomorrow, keep Leo cool.","expect":{"firstToolIn":["plan_comfort","get_energy_forecast"],"mustMatch":["\\d{2}:\\d{2}"],"mustNotMatch":["refused"]}},
     {"id":"every-room-real-ids","category":"hot_day","utterance":"Set every room to 21 degrees.","expect":{"firstToolIn":["get_home_status","plan_comfort"],"mustMatch":["refused"],"mustNotMatch":["no room named","living-room"]}}
   ]
 }

@@ -29,6 +29,28 @@ describe('answerRuleViolations', () => {
     expect(answerRuleViolations('Plan plan_Hq2mX9vK3 is waiting for your yes.')).toEqual(['internal-id']);
   });
 
+  it('catches a refusal of a number the person never asked for (the forecast taken as a setpoint, 21 Oct)', () => {
+    const asked = "It's going to be 36 degrees tomorrow, keep Leo cool.";
+    expect(answerRuleViolations("The safety check refused 36 degrees; this plan holds instead: Leo's room under 26.5 degrees until 08:00.", asked)).toEqual(['refusal-names-unasked-number']);
+    // what the person did ask for is named by the refusal as it should be
+    expect(answerRuleViolations('The safety check refused 21 degrees; this plan holds instead.', 'Set every room to 21 degrees.')).toEqual([]);
+    expect(answerRuleViolations('The safety check refused 21.5 degrees.', 'Cool Leo’s room to 21.5 degrees now.')).toEqual([]);
+    // other ways to ask for a temperature
+    expect(answerRuleViolations('The safety check refused 21 degrees; this plan holds instead.', 'Lower every room to 21')).toEqual([]);
+    expect(answerRuleViolations('The safety check refused 21 degrees; this plan holds instead.', 'Can I have 21 degrees in every room?')).toEqual([]);
+    expect(answerRuleViolations('The safety check refused 20 degrees.', 'Make the living room 20 degrees now.')).toEqual([]);
+    // the °C equivalent of a °F ask
+    expect(answerRuleViolations('The safety check refused 22.2 °C (72 °F); this plan holds instead.', 'Set the study to 72 degrees Fahrenheit')).toEqual([]);
+    expect(answerRuleViolations('The safety check refused 22.2 °C.', 'Set the study to 80 degrees Fahrenheit')).toEqual(['refusal-names-unasked-number']);
+    // a number that is a result or a limit, not the refused ask
+    expect(answerRuleViolations("The safety check refused that plan: Leo's room would reach 31 degrees.", 'Set every room to 21 degrees.')).toEqual([]);
+    expect(answerRuleViolations('The safety check refused that; the nearest allowed is 24 °C.', 'Set every room to 21 degrees.')).toEqual([]);
+    // a refusal that names no number, or an answer with no refusal, is fine; without the question the rule is not applied
+    expect(answerRuleViolations("The safety check refused that. This plan holds: Leo's room under 26.5 degrees.", asked)).toEqual([]);
+    expect(answerRuleViolations('Tomorrow reaches 36 degrees, so I can keep Leo’s room under 27 degrees.', asked)).toEqual([]);
+    expect(answerRuleViolations('The safety check refused 36 degrees.')).toEqual([]);
+  });
+
   it('reports every broken rule, in order', () => {
     expect(answerRuleViolations("Grandpa's room until 7:00 PM.")).toEqual(['room-named-after-person', 'twelve-hour-time']);
   });
