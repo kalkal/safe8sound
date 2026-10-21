@@ -25,8 +25,10 @@ export default defineConfig({
     ...(CI ? {} : { channel: 'chrome' }),
   },
   webServer: {
-    // Vite directly, not through pnpm: in CI a pnpm-wrapped server outlived the run and hung the job.
-    command: 'node node_modules/vite/bin/vite.js',
+    // Vite directly, not through pnpm: in CI a pnpm-wrapped server outlived the run and hung the job. Off CI the card
+    // bundle is built first (#503: a stale one kept the Home card empty; CI builds it in its own step); a stale bundle
+    // stops the server with the fix anyway (vite.config.ts).
+    command: CI ? 'node node_modules/vite/bin/vite.js' : 'node --import tsx ../../packages/ui-cards/scripts/build-card.ts && node node_modules/vite/bin/vite.js',
     cwd: 'apps/alexa-sim',
     url: BASE_URL,
     reuseExistingServer: !CI,

@@ -24,7 +24,7 @@ The Alexa+ simulator (`apps/alexa-sim`) is served per stage (`dev`, `demo`) by `
   - `e2e/site/turn.spec.ts` serves the AWS build behind a stand-in for CloudFront (`apps/alexa-sim/vite.cloudfront-preview.ts`). The stand-in runs the real CloudFront Function in front of the real local chain: sim-api with no allowed origin, the agent with the fake model, and the MCP server. A demo code and a turn go through `/api`, and a foreign origin is refused at the edge.
 
 ## Build and upload
-- `pnpm synth` first runs `pnpm --filter @cold-reserve/alexa-sim build:aws`. That build uses the remote agent and `VITE_SIM_API_URL=/api` (assigned in `vite.config.ts` for `--mode aws`, so a `VITE_AGENT` left in the shell never ships; no secrets) and writes the headers file. The card bundle must be built before it (`pnpm --filter @cold-reserve/ui-cards build:card`).
+- `pnpm synth` first runs `pnpm --filter @cold-reserve/alexa-sim build:aws`. That build uses the remote agent and `VITE_SIM_API_URL=/api` (assigned in `vite.config.ts` for `--mode aws`, so a `VITE_AGENT` left in the shell never ships; no secrets) and writes the headers file. It builds the card bundle first (`pnpm --filter @cold-reserve/ui-cards build:card`, #503), and the simulator's Vite config refuses to serve or build with a bundle older than its sources (ui-cards, contracts, i18n, design tokens).
 - Two `BucketDeployment`s upload the build:
   - Vite's hashed `assets/` with `public, max-age=31536000, immutable`;
   - then every other file (`index.html`, any `public/` file) with `no-cache`, and one invalidation of `/*`.
