@@ -35,6 +35,7 @@ import { useHomePanel } from './ui/HomePanel.js';
 import { ReserveClock } from './ui/ReserveClock.js';
 import { SimClock } from './ui/SimClock.js';
 import { POWER_CUT_QUESTION, clockTime, isPowerCut, planIdOf } from './ui/sim-clock.js';
+import { isAppliedPlan } from './ui/steps.js';
 import { SHIPPED_PLACES, closedNoticeOf, homeFaceOf, skyOfScenario } from './ui/demo-settings.js';
 import { outdoorNow, topBarWords } from './ui/top-bar.js';
 import { SettingsPage, settingsAnnounce, useSettingsPage } from './ui/SettingsPage.js';
@@ -225,9 +226,15 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // frames, so a card shown again by Previous gets it back, and a plan applied by voice is applied on its card too.
   const [cardActions, setCardActions] = useState<CardActions>(NO_ACTIONS);
   const planNowRef = useRef<string | undefined>(undefined);
+  // A plan applied, or a storm prepared or started (a safe-room status with its storm phase), by a tap or a spoken answer
+  // (owner, 21 Oct: the rest tile says "Plan active" from the server): the safe-room tile, and only it, reads the server
+  // once more (review of #498: no extra reading of the reserve, no reading for a calm safe-room answer).
+  const [planMoves, setPlanMoves] = useState(0);
   const onAnswer = useCallback(
     (answer: AgentAnswer, turnId: string) => {
       setCardActions((previous) => recordAnswer(previous, turnId, answer.cards, planNowRef.current));
+      const moved = (answer.cards ?? []).some((card) => card.tool === 'apply_plan' || (card.tool === 'get_safe_room_status' && card.result.stormPhase !== undefined));
+      if (moved) setPlanMoves((n) => n + 1);
       setSky((previous) => skyFor(answer.cards ?? [], homeTimeZone, previous));
       setHome((previous) => homeFor(answer.cards ?? [], previous, homeMode));
       if (homeFor(answer.cards ?? [], undefined, homeMode) !== undefined) setHomeTold(true);
@@ -246,8 +253,9 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   // by voice; a last resort's first step (still "proposed", waiting for the second yes) is not (review of #350).
   const answeredOnCardOf = useCallback((turnId: string, cards: readonly CardSlot[] | undefined) => answeredOnCard(cardActions, turnId, cards), [cardActions]);
   const onCardAction = useCallback(
-    (name: string) => {
+    (name: string, _turnId: string, result: unknown) => {
       if (name !== 'apply_plan') return;
+      if (isAppliedPlan(result)) setPlanMoves((n) => n + 1);
       setHome((previous) => homeAfterApply(previous, homeMode));
       loadHome();
     },
@@ -326,7 +334,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const idleReading = { agent, enabled: scripted || sessionToken !== undefined, scenarioId: demoSettings?.scenarioId, gridDown, now: clock?.now };
   const reserve = useReserve(idleReading);
   // Leo's room on the idle screen (#432 S6, owner D2 = b): the server's "safe until", read again at every jump.
-  const safeRoom = useSafeRoom(idleReading);
+  const safeRoom = useSafeRoom({ ...idleReading, again: planMoves });
   // The bell of the Echo screen: Ana's messages not seen yet (the same feed as her phone, no reading more).
   const notices = useNotices(phone);
   // What the screen shows, for the layout: the sky is dimmed only behind an answer.

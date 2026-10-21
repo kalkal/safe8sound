@@ -112,6 +112,21 @@ export async function applyPlan(deps: ComfortPlanDeps, input: ApplyPlanInput, ct
   // Expiry on the home's domain time (its scenario clock); the store's own clock keeps only the retention (#175).
   const applied = await store.applyPlan(input.planId, deps.clock.now());
   if (!applied.ok) return applied;
+  // The plan is applied, but the store could not record it as the active one (review of #498: best-effort): said here,
+  // with the turn's id, never as a failure; the rest tile then just does not say "Plan active".
+  if (applied.value.activePlanUnsaved === true) {
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'warn',
+      component: 'mcp-server',
+      message: 'The plan is applied but could not be recorded as the active one.',
+      correlationId: ctx.correlationId,
+      code: 'store_unavailable',
+      category: 'dependency_unavailable',
+      ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+      details: { event: 'active_plan_unsaved', planId: applied.value.plan.id, ...homeDetail(ctx.homeId) },
+    });
+  }
   if (lastResort && !applied.value.alreadyApplied) {
     logLastResort(deps, ctx, applied.value.plan, 'last_resort_applied', 'Last-resort plan applied.');
     const alert = await alertFamily(deps.notifier, { plan: applied.value.plan, profile, preferences, snapshot, nowMs: deps.clock.now(), unit: home.units ?? 'C' });

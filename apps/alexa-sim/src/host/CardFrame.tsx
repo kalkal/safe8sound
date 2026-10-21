@@ -243,6 +243,9 @@ function KnownCardFrame({ card, kind, turnId }: { card: ToolCard; kind: CardKind
         className="card-frame"
         title={t(`cardFrame.${kind}`)}
         sandbox="allow-scripts"
+        // Nothing left to choose (its plan applied, by a tap or by voice): the idle return no longer waits for this frame,
+        // and the focus stays where the person tapped (ui/idle-return).
+        {...(action.phase === 'applied' ? { 'data-card-done': true } : {})}
         style={{
           // Never taller than the room in the band, even while the card waits or before it fits itself.
           blockSize: fullscreen ? '100%' : `${String(Math.min(height, maxHeight ?? height))}px`,

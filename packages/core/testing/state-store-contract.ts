@@ -317,6 +317,27 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
         expect(await store.getPlan(t.plan.id)).toMatchObject({ ok: true, value: { status: 'applied' } });
       });
 
+      // The rest tile says a plan is running (owner, 21 Oct): the store keeps which plan was applied last, when, and until
+      // when it runs (its horizon), for the playthrough it was applied in.
+      it('the plan applied last is the active one, until its horizon; applying it again changes nothing', async () => {
+        const t = setup();
+        const store = t.harness.factory(t.homeA);
+        expect(await store.getActivePlan()).toEqual({ ok: true, value: undefined });
+        await store.savePlan(t.plan);
+        await store.applyPlan(t.plan.id, t.start + MINUTE_MS);
+        const active = { planId: t.plan.id, appliedAt: iso(t.start + MINUTE_MS), until: t.plan.horizonAt };
+        expect(await store.getActivePlan()).toEqual({ ok: true, value: active });
+        await store.applyPlan(t.plan.id, t.start + 2 * MINUTE_MS);
+        expect(await t.harness.factory(t.homeA).getActivePlan()).toEqual({ ok: true, value: active });
+        // A newer plan applied replaces it.
+        const next = PlanSchema.parse({ ...t.plan, id: 'plan_next0000000' });
+        await store.savePlan(next);
+        await store.applyPlan(next.id, t.start + 3 * MINUTE_MS);
+        expect(await store.getActivePlan()).toMatchObject({ ok: true, value: { planId: next.id, appliedAt: iso(t.start + 3 * MINUTE_MS) } });
+        // Never another home's.
+        expect(await t.harness.factory(t.homeB).getActivePlan()).toEqual({ ok: true, value: undefined });
+      });
+
       it('lets exactly one of two concurrent applies win (conditional write)', async () => {
         const t = setup();
         await t.harness.factory(t.homeA).savePlan(t.plan);
@@ -570,6 +591,15 @@ export function describeStateStoreContract(name: string, makeHarness: () => Stat
         expect(await second.getLatestStormSession()).toMatchObject({ ok: true, value: { id: 'storm_replayed001' } });
         expect(await first.getLatestStormSession()).toMatchObject({ ok: true, value: { id: 'storm_firstplay01' } });
         expect(await first.listInbox(10)).toMatchObject({ ok: true, value: [{ text: 'from the first playthrough' }] });
+      });
+
+      it('the active plan belongs to the playthrough it was applied in: a replayed day starts with none', async () => {
+        const t = setup();
+        const first = t.harness.factory(t.homeA, { playthrough: t.start });
+        await first.savePlan(t.plan);
+        await first.applyPlan(t.plan.id, t.start);
+        expect(await first.getActivePlan()).toMatchObject({ ok: true, value: { planId: t.plan.id } });
+        expect(await t.harness.factory(t.homeA, { playthrough: t.start + DAY_MS }).getActivePlan()).toEqual({ ok: true, value: undefined });
       });
 
       it('the config-change and refusal logs span every playthrough, in the order they were written', async () => {

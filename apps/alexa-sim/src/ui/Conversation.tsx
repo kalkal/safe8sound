@@ -533,12 +533,14 @@ export function Conversation({
             {t('voice.listening')}
           </p>
         )}
-        {notice !== null && !listening && (
+        {/* "It's on the screen" is only true while the answer is (review of #498): at rest the silent voice's notice and its
+            Listen go with the answer. */}
+        {notice !== null && !listening && !(notice === 'voice.silent' && firstScreen) && (
           <p className="notice" role="status">
             {t(notice)}
           </p>
         )}
-        {notice === 'voice.silent' && !listening && !busy && shown.data?.ok === true && (
+        {notice === 'voice.silent' && !listening && !busy && !firstScreen && shown.data?.ok === true && (
           <button
             type="button"
             className="button button-quiet listen-button"

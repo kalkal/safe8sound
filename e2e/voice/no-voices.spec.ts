@@ -46,3 +46,19 @@ test('a reply that cannot be spoken: answer on screen, one notice, one voice log
   expect(voice[0]).toMatchObject({ message: 'speech_synthesis_failed', correlationId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
   expect(lines).toHaveLength(1);
 });
+
+test('back at rest, the silent voice says nothing more: "it is on the screen" went with the answer (review of #498)', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.clock.install();
+  await page.goto('/');
+  await page.getByLabel('Ask a question').fill("What's my battery level?");
+  await page.getByRole('button', { name: 'Ask' }).click();
+  await expect(page.getByRole('status').filter({ hasText: "I couldn't read the answer aloud." })).toHaveCount(1);
+  // The minute starts once the voice is done or gives up (a few seconds after the answer).
+  await page.clock.fastForward(15_000);
+  await page.clock.fastForward(65_000);
+  await expect(page.getByTestId('echo-screen')).toHaveAttribute('data-screen', 'idle');
+  await expect(page.getByRole('status').filter({ hasText: "I couldn't read the answer aloud." })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Listen to the answer' })).toHaveCount(0);
+  await expect(page.getByTestId('tile-safe-room')).toBeInViewport({ ratio: 1 });
+});

@@ -4,12 +4,14 @@ import { useEffect, useRef } from 'react';
 // does it `delayMs` after the last touch, key or scroll (config.idleReturnMs: one minute, our choice; Amazon publishes
 // no value for the Echo Show). The caller says when the clock runs (an answer or the home on screen, the voice done, no
 // plan waiting for its choice). It also waits while something else waits for the person: a modal dialog (a card at
-// full screen, a sheet) or the focus inside a card's frame (touches inside a frame never reach this page).
+// full screen, a sheet) or the focus inside a card's frame (touches inside a frame never reach this page), unless that
+// card has nothing left to choose (`data-card-done`: its plan applied), so a tap on Apply never holds the screen.
 
 const ACTIVITY = ['pointerdown', 'keydown', 'wheel'] as const;
 
 function somethingWaits(doc: Document): boolean {
-  return doc.querySelector('[aria-modal="true"]') !== null || doc.activeElement?.tagName === 'IFRAME';
+  const focused = doc.activeElement;
+  return doc.querySelector('[aria-modal="true"]') !== null || (focused?.tagName === 'IFRAME' && !focused.hasAttribute('data-card-done'));
 }
 
 export function useIdleReturn(o: { active: boolean; delayMs: number; onReturn: () => void }): void {

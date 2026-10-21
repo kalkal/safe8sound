@@ -259,3 +259,10 @@ export const PlanSchema = z
     });
   });
 export type Plan = z.infer<typeof PlanSchema>;
+
+/**
+ * The plan applied last in a playthrough, as the store keeps it (owner, 21 Oct: the rest tile says a plan is running;
+ * additive, approved in review): which plan, when it was applied and until when it runs (its horizon), domain times.
+ */
+export const ActivePlanSchema = z.strictObject({ planId: PlanIdSchema, appliedAt: IsoDateTimeSchema, until: IsoDateTimeSchema });
+export type ActivePlan = z.infer<typeof ActivePlanSchema>;

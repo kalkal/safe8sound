@@ -6,7 +6,7 @@ import { PHONE_FIXTURE_NAMES, phoneMessage } from '../phone/phone-fixtures.js';
 import type { ScriptedPhone } from '../phone/phone-feed.js';
 import { SCRIPT_FIXTURES, SCRIPT_FIXTURE_NAMES } from './script-fixtures.js';
 import { createScriptedClock } from './scripted-clock.js';
-import { createScriptedPreferences, refuseAction, scriptedToolCall } from './scripted-tools.js';
+import { createScriptedPlans, createScriptedPreferences, refuseAction, scriptedToolCall } from './scripted-tools.js';
 import { StatusFactsSchema, type ToolName } from './wire.js';
 
 const TOOL_NAMES = ['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_preferences', 'get_safe_room_status', 'get_home_status'] as const satisfies readonly ToolName[];
@@ -90,6 +90,8 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
   let previous: string | undefined;
   // The simulated clock of the scripted home: the storm night's moments, the phone told on the way.
   const preferences = createScriptedPreferences();
+  // The plan the scripted home runs (owner, 21 Oct): a tap on Apply or "apply the plan" starts it; the storm replaces it.
+  const plans = createScriptedPlans();
   const clock = createScriptedClock(options.phone === undefined ? {} : { phone: options.phone });
 
   return ok({
@@ -98,7 +100,7 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
       if (options.degraded === true) return Promise.resolve(refuseAction());
       const clocked = clock.call(name, args);
       if (clocked !== undefined) return Promise.resolve(clocked);
-      const result = scriptedToolCall(name, args, script.status?.ts, preferences);
+      const result = scriptedToolCall(name, args, script.status?.ts, preferences, plans);
       // The card says the family was told (familyAlert.sent): the scripted phone gets that message, as the server sends it.
       const alert = result.structuredContent?.['familyAlert'];
       const sent = typeof alert === 'object' && alert !== null && 'sent' in alert && typeof alert.sent === 'number' ? alert.sent : 0;
@@ -120,6 +122,9 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
       const answer: AgentAnswer =
         entry.withStatus && status !== undefined ? { text: entry.text.replaceAll('{soc}', String(status.batterySocPct)), status } : { text: entry.text };
       if (entry.cards !== undefined) answer.cards = entry.cards.map((card) => SCRIPT_FIXTURES[card.fixture]());
+      // The plan the scripted home runs: a plan applied by voice starts it, the storm replaces it (owner, 21 Oct).
+      for (const card of answer.cards ?? []) if (card.tool === 'apply_plan') plans.apply(card.result.plan);
+      if (entry.id === 'storm-start') plans.clear();
       if (entry.phone !== undefined && options.phone !== undefined) {
         const messages = entry.phone.map((m) => phoneMessage(m.fixture));
         options.phone.deliver(messages);

@@ -12,7 +12,7 @@ const unreachable = () => toolError('store_unavailable', 'The saved settings are
 const storeDown = (deps: StormModeDeps): StormModeDeps => ({ ...deps, preferencesFor: () => Promise.resolve(err(unreachable())) });
 const sessionDown = (deps: StormModeDeps): StormModeDeps => ({
   ...deps,
-  storeFor: (homeId, scope) => ({ ...deps.storeFor(homeId, scope), getLatestStormSession: () => Promise.resolve(err(unreachable())) }),
+  storeFor: (homeId, scope) => ({ ...deps.storeFor(homeId, scope), getLatestStormSession: () => Promise.resolve(err(unreachable())), getActivePlan: () => Promise.resolve(err(unreachable())) }),
 });
 // Nobody older in the safe room: the normal reading plays the standard night limit (26 °C).
 // A heatwave evening on a low battery, so the hold ends before its cap and the night limit counts.

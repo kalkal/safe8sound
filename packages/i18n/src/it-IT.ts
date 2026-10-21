@@ -212,6 +212,7 @@ export const itIT = {
   'screen.weather.dusk': 'Sera calda',
   'screen.weather.storm': 'Temporale',
   'idle.safeUntil': 'Al sicuro fino alle {time}',
+  'idle.planActive': 'Piano attivo · {headline}',
   'idle.withinUntil': 'Nei suoi limiti fino a circa le {time}',
   'idle.safeRoomNeutral': 'Stanza sicura',
   'idle.withinAtLeast': 'Nei suoi limiti almeno fino alle {time}',

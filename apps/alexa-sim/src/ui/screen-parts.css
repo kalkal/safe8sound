@@ -375,6 +375,20 @@
     block-size: 4.5rem;
   }
 
+  /* A phone (review of #498): a smaller face and tighter padding, so "Plan active · Safe until …" keeps the whole tile in
+     the first view under the cubes, in both languages. */
+  @media (width < 48rem) {
+    .idle-room {
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+    }
+
+    .idle-avatar {
+      inline-size: 3rem;
+      block-size: 3rem;
+    }
+  }
+
   /* A new message to Ana: the first tile, marked with the storm colour while it is unseen (our addition). */
   .idle-notice {
     display: flex;

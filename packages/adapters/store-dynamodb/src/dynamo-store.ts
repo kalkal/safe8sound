@@ -1,4 +1,5 @@
 import {
+  ActivePlanSchema,
   AdminSettingsSchema,
   ConfigChangeSchema,
   GuaranteeIdSchema,
@@ -15,6 +16,7 @@ import {
   err,
   ok,
   toolError,
+  type ActivePlan,
   type AdminSettings,
   type ConfigChange,
   type ErrorEnvelope,
@@ -45,7 +47,8 @@ import { z } from 'zod';
 import type { TableClient, TableItem } from './table.js';
 
 // StateStore on the single table (plan §3.2): PK = HOME#<homeId>; SK = PREFS | PLAN#<id> |
-// EVENT#<ts>#<n> | GUARD#<ts>#<n> | CONFIRM#<planId> | [PLAY#<playthrough>#]STORM#… | [PLAY#<playthrough>#]INBOX#… | SETTINGS (a sandbox's settings, C1,
+// EVENT#<ts>#<n> | GUARD#<ts>#<n> | CONFIRM#<planId> | [PLAY#<playthrough>#]STORM#… | [PLAY#<playthrough>#]INBOX#… |
+// [PLAY#<playthrough>#]ACTIVE_PLAN (the plan applied last) | SETTINGS (a sandbox's settings, C1,
 // with a top-level `version` for the conditional write). One item outside the homes: PK = ADMIN#CONFIG,
 // SK = CONFIG, the demo's admin config read by every home (C1, same conditional write). The sim-api's quota
 // counters live under DEMO#… (counter.ts). Every item carries schemaVersion; logs and plans carry the DynamoDB TTL
@@ -221,10 +224,32 @@ class DynamoStateStore implements StateStore {
         { attr: 'expiresAtMs', op: '>', value: now },
         { attr: 'wallDeadlineMs', op: '>', value: this.#clock.now() },
       ]);
-      if (outcome === 'ok') return { plan: applied, alreadyApplied: false };
+      if (outcome === 'ok') {
+        // The plan applied last in this playthrough (owner, 21 Oct): one item, replaced by the next apply. Only the first
+        // apply writes it: one that lost the race below never moves it.
+        // Best-effort (review of #498): the plan is applied whatever this write does, so its failure never turns the apply
+        // into an error (a retry would see "already applied" and a last-resort alert would be skipped). It is said on
+        // onError and in the result, for the tool's log.
+        const active: ActivePlan = { planId, appliedAt: new Date(now).toISOString(), until: plan.horizonAt };
+        try {
+          await this.#table.put(this.#item(`${this.#play}ACTIVE_PLAN`, active, this.#retainedFor(this.#ttl.planDays)));
+        } catch (cause) {
+          const code = isTransient(cause) ? 'store_unavailable' : 'unexpected_error';
+          this.#onError?.({ code, operation: 'applyPlan.activePlan', cause, ...(this.#correlationId === undefined ? {} : { correlationId: this.#correlationId }) });
+          return { plan: applied, alreadyApplied: false, activePlanUnsaved: true as const };
+        }
+        return { plan: applied, alreadyApplied: false };
+      }
       // Lost the race or the plan changed meanwhile: report what is stored now.
       const current = (await this.#readPlan(planId)) ?? fail(notFound(planId));
       return current.status === 'applied' ? { plan: current, alreadyApplied: true } : fail(expired(planId));
+    });
+  }
+
+  getActivePlan(): Promise<Result<ActivePlan | undefined, ErrorEnvelope>> {
+    return this.#run('getActivePlan', async () => {
+      const item = await this.#table.get(this.#pk, `${this.#play}ACTIVE_PLAN`);
+      return item && this.#isLive(item) ? parse(ActivePlanSchema, item) : undefined;
     });
   }
 

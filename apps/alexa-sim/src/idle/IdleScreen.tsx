@@ -185,8 +185,16 @@ export interface IdleTilesProps {
   named?: boolean;
 }
 
-/** The tile says what the safe room card says (safeRoomHeadline): the same time, the same meaning. */
+/**
+ * The tile says what the safe room card says (safeRoomHeadline): the same time, the same meaning; while a plan runs, the
+ * server says so (activePlan) and the tile says it first (owner, 21 Oct: "Plan active · safe until 07:00").
+ */
 function headlineOf(room: SafeRoomStatus, timeZone: string): string {
+  const words = safeRoomWords(room, timeZone);
+  return room.activePlan === undefined ? words : t('idle.planActive', { headline: words });
+}
+
+function safeRoomWords(room: SafeRoomStatus, timeZone: string): string {
   const headline = safeRoomHeadline(room);
   const time = homeClock(headline.until, timeZone);
   if (headline.kind === 'atLeast') return t(headline.tomorrow ? 'idle.atLeastTomorrow' : 'idle.atLeastUntil', { time });

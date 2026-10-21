@@ -2,7 +2,7 @@ import { PlanSchema, ReserveOutlookSchema, SafeRoomStatusSchema } from '@cold-re
 import { CATALOGS } from '@cold-reserve/i18n';
 import { describe, expect, it } from 'vitest';
 import { lastResortPlan } from '@cold-reserve/ui-cards';
-import { SCRIPTED_LAST_RESORT_TOKEN } from '../src/agent/script-fixtures.js';
+import { SCRIPTED_LAST_RESORT_TOKEN, SCRIPT_FIXTURES } from '../src/agent/script-fixtures.js';
 import { createScriptedAgent } from '../src/agent/scripted-agent.js';
 import { createScriptedPhone } from '../src/phone/phone-feed.js';
 import script from '../src/agent/script.v1.json' with { type: 'json' };
@@ -255,6 +255,24 @@ describe('ScriptedAgent: the storm scene and the family phone (#24)', () => {
     const room = SafeRoomStatusSchema.parse(reply.structuredContent);
     expect(room.stormPhase).toBeUndefined();
     expect(room.safeRoomName).toBe("Leo's room");
+  });
+
+  // The rest tile says a plan is running (owner, 21 Oct), in the scripted story too: the hot-day plan applied by a tap or
+  // by voice runs until its horizon; the storm replaces it.
+  it('the safe room says the plan is active once applied, by a tap or by voice, and no more once the storm starts', async () => {
+    const read = async (a: ReturnType<typeof agent>) => SafeRoomStatusSchema.parse((await a.callTool('get_safe_room_status', {}, ctx)).structuredContent);
+    const tapped = agent();
+    expect((await read(tapped)).activePlan).toBeUndefined();
+    const plan = SCRIPT_FIXTURES['hot-day-applied']();
+    if (plan.tool !== 'apply_plan') throw new Error('fixture');
+    expect((await tapped.callTool('apply_plan', { planId: plan.result.plan.id }, ctx)).isError).not.toBe(true);
+    expect((await read(tapped)).activePlan).toEqual({ planId: plan.result.plan.id, until: plan.result.plan.horizonAt });
+    await tapped.ask('The power is out', ctx);
+    expect((await read(tapped)).activePlan).toBeUndefined();
+
+    const said = agent();
+    await said.ask('Apply the plan', ctx);
+    expect((await read(said)).activePlan).toMatchObject({ planId: plan.result.plan.id });
   });
 
   it('in the degraded mode never pretends a message was sent', async () => {

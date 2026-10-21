@@ -86,4 +86,15 @@ describe('useIdleReturn', () => {
     vi.advanceTimersByTime(DELAY);
     expect(onReturn).toHaveBeenCalledTimes(1);
   });
+
+  it('does not wait for a card that has nothing left to choose (its plan applied): the focus stays where the person tapped', () => {
+    const { onReturn } = start();
+    const frame = document.createElement('iframe');
+    frame.setAttribute('data-card-done', 'true');
+    document.body.append(frame);
+    frame.focus();
+    expect(document.activeElement).toBe(frame);
+    vi.advanceTimersByTime(DELAY);
+    expect(onReturn).toHaveBeenCalledTimes(1);
+  });
 });

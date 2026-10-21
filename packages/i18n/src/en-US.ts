@@ -234,6 +234,8 @@ export const enUS = {
   'screen.weather.dusk': 'Warm evening',
   'screen.weather.storm': 'Storm',
   'idle.safeUntil': 'Safe until {time}',
+  // A plan applied and still running, as the server says it (owner, 21 Oct).
+  'idle.planActive': 'Plan active · {headline}',
   'idle.withinUntil': 'Within its limits until about {time}',
   'idle.safeRoomNeutral': 'Safe room',
   'idle.withinAtLeast': 'Within its limits at least until {time}',

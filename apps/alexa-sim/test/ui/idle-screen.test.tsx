@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { celsius, type InboxMessage, type Milestone } from '@cold-reserve/contracts';
+import { PlanIdSchema, celsius, type InboxMessage, type Milestone } from '@cold-reserve/contracts';
 import { setLocale } from '@cold-reserve/i18n';
 import { safeRoomCalm } from '@cold-reserve/ui-cards';
 import { act, cleanup, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
@@ -107,6 +107,18 @@ describe('IdleTiles', () => {
     const above = { ...base, tempC: celsius(27), limitNow: { limitC: celsius(24), kind: 'night' as const } };
     render(<IdleTiles avatar="older-man" room={above} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
     expect(within(screen.getByTestId('tile-safe-room')).getByText('Battery holds it until 03:05')).toBeTruthy();
+  });
+
+  // A plan applied and still running (owner, 21 Oct), as the server says it: the tile says so before its time, in both
+  // languages; without one, the tile as before.
+  it('a plan running says "Plan active" before the time it stays safe until, in both languages', () => {
+    const room = { ...safeRoomCalm(), safeRoomName: "Leo's room", safeUntil: '2026-07-16T07:00:00+02:00', activePlan: { planId: PlanIdSchema.parse('plan_7Hq2mX9vK3'), until: '2026-07-16T07:00:00+02:00' } };
+    const { unmount } = render(<IdleTiles avatar="older-man" room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    expect(within(screen.getByTestId('tile-safe-room')).getByText('Plan active · Safe until 07:00')).toBeTruthy();
+    unmount();
+    setLocale('it-IT');
+    render(<IdleTiles avatar="older-man" room={room} reserve={undefined} next={undefined} notice={undefined} timeZone="Europe/Rome" />);
+    expect(within(screen.getByTestId('tile-safe-room')).getByText('Piano attivo · Al sicuro fino alle 07:00')).toBeTruthy();
   });
 
   it('the clear day at 12:00: safe at least until 12:00 tomorrow, never "until" the hour it is now', () => {

@@ -400,6 +400,18 @@ describe('a last-resort plan: two explicit yeses, the second bound to the plan b
       expect(r.ok && applySummary(r.value)).toContain('1 registered family contact was alerted.');
     });
 
+    // Review of #498: the store could not record the plan as the active one (best-effort): the apply still answers
+    // applied, the family is still alerted, and the tool says it in its log with the turn's correlation id.
+    it('a plan the store could not record as active is still applied, its family alerted, the miss in the log', async () => {
+      const w = stormAt(20, { unsavedActivePlan: true });
+      const plan = await lastResort(w);
+      const { token } = await firstYes(w, plan);
+      const done = await applyPlan(w.deps, { planId: plan.id, lastResortToken: token }, w.ctx);
+      expect(done.ok && done.value.familyAlert).toEqual({ sent: 1, failed: 0 });
+      const line = w.logger.lines.find((l) => l.details?.['event'] === 'active_plan_unsaved');
+      expect(line).toMatchObject({ level: 'warn', correlationId: 'test-correlation' });
+    });
+
     it('the result says how it went: sent once, nothing on a repeat, failed when the phone is down, zero with no contact', async () => {
       const w = stormAt(20);
       const plan = await lastResort(w);

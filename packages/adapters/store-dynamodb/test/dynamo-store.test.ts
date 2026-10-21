@@ -240,3 +240,19 @@ describe('store-dynamodb failures (docs/error-handling.md)', () => {
     expect(!result.ok && result.error.message).not.toContain('PREFS');
   });
 });
+
+// Review of #498: the pointer of the active plan is written after the conditional apply. If that write fails, the plan
+// is still applied: the apply answers applied (never "failed" for a plan that is applied, so a last-resort alert is never
+// skipped), says the pointer is missing, and reports the cause on onError.
+describe('the active plan pointer is best-effort', () => {
+  it('a failed pointer write leaves the plan applied and the apply ok, said on onError', async () => {
+    const real = createFakeTable();
+    const table: TableClient = { ...real, put: (item) => (item.SK.endsWith('ACTIVE_PLAN') ? Promise.reject(sdkError('ProvisionedThroughputExceededException')) : real.put(item)) };
+    const { store, errors } = setup(table);
+    await store.savePlan(plan);
+    expect(await store.applyPlan(plan.id, createdMs)).toEqual({ ok: true, value: { plan: { ...plan, status: 'applied' }, alreadyApplied: false, activePlanUnsaved: true } });
+    expect(await store.getPlan(plan.id)).toMatchObject({ ok: true, value: { status: 'applied' } });
+    expect(await store.getActivePlan()).toEqual({ ok: true, value: undefined });
+    expect(errors).toMatchObject([{ code: 'store_unavailable', operation: 'applyPlan.activePlan' }]);
+  });
+});

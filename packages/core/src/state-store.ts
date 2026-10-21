@@ -2,6 +2,7 @@ import {
   IsoDateTimeSchema,
   PlanIdSchema,
   toolError,
+  type ActivePlan,
   type AdminSettings,
   type ConfigChange,
   type ErrorEnvelope,
@@ -34,6 +35,11 @@ export interface PlanApplication {
   readonly plan: Plan;
   /** True when the plan had already been applied: the original outcome is returned (idempotent). */
   readonly alreadyApplied: boolean;
+  /**
+   * The plan is applied but the store could not record it as the active one (review of #498): best-effort, never an
+   * error for an applied plan. The tool says it in its log; the rest tile then just does not say "Plan active".
+   */
+  readonly activePlanUnsaved?: true;
 }
 
 /**
@@ -106,6 +112,12 @@ export interface StateStore {
    * scenario clock it is not the wall clock, which drives only the retention (#175).
    */
   applyPlan(planId: PlanId, now: number): Promise<Result<PlanApplication, ErrorEnvelope>>;
+  /**
+   * The plan applied last in this playthrough (#234), when it was applied (`now` of applyPlan) and until when it runs
+   * (its horizon); `undefined` before any. A first apply records it; applying again changes nothing; a newer plan
+   * applied replaces it. Whether it still runs (its horizon, a storm since) is the caller's rule (owner, 21 Oct).
+   */
+  getActivePlan(): Promise<Result<ActivePlan | undefined, ErrorEnvelope>>;
   /**
    * Stores the confirmation of a last-resort plan, kept as long as a plan; it replaces an earlier one of the same
    * plan. `now` is the domain time it is issued at: its lifetime (`expiresAt - now`) also runs on the wall clock.

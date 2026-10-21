@@ -1,4 +1,5 @@
 import {
+  ActivePlanSchema,
   AdminSettingsSchema,
   InboxMessageSchema,
   SandboxSettingsSchema,
@@ -11,6 +12,7 @@ import {
   err,
   ok,
   toolError,
+  type ActivePlan,
   type AdminSettings,
   type ConfigChange,
   type ErrorEnvelope,
@@ -41,8 +43,8 @@ import {
 
 // In-memory StateStore. It mirrors the DynamoDB single-table keys (plan §3.2) so both adapters
 // behave the same: PK = HOME#<homeId>, SK = PREFS | PLAN#<id> | EVENT#<ts>#<n> | GUARD#<ts>#<n> |
-// STORM#<startedAt>#<id> | INBOX#<at>#<n> | CONFIRM#<planId>; within a playthrough (#234) the storm and inbox keys
-// start with PLAY#<playthrough>#.
+// STORM#<startedAt>#<id> | INBOX#<at>#<n> | CONFIRM#<planId> | ACTIVE_PLAN; within a playthrough (#234) the storm, inbox and
+// active-plan keys start with PLAY#<playthrough>#.
 // Expired items are invisible on read, like DynamoDB TTL items that are not yet deleted.
 
 interface Item {
@@ -146,7 +148,14 @@ class MemoryStateStore implements StateStore {
     }
     const applied: Plan = { ...plan, status: 'applied' };
     this.#put(sk, { ...stored, value: applied });
+    // The plan applied last in this playthrough (owner, 21 Oct): one item, replaced by the next apply.
+    const active: ActivePlan = { planId, appliedAt: new Date(now).toISOString(), until: plan.horizonAt };
+    this.#put(`${this.#play}ACTIVE_PLAN`, { value: active, expiresAtMs: this.#retainedFor(this.#ttl.planDays) });
     return Promise.resolve(ok({ plan: structuredClone(applied), alreadyApplied: false }));
+  }
+
+  getActivePlan(): Promise<Result<ActivePlan | undefined, ErrorEnvelope>> {
+    return Promise.resolve(this.#read(`${this.#play}ACTIVE_PLAN`, ActivePlanSchema));
   }
 
   saveLastResortConfirmation(confirmation: LastResortConfirmation, now: number): Promise<Result<void, ErrorEnvelope>> {

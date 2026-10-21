@@ -6,6 +6,7 @@ import { LevelReasonSchema, LevelSchema } from './pacing.js';
 import { ContactChannelSchema } from './preferences.js';
 import { DeviceAdviceSchema, DeviceSecuredSchema, FamilyReplySchema } from './storm-prep.js';
 import { CelsiusSchema, PctSchema } from './units.js';
+import { PlanIdSchema } from './plan.js';
 
 // Storm mode contracts (plan §3.1, §9.2, §11.2 p.8, §13.2.4). Additive, approved in #23.
 
@@ -168,6 +169,8 @@ export const SafeRoomStatusSchema = z.strictObject({
   gridAvailable: z.boolean().optional(),
   /** The family's latest reply in this storm, by role only (approved in #24). */
   lastCheckIn: FamilyReplySchema.optional(),
+  /** The plan applied last while it runs (additive, owner 21 Oct): the rest tile says "Plan active"; its time on the home's clock. */
+  activePlan: z.strictObject({ planId: PlanIdSchema, until: IsoDateTimeSchema }).optional(),
   origin: DataOriginSchema,
   homeLink: HomeLinkSchema,
   /**

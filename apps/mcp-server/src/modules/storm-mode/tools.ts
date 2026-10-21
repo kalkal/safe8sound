@@ -23,6 +23,7 @@ import type { ToolContext } from '../../tool.js';
 import type { StormModeDeps } from './deps.js';
 import { homeDetail, isSandbox } from '../../sandbox-log.js';
 import { localIso } from '@cold-reserve/core';
+import { activePlanNow } from './active-plan.js';
 import { deliver, detect, levelOf, localeOf, messageFields, namedPeople, readHome, readingEvent, type Observed } from './observe.js';
 
 
@@ -121,6 +122,23 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext, degr
   const limit = o.value.limitNow;
   const within = o.value.withinLimits;
   const reply = session?.phase === 'ended' ? undefined : session?.familyReplies?.at(-1);
+  // The plan applied last while it runs (owner, 21 Oct: the rest tile says "Plan active"), read from the store so the
+  // Echo, a reload and Ana's phone say the same. A store that cannot answer leaves it out (said in the log), never the
+  // safe room's own facts.
+  const stored = await o.value.store.getActivePlan();
+  if (!stored.ok) {
+    deps.logger.log({
+      ts: new Date(deps.clock.now()).toISOString(),
+      level: 'warn',
+      component: 'mcp-server',
+      message: 'active_plan_unread',
+      correlationId: ctx.correlationId,
+      code: stored.error.code,
+      category: stored.error.category,
+      details: { event: 'active_plan_unread', ...homeDetail(ctx.homeId) },
+    });
+  }
+  const activePlan = activePlanNow({ active: stored.ok ? stored.value : undefined, session, nowMs: Date.parse(snapshot.ts), timeZone: o.value.home.profile.location.tz });
   return ok({
     safeRoomId: safeRoom.id,
     ...(roomName === undefined ? {} : { safeRoomName: roomName }),
@@ -144,6 +162,7 @@ export async function safeRoomStatus(deps: StormModeDeps, ctx: ToolContext, degr
       ? {}
       : { withinLimits: { until: localIso(within.ms, o.value.home.profile.location.tz), ...(within.limitC === undefined ? {} : { limitC: celsius(within.limitC) }) } }),
     ...(people.length === 0 ? {} : { people }),
+    ...(activePlan === undefined ? {} : { activePlan }),
   });
 }
 

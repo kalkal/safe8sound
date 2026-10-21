@@ -208,6 +208,25 @@ describe('useReserve', () => {
 });
 
 describe('useSafeRoom', () => {
+  // A plan applied (owner, 21 Oct: the tile says "Plan active"): the tile reads the server once more, by a tap or by voice.
+  it('reads once more when a plan is applied (again), never for a re-render', async () => {
+    const room = SCRIPT_FIXTURES['safe-room-calm']();
+    if (room.tool !== 'get_safe_room_status') throw new Error('fixture');
+    const fake = fakeAgent({ get_safe_room_status: reply(room.result) });
+    const { rerender } = renderHook(({ again }) => useSafeRoom({ agent: fake.agent, enabled: true, scenarioId: 'heatwave', gridDown: false, now: '2026-07-17T12:00:00', again }), {
+      initialProps: { again: 0 },
+    });
+    await waitFor(() => {
+      expect(fake.count('get_safe_room_status')).toBe(1);
+    });
+    rerender({ again: 1 });
+    await waitFor(() => {
+      expect(fake.count('get_safe_room_status')).toBe(2);
+    });
+    rerender({ again: 1 });
+    expect(fake.count('get_safe_room_status')).toBe(2);
+  });
+
   // Owner, D2 = b (18 Oct): the idle tile "Leo's room · safe until …" reads the server again at every jump of the
   // clock, and only then: one reading per move, none for a re-render (the judges' daily quota counts each one).
   it('reads once when it may, then exactly once per move of the clock; a failed reading hides the tile', async () => {

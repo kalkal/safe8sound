@@ -2,6 +2,7 @@ import { exampleHomeProfile } from '../src/fixtures.js';
 import { describe, expect, it } from 'vitest';
 import { HomeProfileSchema } from '../src/home.js';
 import { PhoneReplyOutputSchema, SafeRoomStatusSchema, StormSessionSchema } from '../src/storm.js';
+import { ActivePlanSchema } from '../src/plan.js';
 import { toolError } from '../src/errors.js';
 import { DeviceAdviceSchema, DeviceSecuredSchema, FamilyReplySchema, PhoneReplyInputSchema, StormDeviceSchema } from '../src/storm-prep.js';
 
@@ -93,5 +94,36 @@ describe('the answer of POST /phone/reply', () => {
 
   it('has its own rate-limit code, retryable', () => {
     expect(toolError('family_reply_rate_limited', 'Too soon.', { retryAfterMs: 20_000 })).toMatchObject({ category: 'rate_limited', retryable: true, retryAfterMs: 20_000 });
+  });
+});
+
+// The rest tile says a plan is running (owner, 21 Oct; additive, approved in review): the safe room's status carries the
+// plan applied last while it runs, read from the store, so the Echo, a reload and Ana's phone say the same.
+describe('the active plan in the safe room status', () => {
+  const status = {
+    safeRoomId: 'bedroom-1',
+    tempC: 25.4,
+    occupantRoles: ['grandpa'],
+    level: 'comfort',
+    levelReason: 'weather',
+    safeHours: 17,
+    safeUntil: '2026-07-16T07:00:00+02:00',
+    origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' },
+    homeLink: 'ok',
+  };
+
+  it('is optional: a status without it still parses', () => {
+    expect(SafeRoomStatusSchema.safeParse(status).success).toBe(true);
+  });
+
+  it('names the plan and until when it runs, and nothing else', () => {
+    const activePlan = { planId: 'plan_7Hq2mX9vK3', until: '2026-07-16T07:00:00+02:00' };
+    expect(SafeRoomStatusSchema.parse({ ...status, activePlan }).activePlan).toEqual(activePlan);
+    expect(SafeRoomStatusSchema.safeParse({ ...status, activePlan: { ...activePlan, steps: [] } }).success).toBe(false);
+  });
+
+  it('the store keeps which plan was applied last, when and until when (ActivePlanSchema)', () => {
+    expect(ActivePlanSchema.safeParse({ planId: 'plan_7Hq2mX9vK3', appliedAt: '2026-07-15T14:00:00+02:00', until: '2026-07-16T07:00:00+02:00' }).success).toBe(true);
+    expect(ActivePlanSchema.safeParse({ planId: 'plan_7Hq2mX9vK3', appliedAt: 'yesterday', until: '2026-07-16T07:00:00+02:00' }).success).toBe(false);
   });
 });

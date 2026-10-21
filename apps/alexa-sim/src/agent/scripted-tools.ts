@@ -30,6 +30,27 @@ function applyLastResort(token: unknown): ToolCallResult {
   return success(SCRIPT_FIXTURES['last-resort-applied']().result, 'The last-resort plan is applied.');
 }
 
+/** The plan the scripted home runs (owner, 21 Oct: the rest tile says "Plan active"): applied by a tap or by voice, until
+ *  its horizon; the storm of the story replaces it. For this agent only, like its preferences. */
+export interface ScriptedPlans {
+  active: () => { planId: string; until: string } | undefined;
+  apply: (plan: { id: string; horizonAt: string }) => void;
+  clear: () => void;
+}
+
+export function createScriptedPlans(): ScriptedPlans {
+  let current: { planId: string; until: string } | undefined;
+  return {
+    active: () => current,
+    apply: (plan) => {
+      current = { planId: plan.id, until: plan.horizonAt };
+    },
+    clear: () => {
+      current = undefined;
+    },
+  };
+}
+
 /** The scripted home's preferences (#402): the fixture, then what the settings and the cards saved, for this agent only. */
 export interface ScriptedPreferences {
   read: () => GetPreferencesOutput | undefined;
@@ -102,15 +123,30 @@ function setPreferences(args: Record<string, unknown>, at: string | undefined, s
   return success(output.data, 'Preferences saved.');
 }
 
-export function scriptedToolCall(name: string, args: Record<string, unknown>, at: string | undefined, preferences: ScriptedPreferences = createScriptedPreferences()): ToolCallResult {
-  if (name === 'apply_plan') return applyPlan(args);
+export function scriptedToolCall(
+  name: string,
+  args: Record<string, unknown>,
+  at: string | undefined,
+  preferences: ScriptedPreferences = createScriptedPreferences(),
+  plans: ScriptedPlans = createScriptedPlans(),
+): ToolCallResult {
+  if (name === 'apply_plan') {
+    const result = applyPlan(args);
+    const plan = result.structuredContent?.['plan'] as { id?: unknown; horizonAt?: unknown } | undefined;
+    if (result.isError !== true && typeof plan?.id === 'string' && typeof plan.horizonAt === 'string') plans.apply({ id: plan.id, horizonAt: plan.horizonAt });
+    return result;
+  }
   // The idle screen's cold reserve clock (owner, 11 Oct): read-only, the reserve of the scripted home.
   if (name === 'get_reserve_outlook') {
     const reserve = SCRIPT_FIXTURES['reserve-outlook']();
     return success(reserve.result, 'Cold reserve.');
   }
   // The idle screen's tile "Leo's room · safe until …" (#432 S6): read-only, the calm room of the scripted home.
-  if (name === 'get_safe_room_status') return success(demoSafeRoom(), 'Safe room.');
+  if (name === 'get_safe_room_status') {
+    // The plan the scripted home runs (owner, 21 Oct), as the server says it.
+    const active = plans.active();
+    return success({ ...demoSafeRoom(), ...(active === undefined ? {} : { activePlan: active }) }, 'Safe room.');
+  }
   if (name === 'set_preferences') return setPreferences(args, at, preferences);
   if (name === 'get_preferences') return getPreferences(preferences);
   return toolErrorResult(toolError('invalid_input', `The simulator does not run ${name}.`));

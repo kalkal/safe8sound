@@ -47,7 +47,7 @@ export function comfortConfig() {
  */
 const GUIDED_STORM: Scenario = ScenarioSchema.parse(guidedStormDay);
 
-export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean; notifier?: Notifier; storeWallMs?: number; units?: 'C' | 'F' } = {}) {
+export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; readOnly?: boolean; snapshot?: (s: Snapshot) => Snapshot; forecast?: (f: Forecast) => Forecast; preferences?: Preferences; failRejections?: boolean; unsavedActivePlan?: boolean; notifier?: Notifier; storeWallMs?: number; units?: 'C' | 'F' } = {}) {
   const profile = demoProfile();
   const scenario = id === 'storm-blackout' ? GUIDED_STORM : builtInScenario(id);
   const startMs = Date.parse(scenario.startAt);
@@ -57,15 +57,21 @@ export function world(id: ScenarioId, atH: number, over: { homeId?: HomeId; read
   // The store's own wall clock (#175): the same as the modules' unless a test sets the wall apart from the domain.
   const memory = memoryStateStoreFactory({ backing: createMemoryBacking(), clock: over.storeWallMs === undefined ? clock : fixedClock(over.storeWallMs) });
   const scopes: (StoreScope | undefined)[] = [];
-  // Records what each store was opened for; optionally fails the refusal log, for fault injection.
+  // Records what each store was opened for; optionally fails the refusal log, or the active plan's pointer of an apply
+  // (review of #498: best-effort, the apply still answers applied), for fault injection.
   const storeFor: StateStoreFactory = (h, scope) => {
     scopes.push(scope);
     const store = memory(h, scope);
-    if (!over.failRejections) return store;
+    if (!over.failRejections && !over.unsavedActivePlan) return store;
     const failed = () => Promise.resolve(err(toolError('store_unavailable', 'The state store did not answer.')));
+    const applyUnsaved = async (...args: Parameters<typeof store.applyPlan>) => {
+      const applied = await store.applyPlan(...args);
+      return applied.ok && !applied.value.alreadyApplied ? ok({ ...applied.value, activePlanUnsaved: true as const }) : applied;
+    };
     return new Proxy(store, {
       get: (target, key) => {
-        if (key === 'recordGuardRejection') return failed;
+        if (key === 'recordGuardRejection' && over.failRejections) return failed;
+        if (key === 'applyPlan' && over.unsavedActivePlan) return applyUnsaved;
         const value: unknown = Reflect.get(target, key);
         return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
       },

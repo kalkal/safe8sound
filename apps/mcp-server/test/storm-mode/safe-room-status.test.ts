@@ -1,4 +1,6 @@
-import { HomeProfileSchema, SafeRoomStatusSchema, pct, type HomeProfile } from '@cold-reserve/contracts';
+import { HomeProfileSchema, PlanSchema, SafeRoomStatusSchema, pct, type ActivePlan, type HomeProfile } from '@cold-reserve/contracts';
+import { examplePlan } from '@cold-reserve/contracts/fixtures';
+import { activePlanNow } from '../../src/modules/storm-mode/active-plan.js';
 import { describe, expect, it } from 'vitest';
 import { runStormDetector } from '../../src/modules/storm-mode/observe.js';
 import { safeRoomStatus, startStormMode } from '../../src/modules/storm-mode/tools.js';
@@ -146,5 +148,38 @@ describe('the storm detector (tick)', () => {
     const out = await runStormDetector(w.deps, w.ctx);
     expect(out.ok && out.value.session?.phase).toBe('active');
     expect((await w.inbox())).toHaveLength(1);
+  });
+});
+
+// The rest tile says a plan is running (owner, 21 Oct): the safe room's status carries the plan applied last while it
+// runs. It runs until its horizon; a storm started since replaces it; the home's own clock reads the times.
+describe('the active plan of the safe room status', () => {
+  const active = { planId: 'plan_7Hq2mX9vK3', appliedAt: '2026-07-15T14:00:00+02:00', until: '2026-07-16T07:00:00+02:00' } as ActivePlan;
+  const at = (iso: string) => Date.parse(iso);
+
+  it('runs from its apply until its horizon, its time on the home clock', () => {
+    expect(activePlanNow({ active, session: undefined, nowMs: at('2026-07-15T18:00:00+02:00'), timeZone: 'Europe/Rome' })).toEqual({ planId: 'plan_7Hq2mX9vK3', until: '2026-07-16T07:00:00+02:00' });
+    expect(activePlanNow({ active, session: undefined, nowMs: at('2026-07-16T07:00:00+02:00'), timeZone: 'Europe/Rome' })).toBeUndefined();
+    expect(activePlanNow({ active: undefined, session: undefined, nowMs: at('2026-07-15T18:00:00+02:00'), timeZone: 'Europe/Rome' })).toBeUndefined();
+  });
+
+  it('a storm started since the apply replaces it; a storm before it does not', () => {
+    const storm = (startedAt: string) => ({ startedAt }) as never;
+    expect(activePlanNow({ active, session: storm('2026-07-15T19:00:00+02:00'), nowMs: at('2026-07-15T20:00:00+02:00'), timeZone: 'Europe/Rome' })).toBeUndefined();
+    expect(activePlanNow({ active, session: storm('2026-07-14T19:00:00+02:00'), nowMs: at('2026-07-15T20:00:00+02:00'), timeZone: 'Europe/Rome' })).toMatchObject({ planId: 'plan_7Hq2mX9vK3' });
+  });
+
+  it('get_safe_room_status says it once a plan is applied in the store; without one, nothing', async () => {
+    const w = world(1, {}, 'heatwave');
+    const before = await safeRoomStatus(w.deps, w.ctx);
+    if (!before.ok) throw new Error(before.error.message);
+    expect(before.value.activePlan).toBeUndefined();
+    const now = Date.parse(w.snapshot().ts);
+    const plan = PlanSchema.parse({ ...examplePlan(), homeId: 'demo', createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 10 * MIN).toISOString(), horizonAt: new Date(now + 12 * 60 * MIN).toISOString(), steps: examplePlan().steps.map((s) => ({ ...s, ts: new Date(now + 60 * MIN).toISOString() })) });
+    await w.store.savePlan(plan);
+    expect((await w.store.applyPlan(plan.id, now)).ok).toBe(true);
+    const after = await safeRoomStatus(w.deps, w.ctx);
+    if (!after.ok) throw new Error(after.error.message);
+    expect(SafeRoomStatusSchema.parse(after.value).activePlan).toMatchObject({ planId: plan.id });
   });
 });

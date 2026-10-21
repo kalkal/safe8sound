@@ -10,16 +10,18 @@ interface IdleReadingInput {
   gridDown: boolean;
   /** The simulated time: each move of the clock reads again (one reading per jump, never polled). */
   now: string | undefined;
+  /** A count that reads again when it moves: a plan applied, by a tap or by voice (owner, 21 Oct: "Plan active"). */
+  again?: number;
 }
 
 /**
- * One reading of the idle screen: read when `enabled`, again when the scenario, the grid or the simulated time
- * changes, never polled. A new reading drops the old value first (never a calm day's hours beside a melting cube), and
+ * One reading of the idle screen: read when `enabled`, again when the scenario, the grid, the simulated time or
+ * `again` changes, never polled. A new reading drops the old value first (never a calm day's hours beside a melting cube), and
  * a reply that comes after the next change is dropped; a failed read leaves none, quietly (the fetch logs it). `read`
  * is a module function, the same at every render.
  */
 function useIdleReading<T>(read: (agent: Agent, context: AskContext) => Promise<Result<T, ErrorEnvelope>>, o: IdleReadingInput): T | undefined {
-  const { agent, enabled, scenarioId, gridDown, now } = o;
+  const { agent, enabled, scenarioId, gridDown, now, again } = o;
   const [value, setValue] = useState<T | undefined>(undefined);
   useEffect(() => {
     setValue(undefined);
@@ -31,7 +33,7 @@ function useIdleReading<T>(read: (agent: Agent, context: AskContext) => Promise<
     return () => {
       current = false;
     };
-  }, [read, agent, enabled, scenarioId, gridDown, now]);
+  }, [read, agent, enabled, scenarioId, gridDown, now, again]);
   return value;
 }
 
