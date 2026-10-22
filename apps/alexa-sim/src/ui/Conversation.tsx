@@ -1,4 +1,4 @@
-import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
+import { ok, type ErrorEnvelope, type LocationId, type Result } from '@cold-reserve/contracts';
 import { getLocale } from '@cold-reserve/i18n';
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMachine } from '@xstate/react';
@@ -29,6 +29,7 @@ import { t } from './text.js';
 import { failedTurnText, mayHaveGoneThrough, type FailedTurnFinding } from './failed-turn.js';
 import { useIdleReturn } from './idle-return.js';
 import { VoiceBar, voiceBarState } from './VoiceBar.js';
+import { WeatherCredit } from './WeatherCredit.js';
 import type { ScreenState } from '../surface/contract.js';
 
 type TurnResult = Result<AgentAnswer, ErrorEnvelope>;
@@ -94,6 +95,8 @@ export interface ConversationProps {
   greeting?: ReactNode;
   /** The demo closed for today (the day's turns used up, closedNoticeOf): said in the greeting's place, questions off. */
   closedNotice?: string;
+  /** The sandbox's place: the notes under the device credit Open-Meteo for the places whose weather it gives (22 Oct). */
+  place?: LocationId | undefined;
 }
 
 export function Conversation({
@@ -122,6 +125,7 @@ export function Conversation({
   askRef,
   greeting,
   closedNotice,
+  place,
 }: ConversationProps) {
   // Read when a turn starts: the machine is built once, the frame may hand a new function at each render.
   const prepareRef = useRef(prepareTurn);
@@ -530,6 +534,7 @@ export function Conversation({
         </p>
       )}
       {privacy !== null && <p className="notice privacy-notice">{t(privacy)}</p>}
+      <WeatherCredit place={place} className="notice weather-credit" />
     </div>
   );
   return (

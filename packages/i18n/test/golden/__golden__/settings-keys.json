@@ -1,6 +1,7 @@
 {
   "en-US": {
     "settings.place": "Place",
+    "settings.place.credit": "Weather data by Open-Meteo.com (CC BY 4.0)",
     "settings.place.houston": "Houston, Texas",
     "settings.place.reference": "Reference home (Italy)",
     "settings.place.turin": "Turin, Italy",
@@ -11,6 +12,7 @@
   },
   "it-IT": {
     "settings.place": "Luogo",
+    "settings.place.credit": "Dati meteo di Open-Meteo.com (CC BY 4.0)",
     "settings.place.houston": "Houston, Texas",
     "settings.place.reference": "Casa di riferimento (Italia)",
     "settings.place.turin": "Torino, Italia",

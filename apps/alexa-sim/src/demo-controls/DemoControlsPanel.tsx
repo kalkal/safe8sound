@@ -2,6 +2,7 @@ import type { LocationId, Milestone, MilestoneKind, SetScenarioInput } from '@co
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ChipGroup } from '../ui/ChipGroup.js';
 import { HOUSEHOLDS, PLACES, SCENARIOS, homeFaceOf, nothingAheadText, skyOfScenario, type DemoSettingsView } from '../ui/demo-settings.js';
+import { WeatherCredit } from '../ui/WeatherCredit.js';
 import { clockTime } from '../ui/sim-clock.js';
 import { t } from '../ui/text.js';
 import { useModal } from '../ui/use-modal.js';
@@ -180,6 +181,8 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
           send({ locationId: v as LocationId }, { name: 'place', value: v });
         }}
       />
+      {/* Open-Meteo's credit, next to the place (its licence, CC BY 4.0). */}
+      <WeatherCredit place={settings.locationId} className="muted" />
       <ChipGroup
         label={t('settings.household')}
         name="household"

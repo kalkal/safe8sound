@@ -466,6 +466,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                 agent={agent}
                 turnBudgetMs={config.turnBudgetMs}
                 timeZone={homeTimeZone}
+                place={demoSettings?.locationId}
                 voice={config.voice}
                 demo={config.demo}
                 onAnswer={onAnswer}

@@ -100,6 +100,7 @@ export const itIT = {
   'settings.place.reference': 'Casa di riferimento (Italia)',
   'settings.place.turin': 'Torino, Italia',
   'settings.place.houston': 'Houston, Texas',
+  'settings.place.credit': 'Dati meteo di Open-Meteo.com (CC BY 4.0)',
   'settings.placeShort.reference': 'Casa di riferimento',
   'settings.placeShort.turin': 'Torino',
   'settings.placeShort.houston': 'Houston',

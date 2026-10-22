@@ -37,6 +37,8 @@ export interface DemoSettingsView {
 
 export const SCENARIOS: readonly ScenarioId[] = ['clear-day', 'heatwave', 'storm-blackout'];
 export const PLACES: readonly LocationId[] = ['reference', 'turin', 'houston'];
+/** The places whose weather is Open-Meteo's (source-simulator/locations, CC BY 4.0): they show its credit. */
+export const OPEN_METEO_PLACES: ReadonlySet<LocationId> = new Set(['turin', 'houston']);
 /** Who is at home (owner, 20 Oct): an older man, or no one at risk (core's HOUSEHOLD_CHOICES). */
 export const HOUSEHOLDS: readonly Household[] = HOUSEHOLD_CHOICES;
 

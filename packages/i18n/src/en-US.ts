@@ -115,6 +115,8 @@ export const enUS = {
   'settings.place.reference': 'Reference home (Italy)',
   'settings.place.turin': 'Turin, Italy',
   'settings.place.houston': 'Houston, Texas',
+  // Open-Meteo's licence (CC BY 4.0): a link next to any place its data are shown (22 Oct).
+  'settings.place.credit': 'Weather data by Open-Meteo.com (CC BY 4.0)',
   // The Echo's top bar on a phone (owner, 20 Oct, choice C): the place in one short word or two.
   'settings.placeShort.reference': 'Reference home',
   'settings.placeShort.turin': 'Turin',

@@ -305,3 +305,24 @@ describe('the power cut hint follows who is at home (owner, 21 Oct)', () => {
   });
 });
 
+
+describe('the Open-Meteo credit (CC BY 4.0: "a link next to any location Open-Meteo data are displayed")', () => {
+  const sheet = { open: false, setOpen: vi.fn(), opener: { current: null } };
+  const props = { sheet, wide: true, availablePlaces: ['reference', 'turin', 'houston'] as const, onChange: vi.fn(() => Promise.resolve(true)), stops: [], now: undefined };
+
+  it('Turin and Houston show it under the place, a link to open-meteo.com in a new tab', () => {
+    for (const locationId of ['turin', 'houston'] as const) {
+      const { unmount } = render(<DemoControlsPanel {...props} settings={{ ...scriptedDemoSettings(), locationId }} />);
+      const link = screen.getByRole('link', { name: 'Weather data by Open-Meteo.com (CC BY 4.0)' });
+      expect(link.getAttribute('href')).toBe('https://open-meteo.com/');
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+      unmount();
+    }
+  });
+
+  it('the reference home, whose weather is our own, does not', () => {
+    render(<DemoControlsPanel {...props} settings={scriptedDemoSettings()} />);
+    expect(screen.queryByRole('link', { name: /Open-Meteo/ })).toBeNull();
+  });
+});
