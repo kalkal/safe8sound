@@ -289,6 +289,15 @@
     overflow-y: auto;
   }
 
+  /* The silent voice's notice and its Listen button on a short screen (960 x 480): closer to each other and to the answer, so the
+     answer's figure is not cut at the bottom (the place, day and weather in the top bar took 21 px, #487; 22 Oct). The notice
+     keeps its words, Listen its 44 px target. */
+  @media (height < 31rem) {
+    .band-content:has(.listen-button) {
+      row-gap: var(--space-1);
+    }
+  }
+
   .welcome {
     margin: 0;
     font-size: var(--font-size-lead);
