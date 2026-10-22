@@ -1,5 +1,5 @@
 import { ok, type ErrorEnvelope, type Result } from '@cold-reserve/contracts';
-import type { Clock, StateStoreFactory } from '@cold-reserve/core';
+import type { Clock, Logger, StateStoreFactory } from '@cold-reserve/core';
 import type { App } from './app.js';
 import { comfortPlanWiring, type ComfortPlanWiring } from './comfort-plan-config.js';
 import { composeModules } from './compose.js';
@@ -22,7 +22,7 @@ export interface WiredModules {
   readonly bind: (app: App) => void;
 }
 
-export function wireModules(o: { readonly store: StateStoreFactory; readonly clock: Clock }): Result<WiredModules, ErrorEnvelope> {
+export function wireModules(o: { readonly store: StateStoreFactory; readonly clock: Clock; readonly logger?: Logger }): Result<WiredModules, ErrorEnvelope> {
   // Before `bind` nothing has a home's clock or unit: a call then is a wiring bug, said loudly, never the wall clock or °C.
   const unbound = (): never => {
     throw new Error('wireModules: a home was used before bind(app)');
@@ -34,7 +34,7 @@ export function wireModules(o: { readonly store: StateStoreFactory; readonly clo
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) return preferences;
   const { clock } = o;
-  const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId), unitsFor: (homeId) => homeUnits(homeId), householdFor: (homeId) => homeHousehold(homeId) });
+  const modules = composeModules({ preferences: preferences.value, storeFor, clock, clockFor: (homeId) => homeClock(homeId), unitsFor: (homeId) => homeUnits(homeId), householdFor: (homeId) => homeHousehold(homeId), ...(o.logger === undefined ? {} : { logger: o.logger }) });
   if (!modules.ok) return modules;
   // The family phone's notifier and inbox (#24) live in the same store; comfort-plan alerts go through the same notifier.
   const stormMode = stormModeWiring({ storeFor, preferences: preferences.value, clock });

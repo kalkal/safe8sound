@@ -43,7 +43,7 @@ export function createLocalApp(
   if (!startSoc.ok) return startSoc;
   // The store's clock is the wall's: it drives only the retention; plan expiry is judged on the home's scenario time (#175).
   const memory = memoryStateStoreFactory({ backing: opts.backing ?? createMemoryBacking(), clock: opts.wallClock });
-  const wired = wireModules({ store: memory, clock });
+  const wired = wireModules({ store: memory, clock, logger: wallStamped(opts.logger, opts.wallClock) });
   if (!wired.ok) return wired;
   const { modules, stormMode, comfortPlan } = wired.value;
   const app = createApp(env, {

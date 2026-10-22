@@ -19,7 +19,7 @@ export function createLambdaApp(
   const clock = play.value.clock;
   // The family phone's inbox lives in the same table (#24); its read route is served here for the visitor sandboxes
   // (#267): sim-api reads it with its sandbox phone token for the visitor's phone panel.
-  const wired = wireModules({ store: opts.storeFor, clock });
+  const wired = wireModules({ store: opts.storeFor, clock, logger: wallStamped(opts.logger, opts.wallClock) });
   if (!wired.ok) return wired;
   const { modules, stormMode, comfortPlan } = wired.value;
   // No cardDocuments yet: the built card bundle is not shipped with the function, so the Lambda serves

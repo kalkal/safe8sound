@@ -32,6 +32,13 @@ describe('set_scenario input', () => {
     expect(SetScenarioInputSchema.parse({ restart: true })).toEqual({ restart: true });
   });
 
+  it('refuses anything outside its lists: an address, a path or a script in place of a place or a scenario (injection hardening)', () => {
+    for (const hostile of ['http://169.254.169.254/', '../../etc/passwd', '<script>x</script>', "' OR 1=1 --"]) {
+      expect(SetScenarioInputSchema.safeParse({ locationId: hostile }).success, hostile).toBe(false);
+      expect(SetScenarioInputSchema.safeParse({ scenarioId: hostile }).success, hostile).toBe(false);
+    }
+  });
+
   it('needs at least one field, and refuses unknown fields and values', () => {
     expect(SetScenarioInputSchema.safeParse({}).success).toBe(false);
     expect(SetScenarioInputSchema.safeParse({ restart: false }).success).toBe(false);

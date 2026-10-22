@@ -25,6 +25,7 @@ import { CORRELATION_ID_HEADER, SandboxHomeIdSchema, correlationIdFrom } from '@
 import type { Clock } from '@cold-reserve/core';
 import type { SimApiConfig, SpeechEngine } from './config.js';
 import { CLIENT_LOG_MAX_BODY_BYTES, ClientLogRequestSchema, clientLogEntries } from './client-log.js';
+import { suspiciousKinds } from './input-flags.js';
 import { createQuota, type QuotaStore } from './quota.js';
 import { signSpeechTicket, verifySpeechTicket } from './speech-ticket.js';
 import { signToken, verifyToken, type DemoClaims } from './token.js';
@@ -119,6 +120,15 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       const { event, ...details } = line;
       deps.logger.log({ ts: new Date(now).toISOString(), level: 'info', component: 'sim-api', message: event, correlationId, details: { ...details, durationMs: now - startedMs } });
     };
+    /** A suspicious input: its kinds and length only, never the text (injection hardening, 22 Oct). */
+    const flag = (field: 'code' | 'question', raw: unknown, codeId?: string) => {
+      if (typeof raw !== 'string') return;
+      const kinds = suspiciousKinds(raw);
+      if (kinds.length === 0) return;
+      const details = { event: 'input_flagged', field, kinds, length: raw.length, ...(codeId === undefined ? {} : { codeId }) };
+      deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'info', component: 'sim-api', message: 'input_flagged', correlationId, details });
+    };
+    const field = (body: unknown, name: string): unknown => (typeof body === 'object' && body !== null ? (body as Record<string, unknown>)[name] : undefined);
     const fail = (error: ErrorEnvelope, status?: HttpErrorStatus, headers: Record<string, string> = {}, codeId?: string) => {
       if (LOGGED.has(error.category)) {
         // A dependency's error name (e.g. DynamoDB throttling), never its text.
@@ -273,6 +283,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       }
 
       if (path === '/v1/session') {
+        flag('code', field(body, 'code'));
         const request = SessionRequestSchema.safeParse(body);
         if (!request.success) return fail(toolError('invalid_input', 'Send {"code": "<demo code>"}.'));
         // One atomic count per attempt BEFORE the code is compared (review of #110): concurrent wrong
@@ -282,7 +293,15 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
         if (!attempt.ok) return fail(attempt.error);
         if (!attempt.value.allowed) return fail(quota.tooManyAttempts());
         const codeId = config.demoCodes.get(createHash('sha256').update(request.data.code).digest('hex'));
-        if (codeId === undefined) return fail(toolError('invalid_demo_code', 'That demo code is not valid.'));
+        if (codeId === undefined) {
+          // Everyone's wrong codes this hour reached the cap: a wrong code is refused, with one line for the alarm (never
+          // an address). A right code always opens, so nobody's guesses can lock the judges out.
+          if (attempt.value.globalCapReached === true) {
+            deps.logger.log({ ts: new Date(deps.clock.now()).toISOString(), level: 'warn', component: 'sim-api', message: 'code_attempts_global_cap', correlationId, details: { event: 'code_attempts_global_cap' } });
+            return fail(quota.tooManyAttempts());
+          }
+          return fail(toolError('invalid_demo_code', 'That demo code is not valid.'));
+        }
         try {
           await attempt.value.release();
         } catch (e) {
@@ -315,6 +334,7 @@ export function createSimApiHandler(config: SimApiConfig, deps: SimApiDeps): Sim
       }
 
       if (path === '/v1/turns') {
+        flag('question', field(body, 'question'), codeId);
         const request = TurnRequestSchema.safeParse(body);
         if (!request.success) return fail(toolError('invalid_input', 'Send {"question": "..."} only.'));
         const allowed = await quota.turn(codeId);

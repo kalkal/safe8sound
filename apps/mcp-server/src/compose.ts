@@ -1,7 +1,7 @@
 import type { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { HomeIdSchema, SandboxHomeIdSchema, ok, type ErrorEnvelope, type HomeId, type HomeProfile, type Household, type Result, type TempUnit } from '@cold-reserve/contracts';
-import { seededRng, type Clock, type StateStoreFactory } from '@cold-reserve/core';
+import { seededRng, type Clock, type Logger, type StateStoreFactory } from '@cold-reserve/core';
 import { demoProfile, demoStoryProfile } from '@cold-reserve/source-simulator';
 import {
   createDocumentTableClient,
@@ -39,6 +39,8 @@ export interface ComposeOptions {
   readonly unitsFor?: (homeId: HomeId) => TempUnit;
   /** Who is at home in a sandbox (owner, 21 Oct): it names the rooms; bound late like clockFor. Absent: Leo's home. */
   readonly householdFor?: (homeId: HomeId) => Household;
+  /** For the warn line of a preferences change tried from a voice turn (injection hardening). */
+  readonly logger?: Logger;
 }
 
 export function composeModules(opts: ComposeOptions): Result<CapabilityModule[], ErrorEnvelope> {
@@ -59,6 +61,7 @@ export function composeModules(opts: ComposeOptions): Result<CapabilityModule[],
     clock: opts.clock,
     ...(opts.clockFor === undefined ? {} : { clockFor: opts.clockFor }),
     ...(opts.unitsFor === undefined ? {} : { unitsFor: opts.unitsFor }),
+    ...(opts.logger === undefined ? {} : { logger: opts.logger }),
   });
   return ok([{ ...preferences, enabledFor: (homeId) => profileFor(homeId) !== undefined }]);
 }

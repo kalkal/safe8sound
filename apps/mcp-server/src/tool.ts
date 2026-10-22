@@ -1,5 +1,6 @@
 import { toolOutputJsonSchema, type ErrorEnvelope, type HomeId, type JsonObjectSchema, type Result } from '@cold-reserve/contracts';
 import { z } from 'zod';
+import type { ClientScope } from './config.js';
 
 export interface ToolContext {
   readonly correlationId: string;
@@ -8,6 +9,8 @@ export interface ToolContext {
   readonly homeId: HomeId;
   /** The conversation turn (TURN_HEADER, #230): set by the agent on its calls, never by a card tap. */
   readonly turnId?: string;
+  /** The calling client's scope (MCP_CLIENTS), when it has one: `agent` is the model, `cards` the person's taps. */
+  readonly scope?: ClientScope;
   /**
    * The person asked for what this call proposes (ASKED_BY_PERSON_META in the call's _meta, set by the agent from the
    * person's words, owner 22 Oct): only then is a refused proposal said and shown.

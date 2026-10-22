@@ -311,6 +311,8 @@ describe('updatePreferences', () => {
   it('an unknown room is refused with the rooms there are, as "Name (id)" (#192)', () => {
     const r = updatePreferences(current(), { safeRoomId: 'attic' }, { ...ctx, roomNames: { 'bedroom-1': 'Bedroom' } });
     expect(!r.ok && r.error.message).toContain('The rooms are: Bedroom (bedroom-1),');
+    // The text never repeats what the model sent (injection hardening): only the rooms the home has.
+    expect(!r.ok && r.error.message).not.toContain('attic');
   });
 
   it('refuses rooms the home does not have', () => {

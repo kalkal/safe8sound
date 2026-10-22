@@ -55,6 +55,20 @@ describe('get_preferences and set_preferences shapes', () => {
     expect(SetPreferencesInputSchema.safeParse({ familyContacts: [], confirmed: true }).success).toBe(false);
   });
 
+  it('set_preferences takes room ids only as ids (lower case, digits, - and _): never free text (injection hardening)', () => {
+    expect(SetPreferencesInputSchema.safeParse({ safeRoomId: 'bedroom-1', roomPriority: ['bedroom-1', 'study'], confirmed: true }).success).toBe(true);
+    for (const id of ['../x', '<b>x</b>', "'; DROP TABLE x; --", '${x}', 'Bedroom 1', '', 'a'.repeat(65)]) {
+      expect(SetPreferencesInputSchema.safeParse({ safeRoomId: id, confirmed: true }).success, JSON.stringify(id)).toBe(false);
+      expect(SetPreferencesInputSchema.safeParse({ roomPriority: ['bedroom-1', id], confirmed: true }).success, JSON.stringify(id)).toBe(false);
+    }
+  });
+
+  it('set_preferences refuses a temperature that is not a finite number (1e999 parses to Infinity) and a text in its place', () => {
+    for (const cooling of [JSON.parse('1e999') as number, -Infinity, Number.NaN, '24', '<script>']) {
+      expect(SetPreferencesInputSchema.safeParse({ comfortC: { cooling }, confirmed: true }).success, String(cooling)).toBe(false);
+    }
+  });
+
   it('set_preferences returns the new public view and the logged changes', () => {
     const output = {
       preferences: toPublicPreferences(preferences()),

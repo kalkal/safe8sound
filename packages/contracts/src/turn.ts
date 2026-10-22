@@ -14,8 +14,18 @@ import { PctSchema } from './units.js';
 // The wire between alexa-sim and sim-api (#55, #101). The browser only ever holds the demo token:
 // the home comes from it server-side, never from these bodies (closed objects).
 
+/**
+ * A demo code: 16 to 128 visible ASCII characters (injection hardening, 22 Oct), so no space, line break, invisible
+ * character or look-alike letter ever reaches the server. Every code the earlier rule (any 16-128 characters) took and
+ * that has none of those still opens: nobody is locked out by the change. New codes are 24 hex characters
+ * (infra/scripts/new-demo-parameters.ps1, rotate-demo-code.ps1). The page checks the same pattern before sending.
+ */
+export const DEMO_CODE_PATTERN = /^[!-~]{16,128}$/;
+/** The longest demo code the field takes. */
+export const DEMO_CODE_MAX_LENGTH = 128;
+
 /** POST /v1/session: a demo code for a short-lived signed token (plan §13.2 point 2). */
-export const SessionRequestSchema = z.strictObject({ code: z.string().min(16).max(128) });
+export const SessionRequestSchema = z.strictObject({ code: z.string().regex(DEMO_CODE_PATTERN) });
 export type SessionRequest = z.infer<typeof SessionRequestSchema>;
 
 export const SessionReplySchema = z.strictObject({ token: z.string().min(1).max(2048), expiresAt: IsoDateTimeSchema });
@@ -26,8 +36,21 @@ export type SessionReply = z.infer<typeof SessionReplySchema>;
 export const LocaleSchema = z.enum(['en-US', 'it-IT']);
 export type LocaleId = z.infer<typeof LocaleSchema>;
 
+/** The longest question a person can ask; the page's field stops there too. */
+export const QUESTION_MAX_LENGTH = 500;
+
+/** Control and format characters (zero-width marks, direction overrides, soft hyphens, tag characters): never shown, only good for faking lines ("System: …") or hiding text. */
+const INVISIBLE = /[\p{Cc}\p{Cf}]/gu;
+
+/** The question as the model will see it: look-alike letters as plain ones (NFKC), invisible characters and line breaks as spaces, one at a time. */
+const QuestionSchema = z
+  .string()
+  .max(QUESTION_MAX_LENGTH * 2)
+  .transform((q) => q.normalize('NFKC').replace(INVISIBLE, ' ').replace(/\s+/g, ' ').trim())
+  .pipe(z.string().min(1).max(QUESTION_MAX_LENGTH));
+
 export const TurnRequestSchema = z.strictObject({
-  question: z.string().trim().min(1).max(500),
+  question: QuestionSchema,
   /** The language of the answer (#263, additive): absent means English. */
   locale: LocaleSchema.optional(),
 });

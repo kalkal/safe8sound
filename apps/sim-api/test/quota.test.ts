@@ -2,7 +2,7 @@ import { fixedClock } from '@cold-reserve/core';
 import { describe, expect, it } from 'vitest';
 import { createQuota, memoryQuotaStore, type QuotaLimits, type QuotaStore } from '../src/quota.js';
 
-const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, readCallsPerCodePerDay: 2, readCallsGlobalPerDay: 3, demoCallsPerCodePerDay: 2, codeAttemptsPerIpPerHour: 2, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 2, phoneReadsPerCodePerMinute: 3, logLinesPerSessionPerMinute: 3, logLinesGlobalPerMinute: 5 };
+const LIMITS: QuotaLimits = { turnsPerCodePerDay: 2, turnsGlobalPerDay: 3, toolCallsPerCodePerDay: 1, readCallsPerCodePerDay: 2, readCallsGlobalPerDay: 3, demoCallsPerCodePerDay: 2, codeAttemptsPerIpPerHour: 2, codeAttemptsGlobalPerHour: 5, speechCharsPerCodePerDay: 6000, speechCharsGlobalPerDay: 30_000, phoneReadsPerSessionPerMinute: 2, phoneReadsPerCodePerMinute: 3, logLinesPerSessionPerMinute: 3, logLinesGlobalPerMinute: 5 };
 // 2026-10-01 23:59:00 UTC: one minute to the daily reset.
 const NOW = Date.UTC(2026, 9, 1, 23, 59, 0);
 
@@ -113,8 +113,9 @@ describe('daily caps, checked before calling the agent (plan §13.2.4), reset at
     await quota(NOW, store).codeAttempt('203.0.113.7');
     await createQuota({ store, limits: LIMITS, clock: fixedClock(NOW), ipSalt: Buffer.alloc(32, 6) }).codeAttempt('203.0.113.7');
     expect(keys.join()).not.toContain('203.0.113.7');
-    expect(keys[0]).toMatch(/^ATTEMPT#[0-9a-f]{32}#2026-10-01T23$/);
-    expect(keys[1]).not.toBe(keys[0]); // another salt, another key: the hash cannot be looked up without the salt
+    const perIp = keys.filter((k) => !k.startsWith('ATTEMPT#GLOBAL#'));
+    expect(perIp[0]).toMatch(/^ATTEMPT#[0-9a-f]{32}#2026-10-01T23$/);
+    expect(perIp[1]).not.toBe(perIp[0]); // another salt, another key: the hash cannot be looked up without the salt
   });
 });
 
@@ -285,5 +286,40 @@ describe('per-code caps of one code id (demo stage: the owner tests on her own c
     expect((await quota.turn('owner')).ok).toBe(true);
     expect((await quota.turn('owner')).ok).toBe(true);
     expect((await quota.turn('owner')).ok).toBe(false);
+  });
+});
+
+describe('demo code attempts: one IPv6 network counts as one source, and a global hourly cap (injection hardening, 22 Oct)', () => {
+  it('counts the addresses of one IPv6 /64 together: a new address in the same network gets no fresh attempts', async () => {
+    const q = quota();
+    expect(await allowedOf(q, '2001:db8:1:2::1')).toBe(true);
+    expect(await allowedOf(q, '2001:db8:1:2:aaaa:bbbb:cccc:dddd')).toBe(true);
+    expect(await allowedOf(q, '2001:0db8:0001:0002::ffff')).toBe(false);
+    // Another /64 is another source.
+    expect(await allowedOf(q, '2001:db8:1:3::1')).toBe(true);
+  });
+
+  it('reads an IPv4 address written as IPv6 (::ffff:) as the IPv4 address itself', async () => {
+    const q = quota();
+    expect(await allowedOf(q, '::ffff:203.0.113.7')).toBe(true);
+    expect(await allowedOf(q, '203.0.113.7')).toBe(true);
+    expect(await allowedOf(q, '203.0.113.7')).toBe(false);
+  });
+
+  it('past the global hourly cap, still lets the attempt reach the code (a right code must always open: no lock-out of the judges) and says the cap was reached', async () => {
+    const q = quota();
+    for (const ip of ['198.51.100.1', '198.51.100.2', '198.51.100.3', '198.51.100.4', '198.51.100.5']) expect(await allowedOf(q, ip)).toBe(true);
+    const sixth = await q.codeAttempt('198.51.100.6');
+    expect(sixth).toMatchObject({ ok: true, value: { allowed: true, globalCapReached: true } });
+  });
+
+  it('a right code gives back both counts, its address and the global one', async () => {
+    const q = quota();
+    for (let i = 0; i < 8; i++) {
+      const attempt = await q.codeAttempt(`198.51.100.${String(i)}`);
+      if (!attempt.ok) throw new Error('store failed');
+      expect(attempt.value.allowed).toBe(true);
+      await attempt.value.release();
+    }
   });
 });

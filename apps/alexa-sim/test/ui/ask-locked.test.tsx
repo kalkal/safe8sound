@@ -32,6 +32,11 @@ function setup(answer: Promise<ReturnType<typeof ok<{ text: string }>>> = Promis
 }
 
 describe('the question box', () => {
+  it('stops at 500 characters, the most the server takes (injection hardening)', () => {
+    const { box } = setup();
+    expect(box().maxLength).toBe(500);
+  });
+
   it('is off while the mic listens, says "Listening…", keeps what was typed unsent, and comes back when the mic stops', () => {
     const { ask, box, send } = setup();
     fireEvent.change(box(), { target: { value: "What's my batt" } });

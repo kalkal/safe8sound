@@ -1,4 +1,4 @@
-import { ok, type ErrorEnvelope, type LocationId, type Result } from '@cold-reserve/contracts';
+import { QUESTION_MAX_LENGTH, ok, type ErrorEnvelope, type LocationId, type Result } from '@cold-reserve/contracts';
 import { getLocale } from '@cold-reserve/i18n';
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMachine } from '@xstate/react';
@@ -472,6 +472,7 @@ export function Conversation({
               ref={inputRef}
               name="question"
               autoComplete="off"
+              maxLength={QUESTION_MAX_LENGTH}
               aria-describedby="question-hint"
               placeholder={t(listening ? 'voice.listening' : 'chat.placeholder')}
               readOnly={askLocked}

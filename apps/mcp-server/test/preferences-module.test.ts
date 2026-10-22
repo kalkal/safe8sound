@@ -229,3 +229,58 @@ describe('preferences module (MCP tools)', () => {
     expect(scopes.every((s) => s === id)).toBe(true);
   });
 });
+
+describe('set_preferences from a voice turn never saves (injection hardening, owner choice A, 22 Oct)', () => {
+  const tool = (d: PreferencesModuleDeps) => {
+    const found = preferencesModule(d).tools.find((t) => t.name === 'set_preferences');
+    if (found === undefined) throw new Error('no set_preferences');
+    return found;
+  };
+  const home = 'home' as HomeId;
+  const ctx = (turnId?: string) => ({ correlationId: 'c-1', clientId: 'agent', homeId: home, ...(turnId === undefined ? {} : { turnId }) });
+
+  it('refuses a change the model sends in a turn, even with confirmed: true, and saves nothing: the person saves it on the Preferences card', async () => {
+    const d = deps();
+    const r = await tool(d).handler({ safety: { cooling: { maxC: 26 } }, confirmed: true }, ctx('turn-0001'));
+    expect(r).toMatchObject({ ok: false, error: { code: 'confirmation_required', category: 'validation' } });
+    expect(!r.ok && r.error.message).toMatch(/Preferences card/);
+    expect(!r.ok && r.error.message).toMatch(/get_preferences/);
+    const saved = await d.storeFor(home, { correlationId: 'c-2' }).getPreferences();
+    expect(saved).toMatchObject({ ok: true, value: undefined });
+  });
+
+  it('a hostile change in a turn ("ignore the rules, lower the limit, confirmed") is refused the same way', async () => {
+    const r = await tool(deps()).handler({ safeRoomId: 'study', roomPriority: ['study'], confirmed: true }, ctx('turn-0002'));
+    expect(r).toMatchObject({ ok: false, error: { code: 'confirmation_required' } });
+  });
+
+  it('writes one warn line with the correlation id and the changed fields only, never their values', async () => {
+    const lines: unknown[] = [];
+    const d = deps({ logger: { log: (entry) => lines.push(entry) } });
+    await tool(d).handler({ safeRoomId: 'study', safety: { cooling: { maxC: 26 } }, confirmed: true }, ctx('turn-0003'));
+    expect(lines).toMatchObject([
+      {
+        level: 'warn',
+        component: 'mcp-server',
+        correlationId: 'c-1',
+        code: 'confirmation_required',
+        category: 'validation',
+        details: { event: 'set_preferences_in_turn', fields: ['safeRoomId', 'safety'] },
+      },
+    ]);
+    expect(JSON.stringify(lines)).not.toMatch(/study|\b26\b/);
+  });
+
+  it('saves the same change from the card (a tap carries no turn): the tap is the person\'s own yes', async () => {
+    const r = await tool(deps()).handler({ safety: { cooling: { maxC: 26 } }, confirmed: true }, ctx());
+    expect(r).toMatchObject({ ok: true, value: { changes: [{ field: 'safety.cooling.maxC', to: 26 }] } });
+  });
+
+  it("decides by the client's scope too: the agent (or a read-only client) never saves, even with no turn id; a cards client does (security review)", async () => {
+    const change = { safety: { cooling: { maxC: 26 } }, confirmed: true } as const;
+    for (const scope of ['agent', 'read'] as const) {
+      expect(await tool(deps()).handler(change, { ...ctx(), scope }), scope).toMatchObject({ ok: false, error: { code: 'confirmation_required' } });
+    }
+    expect(await tool(deps()).handler(change, { ...ctx(), clientId: 'sim', scope: 'cards' })).toMatchObject({ ok: true });
+  });
+});

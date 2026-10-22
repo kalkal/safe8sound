@@ -49,8 +49,9 @@ export type GetPreferencesOutput = z.infer<typeof GetPreferencesOutputSchema>;
 /** Input of `set_preferences`: a partial change, sent only after the person confirmed it. */
 export const SetPreferencesInputSchema = z.strictObject({
   comfortC: z.strictObject({ cooling: z.number().optional(), heating: z.number().optional() }).optional(),
-  safeRoomId: z.string().max(64).optional(),
-  roomPriority: z.array(z.string().max(64)).max(20).optional(),
+  /** Room ids, never free text (injection hardening, 22 Oct): the same allowlist as every other id. */
+  safeRoomId: EntityIdSchema.optional(),
+  roomPriority: z.array(EntityIdSchema).max(20).optional(),
   safety: z
     .strictObject({
       cooling: z.strictObject({ maxC: z.number().optional() }).optional(),

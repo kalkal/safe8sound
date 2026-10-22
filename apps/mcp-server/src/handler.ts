@@ -354,7 +354,13 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       });
       return problem(error, correlationId);
     }
-    const ctx: ToolContext = { correlationId, clientId: grant.clientId, homeId, ...(turn.value === undefined ? {} : { turnId: turn.value }) };
+    const ctx: ToolContext = {
+      correlationId,
+      clientId: grant.clientId,
+      homeId,
+      ...(turn.value === undefined ? {} : { turnId: turn.value }),
+      ...(grant.scope === undefined ? {} : { scope: grant.scope }),
+    };
     const server = buildServer(ctx);
     // Stateless: no sessionIdGenerator (the documented `undefined` breaks exactOptionalPropertyTypes).
     const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });

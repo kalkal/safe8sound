@@ -57,6 +57,7 @@ const NumbersSchema = z.object({
   readCallsGlobalPerDay: int(1, 1_000_000),
   demoCallsPerCodePerDay: int(1, 10_000),
   codeAttemptsPerIpPerHour: int(1, 1000),
+  codeAttemptsGlobalPerHour: int(1, 100_000),
   speechCharsPerCodePerDay: int(1, 1_000_000),
   speechCharsGlobalPerDay: int(1, 10_000_000),
   phoneReadsPerSessionPerMinute: int(1, 600),
@@ -126,6 +127,8 @@ export function loadPlainSimApiSettings(env: Readonly<Record<string, string | un
     readCallsGlobalPerDay: env['SIM_LIMIT_READ_CALLS_GLOBAL'] ?? '2000',
     demoCallsPerCodePerDay: env['SIM_LIMIT_DEMO_CALLS_PER_CODE'] ?? '150',
     codeAttemptsPerIpPerHour: env['SIM_LIMIT_CODE_ATTEMPTS_PER_IP_HOUR'] ?? '10',
+    // Wrong codes from everyone together per hour (injection hardening, 22 Oct); infra may set it, the default holds otherwise.
+    codeAttemptsGlobalPerHour: env['SIM_LIMIT_CODE_ATTEMPTS_GLOBAL_HOUR'] ?? '300',
     speechCharsPerCodePerDay: env['SIM_LIMIT_SPEECH_CHARS_PER_CODE'] ?? '6000',
     speechCharsGlobalPerDay: env['SIM_LIMIT_SPEECH_CHARS_GLOBAL'] ?? '30000',
     phoneReadsPerSessionPerMinute: env['SIM_LIMIT_PHONE_READS_PER_SESSION_PER_MINUTE'] ?? '20',

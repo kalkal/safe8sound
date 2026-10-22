@@ -27,6 +27,29 @@ describe('DemoCodeGate: the demo code field (remote mode, no token)', () => {
     expect(field().type).toBe('password');
   });
 
+  it('stops at 128 characters and sends a pasted code without the spaces or line break around it (injection hardening)', async () => {
+    const start = vi.fn(() => Promise.resolve(ok(undefined)));
+    render(<DemoCodeGate session={fakeSession(start)} />);
+    expect(field().maxLength).toBe(128);
+    fireEvent.change(field(), { target: { value: `  ${CODE}\n` } });
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(start).toHaveBeenCalledWith(CODE);
+    await waitFor(() => {
+      expect(field().value).toBe('');
+    });
+  });
+
+  it('says at once that a code with a space inside or too short is not valid, without asking the server (security review)', () => {
+    const start = vi.fn(() => Promise.resolve(ok(undefined)));
+    render(<DemoCodeGate session={fakeSession(start)} />);
+    for (const typed of ['judges demo code 2026', 'tooshort']) {
+      fireEvent.change(field(), { target: { value: typed } });
+      fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    }
+    expect(start).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toBe("That demo code doesn't work. Check it and try again.");
+  });
+
   it('says, before the code is entered, that the access logs keep the IP address for 30 days (#244)', () => {
     render(<DemoCodeGate session={fakeSession(vi.fn())} />);
     expect(screen.getByText('This demo keeps your IP address in its access logs for 30 days, for security.')).toBeTruthy();

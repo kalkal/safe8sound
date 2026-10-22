@@ -71,7 +71,7 @@ export function updatePreferences(
   const unknown = [safeRoomId, ...(update.roomPriority ?? [])].find((id) => !ctx.roomIds.includes(id));
   if (unknown !== undefined) {
     const rooms = ctx.roomIds.map((id) => (ctx.roomNames?.[id] === undefined ? id : `${ctx.roomNames[id]} (${id})`)).join(', ');
-    return err(toolError('unknown_room', `This home has no room "${unknown}". The rooms are: ${rooms}.`, { details: { roomId: unknown } }));
+    return err(toolError('unknown_room', `This home has no such room. The rooms are: ${rooms}.`, { details: { roomId: unknown } }));
   }
 
   let roomPriority: string[];

@@ -4,16 +4,19 @@ import {
   SetPreferencesOutputSchema,
   effectiveHeatSafety,
   formatTempForInput,
+  err,
   ok,
   toPublicPreferences,
+  toolError,
   type HomeId,
   type Preferences,
   type SafetyHardLimits,
   type TempUnit,
 } from '@cold-reserve/contracts';
-import { updatePreferences, type Clock, type StateStoreFactory } from '@cold-reserve/core';
+import { updatePreferences, type Clock, type Logger, type StateStoreFactory } from '@cold-reserve/core';
 import { z } from 'zod';
 import type { CapabilityModule } from '../registry.js';
+import { homeDetail, isSandbox } from '../sandbox-log.js';
 import { defineTool } from '../tool.js';
 
 // `preferences` capability module (plan §14.1, issue #20): read and change the comfort setpoints,
@@ -36,6 +39,8 @@ export interface PreferencesModuleDeps {
   readonly clockFor?: (homeId: HomeId) => Clock | undefined;
   /** The home's temperature unit for the texts (#306); °C when unset. The tools still take °C. */
   readonly unitsFor?: (homeId: HomeId) => TempUnit;
+  /** For the one warn line of a change the model tried to save from a voice turn (injection hardening, 22 Oct). */
+  readonly logger?: Logger;
 }
 
 /** A changed field holds a temperature when one of its path segments is a °C value (comfortC, maxC, heatIndexCapC…). */
@@ -45,8 +50,9 @@ const fieldWords = (field: string): string => field.replace(/Id$/, '').replace(/
 const changeValue = (field: string, value: unknown, unit: TempUnit): string =>
   typeof value === 'number' && isTemperatureField(field) && unit === 'F' ? formatTempForInput(value, unit) : String(value);
 
-// set_preferences overwrites safety thresholds: marked destructive, so the host asks for confirmation.
-// That host prompt is the one gate a prompt injection cannot bypass.
+// set_preferences overwrites safety thresholds: marked destructive. Our own agent has no host prompt, so the gate is in
+// the tool itself (injection hardening, owner's choice A, 22 Oct): a call from a voice turn never saves, whatever the
+// model writes in `confirmed`; only the person's tap on Save (the Preferences card, the settings) does.
 const annotations = (readOnly: boolean) => ({ readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: true, openWorldHint: false });
 
 export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule {
@@ -106,6 +112,27 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
       return `Saved: ${o.changes.map((c) => `${fieldWords(c.field)} from ${val(c.field, c.from)} to ${val(c.field, c.to)}`).join(', ')}.`;
     },
     handler: async (args, ctx) => {
+      // A voice turn carries its turn id; a tap on Save carries none. The model cannot confirm for the person. The client's
+      // scope decides too (security review): the agent's client or a read-only one never saves, even with no turn id.
+      if (ctx.turnId !== undefined || ctx.scope === 'agent' || ctx.scope === 'read') {
+        const refused = toolError(
+          'confirmation_required',
+          'Not saved: a change to the preferences is saved only by the person, on the Preferences card. Call get_preferences to show the card, tell them the change, and ask them to make it there and press Save.',
+        );
+        // A validation error is not logged by the handler: this one is, once, with the fields the model tried (never their values).
+        deps.logger?.log({
+          ts: new Date(deps.clock.now()).toISOString(),
+          level: 'warn',
+          component: 'mcp-server',
+          message: 'set_preferences came from a voice turn: refused, only a tap on Save saves.',
+          correlationId: ctx.correlationId,
+          ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+          code: refused.code,
+          category: refused.category,
+          details: { event: 'set_preferences_in_turn', fields: Object.keys(args).filter((k) => k !== 'confirmed'), ...homeDetail(ctx.homeId) },
+        });
+        return err(refused);
+      }
       const read = await current(ctx.homeId, ctx.correlationId);
       if (!read.ok) return read;
       // `confirmed` is checked by the input schema (literal true); the rest is the update.
@@ -116,7 +143,7 @@ export function preferencesModule(deps: PreferencesModuleDeps): CapabilityModule
         roomNames: Object.fromEntries(deps.roomIdsFor(ctx.homeId).flatMap((id) => { const n = deps.roomNameFor?.(ctx.homeId, id); return n === undefined ? [] : [[id, n]]; })),
         at: new Date((deps.clockFor?.(ctx.homeId) ?? deps.clock).now()).toISOString(),
         by: 'user',
-        // The model passed confirmed: true after the host prompt; the log says so, not more.
+        // Only a tap reaches here (a voice turn is refused above): the change log says it came through the tool.
         confirmedVia: 'tool',
         // Its refusals said in the sandbox's unit, with the °C to send (#306 review).
         unit: deps.unitsFor?.(ctx.homeId) ?? 'C',

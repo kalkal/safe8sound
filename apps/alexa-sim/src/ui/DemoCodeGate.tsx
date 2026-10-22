@@ -1,5 +1,5 @@
 import { useState, type SyntheticEvent } from 'react';
-import type { ErrorCode } from '@cold-reserve/contracts';
+import { DEMO_CODE_MAX_LENGTH, DEMO_CODE_PATTERN, type ErrorCode } from '@cold-reserve/contracts';
 import type { DemoSession } from '../agent/demo-session.js';
 import { t } from './text.js';
 
@@ -25,9 +25,15 @@ export function DemoCodeGate({ session }: { session: DemoSession }) {
   const onSubmit = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     // Start stays enabled (so it keeps the focus): an empty field or a pending check does nothing.
-    if (busy || code.length === 0) return;
-    const entered = code;
+    // A pasted code often brings a space or a line break with it: the code itself never has one.
+    const entered = code.trim();
+    if (busy || entered.length === 0) return;
     setCode(''); // the code leaves the UI state at once; only the token is kept, in memory
+    // A code no demo code can look like (a space inside, too short) is said at once, without asking the server.
+    if (!DEMO_CODE_PATTERN.test(entered)) {
+      setProblem(problemText('invalid_demo_code'));
+      return;
+    }
     setBusy(true);
     void session.start(entered).then((result) => {
       setBusy(false);
@@ -56,6 +62,7 @@ export function DemoCodeGate({ session }: { session: DemoSession }) {
           type={visible ? 'text' : 'password'}
           autoComplete="off"
           spellCheck={false}
+          maxLength={DEMO_CODE_MAX_LENGTH}
           value={code}
           onChange={(e) => {
             setCode(e.target.value);

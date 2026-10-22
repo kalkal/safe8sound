@@ -39,8 +39,10 @@ export interface QuotaLimits {
   readonly readCallsGlobalPerDay: number;
   /** The simulated clock and the scenario (set_scenario, get_milestones, advance_clock) per demo code per UTC day (time pack). */
   readonly demoCallsPerCodePerDay: number;
-  /** Wrong demo codes per client IP per hour (a right code gives its attempt back, review of #139). */
+  /** Wrong demo codes per client IP per hour (a right code gives its attempt back, review of #139); an IPv6 /64 is one IP. */
   readonly codeAttemptsPerIpPerHour: number;
+  /** Wrong demo codes per hour from everyone together (injection hardening, 22 Oct): changing address does not get past it. */
+  readonly codeAttemptsGlobalPerHour: number;
   /** Characters spoken by Polly per demo code and overall per UTC day; cache hits are free (approved in #25). */
   readonly speechCharsPerCodePerDay: number;
   readonly speechCharsGlobalPerDay: number;
@@ -80,6 +82,22 @@ const HOUR_MS = 3_600_000;
 const MINUTE_MS = 60_000;
 /** A window's id: the day, the hour or the minute of its start (UTC). */
 const ID_LENGTH: Readonly<Record<number, number>> = { [DAY_MS]: 10, [HOUR_MS]: 13, [MINUTE_MS]: 16 };
+
+/**
+ * Who a demo code attempt counts against: an IPv4 address as it is (also when written ::ffff:a.b.c.d), an IPv6 address
+ * by its /64 network, since one home connection holds a whole /64 and could change address at every attempt.
+ */
+export function attemptSource(ip: string): string {
+  const address = ip.trim().toLowerCase().replace(/%.*$/, '');
+  const v4 = /^(?:::ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/.exec(address);
+  if (v4?.[1] !== undefined) return v4[1];
+  if (!address.includes(':')) return address;
+  const [head = '', tail] = address.split('::');
+  const left = head === '' ? [] : head.split(':');
+  const right = tail === undefined || tail === '' ? [] : tail.split(':');
+  const zeros = tail === undefined ? [] : Array.from({ length: Math.max(0, 8 - left.length - right.length) }, () => '0');
+  return [...left, ...zeros, ...right].slice(0, 4).map((group) => group.padStart(4, '0')).join(':') + '::/64';
+}
 
 /** Daily caps reset at midnight UTC (one rule, approved in #101), checked BEFORE calling the agent. */
 export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; clock: Clock; ipSalt: Uint8Array }) {
@@ -205,11 +223,27 @@ export function createQuota(deps: { store: QuotaStore; limits: QuotaLimits; cloc
      * past the hourly cap even a right code is refused, so guessing cannot go on. A right code then gives its
      * attempt back (`release`), so only wrong codes stay counted (review of #139).
      */
-    async codeAttempt(ip: string): Promise<Result<{ allowed: boolean; release: () => Promise<void> }, ErrorEnvelope>> {
+    async codeAttempt(ip: string): Promise<Result<{ allowed: boolean; globalCapReached?: true; release: () => Promise<void> }, ErrorEnvelope>> {
       const hour = window(HOUR_MS);
-      const key = `ATTEMPT#${ipKey(ip)}#${hour.id}`;
+      const key = `ATTEMPT#${ipKey(attemptSource(ip))}#${hour.id}`;
       const allowed = await counted(() => store.consume(key, limits.codeAttemptsPerIpPerHour, hour.endMs));
-      return allowed.ok ? ok({ allowed: allowed.value, release: () => store.release(key) }) : allowed;
+      if (!allowed.ok) return allowed;
+      if (!allowed.value) return ok({ allowed: false, release: () => store.release(key) });
+      // Then everyone's count. Past it the attempt still reaches the code: a right code must always open (the judges can
+      // never be locked out by someone else's guesses); the caller refuses only a wrong one, and raises the alarm.
+      const globalKey = `ATTEMPT#GLOBAL#${hour.id}`;
+      const overall = await counted(() => store.consume(globalKey, limits.codeAttemptsGlobalPerHour, hour.endMs));
+      if (!overall.ok) return overall;
+      if (!overall.value) return ok({ allowed: true, globalCapReached: true, release: () => store.release(key) });
+      return ok({
+        allowed: true,
+        // Both given back, each on its own: one failing never keeps the other counted.
+        release: async () => {
+          const results = await Promise.allSettled([store.release(key), store.release(globalKey)]);
+          const failed = results.find((r) => r.status === 'rejected');
+          if (failed !== undefined) throw failed.reason;
+        },
+      });
     },
     /** The store error name behind a `store_unavailable` this quota answered, for the log. */
     causeOf: (error: ErrorEnvelope): string | undefined => causes.get(error),
