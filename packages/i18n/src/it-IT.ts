@@ -46,7 +46,7 @@ export const itIT = {
   'answers.previousShort': 'Precedente',
   'answers.nextShort': 'Successiva',
   'answers.position': 'Risposta {n} di {of}',
-  'answers.planApplied': 'Fatto — piano applicato',
+  'answers.planApplied': 'Ok, piano applicato.',
   'answers.earlier': 'Risposta di prima · {time}',
   'nav.back': 'Indietro',
   'nav.backUtterance': 'Torna indietro',

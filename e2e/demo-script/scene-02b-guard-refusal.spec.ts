@@ -27,5 +27,5 @@ test('a refused proposal: the storm reserve said by voice and card, the plan tha
   await toCardPage(card, 1);
   await plan.getByRole('button', { name: 'Apply plan' }).click();
   // Said once, under the answer: the card never repeats it (owner, 21 Oct).
-  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).toHaveText('OK, plan applied.');
 });

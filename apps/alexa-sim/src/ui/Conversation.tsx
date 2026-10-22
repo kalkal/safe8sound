@@ -327,6 +327,19 @@ export function Conversation({
   const cardOnScreen = busy || shown.data?.ok !== true ? undefined : shownCard(shown.data.value.cards ?? [], cardShown);
   // Its question was answered on a card, or by voice in a later turn: the steps say Confirm, the words say Done.
   const shownAnswered = shownTurn !== undefined && shown.data?.ok === true && answeredOnCard?.(shownTurn, shown.data.value.cards) === true;
+  // The confirmation ("OK, plan applied.") is said aloud like the other answers when the answer on screen becomes answered (a tap
+  // on its card); never when the answer is shown again by Previous, nor for the answer of another turn (owner, 22 Oct). The studio
+  // voice has no ticket for it, so the speaker falls back to the browser voice.
+  const answeredBefore = useRef<{ turn: string | undefined; answered: boolean }>({ turn: undefined, answered: false });
+  useEffect(() => {
+    const before = answeredBefore.current;
+    answeredBefore.current = { turn: shownTurn, answered: shownAnswered };
+    if (!shownAnswered || before.answered || before.turn !== shownTurn || !speakReplies) return;
+    // A Follow Up microphone is still open (8 s): it closes first, as Ask and Speak do, or it would hear the confirmation and take it
+    // for a question (review of #513).
+    if (followUp) send({ type: 'CANCEL' });
+    speaker?.speak(t('answers.planApplied'), shownTurn);
+  }, [shownAnswered, shownTurn, speakReplies, speaker, followUp, send]);
   const where = stepOf({
     // A page in the content band is the home step (the settings page too: no step of its own).
     homeOpen: pageShown,
@@ -548,7 +561,8 @@ export function Conversation({
             onClick={() => {
               if (shown.data?.ok !== true) return;
               setReplaying(true);
-              voice.replay(shown.data.value.text, () => {
+              // An answer whose plan is applied says the confirmation in its place on the screen: Listen reads the same words.
+              voice.replay(shownAnswered ? t('answers.planApplied') : shown.data.value.text, () => {
                 setReplaying(false);
               });
             }}

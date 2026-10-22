@@ -27,8 +27,8 @@ test('scene 2: a hot day → plan card with ribbon, reserve line and receipt →
 
   await toCardPage(card, 1);
   await plan.getByRole('button', { name: 'Apply plan' }).click();
-  // O2 C3: the same plan card, its buttons gone; "Done — plan applied" said once, under the answer, never in the card too.
-  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
+  // O2 C3: the same plan card, its buttons gone; "OK, plan applied." said once, in place of the question (the big words), never in the card too.
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).toHaveText('OK, plan applied.');
   await expect(card.getByRole('heading', { level: 2 })).toHaveCount(1);
   await expect(card.getByRole('button', { name: 'Apply plan' })).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Not now' })).toHaveCount(0);
@@ -50,7 +50,7 @@ async function expectFirstPlanApplied(page: Page, answers: number) {
   await expect(plan.getByTestId('plan-horizon')).toHaveText('07:00');
   await expect(plan.getByRole('button', { name: 'Apply plan' })).toHaveCount(0);
   await expect(plan.getByRole('button', { name: 'Not now' })).toHaveCount(0);
-  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).toHaveText('OK, plan applied.');
   await pager.getByRole('button', { name: 'Next answer' }).click();
   await pager.getByRole('button', { name: 'Previous answer' }).click();
   await expect(plan.getByRole('button', { name: 'Apply plan' })).toHaveCount(0);
@@ -61,7 +61,7 @@ test('O2: the plan card shown again (Previous) stays applied: never Apply on a p
   await ask(page, HOT_DAY);
   const plan = page.frameLocator('iframe[title="Plan card"]').getByRole('region', { name: 'Plan' });
   await plan.getByRole('button', { name: 'Apply plan' }).click();
-  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).toHaveText('OK, plan applied.');
   await ask(page, 'Battery level');
   await expectFirstPlanApplied(page, 2);
 });
@@ -77,19 +77,23 @@ for (const said of ['OK, apply it', 'yes']) {
   });
 }
 
-test('O2/O5: a plan applied on the hot day leaves the storm\'s plan its own: Apply there, no done line under the storm answer', async ({ page }) => {
+test('O2/O5: a plan applied on the hot day leaves the storm\'s plan its own: Apply there, no "OK, plan applied." for the storm answer', async ({ page }) => {
   await page.goto('/');
   await ask(page, HOT_DAY);
   await page.frameLocator('iframe[title="Plan card"]').getByRole('button', { name: 'Apply plan' }).click();
-  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).toHaveText('OK, plan applied.');
   await ask(page, 'The storm is here');
   await expect(page.getByTestId('answer').last()).toContainText("Power's out");
-  await expect(page.getByTestId('answer-done')).toHaveCount(0);
+  // One visible answer first, so "not the confirmation" is never true of nothing.
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).toHaveCount(1);
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).not.toHaveText('OK, plan applied.');
   await ask(page, 'Show the plan');
   const storm = page.locator('iframe[title="Plan card"]:visible').contentFrame().getByRole('region', { name: 'Plan' });
   await expect(storm.getByRole('button', { name: 'Apply plan' })).toBeVisible();
   await expect(storm.getByRole('button', { name: 'Not now' })).toBeVisible();
-  await expect(page.getByTestId('answer-done')).toHaveCount(0);
+  // One visible answer first, so "not the confirmation" is never true of nothing.
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).toHaveCount(1);
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).not.toHaveText('OK, plan applied.');
 });
 
 test('the host theme reaches the card frame (hostContext.theme)', async ({ page }) => {

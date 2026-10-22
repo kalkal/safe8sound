@@ -128,7 +128,7 @@ export function recordAnswer(actions: CardActions, turnId: string, cards: readon
 
 /**
  * An answer that asked ("Do you want me to start this plan?", a first yes waiting for the second) whose plan is now
- * applied: the steps put it at "Confirm" and its words say "Done — plan applied". An answer that already said it was
+ * applied: the steps put it at "Confirm" and its big words say "OK, plan applied.". An answer that already said it was
  * applied never repeats it.
  */
 export function answeredOnCard(actions: CardActions, turnId: string, cards: readonly CardSlot[] | undefined): boolean {

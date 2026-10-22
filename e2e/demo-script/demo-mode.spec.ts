@@ -52,7 +52,7 @@ test('a tap on the page and a tap inside a card each leave a mark; the question 
   await card.getByRole('button', { name: 'Apply plan' }).click();
   await expect(card.locator('html')).toHaveAttribute('data-demo-taps', '1');
   // Said once, under the answer: the card never repeats it (owner, 21 Oct).
-  await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
+  await expect(page.locator('[data-testid="answer-caption"]:visible')).toHaveText('OK, plan applied.');
   // Marks go away by themselves.
   await expect(card.locator('.demo-tap')).toHaveCount(0);
 });

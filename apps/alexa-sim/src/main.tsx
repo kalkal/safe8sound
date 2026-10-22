@@ -264,7 +264,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
   const onCardCall = useCallback((turnId: string, card: ToolCard, event: FrameEvent) => {
     setCardActions((previous) => recordCall(previous, turnId, card, event));
   }, []);
-  // The steps (idea 5) and "Done — plan applied": an answer that asked is answered once its plan is applied, by tap or
+  // The steps (idea 5) and "OK, plan applied.": an answer that asked is answered once its plan is applied, by tap or
   // by voice; a last resort's first step (still "proposed", waiting for the second yes) is not (review of #350).
   const answeredOnCardOf = useCallback((turnId: string, cards: readonly CardSlot[] | undefined) => answeredOnCard(cardActions, turnId, cards), [cardActions]);
   const onCardAction = useCallback(

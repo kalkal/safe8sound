@@ -52,7 +52,8 @@ export const enUS = {
   'answers.previousShort': 'Previous',
   'answers.nextShort': 'Next',
   'answers.position': 'Answer {n} of {of}',
-  'answers.planApplied': 'Done — plan applied',
+  /** Said in place of the answer that asked, once its plan is applied (owner, 22 Oct): read aloud like the other answers. */
+  'answers.planApplied': 'OK, plan applied.',
   'answers.earlier': 'Earlier answer · {time}',
   // Back is said, never drawn on the Echo screen (#432 S6, owner C, 19 Oct): "Back" and "Go back" step back.
   'nav.back': 'Back',

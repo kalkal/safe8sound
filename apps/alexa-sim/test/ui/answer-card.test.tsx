@@ -36,13 +36,15 @@ describe('AnswerCard', () => {
     expect(screen.queryByTestId('answer-when')).toBeNull();
   });
 
-  it('a question the person answered on the card says so under it: "Do you want me to start this plan?" is never left open', () => {
+  it('a question the person answered on the card gets the short confirmation in its place: the big words say "OK, plan applied.", never the question left open (owner, 22 Oct)', () => {
     render(<AnswerCard answer={{ text: 'Do you want me to start this plan?' }} timeZone="Europe/Rome" turnId="t1" applied />);
-    expect(screen.getByTestId('answer-caption').textContent).toBe('Do you want me to start this plan?');
-    expect(screen.getByTestId('answer-done').textContent).toBe('Done — plan applied');
+    expect(screen.getByTestId('answer-caption').textContent).toBe('OK, plan applied.');
+    // No small line under it any more: one sentence, the big one.
+    expect(screen.queryByTestId('answer-done')).toBeNull();
+    expect(screen.queryByText('Do you want me to start this plan?')).toBeNull();
     cleanup();
     render(<AnswerCard answer={{ text: 'Do you want me to start this plan?' }} timeZone="Europe/Rome" turnId="t1" />);
-    expect(screen.queryByTestId('answer-done')).toBeNull();
+    expect(screen.getByTestId('answer-caption').textContent).toBe('Do you want me to start this plan?');
   });
 
   // Option B (owner, 20 Oct): the scripted figures are fixed; they say so instead of looking like live readings.

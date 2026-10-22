@@ -118,10 +118,10 @@ test.describe.serial("a user's journey", { tag: ['@journey:user', '@outcome:O9']
     await expect(plan.getByTestId('origin-badge').first()).toContainText('SIMULATED', SLOW);
     await expectVoiceMatchesCards(page, ['Plan card']);
     await plan.getByRole('button', { name: 'Apply plan' }).click();
-    // O2 C3: Apply and Not now gone from the same plan card; "Done — plan applied" said once, under the answer.
+    // O2 C3: Apply and Not now gone from the same plan card; "OK, plan applied." said once, in place of the question.
     await expect(plan.getByRole('button', { name: 'Apply plan' })).toHaveCount(0, SLOW);
     await expect(plan.getByRole('button', { name: 'Not now' })).toHaveCount(0);
-    await expect(page.getByTestId('answer-done')).toHaveText('Done — plan applied');
+    await expect(page.locator('[data-testid="answer-caption"]:visible')).toHaveText('OK, plan applied.');
   });
 
   test('A3. a plan the guard refuses: the card says why, nothing is applied', { tag: '@outcome:O3' }, async () => {

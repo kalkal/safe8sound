@@ -249,7 +249,7 @@ function AppliedPlan({ result, timeZone, fromThisFrame, canConfirm, action, onCo
   // The first yes to a last resort applies nothing (#160): the card must not say "applied".
   // Advice is never "applied": nothing changes in the home, the person does it (plan §11.6).
   const confirmLabel = t('plan.confirmLastResort');
-  // A plain apply says nothing here: "Done — plan applied" is said once, under the answer (owner, 21 Oct).
+  // A plain apply says nothing here: "OK, plan applied." is said once, in place of the question (owner, 22 Oct).
   let notice: string | undefined;
   // A first yes whose second yes the host says succeeded (the card shown again by Previous) is applied, not pending.
   const pending = confirmation !== undefined && action.phase !== 'applied' ? confirmation : undefined;

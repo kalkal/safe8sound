@@ -119,7 +119,7 @@ describe('recordAnswer: a plan applied by voice is applied on the card that prop
   });
 });
 
-describe('answeredOnCard: an answer that asked, whose plan is now applied (the steps, "Done — plan applied")', () => {
+describe('answeredOnCard: an answer that asked, whose plan is now applied (the steps, "OK, plan applied.")', () => {
   it('a proposed plan, or a first yes, once its plan is applied, by tap or by voice', () => {
     const proposed = recordAnswer(NO_ACTIONS, 'turn-1', [planCard]);
     expect(answeredOnCard(proposed, 'turn-1', [planCard])).toBe(false);

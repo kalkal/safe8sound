@@ -15,7 +15,7 @@ for (const [width, height] of [[1904, 870], [375, 812]] as const) {
     await page.getByLabel('Ask a question').fill('Keep Leo comfortable today.');
     await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await page.frameLocator('iframe[title="Plan card"]').getByRole('button', { name: 'Apply plan' }).click();
-    await expect(page.getByTestId('answer')).toContainText('Done — plan applied');
+    await expect(page.getByTestId('answer')).toContainText('OK, plan applied.');
     // A minute later the idle screen comes back, and its tile says the plan runs.
     // The minute starts once the voice is done or gives up (a few seconds after the answer, measured ~70 s in all).
     await page.clock.fastForward(15_000);
