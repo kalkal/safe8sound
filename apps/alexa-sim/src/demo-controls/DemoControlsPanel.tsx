@@ -76,9 +76,15 @@ export interface DemoControlsPanelProps {
   onPowerCut?: (() => void) | undefined;
   /** The demo session has ended (expired or refused): every choice is off and the panel says so, once (audit of 20 Oct). */
   sessionEnded?: boolean;
+  /**
+   * The scripted mode (option B, owner 20 Oct): its answers tell one fixed story, so the weather and the place are greyed
+   * out, with one line saying why. Who is at home stays: the scripted answers follow it (#493). Power cut, the clock and
+   * Restart the day still play that story.
+   */
+  fixedStory?: boolean;
 }
 
-export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onChange, stops, now, lastJump, onPowerCut, sessionEnded = false }: DemoControlsPanelProps) {
+export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onChange, stops, now, lastJump, onPowerCut, sessionEnded = false, fixedStory = false }: DemoControlsPanelProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
@@ -120,13 +126,18 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
       <p className="demo-controls-summary" role="status" data-testid="demo-controls-summary" data-failed={failed}>
         {sessionEnded ? t('demoControls.expired') : appliedText === '' ? summaryOf(settings) : appliedText}
       </p>
+      {fixedStory && (
+        <p className="muted" data-testid="demo-controls-fixed">
+          {t('demoControls.fixedStory')}
+        </p>
+      )}
       <ChipGroup
         label={t('demoControls.weather')}
         name="scenario"
         value={settings.scenarioId}
         pending={pendingOf('scenario')}
         locked={locked}
-        options={SCENARIOS.map((id) => ({ value: id, label: t(`settings.scenario.${id}`), sky: skyOfScenario(id) }))}
+        options={SCENARIOS.map((id) => ({ value: id, label: t(`settings.scenario.${id}`), sky: skyOfScenario(id), disabled: fixedStory }))}
         onPick={(v) => {
           send({ scenarioId: v as (typeof SCENARIOS)[number] }, { name: 'scenario', value: v });
         }}
@@ -163,7 +174,7 @@ export function DemoControlsPanel({ sheet, wide, settings, availablePlaces, onCh
         locked={locked}
         options={PLACES.map((id) => {
           const available = availablePlaces.includes(id);
-          return { value: id, label: t(`settings.place.${id}`), disabled: !available, ...(available ? {} : { hint: t('settings.notYet') }) };
+          return { value: id, label: t(`settings.place.${id}`), disabled: fixedStory || !available, ...(available ? {} : { hint: t('settings.notYet') }) };
         })}
         onPick={(v) => {
           send({ locationId: v as LocationId }, { name: 'place', value: v });

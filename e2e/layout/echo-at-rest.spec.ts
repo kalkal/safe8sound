@@ -1,5 +1,5 @@
 import { expect, test } from '../no-network.js';
-import { homeButton, menuButton, openDemoControls, slot } from '../surface.js';
+import { homeButton, menuButton, openDemoControls, scriptedStormDay, slot } from '../surface.js';
 import { openRemote } from '../remote-session.js';
 
 // The realistic Echo Show screen (#432 S6, owner 18 Oct; outcomes O1 and O12). At rest the sky is the whole screen, with
@@ -28,7 +28,7 @@ test("at rest: the time, the weather, Leo's room safe until a time and the reser
 test('the storm: the next moment is named, and after the jump the bell rings and the message to Ana shows until seen', async ({ page }) => {
   await page.setViewportSize({ width: 1904, height: 870 });
   await page.goto('/');
-  await (await openDemoControls(page)).getByText('Storm · power outage').click();
+  await scriptedStormDay(page);
   await expect(page.getByTestId('screen-weather')).toHaveText('Storm');
   await expect(page.getByTestId('tile-next')).toContainText(/^Next · \d{2}:\d{2}The grid goes down$/);
   const clock = page.getByRole('group', { name: 'Simulated time' });
@@ -110,7 +110,7 @@ test("after the storm's answer the idle screen comes back a minute later: the pl
 // phone the short place, without the day. The scripted home is a fixed picture, so it shows no temperature (review of
 // #487). Outcome O1 (the judge knows what it is and where it plays).
 for (const [width, height] of [[1904, 870], [375, 812]] as const) {
-  test(`${String(width)} × ${String(height)}: the top bar says where and when we are, and follows the place`, async ({ page }) => {
+  test(`${String(width)} × ${String(height)}: the top bar says where and when we are; the scripted place is fixed`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto('/');
     const place = page.getByTestId('screen-place');
@@ -129,24 +129,30 @@ for (const [width, height] of [[1904, 870], [375, 812]] as const) {
     }
     await expect(page.getByTestId('screen-time')).toBeInViewport({ ratio: 1 });
 
+    // The scripted story is fixed (option B, owner 20 Oct): its place is not a choice; a sandbox in Houston is below.
     const panel = await openDemoControls(page);
-    await panel.getByText('Houston, Texas').click();
+    await expect(panel.getByRole('radio', { name: /Houston, Texas/ })).toBeDisabled();
     if (width < 1600) await page.keyboard.press('Escape');
-    await expect(width >= 768 ? place.getByText('Houston, Texas', { exact: true }) : place.getByText('Houston', { exact: true })).toBeVisible();
     await expect(page.getByTestId('screen-time')).toBeInViewport({ ratio: 1 });
   });
 
-  test(`${String(width)} × ${String(height)}: a sandbox in Houston shows the temperature outside in °F, read with the home`, async ({ page }) => {
+  test(`${String(width)} × ${String(height)}: a sandbox follows a new place in its top bar, and Houston shows the temperature outside in °F`, async ({ page }) => {
     await page.setViewportSize({ width, height });
+    // The sandbox starts at the reference home; the judge then picks Houston in the demo controls (saved, then read back).
+    const PLACES = {
+      reference: { settings: { locationId: 'reference', units: 'C' }, place: { id: 'reference', label: 'Reference home (Italy)', tz: 'Europe/Rome' } },
+      houston: { settings: { locationId: 'houston', units: 'F' }, place: { id: 'houston', label: 'Houston, Texas', tz: 'America/Chicago' } },
+    } as const;
+    let at: keyof typeof PLACES = 'reference';
+    const settings = () => ({ version: 1, updatedAt: '2024-07-05T12:00:00-05:00', scenarioId: 'heatwave', household: 'older-man', ...PLACES[at].settings });
     await page.route('**/sim-api/v1/tools/call', (route) => {
-      const { name } = route.request().postDataJSON() as { name: string };
+      const { name, arguments: args } = route.request().postDataJSON() as { name: string; arguments?: Record<string, unknown> };
       const answer = (structuredContent: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: 'ok' }], structuredContent }) });
-      if (name === 'get_demo_settings') {
-        return answer({
-          settings: { version: 1, updatedAt: '2024-07-05T12:00:00-05:00', scenarioId: 'heatwave', locationId: 'houston', units: 'F', household: 'older-man' },
-          place: { id: 'houston', label: 'Houston, Texas', tz: 'America/Chicago' },
-        });
+      if (name === 'set_scenario') {
+        if (args?.['locationId'] === 'houston' || args?.['locationId'] === 'reference') at = args['locationId'];
+        return answer({ settings: settings(), restarted: true });
       }
+      if (name === 'get_demo_settings') return answer({ settings: settings(), place: PLACES[at].place });
       if (name === 'get_milestones') return answer({ now: '2024-07-05T12:00:00-05:00', day: { from: '2024-07-05T12:00:00-05:00', to: '2024-07-06T12:00:00-05:00' }, milestones: [] });
       if (name === 'get_home_status') {
         return answer({
@@ -170,6 +176,14 @@ for (const [width, height] of [[1904, 870], [375, 812]] as const) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isError: true, content: [{ type: 'text', text: 'No.' }] }) });
     });
     await openRemote(page);
+    // The top bar follows the sandbox's place while the page is open (moved here from the scripted case, whose place is fixed).
+    const place = page.getByTestId('screen-place');
+    await expect(width >= 768 ? place.getByText('Reference home (Italy)', { exact: true }) : place.getByText('Reference home', { exact: true })).toBeVisible();
+    const panel = await openDemoControls(page);
+    await panel.getByText('Houston, Texas').click();
+    await expect(panel.getByRole('radio', { name: /Houston, Texas/ })).toBeChecked();
+    if (width < 1600) await page.keyboard.press('Escape');
+    await expect(width >= 768 ? place.getByText('Houston, Texas', { exact: true }) : place.getByText('Houston', { exact: true })).toBeVisible();
     await expect(page.getByTestId('screen-outdoor')).toHaveText('89.8 °F');
     await expect(page.getByTestId('screen-outdoor')).toBeInViewport({ ratio: 1 });
     await expect(page.getByTestId('screen-time')).toBeInViewport({ ratio: 1 });

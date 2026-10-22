@@ -19,7 +19,8 @@ const TOOL_NAMES = ['plan_comfort', 'apply_plan', 'get_reserve_outlook', 'get_pr
 const ScriptSchema = z
   .strictObject({
     version: z.literal(1),
-    status: StatusFactsSchema.optional(),
+    /** The fixed reading; its time is the scripted clock's, given when it is read (option B, 20 Oct). */
+    status: StatusFactsSchema.omit({ ts: true }).optional(),
     entries: z
       .array(
         z.strictObject({
@@ -115,7 +116,7 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
       if (chosen?.success === true) household = chosen.data;
       const clocked = clock.call(name, args);
       if (clocked !== undefined) return Promise.resolve(clocked);
-      const result = scriptedToolCall(name, args, script.status?.ts, preferences, plans, room());
+      const result = scriptedToolCall(name, args, clock.now(), preferences, plans, room());
       // The card says the family was told (familyAlert.sent): the scripted phone gets that message, as the server sends it.
       const alert = result.structuredContent?.['familyAlert'];
       const sent = typeof alert === 'object' && alert !== null && 'sent' in alert && typeof alert.sent === 'number' ? alert.sent : 0;
@@ -135,11 +136,13 @@ export function createScriptedAgent(source: unknown, options: ScriptedAgentOptio
       if (entry === undefined) return Promise.resolve(ok({ text: fallback }));
       const { status } = script;
       const answer: AgentAnswer =
-        entry.withStatus && status !== undefined ? { text: withRoom(entry.text).replaceAll('{soc}', String(status.batterySocPct)), status } : { text: withRoom(entry.text) };
+        entry.withStatus && status !== undefined ? { text: withRoom(entry.text).replaceAll('{soc}', String(status.batterySocPct)), status: { ...status, ts: clock.now() } } : { text: withRoom(entry.text) };
       if (entry.cards !== undefined) answer.cards = entry.cards.map((card) => SCRIPT_FIXTURES[card.fixture](household, room().safeRoomId));
       // The plan the scripted home runs: a plan applied by voice starts it, the storm replaces it (owner, 21 Oct).
       for (const card of answer.cards ?? []) if (card.tool === 'apply_plan') plans.apply(card.result.plan);
       if (entry.id === 'storm-start') plans.clear();
+      // Fixed figures say they are an example, never a live reading (option B, 20 Oct).
+      if (answer.status !== undefined || answer.cards !== undefined) answer.example = true;
       if (entry.phone !== undefined && options.phone !== undefined) {
         const messages = entry.phone.map((m) => message(m.fixture));
         options.phone.deliver(messages);

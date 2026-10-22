@@ -15,6 +15,11 @@ export interface AgentAnswer {
   text: string;
   status?: StatusFacts;
   cards?: CardSlot[];
+  /**
+   * Set by the scripted home when the answer shows fixed figures (a reading or a card): the page labels its reading an
+   * offline example, never a live one (option B, 20 Oct).
+   */
+  example?: true;
   /** Set when the answer comes from the degraded mode: the code of the failure it replaces. */
   degradedBy?: ErrorCode;
 }

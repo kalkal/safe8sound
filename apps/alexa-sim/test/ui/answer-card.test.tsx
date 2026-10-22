@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StatusFactsSchema } from '@cold-reserve/contracts';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AnswerCard } from '../../src/ui/AnswerCard.js';
@@ -42,5 +43,29 @@ describe('AnswerCard', () => {
     cleanup();
     render(<AnswerCard answer={{ text: 'Do you want me to start this plan?' }} timeZone="Europe/Rome" turnId="t1" />);
     expect(screen.queryByTestId('answer-done')).toBeNull();
+  });
+
+  // Option B (owner, 20 Oct): the scripted figures are fixed; they say so instead of looking like live readings.
+  it('an offline example says so in place of its origin badge, with the time of the scripted clock', () => {
+    const status = StatusFactsSchema.parse({ batterySocPct: 78, origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' }, ts: '2026-07-18T12:00:00+02:00' });
+    render(<AnswerCard answer={{ text: 'Your battery is at 78 percent.', status, example: true }} timeZone="Europe/Rome" turnId="t1" />);
+    expect(screen.getByTestId('offline-example').textContent).toBe('Offline example');
+    expect(screen.queryByTestId('origin-badge')).toBeNull();
+    expect(screen.getByTestId('answer').textContent).toContain('As of 12:00');
+  });
+
+  it('a reading from the real assistant has no such label', () => {
+    const status = StatusFactsSchema.parse({ batterySocPct: 78, origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' }, ts: '2026-07-18T12:00:00+02:00' });
+    render(<AnswerCard answer={{ text: 'Your battery is at 78 percent.', status }} timeZone="Europe/Rome" turnId="t1" />);
+    expect(screen.queryByTestId('offline-example')).toBeNull();
+    expect(screen.getByTestId('origin-badge').textContent).toBe('≈ SIMULATED');
+  });
+
+  // Review of #479: in remote mode the backup answer's time is the scripted clock's, not the home's: it says none.
+  it('a backup answer (the real assistant down) keeps its example label and says no time', () => {
+    const status = StatusFactsSchema.parse({ batterySocPct: 78, origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' }, ts: '2026-07-18T12:00:00+02:00' });
+    render(<AnswerCard answer={{ text: 'Your battery is at 78 percent.', status, example: true, degradedBy: 'agent_unavailable' }} timeZone="Europe/Rome" turnId="t1" />);
+    expect(screen.getByTestId('offline-example').textContent).toBe('Offline example');
+    expect(screen.getByTestId('answer').textContent).not.toContain('As of');
   });
 });

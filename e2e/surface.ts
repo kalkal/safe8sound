@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { CATALOGS, PRODUCT_NAME, type Locale } from '../packages/i18n/src/index.js';
 
 // How the specs reach the screen (separation of the device layout, #432). The device look is a layout that another can
@@ -24,6 +24,22 @@ export async function openDemoControls(page: Page, locale: Locale = 'en-US'): Pr
   const panel = demoControls(page);
   if (!(await panel.isVisible())) await demoControlsButton(page, locale).click();
   return panel;
+}
+/**
+ * The storm day of the scripted demo from its start, the grid still up (its next moment: the grid goes down). The
+ * scripted story is fixed (option B, owner 20 Oct: no weather choice there): Power cut plays the storm, Restart the
+ * day takes it back to its start. Leaves the demo controls closed when they are a sheet.
+ */
+export async function scriptedStormDay(page: Page, locale: Locale = 'en-US'): Promise<void> {
+  await (await openDemoControls(page, locale)).getByRole('button', { name: CATALOGS[locale]['demoControls.powerCut'], exact: true }).click();
+  await expect(page.getByTestId('answer')).toBeVisible();
+  // The notice of Ana's new message covers the top bar's button on a phone for a few seconds: it goes by itself.
+  await expect(page.getByTestId('phone-peek')).toHaveCount(0, { timeout: 15_000 });
+  const panel = await openDemoControls(page, locale);
+  await panel.getByRole('button', { name: CATALOGS[locale]['settings.restart'], exact: true }).click();
+  await panel.getByRole('button', { name: CATALOGS[locale]['settings.restartConfirm'], exact: true }).click();
+  await expect(page.getByTestId('answer')).toHaveCount(0);
+  if (await demoControlsButton(page, locale).isVisible()) await page.keyboard.press('Escape');
 }
 /** What the demo plays now ("Reference home (Italy) · Heat wave"): on the button below the wide layout, in the panel on it. */
 export const demoControlsSummary = (page: Page): Locator => page.getByTestId('demo-controls-summary').filter({ visible: true }).first();

@@ -24,8 +24,8 @@ export function withScriptedFallback(primary: Agent, scripted: Agent, log: Log =
       }
       log({ level: 'warn', code, correlationId: context.correlationId, details: { degraded: true } });
       // The degraded mode never shows a card: a scripted plan or "applied" would claim what did not happen.
-      const { text, status } = fallback.value;
-      return { ok: true, value: { text, ...(status !== undefined && { status }), degradedBy: code } };
+      const { text, status, example } = fallback.value;
+      return { ok: true, value: { text, ...(status !== undefined && { status }), ...(example !== undefined && { example }), degradedBy: code } };
     },
   };
 }

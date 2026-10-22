@@ -1,4 +1,4 @@
-import { PlanSchema, ReserveOutlookSchema, SafeRoomStatusSchema } from '@cold-reserve/contracts';
+import { GetMilestonesOutputSchema, PlanSchema, ReserveOutlookSchema, SafeRoomStatusSchema } from '@cold-reserve/contracts';
 import { CATALOGS } from '@cold-reserve/i18n';
 import { describe, expect, it } from 'vitest';
 import { lastResortPlan } from '@cold-reserve/ui-cards';
@@ -8,6 +8,8 @@ import { createScriptedPhone } from '../src/phone/phone-feed.js';
 import script from '../src/agent/script.v1.json' with { type: 'json' };
 
 const ctx = { correlationId: 'c1' };
+/** Where the scripted clock starts every scenario's day. */
+const DAY_START = '2026-07-18T12:00:00+02:00';
 
 function agent(source: unknown = script) {
   const created = createScriptedAgent(source);
@@ -16,15 +18,42 @@ function agent(source: unknown = script) {
 }
 
 describe('ScriptedAgent', () => {
-  it('answers the battery question with the SOC and the data origin from the script', async () => {
+  it('answers the battery question with the SOC and the data origin from the script, as an offline example', async () => {
     const reply = await agent().ask("What's my battery level?", ctx);
     expect(reply).toEqual({
       ok: true,
       value: {
         text: `Your battery is at ${String(script.status.batterySocPct)} percent.`,
-        status: script.status,
+        status: { ...script.status, ts: DAY_START },
+        example: true,
       },
     });
+  });
+
+  // Option B (owner, 20 Oct): the scripted figures are fixed, but their time is the one the scripted clock shows.
+  it('stamps the battery reading and the cold reserve with the time the scripted clock shows, after every jump', async () => {
+    const a = agent();
+    const reading = async () => {
+      const reply = await a.ask("What's my battery level?", ctx);
+      return reply.ok ? reply.value.status?.ts : undefined;
+    };
+    const reserveTs = async () => ReserveOutlookSchema.parse((await a.callTool('get_reserve_outlook', {}, ctx)).structuredContent).ts;
+    expect(await reading()).toBe(DAY_START);
+    expect(await reserveTs()).toBe(DAY_START);
+    await a.callTool('set_scenario', { scenarioId: 'storm-blackout' }, ctx);
+    const listed = GetMilestonesOutputSchema.parse((await a.callTool('get_milestones', {}, ctx)).structuredContent);
+    const [, essential] = listed.milestones;
+    await a.callTool('advance_clock', { kind: essential?.kind, at: essential?.at }, ctx);
+    expect(await reading()).toBe(essential?.at);
+    expect(await reserveTs()).toBe(essential?.at);
+  });
+
+  it('marks every answer with fixed figures (a reading or a card) as an offline example; words alone are not', async () => {
+    const a = agent();
+    const plan = await a.ask('Keep Leo comfortable, it will be 36 degrees', ctx);
+    expect(plan.ok && plan.value.example).toBe(true);
+    const unknown = await a.ask('Sing me a song', ctx);
+    expect(unknown.ok && unknown.value.example).toBeUndefined();
   });
 
   it('is deterministic: same question, same answer, whatever the casing, spacing or apostrophe', async () => {
@@ -182,7 +211,7 @@ describe('ScriptedAgent', () => {
     if (!created.ok) throw new Error(created.error.message);
     expect(await created.value.ask('Apply the plan', ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
     expect(await created.value.ask('Keep Leo comfortable, it will be 36 degrees', ctx)).toEqual({ ok: true, value: { text: script.degradedFallback } });
-    expect(await created.value.ask("What's my battery level?", ctx)).toMatchObject({ ok: true, value: { status: script.status } });
+    expect(await created.value.ask("What's my battery level?", ctx)).toMatchObject({ ok: true, value: { status: { ...script.status, ts: DAY_START }, example: true } });
   });
 });
 

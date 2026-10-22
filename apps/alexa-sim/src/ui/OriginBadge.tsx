@@ -10,3 +10,12 @@ export function OriginBadge({ origin }: { origin: DataOriginValue }) {
     </span>
   );
 }
+
+/** Option B (owner, 20 Oct): a fixed figure of the scripted mode says it is an example, never a live reading. */
+export function OfflineExampleBadge() {
+  return (
+    <span className="badge" data-origin="simulated" data-testid="offline-example">
+      {t('data.offlineExample')}
+    </span>
+  );
+}

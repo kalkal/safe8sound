@@ -23,6 +23,8 @@ const success = (structuredContent: Record<string, unknown>, text: string): Tool
 export interface ScriptedClock {
   /** Handles the clock's tools; undefined for any other tool. */
   readonly call: (name: string, args: Record<string, unknown>) => ToolCallResult | undefined;
+  /** The time the clock shows: every scripted reading is stamped with it, never a fixed time (option B, 20 Oct). */
+  readonly now: () => string;
 }
 
 export function createScriptedClock(
@@ -42,6 +44,7 @@ export function createScriptedClock(
   };
 
   return {
+    now,
     call: (name, args) => {
       if (name === 'set_scenario') {
         const next = args['scenarioId'];

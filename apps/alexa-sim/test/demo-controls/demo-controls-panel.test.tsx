@@ -132,6 +132,31 @@ describe('DemoControlsPanel', () => {
     expect(screen.getByRole('radiogroup', { name: 'Place' }).textContent).toContain('Not available yet');
   });
 
+  // Option B (owner, 20 Oct): the offline example plays one fixed story, so the judge cannot pick another one there.
+  // Who is at home stays open: since #493 the scripted answers follow it (no Leo with no one at risk), the owner's rule.
+  it('the offline example (scripted) greys out the weather and the place, keeps who is at home, and says why in one line', () => {
+    function Offline() {
+      const sheet = useDemoControlsSheet();
+      return (
+        <DemoControlsPanel sheet={sheet} wide fixedStory settings={scriptedDemoSettings()} availablePlaces={['reference', 'turin', 'houston']} onChange={vi.fn()} stops={stops} now={at('12:00')} onPowerCut={vi.fn()} />
+      );
+    }
+    render(<Offline />);
+    for (const group of ['Weather', 'Place']) {
+      for (const radio of within(screen.getByRole('radiogroup', { name: group })).getAllByRole('radio')) expect(radio).toHaveProperty('disabled', true);
+    }
+    for (const radio of within(screen.getByRole('radiogroup', { name: 'Who is at home' })).getAllByRole('radio')) expect(radio).toHaveProperty('disabled', false);
+    expect(screen.getByTestId('demo-controls-fixed').textContent).toBe('Offline example: the story is fixed (a heat wave day, then a storm). The real assistant plays every scenario.');
+    expect(screen.getByRole('button', { name: 'Power cut' })).toHaveProperty('disabled', false);
+    expect(screen.getByRole('button', { name: 'Restart the day' })).toHaveProperty('disabled', false);
+  });
+
+  it('the real assistant (remote) keeps every choice open and has no such line', () => {
+    render(<Wide />);
+    expect(screen.getByRole('radio', { name: /Clear day/ })).toHaveProperty('disabled', false);
+    expect(screen.queryByTestId('demo-controls-fixed')).toBeNull();
+  });
+
   it('Restart the day takes two taps', () => {
     const onChange = vi.fn(() => Promise.resolve(true));
     render(<Wide onChange={onChange} />);

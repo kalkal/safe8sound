@@ -8,15 +8,16 @@ import { openDemoControls, showMyHome } from '../surface.js';
 
 const examples = (page: import('@playwright/test').Page) => page.getByRole('group', { name: 'Example questions' });
 
-test('scripted: choosing the storm scenario swaps the hot-day examples for the storm ones, which the demo answers', async ({ page }) => {
+test('scripted: the storm (Power cut) swaps the hot-day examples for the storm ones, which the demo answers', async ({ page }) => {
   // A tall screen shows all three examples (a short Echo shows two, on one row).
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/');
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toBeVisible();
 
   const drawer = await openDemoControls(page);
-  await drawer.getByText('Storm · power outage').click();
-  await page.keyboard.press('Escape');
+  // The scripted story is fixed (option B, owner 20 Oct): the storm comes from Power cut, not from the weather choice.
+  await drawer.getByRole('button', { name: 'Power cut' }).click();
+  await expect(page.getByRole('group', { name: 'Simulated time' }).locator('time')).toHaveText('19:42');
 
   await expect(examples(page).getByRole('button', { name: 'A hot day' })).toHaveCount(0);
   await examples(page).getByRole('button', { name: 'Is Leo safe?' }).click();

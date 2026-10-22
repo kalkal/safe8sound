@@ -1,4 +1,4 @@
-import { err, ok, toolError, type ErrorCode } from '@cold-reserve/contracts';
+import { StatusFactsSchema, err, ok, toolError, type ErrorCode } from '@cold-reserve/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent } from '../src/agent/agent.js';
 import { withScriptedFallback } from '../src/agent/fallback-agent.js';
@@ -33,6 +33,12 @@ describe('degraded mode: RemoteAgent down → scripted answer + notice (error-ha
   it('does not hide a quota or permission error behind the script', async () => {
     const result = await withScriptedFallback(failing('demo_quota_exceeded'), scripted).ask('q', ctx);
     expect(result).toMatchObject({ ok: false, error: { code: 'demo_quota_exceeded' } });
+  });
+
+  it('keeps the offline-example mark of a scripted reading: a fixed figure never looks live (option B, 20 Oct)', async () => {
+    const status = StatusFactsSchema.parse({ batterySocPct: 78, origin: { energy: 'simulated', rooms: 'simulated', weather: 'simulated' }, ts: '2026-07-18T12:00:00+02:00' });
+    const reading: Agent = { canCallTools: false, callTool: noTool, ask: () => Promise.resolve(ok({ text: 'At 78%.', status, example: true })) };
+    expect(await withScriptedFallback(failing('agent_unavailable'), reading).ask('q', ctx)).toEqual(ok({ text: 'At 78%.', status, example: true, degradedBy: 'agent_unavailable' }));
   });
 
   it('never passes cards from the script through the degraded mode', async () => {

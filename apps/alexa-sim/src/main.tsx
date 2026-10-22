@@ -434,7 +434,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
     </>
   );
   const demoControls = demoShown ? (
-    <DemoControlsPanel sheet={sheet} wide={wide} sessionEnded={needsCode} settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} stops={stops} now={clock?.now} lastJump={lastJump} onPowerCut={onPowerCut} />
+    <DemoControlsPanel sheet={sheet} wide={wide} sessionEnded={needsCode} settings={demoSettings} availablePlaces={SHIPPED_PLACES} onChange={onDrawerChange} stops={stops} now={clock?.now} lastJump={lastJump} onPowerCut={onPowerCut} fixedStory={scripted} />
   ) : undefined;
   // The family phone, always shown: scripted, the dev proxy's inbox, or (remote mode, #267) the sandbox inbox from sim-api.
   const phonePanel = (
@@ -500,7 +500,7 @@ function Simulator({ agent, config, session, studioVoice }: { agent: Agent; conf
                 idle={
                   <IdleTiles
                     room={safeRoom}
-                    reserve={reserve === undefined ? undefined : <ReserveClock outlook={reserve} storm={gridDown} />}
+                    reserve={reserve === undefined ? undefined : <ReserveClock outlook={reserve} storm={gridDown} example={scripted} />}
                     next={demoShown ? clock?.next : undefined}
                     notice={notices.newest}
                     timeZone={homeTimeZone}

@@ -1,5 +1,5 @@
 import { expect, test } from '../no-network.js';
-import { demoControlsButton, openDemoControls } from '../surface.js';
+import { demoControlsButton, scriptedStormDay } from '../surface.js';
 
 // The language icon at the top (owner, 10 Oct): English by default; one quiet button offers Italiano and changes the
 // page at once, remembered like the drawer's Language row. In view, at least 44 px, and the Echo screen never
@@ -58,8 +58,7 @@ for (const { width, height, italian, storm } of CASES) {
     // The button that opens the judges' demo controls shares the top row (it says what the demo plays, like the badge did).
     const badge = demoControlsButton(page, italian ? 'it-IT' : 'en-US');
     if (storm) {
-      await (await openDemoControls(page, italian ? 'it-IT' : 'en-US')).getByText(italian ? 'Temporale · blackout' : 'Storm · power outage').click();
-      await page.keyboard.press('Escape');
+      await scriptedStormDay(page, italian ? 'it-IT' : 'en-US');
     }
     const toggle = page.getByRole('button', { name: italian ? 'Lingua: English' : 'Language: Italiano' });
     await expect(toggle).toBeInViewport({ ratio: 1 });

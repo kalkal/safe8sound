@@ -10,14 +10,16 @@ const ask = async (page: import('@playwright/test').Page) => {
   await page.getByRole('button', { name: 'Ask' }).click();
 };
 
-test('sim-api answers 503 → degraded scripted answer, still marked SIMULATED', async ({ page }) => {
+test('sim-api answers 503 → degraded scripted answer, marked as an offline example', async ({ page }) => {
   await page.route('**/sim-api/v1/turns', (route) => route.fulfill({ status: 503, body: 'Service Unavailable' }));
   await openRemote(page);
   await ask(page);
 
   await expect(page.getByRole('note')).toHaveText("I can't reach the assistant right now, so this is a scripted answer.");
   await expect(page.getByTestId('battery-soc')).toHaveText('78%');
-  await expect(page.getByTestId('origin-badge')).toHaveText('≈ SIMULATED');
+  // A backup reading is a fixed example (option B, owner 20 Oct): it says so, with no time of its own (review of #479).
+  await expect(page.getByTestId('offline-example')).toHaveText('Offline example');
+  await expect(page.getByTestId('answer')).not.toContainText('As of');
 });
 
 test('sim-api sends malformed JSON → degraded scripted answer', async ({ page }) => {

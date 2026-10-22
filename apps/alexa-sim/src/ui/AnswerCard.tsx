@@ -1,7 +1,7 @@
 import { homeClock, type CardKind } from '@cold-reserve/ui-cards';
 import { useState } from 'react';
 import type { AgentAnswer } from '../agent/index.js';
-import { OriginBadge } from './OriginBadge.js';
+import { OfflineExampleBadge, OriginBadge } from './OriginBadge.js';
 import { t } from './text.js';
 import { ToolCards } from './ToolCards.js';
 
@@ -69,8 +69,10 @@ export function AnswerCard({ answer, timeZone, turnId, earlierAt, show, applied 
               <span className="fact-value" data-testid="battery-soc">
                 {status.batterySocPct}%
               </span>
-              <OriginBadge origin={status.origin.energy} />
-              <span className="fact-asof">{t('data.asOf', { time: homeClock(status.ts, timeZone) })}</span>
+              {/* A fixed figure of the scripted mode says so instead of its origin (option B, 20 Oct): one badge, one row. */}
+              {answer.example === true ? <OfflineExampleBadge /> : <OriginBadge origin={status.origin.energy} />}
+              {/* A backup answer (the real assistant down) has the scripted clock's time, not the home's: it says none. */}
+              {!(answer.example === true && answer.degradedBy !== undefined) && <span className="fact-asof">{t('data.asOf', { time: homeClock(status.ts, timeZone) })}</span>}
             </dd>
           </div>
         </dl>

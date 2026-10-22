@@ -7,6 +7,8 @@ export const enUS = {
   'data.asOf': 'As of {time}',
   'data.live': 'LIVE',
   'data.simulatedBadge': 'SIMULATED',
+  // Option B (owner, 20 Oct): the scripted mode's fixed figures say they are an example, never a live reading.
+  'data.offlineExample': 'Offline example',
   'sim.title': '{product} · Simulated Alexa+ add-on',
   'chat.label': 'Ask a question',
   // The first screen explains itself (guided test, 3/10): what to ask, and three examples that only fill the field.
@@ -182,6 +184,8 @@ export const enUS = {
   'demoControls.intro': 'For the judges: they change only the simulated home of this demo.',
   'demoControls.summary': '{place} · {scenario}',
   'demoControls.weather': 'Weather',
+  // Option B (owner, 20 Oct): the scripted mode plays one fixed story, so its scenario and place are greyed out.
+  'demoControls.fixedStory': 'Offline example: the story is fixed (a heat wave day, then a storm). The real assistant plays every scenario.',
   // #432 S6 (owner, 19 Oct): the judges learn why the screen changes colour; nothing of this inside the Echo.
   'demoControls.skyNote': "The screen's sky follows the simulated weather: clear, heat wave, storm.",
   // H (owner, 19 Oct): one tap cuts the simulated grid and asks for the person what they would say.

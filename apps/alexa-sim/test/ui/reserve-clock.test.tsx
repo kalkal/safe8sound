@@ -29,4 +29,15 @@ describe('ReserveClock', () => {
     expect(melting).toHaveLength(1);
     expect([...container.querySelectorAll('.cube')].indexOf(melting[0] as Element)).toBe(Math.floor(hours));
   });
+
+  it('the offline example says so under the title; the real reserve does not (option B, 20 Oct)', () => {
+    const { rerender } = render(<ReserveClock outlook={outlook} storm={false} example />);
+    const region = screen.getByRole('region', { name: 'Cold reserve' });
+    expect(region.textContent).toContain('Offline example');
+    // Outside the uppercase title: it reads "Offline example" as everywhere else (review of #479), and the hours keep their cell.
+    expect(region.querySelector('h2 [data-testid="offline-example"]')).toBeNull();
+    expect(region.querySelector('.reserve-hours [data-testid="offline-example"]')).toBeNull();
+    rerender(<ReserveClock outlook={outlook} storm={false} />);
+    expect(screen.getByRole('region', { name: 'Cold reserve' }).textContent).not.toContain('Offline example');
+  });
 });

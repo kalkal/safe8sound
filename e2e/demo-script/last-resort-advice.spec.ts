@@ -3,7 +3,6 @@ import { toCardPage } from '../card-pages.js';
 import { expect, test } from '../no-network.js';
 import { openRemote } from '../remote-session.js';
 import { expectScreenSettled } from '../screen-settled.js';
-import { openDemoControls } from '../surface.js';
 
 // The last-resort story (owner decisions of 1 and 12 Oct, #364, #376): the big time is until when the safe room stays
 // within its limits, the battery time below it; the card's own page lists what to do without power, the signs of heat
@@ -14,11 +13,6 @@ const ask = async (page: Page, question: string) => {
   await page.getByRole('button', { name: 'Ask' }).click();
 };
 
-const pickPlace = async (page: Page, place: string) => {
-  await (await openDemoControls(page)).getByText(place).click();
-  await page.keyboard.press('Escape');
-};
-
 /** The advice page: readable (never under the 0.8 scale), and never cut on a large screen. */
 async function expectReadable(page: Page, card: FrameLocator, large: boolean): Promise<void> {
   await expectScreenSettled(page);
@@ -27,13 +21,11 @@ async function expectReadable(page: Page, card: FrameLocator, large: boolean): P
   if (large) expect(await fit.getAttribute('data-cramped')).not.toBe('true');
 }
 
-for (const [place, number, fan] of [
-  ['Turin, Italy', '112', '35 °C'],
-  ['Houston, Texas', '911', '95 °F'],
-] as const) {
+// The scripted story is fixed at the reference home in Italy (option B, owner 20 Oct): 112, °C. The number of another
+// place (911 in Houston, °F) comes from the server's plan, below.
+for (const [place, number, fan] of [['the reference home (Italy)', '112', '35 °C']] as const) {
   test(`scripted, ${place}: the advice page says "call ${number}", the fan rule in ${fan.slice(-2)}`, async ({ page }) => {
     await page.goto('/');
-    await pickPlace(page, place);
     await ask(page, 'Last resort for a hot night');
     const card = page.frameLocator('iframe[title="Plan card"]');
     // The scripted story ends on the room's limits (22:00): its headline does not change.

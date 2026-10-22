@@ -147,8 +147,9 @@ export function scriptedToolCall(
   }
   // The idle screen's cold reserve clock (owner, 11 Oct): read-only, the reserve of the scripted home.
   if (name === 'get_reserve_outlook') {
+    // A fixed example; its time is the scripted clock's (option B, 20 Oct).
     const reserve = SCRIPT_FIXTURES['reserve-outlook']();
-    return success(reserve.result, 'Cold reserve.');
+    return success(reserve.tool === 'get_reserve_outlook' && at !== undefined ? { ...reserve.result, ts: at } : reserve.result, 'Cold reserve.');
   }
   // The idle screen's tile "Leo's room · safe until …" (#432 S6): read-only, the calm room of the scripted home.
   if (name === 'get_safe_room_status') {

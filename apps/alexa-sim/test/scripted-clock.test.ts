@@ -41,4 +41,14 @@ it('a new play of the day (restart, another scenario) empties the phone, as the 
   it('answers only the clock tools', () => {
     expect(createScriptedClock().call('apply_plan', {})).toBeUndefined();
   });
+
+  it("now() is the time the clock shows: every scripted reading is stamped with it, never a fixed time (option B, 20 Oct)", () => {
+    const clock = createScriptedClock();
+    expect(clock.now()).toBe(milestones(clock).now);
+    expect(clock.now()).toBe(milestones(clock).day.from);
+    clock.call('set_scenario', { scenarioId: 'storm-blackout' });
+    const [storm] = milestones(clock).milestones;
+    clock.call('advance_clock', { kind: storm?.kind, at: storm?.at });
+    expect(clock.now()).toBe(storm?.at);
+  });
 });
