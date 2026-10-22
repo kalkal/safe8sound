@@ -93,6 +93,12 @@
   /* On a phone the idle band is short, under the intro: the clock keeps its rows as on an Echo (one, or two above
      CUBES_PER_ROW), the cubes narrower, so all of them stay in the first view. */
   @media (width < 48rem) {
+    .reserve-clock {
+      /* The offline-example badge under the title makes the first row taller (#479): 4 px less between the hours and the cubes
+         keeps the idle stack inside a 375 x 812 phone's band, with the badge where the owner saw it (22 Oct). */
+      row-gap: var(--space-1);
+    }
+
     .reserve-clock .cubes {
       grid-template-columns: repeat(var(--cubes-per-row), minmax(0, var(--cube-size)));
     }
