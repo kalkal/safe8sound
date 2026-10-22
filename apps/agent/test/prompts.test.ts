@@ -10,7 +10,7 @@ describe('system prompt (versioned, short: cost rule)', () => {
   const prompt = buildSystemPrompt();
 
   it('is versioned and matches the snapshot, so every change shows up in review', () => {
-    expect(PROMPT_VERSION).toBe('v7');
+    expect(PROMPT_VERSION).toBe('v8');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -40,6 +40,12 @@ describe('system prompt (versioned, short: cost rule)', () => {
     expect(prompt).not.toContain('Talk about people by their roles');
   });
 
+  it('v8 (21 Oct, found on the real site): an unclear request gets one short question and nothing else', () => {
+    // v7 asked for "one short question"; the real model answered "Make it better." with a list of three and an instruction.
+    expect(prompt).toContain('If the request is unclear, ask one short question and nothing else.');
+    expect(buildSystemPrompt('v7')).not.toContain('and nothing else');
+  });
+
   it('#438: the eval script can build an older version to compare (v3 has no health rule); unknown names are none', () => {
     expect(buildSystemPrompt('v3')).not.toContain('If someone may be unwell');
     expect(buildSystemPrompt()).toBe(buildSystemPrompt(PROMPT_VERSION));
@@ -56,7 +62,7 @@ describe('system prompt (versioned, short: cost rule)', () => {
   });
 
   it('stays short: at most 4,500 characters including the few-shot dialogues', () => {
-    // 4,000 until v5 (3,5xx); v6 one rule and one example (4,285); v7 one more rule and the hot day asked as a forecast: the limit moves to 4,500, no further.
+    // 4,000 until v5 (3,5xx); v6 one rule and one example (4,285); v7 one more rule and the hot day asked as a forecast: the limit moves to 4,500, no further; v8 one short question and nothing else, paid by shorter phrases: 4,500, the limit itself (margin zero).
     expect(prompt.length).toBeLessThanOrEqual(4500);
   });
 
@@ -97,13 +103,14 @@ describe('few-shot dialogues (plan §4: hot day, storm, "is Leo safe?")', () => 
 describe('the examples of each prompt version never change under it (20 Oct: v5 once edited the examples of v1 to v4 in place)', () => {
   const read = async (name: string) => JSON.parse((await (await import('node:fs/promises')).readFile(new URL('../prompts/' + name, import.meta.url), 'utf8'))) as unknown;
 
-  it('v1 to v4 use few-shot.v1.json, v5 few-shot.v5.json, v6 few-shot.v6.json, v7 few-shot.v7.json', async () => {
-    const [v1, v5, v6, v7] = await Promise.all([read('few-shot.v1.json'), read('few-shot.v5.json'), read('few-shot.v6.json'), read('few-shot.v7.json')]);
+  it('v1 to v4 use few-shot.v1.json, v5 few-shot.v5.json, v6 few-shot.v6.json, v7 few-shot.v7.json, v8 few-shot.v8.json', async () => {
+    const [v1, v5, v6, v7, v8] = await Promise.all([read('few-shot.v1.json'), read('few-shot.v5.json'), read('few-shot.v6.json'), read('few-shot.v7.json'), read('few-shot.v8.json')]);
     for (const v of ['v1', 'v2', 'v3', 'v4'] as const) expect(FEW_SHOT_BY_VERSION[v]).toEqual(v1);
     expect(FEW_SHOT_BY_VERSION.v5).toEqual(v5);
     expect(FEW_SHOT_BY_VERSION.v6).toEqual(v6);
     expect(FEW_SHOT_BY_VERSION.v7).toEqual(v7);
-    expect(Object.keys(FEW_SHOT_BY_VERSION)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7']);
+    expect(FEW_SHOT_BY_VERSION.v8).toEqual(v8);
+    expect(Object.keys(FEW_SHOT_BY_VERSION)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8']);
   });
 
   it('freezes what each file says, so an edit in place is a failing test', () => {
@@ -123,6 +130,8 @@ describe('the examples of each prompt version never change under it (20 Oct: v5 
     expect(FEW_SHOT_BY_VERSION.v7.slice(1)).toEqual(FEW_SHOT_BY_VERSION.v6.slice(1));
     expect(FEW_SHOT_BY_VERSION.v7[0]?.user).toBe("It's going to be 36 degrees tomorrow, keep Leo cool.");
     expect(FEW_SHOT_BY_VERSION.v7[0]?.toolCalls[0]?.input).toEqual({ goal: 'cool' });
+    // v8: the examples of v7, unchanged (only the rules change).
+    expect(FEW_SHOT_BY_VERSION.v8).toEqual(FEW_SHOT_BY_VERSION.v7);
   });
 
   it('builds each version with its own examples', () => {
@@ -160,7 +169,7 @@ describe('the system prompt inside the code (G1a: it must survive the CJS bundle
     const read = async (version: string) => (await readFile(new URL(`../prompts/system.${version}.md`, import.meta.url), 'utf8')).trim();
     const { SYSTEM_PROMPTS } = await import('../src/prompts.generated.js');
     // A new version is a new file (#215 review): the old ones stay, unchanged, next to it.
-    expect(Object.keys(SYSTEM_PROMPTS)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7']);
+    expect(Object.keys(SYSTEM_PROMPTS)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8']);
     for (const [version, text] of Object.entries(SYSTEM_PROMPTS)) expect(text).toBe(await read(version));
     expect(SYSTEM_PROMPT_TEMPLATE).toBe(await read(PROMPT_VERSION));
   });

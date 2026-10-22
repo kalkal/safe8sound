@@ -1,6 +1,6 @@
 import { stormNotForecastMessage } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { answerRuleViolations, asksToConfirmAnAppliedPlan } from '../src/evals/answer-rules.js';
+import { answerRuleViolations, asksToConfirmAnAppliedPlan, notOneShortQuestion } from '../src/evals/answer-rules.js';
 
 // The rules on the words the assistant says (found on the real site, 20 Oct): the exact sentences seen there are caught,
 // and ordinary good answers are not.
@@ -122,5 +122,35 @@ describe('asksToConfirmAnAppliedPlan', () => {
   it('is false when the card does not say applied, or the answer does not ask', () => {
     expect(asksToConfirmAnAppliedPlan(asks, 'Plan valid until 14:10. Apply plan')).toBe(false);
     expect(asksToConfirmAnAppliedPlan('The plan is already in place.', 'Plan applied.')).toBe(false);
+  });
+});
+
+describe('notOneShortQuestion', () => {
+  it('catches the real answer to "Make it better." (21 Oct): a list of three questions and an instruction', () => {
+    const real =
+      'I’m happy to help improve your home comfort. Would you like me to: - Adjust the temperature in any room? - Start or stop a comfort plan? - Check the battery or storm reserve? Just tell me what you’d like to change.';
+    expect(notOneShortQuestion(real)).toBe(true);
+  });
+
+  it('passes one short question, with or without a short lead-in', () => {
+    expect(notOneShortQuestion('What would you like me to change?')).toBe(false);
+    expect(notOneShortQuestion('Sure. Which room should feel better?')).toBe(false);
+  });
+
+  it('passes the honest answer to "Yes, confirm it." with nothing to confirm (about 24 words), and a question inside closing quotes', () => {
+    expect(notOneShortQuestion("There's no plan waiting for your yes right now, so I have nothing to confirm. What would you like me to do for the home?")).toBe(false);
+    expect(notOneShortQuestion('You could say “Which room should I cool?”')).toBe(false);
+    expect(notOneShortQuestion('Which room should I cool?) ')).toBe(false);
+  });
+
+  it('catches two questions, a question that is not the end, no question at all, and a question too long to be short', () => {
+    expect(notOneShortQuestion('Cooler or warmer? Which room?')).toBe(true);
+    expect(notOneShortQuestion('What should I change? Tell me the room.')).toBe(true);
+    expect(notOneShortQuestion('I can make the house cooler.')).toBe(true);
+    expect(
+      notOneShortQuestion(
+        'Would you like me to make the living room cooler this afternoon, or keep the battery for the storm reserve tonight, or start a comfort plan for Leo, or something else entirely?',
+      ),
+    ).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import type { AgentTurn } from '../agent.js';
-import { answerRuleViolations } from './answer-rules.js';
+import { answerRuleViolations, notOneShortQuestion } from './answer-rules.js';
 import { DEFAULT_FORBIDDEN_TOOLS, type EvalCase } from './cases.js';
 
 export interface CaseScore {
@@ -9,7 +9,7 @@ export interface CaseScore {
   readonly trajectory: boolean;
   /** Every number in the answer comes from a tool result or from the user. */
   readonly noInventedNumbers: boolean;
-  /** No leak pattern, none of the rules on the words (answer-rules.ts), every required pattern, and a clarifying question when one is expected. */
+  /** No leak pattern, none of the rules on the words (answer-rules.ts), every required pattern, and a question when one is expected (one short question when no tool is expected). */
   readonly answer: boolean;
   readonly pass: boolean;
 }
@@ -35,6 +35,8 @@ export function scoreCase(c: EvalCase, turn: Pick<AgentTurn, 'toolCalls' | 'tool
   const noInventedNumbers = numbers(turn.text).every((n) => known.has(n));
   const leaks = (e.mustNotMatch ?? []).some((p) => new RegExp(p, 'i').test(turn.text));
   const missing = (e.mustMatch ?? []).some((p) => !new RegExp(p, 'i').test(turn.text));
-  const answer = !leaks && !missing && answerRuleViolations(turn.text, c.utterance, turn.toolResults).length === 0 && (e.asksQuestion !== true || turn.text.includes('?'));
+  // A question with no tool behind it is a clarifying one: exactly one short question (A10, 21 Oct).
+  const asks = e.asksQuestion !== true || (e.noTools === true ? !notOneShortQuestion(turn.text) : turn.text.includes('?'));
+  const answer = !leaks && !missing && answerRuleViolations(turn.text, c.utterance, turn.toolResults).length === 0 && asks;
   return { toolChoice, trajectory, noInventedNumbers, answer, pass: toolChoice && trajectory && noInventedNumbers && answer };
 }

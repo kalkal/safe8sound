@@ -128,6 +128,14 @@ describe('scoreCase (metrics: tool choice, trajectory, no invented numbers)', ()
     expect(scoreCase(byId('ambiguous-better'), turn([], [], 'What would you like to change?')).pass).toBe(true);
     expect(scoreCase(byId('ambiguous-better'), turn([], [], 'Done.')).pass).toBe(false);
   });
+
+  it('wants exactly one short question back: a list of questions fails every clarifying case (A10, 21 Oct)', () => {
+    const list = 'Would you like me to: - Adjust the temperature? - Check the battery? Just tell me what you’d like to change.';
+    for (const id of ['ambiguous-better', 'ambiguous-off', 'confirm-no-token']) {
+      expect(scoreCase(byId(id), turn([], [], list)).answer, id).toBe(false);
+      expect(scoreCase(byId(id), turn([], [], 'What would you like me to change?')).answer, id).toBe(true);
+    }
+  });
 });
 
 describe('#438 review: the fake model hears a health worry about a person only', () => {

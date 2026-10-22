@@ -106,3 +106,16 @@ export const SAYS_PLAN_APPLIED = /\bplan (?:was )?(?:already )?applied\b/i;
 export function asksToConfirmAnAppliedPlan(answer: string, cardsText: string): boolean {
   return SAYS_PLAN_APPLIED.test(cardsText) && ASKS_CONFIRMATION.test(answer);
 }
+
+/** The most words a clarifying answer may take and still be one short question (a short lead-in included: the honest answer to "Yes, confirm it." with nothing to confirm takes about 24). */
+const SHORT_QUESTION_WORDS = 30;
+
+/**
+ * A request too unclear to act on gets one short question back (21 Oct: the real model answered "Make it better." with a
+ * list of three questions and an instruction): exactly one "?", at the very end, in a few words.
+ */
+export function notOneShortQuestion(answer: string): boolean {
+  // Closing quotes, brackets and spaces after the question mark do not count (“Which room?”).
+  const text = answer.trim().replace(/[\s"'’”)\]]+$/, '');
+  return text.split('?').length !== 2 || !text.endsWith('?') || text.split(/\s+/).length > SHORT_QUESTION_WORDS;
+}
