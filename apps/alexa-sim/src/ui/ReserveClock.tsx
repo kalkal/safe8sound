@@ -12,14 +12,20 @@ import { t } from './text.js';
 
 export function ReserveClock({ outlook, storm, example = false }: { outlook: ReserveOutlook; storm: boolean; example?: boolean }) {
   const titleId = useId();
-  const hours = outlook.hoursAtCurrentLevel;
+  // The hours if the power goes now (owner, 22 Oct): the whole battery at Essential, the same before and after a blackout.
+  // On grid the hours at the current level count only what comfort may spend above the storm reserve, and read as "0 h"
+  // with a full reserve. An outlook without them (an older server, the scripted example) keeps those.
+  const outage = outlook.hoursIfOutageNow;
+  const hours = outage ?? outlook.hoursAtCurrentLevel;
+  const said = outage === undefined ? null : <p className="reserve-basis">{t(outlook.gridAvailable === false ? 'cubes.batteryNow' : 'cubes.ifOutage')}</p>;
   return (
     <section className="reserve-clock" aria-labelledby={titleId}>
-      {example ? (
-        // One grid cell: the uppercase title, then the badge under it, outside the title's capitals.
+      {example || said !== null ? (
+        // One grid cell: the uppercase title, then what the hours count and the badge under it, outside the title's capitals.
         <div>
           <h2 id={titleId}>{t('cubes.title')}</h2>
-          <OfflineExampleBadge />
+          {said}
+          {example && <OfflineExampleBadge />}
         </div>
       ) : (
         <h2 id={titleId}>{t('cubes.title')}</h2>

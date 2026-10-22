@@ -41,3 +41,24 @@ describe('ReserveClock', () => {
     expect(screen.getByRole('region', { name: 'Cold reserve' }).textContent).not.toContain('Offline example');
   });
 });
+
+describe('the hours if the power goes now (owner, 22 Oct: "0 h" with a full storm reserve)', () => {
+  it('counts the whole battery at Essential, says so under the title, and draws a cube per hour', () => {
+    const all = ReserveOutlookSchema.parse({ ...exampleReserveOutlook(), hoursAtCurrentLevel: 0, hoursAtEssential: 0, hoursIfOutageNow: 8, gridAvailable: true });
+    const { container } = render(<ReserveClock outlook={all} storm={false} />);
+    const region = screen.getByRole('region', { name: 'Cold reserve' });
+    expect(region.textContent).toContain('If the power goes now');
+    expect(region.textContent).toContain('8 h');
+    expect(container.querySelectorAll('.cube')).toHaveLength(cubeFills(8).length);
+  });
+});
+
+describe('the label follows the grid (review of #522)', () => {
+  it('with the grid down the hours are the battery now, never "if the power goes now"', () => {
+    const down = ReserveOutlookSchema.parse({ ...exampleReserveOutlook(), hoursAtCurrentLevel: 2.5, hoursAtEssential: 8.7, hoursIfOutageNow: 8.7, gridAvailable: false });
+    render(<ReserveClock outlook={down} storm />);
+    const region = screen.getByRole('region', { name: 'Cold reserve' });
+    expect(region.textContent).toContain('On the battery now, at Essential');
+    expect(region.textContent).not.toContain('If the power goes now');
+  });
+});

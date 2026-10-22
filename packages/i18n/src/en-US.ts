@@ -455,8 +455,14 @@ export const enUS = {
   'guarantee.safe_room_comfort': 'Safe room comfort',
   'guarantee.pacing_on_track': 'Pacing on track',
   'cubes.title': 'Cold reserve',
+  // What the hours count (owner, 22 Oct): the whole battery at Essential if the grid goes down now.
+  'cubes.ifOutage': 'If the power goes now',
+  // With the grid down the same hours are the battery now (review of 522).
+  'cubes.batteryNow': 'On the battery now, at Essential',
   'cubes.hours': '{hours} h',
   'cubes.basis': 'on battery alone at {level}. One cube is one hour at the current level.',
+  'cubes.basisOutage': 'on the whole battery at Essential, the most frugal level, if the grid goes down now. One cube is one hour.',
+  'cubes.basisBatteryNow': 'on the whole battery at Essential, the most frugal level, now that the grid is down. One cube is one hour.',
   'cubes.hourOne': '{hours} hour',
   'cubes.hourMany': '{hours} hours',
   'cubes.fullOne': '1 full cube',

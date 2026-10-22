@@ -127,6 +127,24 @@ describe('darkWindow: from when PV stops covering the essential load to the next
   });
 });
 
+describe('the hours if the power goes now (owner, 22 Oct: the idle tile said "0 h" with a full storm reserve)', () => {
+  const base = { battery, socPct: pct(60), reserveFloorSocPct: pct(40), reserveWh: 4000, currentLoadW: 1000, essentialLoadW: 350 };
+
+  it('the whole battery down to the hardware floor, at Essential, with the grid up or down: no jump at the blackout', () => {
+    const up = reserveOutlookHours({ ...base, gridAvailable: true });
+    const down = reserveOutlookHours({ ...base, gridAvailable: false });
+    expect(up.hoursIfOutageNow).toBeCloseTo(usableWh(battery, pct(60)) / 350, 9);
+    expect(up.hoursIfOutageNow).toBeCloseTo(down.hoursIfOutageNow, 9);
+    expect(down.hoursIfOutageNow).toBeCloseTo(down.hoursAtEssential, 9);
+  });
+
+  it('a battery that is all storm reserve still has its hours: never 0 while it holds energy above the floor', () => {
+    const o = reserveOutlookHours({ ...base, socPct: pct(40), gridAvailable: true });
+    expect(o.hoursAtCurrentLevel).toBe(0);
+    expect(o.hoursIfOutageNow).toBeGreaterThan(0);
+  });
+});
+
 describe('reserveOutlookHours (the ice cubes, agreed with F8b in #21)', () => {
   const base = { battery, socPct: pct(60), reserveFloorSocPct: pct(40), reserveWh: 4000, currentLoadW: 1000, essentialLoadW: 350 };
 
@@ -148,7 +166,7 @@ describe('reserveOutlookHours (the ice cubes, agreed with F8b in #21)', () => {
 
   it('the reserve alone never counts energy the battery does not hold (#273): at the hardware floor every value is 0', () => {
     for (const gridAvailable of [true, false]) {
-      expect(reserveOutlookHours({ ...base, gridAvailable, socPct: pct(battery.minSocHwPct) })).toEqual({ hoursAtCurrentLevel: 0, hoursAtEssential: 0, reserveHoursAtEssential: 0 });
+      expect(reserveOutlookHours({ ...base, gridAvailable, socPct: pct(battery.minSocHwPct) })).toEqual({ hoursAtCurrentLevel: 0, hoursAtEssential: 0, reserveHoursAtEssential: 0, hoursIfOutageNow: 0 });
     }
   });
 

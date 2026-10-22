@@ -557,11 +557,13 @@ describe('what the model reads', () => {
     const up = await reserveOutlook(low.deps, {}, low.ctx);
     if (!up.ok) throw new Error(up.error.message);
     expect(up.value.gridAvailable).toBe(true);
-    expect(outlookSummary(up.value)).toMatch(/^For comfort, above the storm reserve: about /);
+    // The grid and the hours if it goes down now come first (owner, 22 Oct): the small comfort figure is never the first number.
+    expect(outlookSummary(up.value)).toMatch(/^The grid is on\. If it goes down now, the battery keeps the home going for about \d+\.\d hours at essential\. For comfort, above the storm reserve: about /);
+    expect(outlookSummary(up.value)).not.toMatch(/autonomy/i);
     const storm = world('storm-blackout', 3);
     const down = await reserveOutlook(storm.deps, {}, storm.ctx);
     if (!down.ok) throw new Error(down.error.message);
-    expect(outlookSummary(down.value)).toMatch(/^On the battery alone: about /);
+    expect(outlookSummary(down.value)).toMatch(/^The grid is down\. On the battery alone: about /);
   });
 
   it('a refused proposal gives no bare night-hours figure for the plan that holds: the model read 8.75 as "9" over a card saying "0 of 6" (21 Oct)', async () => {

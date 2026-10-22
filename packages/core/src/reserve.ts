@@ -46,13 +46,16 @@ export function reserveOutlookHours(input: {
   reserveWh: number;
   currentLoadW: number;
   essentialLoadW: number;
-}): { hoursAtCurrentLevel: number; hoursAtEssential: number; reserveHoursAtEssential: number } {
+}): { hoursAtCurrentLevel: number; hoursAtEssential: number; reserveHoursAtEssential: number; hoursIfOutageNow: number } {
   const energy = input.gridAvailable ? usableWh(input.battery, input.socPct, input.reserveFloorSocPct) : usableWh(input.battery, input.socPct);
   return {
     hoursAtCurrentLevel: energy / input.currentLoadW,
     hoursAtEssential: energy / input.essentialLoadW,
     // Never more than the battery holds above its hardware floor (#273): at the floor the reserve is spent too.
     reserveHoursAtEssential: Math.min(input.reserveWh * input.battery.roundTripEff, usableWh(input.battery, input.socPct)) / input.essentialLoadW,
+    // If the power goes now (owner, 22 Oct): the whole battery down to its hardware floor at Essential, as off grid. The same
+    // number before and after the blackout, never "0 h" while the storm reserve holds energy.
+    hoursIfOutageNow: usableWh(input.battery, input.socPct) / input.essentialLoadW,
   };
 }
 

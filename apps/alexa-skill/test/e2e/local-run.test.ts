@@ -79,7 +79,8 @@ describe('the skill against the local MCP server', () => {
     expect(launch.response.shouldEndSession).toBe(false);
 
     const reserve = await handle(fixture('reserve-outlook'), d);
-    expect(spoken(reserve)).toContain(`At the ${outlook.level} level, the battery alone lasts`);
+    // With the grid on, what the whole battery keeps going if the power goes now comes first (owner, 22 Oct).
+    expect(spoken(reserve)).toContain(outlook.gridAvailable === true ? "If the power goes now, the battery keeps the home going for" : `At the ${outlook.level} level, the battery alone lasts`);
     expect(reserve.response.shouldEndSession).toBe(false);
 
     const help = await handle(fixture('help'), d);

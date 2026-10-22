@@ -7,7 +7,10 @@ import { formatHours, t } from './text.js';
 export { cubeFills, cubesLabel } from './CubeRow.js';
 
 export function IceCubesCard({ outlook }: { outlook: ReserveOutlook }) {
-  const hours = outlook.hoursAtCurrentLevel;
+  // The hours if the power goes now (owner, 22 Oct), as the idle tile: the whole battery at Essential. An outlook without
+  // them (an older server) keeps the hours at the current level and their own words.
+  const outage = outlook.hoursIfOutageNow;
+  const hours = outage ?? outlook.hoursAtCurrentLevel;
   return (
     <CardShell
       title={t('cubes.title')}
@@ -15,6 +18,7 @@ export function IceCubesCard({ outlook }: { outlook: ReserveOutlook }) {
       pages={[
         <Fragment key="first">
           <div className="hero-row">
+            {outage !== undefined && <p className="muted">{t(outlook.gridAvailable === false ? 'cubes.batteryNow' : 'cubes.ifOutage')}</p>}
             <p className="hero-value" data-testid="cube-hours">
               {t('cubes.hours', { hours: formatHours(hours) })}
             </p>
@@ -23,8 +27,8 @@ export function IceCubesCard({ outlook }: { outlook: ReserveOutlook }) {
           </div>
         </Fragment>,
         <Fragment key="more">
-          <p className="muted">{t('cubes.basis', { level: t(`level.${outlook.level}`) })}</p>
-          {outlook.level !== 'essential' && (
+          <p className="muted">{outage === undefined ? t('cubes.basis', { level: t(`level.${outlook.level}`) }) : t(outlook.gridAvailable === false ? 'cubes.basisBatteryNow' : 'cubes.basisOutage')}</p>
+          {outage === undefined && outlook.level !== 'essential' && (
             <p className="warning">{t('cubes.essential', { hours: formatHours(outlook.hoursAtEssential) })}</p>
           )}
         </Fragment>,

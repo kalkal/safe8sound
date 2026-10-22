@@ -34,6 +34,14 @@ export function homeStatusSpeech(s: HomeStatus): string {
 
 export function reserveOutlookSpeech(o: ReserveOutlook): string {
   const essential = o.level === 'essential' ? '' : ` At the essential level, ${hoursText(o.hoursAtEssential)}.`;
+  // With the grid on (owner, 22 Oct): first what the whole battery keeps going if the power goes now; the hours at the
+  // level are only what comfort may spend above the storm reserve, never "the battery alone".
+  if (o.gridAvailable === true && o.hoursIfOutageNow !== undefined) {
+    return (
+      `If the power goes now, the battery keeps the home going for ${hoursText(o.hoursIfOutageNow)} at the essential level.` +
+      ` Above the storm reserve, comfort can use ${hoursText(o.hoursAtCurrentLevel)} at the ${o.level} level.`
+    );
+  }
   return (
     `At the ${o.level} level, the battery alone lasts ${hoursText(o.hoursAtCurrentLevel)}.${essential}` +
     ` The storm reserve on its own covers ${hoursText(o.reserveHoursAtEssential)} at the essential level.`

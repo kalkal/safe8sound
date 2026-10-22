@@ -38,3 +38,11 @@ describe('ReserveOutlookSchema (ice cubes and reserve hours, approved in #21)', 
     expect(ReserveOutlookSchema.safeParse({ ...exampleReserveOutlook(), gridAvailable: 'no' }).success).toBe(false);
   });
 });
+
+describe('the hours if the power goes now (owner, 22 Oct, additive)', () => {
+  it('is optional, so an outlook without it still parses; when given it is a number of hours, never negative', () => {
+    expect(ReserveOutlookSchema.safeParse(exampleReserveOutlook()).success).toBe(true);
+    expect(ReserveOutlookSchema.safeParse({ ...exampleReserveOutlook(), hoursIfOutageNow: 8.2 }).success).toBe(true);
+    expect(ReserveOutlookSchema.safeParse({ ...exampleReserveOutlook(), hoursIfOutageNow: -1 }).success).toBe(false);
+  });
+});

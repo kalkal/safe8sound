@@ -63,3 +63,19 @@ describe('IceCubesCard', () => {
     expect(screen.queryByText(/If the level drops/)).toBeNull();
   });
 });
+
+describe('the card says the hours if the power goes now, as the idle tile (owner, 22 Oct)', () => {
+  it('a battery that is all storm reserve shows its hours, not "0 h", and says what they count', () => {
+    render(<IceCubesCard outlook={outlook({ hoursAtCurrentLevel: 0, hoursAtEssential: 0, hoursIfOutageNow: 8, gridAvailable: true })} />);
+    expect(document.body.textContent).toContain('8 h');
+    expect(document.body.textContent).toContain('If the power goes now');
+  });
+});
+
+describe('the card label follows the grid (review of #522)', () => {
+  it('with the grid down: the battery now, never "if the power goes now"', () => {
+    render(<IceCubesCard outlook={outlook({ hoursAtCurrentLevel: 2.5, hoursAtEssential: 8.7, hoursIfOutageNow: 8.7, gridAvailable: false })} />);
+    expect(document.body.textContent).toContain('On the battery now, at Essential');
+    expect(document.body.textContent).not.toContain('If the power goes now');
+  });
+});

@@ -151,12 +151,13 @@
     "tool": "get_reserve_outlook",
     "args": {},
     "isError": false,
-    "text": "For comfort, above the storm reserve: about 5.7 hours at comfort level, or 19.7 hours at essential with the same energy; the storm reserve alone gives 15.2 hours at essential. The grid is on. As of 12:00 (simulated data (energy, rooms, weather, scenario clear-day)).",
+    "text": "The grid is on. If it goes down now, the battery keeps the home going for about 34.9 hours at essential. For comfort, above the storm reserve: about 5.7 hours at comfort level, or 19.7 hours at essential with the same energy; the storm reserve alone gives 15.2 hours at essential. As of 12:00 (simulated data (energy, rooms, weather, scenario clear-day)).",
     "structuredContent": {
       "level": "comfort",
       "hoursAtCurrentLevel": 5.745999999999999,
       "hoursAtEssential": 19.700571428571426,
       "reserveHoursAtEssential": 15.154285714285715,
+      "hoursIfOutageNow": 34.85485714285714,
       "gridAvailable": true,
       "origin": {
         "energy": "simulated",

@@ -318,8 +318,11 @@ export function outlookSummary(o: ReserveOutlook): string {
   // On grid the spendable hours are only what comfort may use above the storm reserve (#21): said so, or "0 hours"
   // next to "the reserve gives 1 hour" reads as a contradiction (#287 review). Off grid it is the whole battery.
   const spendable = o.gridAvailable ? 'For comfort, above the storm reserve' : 'On the battery alone';
+  // The grid and, with it up, what the battery keeps going if it goes down now come first (owner, 22 Oct): the comfort
+  // hours above the reserve, often near 0, once read as the home's "autonomy" (the idle tile said "0 h" with a full reserve).
+  const ifOutage = o.gridAvailable && o.hoursIfOutageNow !== undefined ? ` If it goes down now, the battery keeps the home going for about ${one(o.hoursIfOutageNow)} hours at essential.` : '';
   return (
-    `${spendable}: about ${one(o.hoursAtCurrentLevel)} hours at ${o.level} level, or ${one(o.hoursAtEssential)} hours at essential with the same energy; ` +
-    `the storm reserve alone gives ${one(o.reserveHoursAtEssential)} hours at essential. ${grid} ${asOf}`
+    `${grid}${ifOutage} ${spendable}: about ${one(o.hoursAtCurrentLevel)} hours at ${o.level} level, or ${one(o.hoursAtEssential)} hours at essential with the same energy; ` +
+    `the storm reserve alone gives ${one(o.reserveHoursAtEssential)} hours at essential. ${asOf}`
   );
 }

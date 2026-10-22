@@ -19,6 +19,12 @@ export const ReserveOutlookSchema = z
     /** The storm reserve alone, at Essential: what the reserve buys when the grid is lost. */
     reserveHoursAtEssential: hours,
     /**
+     * If the power goes now (owner, 22 Oct, additive, optional): the whole battery down to its hardware floor, at
+     * Essential, with the grid up or down. What the cold reserve tile and card show: on grid the hours above are only
+     * what comfort may spend above the storm reserve, and read as "0 h" with a full reserve.
+     */
+    hoursIfOutageNow: hours.optional(),
+    /**
      * Whether the grid was up when the hours were counted: false in a storm, when the cards switch to the
      * storm theme (optional, added 2026-09-30, approved in #21; same meaning as Plan.gridAvailable).
      */

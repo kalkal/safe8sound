@@ -59,6 +59,14 @@ describe('handle: the requests that read the home', () => {
     expect(spoken(fine)).toContain('It stays safe for about 12 hours.');
   });
 
+  it('with the grid on it says first what the battery keeps going if the power goes now, never the comfort hours as the battery (owner, 22 Oct)', async () => {
+    const outlook = { ...reserveOutlook(), level: 'comfort', hoursAtCurrentLevel: 0, hoursAtEssential: 0, reserveHoursAtEssential: 7.7, hoursIfOutageNow: 8.4, gridAvailable: true };
+    const fake = fakeCaller(() => Promise.resolve(toolResult(outlook)));
+    const said = spoken(await handle(fixture('reserve-outlook'), makeDeps({ caller: fake.caller }).deps));
+    expect(said).toMatch(/^If the power goes now, the battery keeps the home going for about 8 hours at the essential level\. /);
+    expect(said).not.toMatch(/the battery alone lasts/);
+  });
+
   it('every number it says comes from the structuredContent', async () => {
     // Other values in, other numbers out: nothing spoken is a constant of the skill.
     const outputs = {
