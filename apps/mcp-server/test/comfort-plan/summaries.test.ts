@@ -580,7 +580,7 @@ describe('what the model reads', () => {
 
   it('a refused proposal: the first words say the guard refused it and why, then that this plan holds and is ready to apply (#202)', async () => {
     const w = world('heatwave', 14);
-    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(22), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(22), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, { ...w.ctx, askedByPerson: true });
     if (!r.ok) throw new Error(r.error.message);
     const text = planSummary(r.value, NIGHT);
     expect(r.value.refusedProposal?.message).toMatch(/Nearest allowed: 6000 W\.$/);

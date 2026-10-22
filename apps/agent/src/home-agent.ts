@@ -96,7 +96,7 @@ export function createHomeAgent(deps: {
       deps.log?.(logLine(timeout, 'TurnDeadline', { correlationId }));
       return err(timeout);
     }
-    recorder.reset(correlationId);
+    recorder.reset(correlationId, question);
     const answer = await agent.ask(question, { correlationId, deadlineMs: leftMs });
     if (!answer.ok) {
       if (answer.error.code === 'agent_timeout') {

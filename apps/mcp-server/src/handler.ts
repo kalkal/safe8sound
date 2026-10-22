@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  ASKED_BY_PERSON_META,
   CORRELATION_ID_HEADER,
   HOME_HEADER,
   TURN_HEADER,
@@ -226,7 +227,9 @@ export function createMcpHandler(config: ServerConfig, deps: HandlerDeps): McpHa
       const tool = deps.registry.findTool(request.params.name, ctx.homeId);
       if (!tool) throw new McpError(RpcErrorCode.InvalidParams, `Unknown tool: ${request.params.name}`);
       const started = now();
-      const result = await runTool(tool, request.params.arguments, ctx);
+      // Who asked for the proposal: the agent's _meta, never an argument the model writes (owner, 22 Oct).
+      const asked = request.params._meta?.[ASKED_BY_PERSON_META] === true;
+      const result = await runTool(tool, request.params.arguments, asked ? { ...ctx, askedByPerson: true } : ctx);
       observe(tool.name, result, Math.round(now() - started), ctx);
       return result;
     });

@@ -8,6 +8,11 @@ export interface ToolContext {
   readonly homeId: HomeId;
   /** The conversation turn (TURN_HEADER, #230): set by the agent on its calls, never by a card tap. */
   readonly turnId?: string;
+  /**
+   * The person asked for what this call proposes (ASKED_BY_PERSON_META in the call's _meta, set by the agent from the
+   * person's words, owner 22 Oct): only then is a refused proposal said and shown.
+   */
+  readonly askedByPerson?: true;
 }
 
 /** MCP tool annotations: every tool states them explicitly (plan §4). */

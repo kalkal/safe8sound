@@ -23,6 +23,12 @@ export function correlationIdFrom(presented: string | null | undefined, fresh: (
  */
 export const TURN_HEADER = 'x-cold-reserve-turn';
 
+/**
+ * Whether the person asked for what a plan_comfort call proposes (owner, 22 Oct, additive): the agent sets it from the
+ * person's words in the MCP call's `_meta`, never the model. A refused proposal is said and shown only when it is true.
+ */
+export const ASKED_BY_PERSON_META = 'cold-reserve/askedByPerson';
+
 /** The turn id the caller presented: a well-formed UUID, or none; a malformed one is refused, never ignored. */
 export function turnIdFrom(presented: string | null | undefined): Result<CorrelationId | undefined, ErrorEnvelope> {
   if (presented === null || presented === undefined) return ok(undefined);

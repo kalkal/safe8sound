@@ -244,7 +244,21 @@ export async function planComfort(deps: ComfortPlanDeps, asked: PlanComfortInput
     if (refusal !== undefined && passing !== undefined) {
       // The guard's no to the proposal stays in the audit trail.
       await recordRejection(store, last.verdict, deps, { correlationId: ctx.correlationId, homeId: ctx.homeId });
-      refusedProposal = { code: refusal.code, message: refusal.message };
+      const askedByPerson = ctx.askedByPerson === true;
+      deps.logger.log({
+        ts: new Date(deps.clock.now()).toISOString(),
+        level: 'info',
+        component: 'mcp-server',
+        message: 'The guard refused the proposal; the plan that holds is the answer.',
+        correlationId: ctx.correlationId,
+        ...(isSandbox(ctx.homeId) ? {} : { homeId: ctx.homeId }),
+        code: refusal.code,
+        category: refusal.category,
+        details: { event: 'proposal_refused', askedByPerson, ...homeDetail(ctx.homeId) },
+      });
+      // Said and shown only when the person asked for it (owner, 22 Oct): a proposal the model made up on its own is
+      // neither, the card and the text describe only the plan that holds.
+      if (askedByPerson) refusedProposal = { code: refusal.code, message: refusal.message };
       chosen = passing;
     }
   }

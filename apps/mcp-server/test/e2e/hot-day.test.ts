@@ -1,4 +1,4 @@
-import { ApplyPlanOutputSchema, ErrorEnvelopeSchema, PlanSchema, ReserveOutlookSchema } from '@cold-reserve/contracts';
+import { ASKED_BY_PERSON_META, ApplyPlanOutputSchema, ErrorEnvelopeSchema, PlanSchema, ReserveOutlookSchema } from '@cold-reserve/contracts';
 import { fixedClock } from '@cold-reserve/core';
 import { createMemoryBacking, memoryStateStoreFactory } from '@cold-reserve/store-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -11,6 +11,9 @@ import { startNodeServer } from '../../src/node-server.js';
 import { loadPreferencesConfig, preferencesConfigFile } from '../../src/preferences-config.js';
 import { HOME_TOKEN, TOKEN, quietNotifier } from '../helpers.js';
 
+/** The person asked for the proposal (owner, 22 Oct): the agent says so in the call's _meta. */
+const ASKED = { [ASKED_BY_PERSON_META]: true };
+
 // The hot-day and storm flows end to end: the official SDK client over real HTTP, the production
 // registry with the comfort-plan module, the seeded simulator and F5's in-memory store. Model turns are
 // scripted.
@@ -19,7 +22,7 @@ const textOf = (r: Record<string, unknown>): string => (r['content'] as { type: 
 
 const wall = fixedClock(Date.parse('2026-09-30T10:00:00Z'));
 
-async function withServer<T>(env: Record<string, string>, run: (call: (token: string, name: string, args: Record<string, unknown>) => Promise<Awaited<ReturnType<Client['callTool']>>>) => Promise<T>): Promise<T> {
+async function withServer<T>(env: Record<string, string>, run: (call: (token: string, name: string, args: Record<string, unknown>, meta?: Record<string, unknown>) => Promise<Awaited<ReturnType<Client['callTool']>>>) => Promise<T>): Promise<T> {
   const preferences = loadPreferencesConfig(preferencesConfigFile());
   if (!preferences.ok) throw new Error(preferences.error.message);
   const comfortPlan = comfortPlanWiring({ storeFor: memoryStateStoreFactory({ backing: createMemoryBacking(), clock: wall }), preferences: preferences.value, clock: wall, notifier: quietNotifier });
@@ -28,14 +31,14 @@ async function withServer<T>(env: Record<string, string>, run: (call: (token: st
   if (!app.ok) throw new Error(app.error.message);
   const server = await startNodeServer(app.value.handler, { host: '127.0.0.1', port: 0, path: '/mcp', maxBodyBytes: app.value.config.maxBodyBytes });
   const clients: Client[] = [];
-  const call = async (token: string, name: string, args: Record<string, unknown>) => {
+  const call = async (token: string, name: string, args: Record<string, unknown>, meta?: Record<string, unknown>) => {
     const client = new Client({ name: 'e2e-comfort', version: '0.0.0' });
     clients.push(client);
     const transport = new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers: { authorization: `Bearer ${token}` } } });
     // SDK v1 types do not satisfy exactOptionalPropertyTypes (sessionId?: string vs undefined).
     await client.connect(transport as unknown as Transport);
     await client.listTools(); // loads the output validators, as a real agent would
-    return client.callTool({ name, arguments: args });
+    return client.callTool({ name, arguments: args, ...(meta === undefined ? {} : { _meta: meta }) });
   };
   try {
     return await run(call);
@@ -46,11 +49,26 @@ async function withServer<T>(env: Record<string, string>, run: (call: (token: st
 }
 
 describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confirm, retry', () => {
+  it('a refused proposal without the agent\'s _meta, or with askedByPerson among the arguments, is never said (review of #518)', async () => {
+    await withServer({ MCP_SCENARIO: 'heatwave', MCP_SCENARIO_START_H: '14' }, async (call) => {
+      const greedy = { goal: 'cool', setpointC: 22, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] };
+      // No _meta: the model's own proposal. The plan that holds, with no refusal on it nor in the text.
+      const plain = await call(TOKEN, 'plan_comfort', greedy);
+      expect(plain.isError).toBeFalsy();
+      expect(PlanSchema.parse(plain.structuredContent).refusedProposal).toBeUndefined();
+      expect(textOf(plain)).not.toMatch(/refus/i);
+      // An argument is the model's to write: it never counts as the person's ask (the tool refuses it, or ignores it).
+      const forged = await call(TOKEN, 'plan_comfort', { ...greedy, askedByPerson: true });
+      expect((forged.structuredContent as { refusedProposal?: unknown } | undefined)?.refusedProposal).toBeUndefined();
+      expect(textOf(forged)).not.toMatch(/refused the proposed plan/i);
+    });
+  });
+
   it('runs the whole flow through MCP', async () => {
     await withServer({ MCP_SCENARIO: 'heatwave', MCP_SCENARIO_START_H: '14' }, async (call) => {
       // 1. The model proposes "every room at 22 °C": the guard refuses it, and the answer is the plan that holds,
       // saved and ready to apply, with the refusal said first (#202).
-      const greedy = await call(TOKEN, 'plan_comfort', { goal: 'cool', setpointC: 22, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] });
+      const greedy = await call(TOKEN, 'plan_comfort', { goal: 'cool', setpointC: 22, roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, ASKED);
       expect(greedy.isError).toBeFalsy();
       const holds = PlanSchema.parse(greedy.structuredContent);
       expect(holds.refusedProposal?.code).toBe('inverter_limit_exceeded');

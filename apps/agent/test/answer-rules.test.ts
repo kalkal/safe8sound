@@ -72,6 +72,23 @@ describe('answerRuleViolations', () => {
     });
   });
 
+  describe('a refusal the person never asked for is never said (owner, 22 Oct)', () => {
+    // The model made the proposal up: the server sends only the plan that holds, without a refusal sentence.
+    const plain = ['Proposed plan: comfort level until 08:00 (nothing changes until apply_plan), built on simulated data.'];
+    const asked = "It's going to be 36 degrees tomorrow, keep Leo cool.";
+
+    it('an answer that says "refused" over a plan without a refusal breaks the rule', () => {
+      expect(answerRuleViolations('The safety check refused my first idea, but this plan keeps Leo cool until 08:00. Shall I start it?', asked, plain)).toEqual(['refusal-said-unasked']);
+      expect(answerRuleViolations("I can keep Leo's room under 26.5 degrees until 08:00. Shall I start it?", asked, plain)).toEqual([]);
+    });
+
+    it('is not applied when the tool results carry the refusal (the person asked for it) or no plan at all', () => {
+      const refused = ['The safety check refused the proposed plan: Peak load 8.0 kW is above the limit. This plan holds instead. It is ready to apply. Proposed plan: comfort level until 08:00.'];
+      expect(answerRuleViolations('The safety check refused that: it would overload the inverter. This plan holds instead. Shall I start it?', 'Set every room to 21 degrees.', refused)).toEqual([]);
+      expect(answerRuleViolations('The safety check refused every plan.', asked, [])).toEqual([]);
+    });
+  });
+
   describe('a storm-mode request with no storm in the forecast (21 Oct)', () => {
     const noStorm = [`Error: ${stormNotForecastMessage()}`, `Error: ${stormNotForecastMessage(true)}`];
     const said = 'The power went out.';

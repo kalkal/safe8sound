@@ -1,9 +1,10 @@
-import { CORRELATION_ID_HEADER, CorrelationIdSchema, GuardRefusalSchema, TURN_HEADER, HOME_HEADER, StatusFactsSchema, ToolCardSchema, toolError, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
+import { ASKED_BY_PERSON_META, CORRELATION_ID_HEADER, CorrelationIdSchema, GuardRefusalSchema, TURN_HEADER, HOME_HEADER, StatusFactsSchema, ToolCardSchema, toolError, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { FunctionTool } from '@strands-agents/sdk';
 import type { AgentConfig, McpToken } from './config.js';
+import { askedByPerson } from './asked-by-person.js';
 import { logLine, type AgentLogEntry } from './log.js';
 
 // Our own MCP wrapper (approved in #101): Strands' McpTool drops structuredContent, so each server
@@ -25,7 +26,8 @@ export interface McpCallResult {
 export interface McpSession {
   listTools(): Promise<McpToolInfo[]>;
   /** `correlationId` is the user turn's id: sent as x-correlation-id with the request. */
-  callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal, correlationId?: string): Promise<McpCallResult>;
+  /** `meta`: the call's `_meta`, set by the code, never by the model (ASKED_BY_PERSON_META on plan_comfort). */
+  callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal, correlationId?: string, meta?: Record<string, unknown>): Promise<McpCallResult>;
   /** Ends the session (the real client); a fake may omit it. */
   close?(): Promise<void>;
 }
@@ -41,6 +43,7 @@ export function createTurnRecorder() {
   let cards: ToolCard[] = [];
   let status: StatusFacts | undefined;
   let turnId: string | undefined;
+  let question: string | undefined;
   return {
     record(tool: string, structured: Record<string, unknown> | undefined) {
       if (structured === undefined) return;
@@ -57,12 +60,15 @@ export function createTurnRecorder() {
     },
     cards: (): readonly ToolCard[] => [...cards],
     status: () => status,
+    /** The person's words of the current turn: only the code reads them, to tell who asked for a proposal (22 Oct). */
+    question: () => question,
     /** The correlation id of the current turn, for every MCP call it makes. */
     correlationId: () => turnId,
-    reset(correlationId?: string) {
+    reset(correlationId?: string, asked?: string) {
       cards = [];
       status = undefined;
       turnId = correlationId;
+      question = asked;
     },
   };
 }
@@ -74,7 +80,7 @@ const textOf = (result: McpCallResult) => result.content.map((c) => c.text ?? ''
  * Arguments only the host may carry (#201): the last-resort token comes from the card's second tap. The model
  * never sees them in a schema and never passes them, so it cannot ask the person for one or make one up.
  */
-const HOST_ONLY_ARGS: Readonly<Record<string, readonly string[]>> = { apply_plan: ['lastResortToken'] };
+const HOST_ONLY_ARGS: Readonly<Record<string, readonly string[]>> = { apply_plan: ['lastResortToken'], plan_comfort: ['askedByPerson'] };
 
 /** The tool's input schema without the host-only arguments. */
 function modelSchema(name: string, schema: McpToolInfo['inputSchema']): McpToolInfo['inputSchema'] {
@@ -114,7 +120,9 @@ export async function mcpToolset(session: McpSession, recorder: TurnRecorder, lo
             log?.(logLine(error, 'TurnIdInvalid'));
             throw new Error(error.message);
           }
-          const result = await session.callTool(info.name, args, signal, turn.data);
+          // Who asked for the proposal (owner, 22 Oct): decided here from the person's words, sent in _meta, never an argument.
+          const meta = info.name === 'plan_comfort' ? { [ASKED_BY_PERSON_META]: askedByPerson(recorder.question(), args) } : undefined;
+          const result = await session.callTool(info.name, args, signal, turn.data, meta);
           // A tool error reaches the model as an error result (with its text). Only a guard refusal with its
           // verdict also becomes a card, the REJECTED receipt (#186); every other error stays text.
           if (result.isError === true) {
@@ -162,9 +170,9 @@ export async function connectMcp(config: Pick<AgentConfig, 'mcpUrl'>, token: Mcp
   await client.connect(transport as unknown as Transport);
   return {
     listTools: async () => (await client.listTools()).tools as McpToolInfo[],
-    callTool: async (name, args, signal, correlationId) => {
+    callTool: async (name, args, signal, correlationId, meta) => {
       current = correlationId;
-      return (await client.callTool({ name, arguments: args }, undefined, signal ? { signal } : {})) as McpCallResult;
+      return (await client.callTool({ name, arguments: args, ...(meta === undefined ? {} : { _meta: meta }) }, undefined, signal ? { signal } : {})) as McpCallResult;
     },
     close: () => client.close(),
   };

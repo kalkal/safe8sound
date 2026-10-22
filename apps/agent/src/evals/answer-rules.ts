@@ -84,12 +84,25 @@ export function refusalNotSaidFirst(answer: string, toolResults: readonly string
   return !/\brefus/i.test(first);
 }
 
+
+/** A plan summary the model read this turn (summaries.ts, planSummary). */
+const PLAN_SUMMARY = /(?:^|\. )Proposed (?:last-resort )?plan: /;
+
+/**
+ * A refusal the person never asked for (owner, 22 Oct): when the model made the proposal up, the server sends only the plan
+ * that holds, with no refusal sentence. An answer that still says something was refused tells of a plan nobody asked for.
+ */
+export function refusalSaidUnasked(answer: string, toolResults: readonly string[]): boolean {
+  if (!toolResults.some((r) => PLAN_SUMMARY.test(r)) || toolResults.some((r) => PLAN_REFUSED.test(r))) return false;
+  return /\brefus/i.test(answer);
+}
 /** The ids of the rules the text breaks, in order. With the question and the tool results, also the rules that compare the answer with them. */
 export function answerRuleViolations(text: string, question?: string, toolResults: readonly string[] = []): string[] {
   const broken = ANSWER_RULES.filter((r) => r.pattern.test(text)).map((r) => r.id);
   if (question !== undefined && refusalNamesUnaskedNumber(text, question)) broken.push('refusal-names-unasked-number');
   if (ignoresStormRefusal(text, toolResults)) broken.push('ignores-storm-refusal');
   if (refusalNotSaidFirst(text, toolResults)) broken.push('refusal-not-said-first');
+  if (refusalSaidUnasked(text, toolResults)) broken.push('refusal-said-unasked');
   return broken;
 }
 

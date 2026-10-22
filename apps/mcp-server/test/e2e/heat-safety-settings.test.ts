@@ -1,4 +1,4 @@
-import { PlanSchema } from '@cold-reserve/contracts';
+import { ASKED_BY_PERSON_META, PlanSchema } from '@cold-reserve/contracts';
 import { memoryLogger } from '@cold-reserve/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -8,6 +8,9 @@ import { createLocalApp } from '../../src/local-app.js';
 import { startNodeServer } from '../../src/node-server.js';
 import { settableClock } from '../comfort-plan/support.js';
 import { TOKEN } from '../helpers.js';
+
+/** The person asked for the proposal (owner, 22 Oct): the agent says so in the call's _meta. */
+const ASKED = { [ASKED_BY_PERSON_META]: true };
 
 // #266: the heat-safety settings over MCP, on the local entry (every module, the in-memory store). The heatwave at
 // 23:00 with grandpa in the safe room: a proposal that holds the room at 25 °C all night.
@@ -25,7 +28,7 @@ async function proposeAt25(stricterNightLimit: boolean) {
   try {
     const set = await client.callTool({ name: 'set_preferences', arguments: { safety: { stricterNightLimit }, confirmed: true } });
     expect(set.isError).toBeFalsy();
-    const r = await client.callTool({ name: 'plan_comfort', arguments: { goal: 'cool', setpointC: 25, roomIds: ['bedroom-1'] } });
+    const r = await client.callTool({ name: 'plan_comfort', arguments: { goal: 'cool', setpointC: 25, roomIds: ['bedroom-1'] }, _meta: ASKED });
     expect(r.isError).toBeFalsy();
     return PlanSchema.parse(r.structuredContent);
   } finally {

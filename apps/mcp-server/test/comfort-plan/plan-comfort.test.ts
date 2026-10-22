@@ -49,7 +49,7 @@ describe('plan_comfort (two-phase: propose)', () => {
   it('a refused proposal comes back as the plan that holds: saved, applicable, with a short note of the refusal (#202)', async () => {
     const w = world('storm-blackout', 3);
     // Cooling to only 29 °C lets the safe room reach 27.8 °C, above its 27 °C maximum.
-    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, { ...w.ctx, askedByPerson: true });
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     const plan = PlanSchema.parse(r.value);
     // The planner's own plan for the same moment, as plan_comfort with only the goal gives it.
@@ -179,7 +179,7 @@ describe('plan_comfort (two-phase: propose)', () => {
 
   it('the live defect: "living-room" at 21 °C reaches the guard, which refuses the 21 °C (the plan that holds comes back)', async () => {
     const w = world('heatwave', 14);
-    const r = await planComfort(w.deps, { goal: 'cool', roomIds: ['living-room'], setpointC: celsius(21) }, w.ctx);
+    const r = await planComfort(w.deps, { goal: 'cool', roomIds: ['living-room'], setpointC: celsius(21) }, { ...w.ctx, askedByPerson: true });
     expect(!r.ok && r.error.code).not.toBe('unknown_room');
     expect(r.ok ? r.value.refusedProposal : undefined).toBeDefined();
   });
@@ -264,7 +264,7 @@ describe('plan_comfort (two-phase: propose)', () => {
 
   it('checks a plan the model proposed as it is: no mode is changed for humidity; refused, the answer is the plan that holds (#202)', async () => {
     const w = world('heatwave', 14);
-    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(26), roomIds: ['bedroom-1'] }, w.ctx);
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(26), roomIds: ['bedroom-1'] }, { ...w.ctx, askedByPerson: true });
     if (!r.ok) throw new Error(r.error.message);
     // Cool at 26 °C misses the older person's 24 °C night target (the guided test of #202; humid air alone is no
     // longer a refusal, #248): the guard refuses the proposal as it is, never a silently edited one, and the
@@ -449,7 +449,7 @@ describe('last resort (approved in #19: proposal only)', () => {
 
   it('a refused proposal on 30 %: the hold that keeps every guarantee is the answer, with the refusal noted (#202)', async () => {
     const w = stormAt(30);
-    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, w.ctx);
+    const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, { ...w.ctx, askedByPerson: true });
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     expect(r.value.refusedProposal?.message).toMatch(/Nearest allowed/);
     expect(r.value.lastResort).toBeUndefined();

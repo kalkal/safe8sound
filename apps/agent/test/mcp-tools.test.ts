@@ -1,5 +1,5 @@
 import './no-network.js';
-import { HomeIdSchema, PlanSchema } from '@cold-reserve/contracts';
+import { ASKED_BY_PERSON_META, HomeIdSchema, PlanSchema } from '@cold-reserve/contracts';
 import { examplePlan } from '@cold-reserve/contracts/fixtures';
 import { describe, expect, it } from 'vitest';
 import { McpToken } from '../src/config.js';
@@ -25,12 +25,12 @@ function inTurn() {
 }
 
 function fakeSession(results: Record<string, { text: string; structuredContent?: Record<string, unknown>; isError?: boolean }>) {
-  const calls: { name: string; args: unknown; correlationId?: string | undefined }[] = [];
+  const calls: { name: string; args: unknown; correlationId?: string | undefined; meta?: Record<string, unknown> }[] = [];
   const session: McpSession = {
     listTools: () =>
       Promise.resolve(Object.keys(results).map((name) => ({ name, description: `The ${name} tool.`, inputSchema: { type: 'object' as const, properties: {} } }))),
-    callTool: (name, args, _signal, correlationId) => {
-      calls.push({ name, args, ...(correlationId === undefined ? {} : { correlationId }) });
+    callTool: (name, args, _signal, correlationId, meta) => {
+      calls.push({ name, args, ...(correlationId === undefined ? {} : { correlationId }), ...(meta === undefined ? {} : { meta }) });
       const r = results[name] ?? { text: 'unknown', isError: true };
       return Promise.resolve({ content: [{ type: 'text', text: r.text }], ...(r.structuredContent ? { structuredContent: r.structuredContent } : {}), ...(r.isError ? { isError: true } : {}) });
     },
@@ -94,6 +94,24 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
     const recorder = inTurn();
     expect(await run(await mcpToolset(session, recorder), 'plan_comfort', {})).toBe('Plan proposed.');
     expect(recorder.cards()).toEqual([]);
+  });
+
+  it('tells plan_comfort, in the call\'s _meta and never as an argument, whether the person asked for the proposal (owner, 22 Oct)', async () => {
+    const { session, calls } = fakeSession({ plan_comfort: { text: 'Plan proposed.' }, get_home_status: { text: 'Battery at 45%.' } });
+    const recorder = createTurnRecorder();
+    const tools = await mcpToolset(session, recorder);
+    recorder.reset(TURN, "It's going to be 36 degrees tomorrow, keep Leo cool.");
+    await run(tools, 'plan_comfort', { goal: 'comfort', setpointC: 24, askedByPerson: true });
+    recorder.reset(TURN, 'Set every room to 21 degrees.');
+    await run(tools, 'plan_comfort', { goal: 'comfort', setpointC: 21 });
+    await run(tools, 'get_home_status', {});
+    expect(calls.map((c) => [c.name, c.meta])).toEqual([
+      ['plan_comfort', { [ASKED_BY_PERSON_META]: false }],
+      ['plan_comfort', { [ASKED_BY_PERSON_META]: true }],
+      ['get_home_status', undefined],
+    ]);
+    // The model's own "askedByPerson" never reaches the server.
+    expect(calls[0]?.args).toEqual({ goal: 'comfort', setpointC: 24 });
   });
 
   it('never calls a tool outside a well-formed turn: one log line, and the model gets an error (#233)', async () => {
