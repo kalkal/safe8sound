@@ -18,7 +18,7 @@ import { PctSchema } from './units.js';
  * A demo code: 16 to 128 visible ASCII characters (injection hardening, 22 Oct), so no space, line break, invisible
  * character or look-alike letter ever reaches the server. Every code the earlier rule (any 16-128 characters) took and
  * that has none of those still opens: nobody is locked out by the change. New codes are 24 hex characters
- * (infra/scripts/new-demo-parameters.ps1, rotate-demo-code.ps1). The page checks the same pattern before sending.
+ * (the scripts in infra/scripts). The page checks the same pattern before sending.
  */
 export const DEMO_CODE_PATTERN = /^[!-~]{16,128}$/;
 /** The longest demo code the field takes. */

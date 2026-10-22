@@ -54,7 +54,7 @@ Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server
 
 ### Reserve "ice cubes", preferences and cards
 - The cold reserve tile and card show the hours at Essential if the power goes now: the whole battery, the same number before and after a blackout. "How long will the battery last?" also says the comfort hours above the storm reserve and the storm reserve alone.
-- Preferences change only after you confirm, only inside hard limits, and every change is logged. Contacts are shown by role only.
+- Preferences are saved **only by a tap on the card, never by voice**: a spoken request gets pointed to the preferences card. They change only inside hard limits, and every change is logged. Contacts are shown by role only.
 - Cards (MCP Apps) show the plan, the applied plan, the reserve outlook, the preferences and the safe room; light and dark themes, they fit a 375 px phone.
 
 ### Web simulator
