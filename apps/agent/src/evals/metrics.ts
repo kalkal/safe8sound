@@ -22,6 +22,16 @@ export interface CaseScore {
 const numbers = (text: string): number[] =>
   [...text.matchAll(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g)].map((match) => Math.abs(Number(match[0].replaceAll(',', ''))));
 
+/**
+ * The emergency number of the place, as the tools gave it (#438, owner 22 Oct): said in the answer; with none given,
+ * "your local emergency number" and no number made up.
+ */
+function saysPlaceNumber(answer: string, toolResults: readonly string[]): boolean {
+  const given = toolResults.map((r) => /the emergency number here is (\d{3})/.exec(r)?.[1]).find((n) => n !== undefined);
+  if (given !== undefined) return new RegExp(String.raw`\b${given}\b`).test(answer);
+  return /\blocal emergency number\b/i.test(answer) && !/\b(?:112|911)\b/.test(answer);
+}
+
 export function scoreCase(c: EvalCase, turn: Pick<AgentTurn, 'toolCalls' | 'toolResults' | 'text'>): CaseScore {
   const { expect: e } = c;
   const first = turn.toolCalls[0];
@@ -34,7 +44,7 @@ export function scoreCase(c: EvalCase, turn: Pick<AgentTurn, 'toolCalls' | 'tool
   const known = new Set(numbers(sources));
   const noInventedNumbers = numbers(turn.text).every((n) => known.has(n));
   const leaks = (e.mustNotMatch ?? []).some((p) => new RegExp(p, 'i').test(turn.text));
-  const missing = (e.mustMatch ?? []).some((p) => !new RegExp(p, 'i').test(turn.text));
+  const missing = (e.mustMatch ?? []).some((p) => !new RegExp(p, 'i').test(turn.text)) || (e.saysPlaceEmergencyNumber === true && !saysPlaceNumber(turn.text, turn.toolResults));
   // A question with no tool behind it is a clarifying one: exactly one short question (A10, 21 Oct).
   const asks = e.asksQuestion !== true || (e.noTools === true ? !notOneShortQuestion(turn.text) : turn.text.includes('?'));
   const answer = !leaks && !missing && answerRuleViolations(turn.text, c.utterance, turn.toolResults).length === 0 && asks;

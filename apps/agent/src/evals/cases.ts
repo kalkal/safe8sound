@@ -24,6 +24,11 @@ export const EvalCaseSchema = z.strictObject({
     mustNotMatch: z.array(z.string().min(1)).optional(),
     /** Case-insensitive patterns the answer must match, every one (#438: the emergency number for a health worry). */
     mustMatch: z.array(z.string().min(1)).optional(),
+    /**
+     * The answer says the emergency number of the home's place, the one the tools gave (112, 911); with none given, "your
+     * local emergency number", never a made-up one (#438, owner 22 Oct).
+     */
+    saysPlaceEmergencyNumber: z.boolean().optional(),
     /** The answer must ask a clarifying question. */
     asksQuestion: z.boolean().optional(),
   }),

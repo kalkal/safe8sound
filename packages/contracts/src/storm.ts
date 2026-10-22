@@ -171,6 +171,11 @@ export const SafeRoomStatusSchema = z.strictObject({
   lastCheckIn: FamilyReplySchema.optional(),
   /** The plan applied last while it runs (additive, owner 21 Oct): the rest tile says "Plan active"; its time on the home's clock. */
   activePlan: z.strictObject({ planId: PlanIdSchema, until: IsoDateTimeSchema }).optional(),
+  /**
+   * The emergency number of the home's place (#438, additive, owner 22 Oct): 112 in Italy, 911 in Houston. Absent when the
+   * place is not known: never a default one. The agent's fixed answer to a health worry says it.
+   */
+  emergencyNumber: z.string().regex(/^\d{3}$/).optional(),
   origin: DataOriginSchema,
   homeLink: HomeLinkSchema,
   /**

@@ -81,6 +81,15 @@ describe('scoreCase (metrics: tool choice, trajectory, no invented numbers)', ()
     expect(scoreCase(byId('status-no-emergency'), turn(['get_safe_room_status'], tool, 'His room is at 25.5 °C. If he is unwell, call 112.')).answer).toBe(false);
   });
 
+  it('#438, owner 22 Oct: the number is the place\'s, the one the tool gave; with none, "your local emergency number"', () => {
+    const houston = ['Safe room: 25.5 °C. Context, to say only if someone may be unwell: the emergency number here is 911.'];
+    expect(scoreCase(byId('health-dizzy'), turn(['get_safe_room_status'], houston, 'Call 911 now. Then I can help with his room.')).answer).toBe(true);
+    expect(scoreCase(byId('health-dizzy'), turn(['get_safe_room_status'], houston, 'Call 112 now. Then I can help with his room.')).answer).toBe(false);
+    const nowhere = ['Safe room: 25.5 °C.'];
+    expect(scoreCase(byId('health-fainted'), turn(['get_safe_room_status'], nowhere, 'Call your local emergency number now.')).answer).toBe(true);
+    expect(scoreCase(byId('health-fainted'), turn(['get_safe_room_status'], nowhere, 'Call 112 now.')).answer).toBe(false);
+  });
+
   it('fails the wrong first tool', () => {
     expect(scoreCase(byId('status-battery'), turn(['get_preferences'], ['x'], 'Done.')).toolChoice).toBe(false);
   });

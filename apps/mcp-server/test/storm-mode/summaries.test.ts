@@ -126,6 +126,20 @@ describe('what the model reads', () => {
     expect(said).not.toMatch(/emergency number|\b(112|911)\b/);
   });
 
+  it('#438, owner 22 Oct: get_safe_room_status carries the number of the place in its result, for the agent\'s fixed answer; none without a place', async () => {
+    for (const [place, number] of [['houston', '911'], ['turin', '112'], ['reference', '112']] as const) {
+      const w = world(4, { place });
+      const tool = stormModeModule(w.deps).tools.find((t) => t.name === 'get_safe_room_status');
+      const out = await tool?.handler({}, w.ctx);
+      expect(out?.ok && out.value).toMatchObject({ emergencyNumber: number });
+      expect(SafeRoomStatusSchema.safeParse(out?.ok ? out.value : undefined).success).toBe(true);
+    }
+    const w = world(4);
+    const out = await stormModeModule(w.deps).tools.find((t) => t.name === 'get_safe_room_status')?.handler({}, w.ctx);
+    expect(out?.ok).toBe(true);
+    expect(out?.ok ? out.value : undefined).not.toHaveProperty('emergencyNumber');
+  });
+
   it('notify_family: sent and skipped roles, and the preview addressed to the role', async () => {
     const w = world(4);
     await startStormMode(w.deps, { mode: 'active' }, w.ctx);

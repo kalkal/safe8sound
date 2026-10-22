@@ -1,4 +1,4 @@
-import { NotifyFamilyInputSchema, NotifyFamilyOutputSchema, SafeRoomStatusSchema, StartStormModeInputSchema, StartStormModeOutputSchema, type HomeId } from '@cold-reserve/contracts';
+import { ok, NotifyFamilyInputSchema, NotifyFamilyOutputSchema, SafeRoomStatusSchema, StartStormModeInputSchema, StartStormModeOutputSchema, type HomeId } from '@cold-reserve/contracts';
 import { emergencyNumberOf } from '@cold-reserve/i18n';
 import { z } from 'zod';
 import type { CapabilityModule } from '../../registry.js';
@@ -49,7 +49,12 @@ export function stormModeModule(deps: StormModeDeps): CapabilityModule {
           const emergency = home?.place === undefined ? undefined : emergencyNumberOf(home.place);
           return safeRoomSummary(o, home?.units ?? 'C', roomLabel(deps, ctx.homeId), deps.config.capHours, emergency);
         },
-        handler: (_args, ctx) => safeRoomStatus(atHome(deps, ctx.homeId), ctx),
+        // The place's number in the result too (#438, owner 22 Oct): the agent's fixed answer to a health worry reads it.
+        handler: async (_args, ctx) => {
+          const status = await safeRoomStatus(atHome(deps, ctx.homeId), ctx);
+          const place = deps.homes(ctx.homeId)?.place;
+          return status.ok && place !== undefined ? ok({ ...status.value, emergencyNumber: emergencyNumberOf(place) }) : status;
+        },
       }),
       defineTool({
         name: 'notify_family',

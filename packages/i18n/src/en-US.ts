@@ -521,6 +521,10 @@ export const enUS = {
   'floor.waiting.user_off': 'Waiting: switched off by you',
   'manual.title': 'Manual control',
   'manual.cloud_unreachable': "The air-conditioner cloud is not answering, so I can't set the splits myself. Please set these with the remote:",
+  // A health worry (#438, owner 22 Oct): the code's fixed answer, never the model's: the number of the home's place, no
+  // medical advice, never "safe", and never a claim that anyone was called.
+  'emergency.health': "If someone may be unwell, call {number} now. I can't give medical advice, and I haven't called anyone for you.",
+  'emergency.healthLocal': "If someone may be unwell, call your local emergency number now. I can't give medical advice, and I haven't called anyone for you.",
   'manual.read_only': 'This home is read-only for now, so nothing is changed automatically. Please set these with the remote:',
   'manual.list': 'Set by hand',
   'manual.done': 'Done: {text}',

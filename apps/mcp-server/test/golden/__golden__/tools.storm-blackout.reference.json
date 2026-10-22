@@ -126,6 +126,7 @@
       "safeHours": 24,
       "safeUntil": "2026-07-18T12:00:00+02:00",
       "gridAvailable": true,
+      "emergencyNumber": "112",
       "origin": {
         "energy": "simulated",
         "rooms": "simulated",
@@ -496,6 +497,7 @@
       "safeUntil": "2026-07-18T15:00:00+02:00",
       "stormPhase": "active",
       "gridAvailable": false,
+      "emergencyNumber": "112",
       "origin": {
         "energy": "simulated",
         "rooms": "simulated",
@@ -950,6 +952,7 @@
       "safeUntil": "2026-07-18T21:00:00+02:00",
       "stormPhase": "active",
       "gridAvailable": false,
+      "emergencyNumber": "112",
       "origin": {
         "energy": "simulated",
         "rooms": "simulated",
@@ -1344,6 +1347,7 @@
       "safeUntil": "2026-07-19T06:40:00+02:00",
       "stormPhase": "ended",
       "gridAvailable": true,
+      "emergencyNumber": "112",
       "origin": {
         "energy": "simulated",
         "rooms": "simulated",
@@ -1677,6 +1681,7 @@
       "safeUntil": "2026-07-19T08:00:00+02:00",
       "stormPhase": "ended",
       "gridAvailable": true,
+      "emergencyNumber": "112",
       "origin": {
         "energy": "simulated",
         "rooms": "simulated",

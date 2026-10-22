@@ -125,6 +125,7 @@
       "safeHours": 24,
       "safeUntil": "2024-07-06T12:00:00-05:00",
       "gridAvailable": true,
+      "emergencyNumber": "911",
       "origin": {
         "energy": "simulated",
         "rooms": "simulated",
@@ -1073,6 +1074,7 @@
       "safeHours": 24,
       "safeUntil": "2024-07-07T08:00:00-05:00",
       "gridAvailable": true,
+      "emergencyNumber": "911",
       "origin": {
         "energy": "simulated",
         "rooms": "simulated",

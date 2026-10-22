@@ -7,6 +7,7 @@ import { logLine, type AgentLogEntry } from './log.js';
 import type { HomeAgent } from './invocations.js';
 import { createTurnRecorder, mcpToolset, type McpSession, type TurnRecorder } from './mcp-tools.js';
 import { replyText } from './reply-text.js';
+import { healthEmergencyReply, isHealthEmergency } from './health-emergency.js';
 
 /** One running turn and one waiting: a third question for the same home is refused (review of #132). */
 const MAX_TURNS_PER_HOME = 2;
@@ -41,9 +42,40 @@ export function createHomeAgent(deps: {
     return { agent: createAgent({ config: deps.config, model: deps.model, tools, ...(deps.log ? { log: deps.log } : {}) }), recorder, session };
   };
 
+  /**
+   * The fixed answer to a health worry (#438, owner 22 Oct): the safe room read by the code (its card comes with the
+   * answer), its place's number said first; with the server down or no number, "your local emergency number". One info
+   * line, never the person's words.
+   */
+  const healthEmergencyTurn = async (session: McpSession, recorder: TurnRecorder, correlationId: string, leftMs: number): Promise<TurnReply> => {
+    let number: string | undefined;
+    try {
+      // The turn's own deadline, never the SDK's 60 s (review of #523).
+      const status = await session.callTool('get_safe_room_status', {}, AbortSignal.timeout(Math.max(1, leftMs)), correlationId);
+      const found = status.isError === true ? undefined : status.structuredContent?.['emergencyNumber'];
+      if (typeof found === 'string' && /^\d{3}$/.test(found)) number = found;
+      if (status.isError !== true) recorder.record('get_safe_room_status', status.structuredContent);
+    } catch (e) {
+      // The answer never waits for the room: without it, the local emergency number.
+      deps.log?.({ ...logLine(toolError('agent_unavailable', 'The safe room could not be read for a health worry.'), e instanceof Error ? e.name : typeof e, { correlationId }), level: 'warn' });
+    }
+    deps.log?.({ ts: new Date(now()).toISOString(), level: 'info', component: 'agent', message: 'health_emergency_answer', correlationId, details: { event: 'health_emergency_answer', numberKnown: number !== undefined } });
+    const cards = recorder.cards();
+    return { text: healthEmergencyReply(number), ...(cards.length === 0 ? {} : { cards: [...cards] }) };
+  };
+  /** No session to read the room (it could not open, or opened too late): the fixed answer with the local number. */
+  const healthEmergencyWithoutRoom = (correlationId: string): TurnReply => {
+    deps.log?.({ ts: new Date(now()).toISOString(), level: 'info', component: 'agent', message: 'health_emergency_answer', correlationId, details: { event: 'health_emergency_answer', numberKnown: false } });
+    return { text: healthEmergencyReply(undefined) };
+  };
+
   const turn = async (question: string, correlationId: string, arrivedAt: number): Promise<Result<TurnReply, ErrorEnvelope>> => {
+    // A health worry (#438, owner 22 Oct) is known before anything is waited for (review of #523): whatever fails next,
+    // the person still hears the fixed answer, never an error.
+    const health = isHealthEmergency(question);
     // Waited too long for the previous turn: answer now, and keep the agent (this turn never started).
     const deadlineMs = deps.config.turnDeadlineMs - (now() - arrivedAt);
+    if (deadlineMs <= 0 && health) return ok(healthEmergencyWithoutRoom(correlationId));
     if (deadlineMs <= 0) {
       const timeout = toolError('agent_timeout', 'The assistant took too long to answer. Try again in a moment.');
       deps.log?.(logLine(timeout, 'TurnDeadline', { correlationId }));
@@ -67,7 +99,7 @@ export function createHomeAgent(deps: {
       const failure = classifyFailure(e);
       if (failure.kind === 'bug') throw failure.error;
       deps.log?.(logLine(failure.error, e instanceof Error ? e.name : typeof e, { correlationId, httpStatus: failure.httpStatus, cause: e instanceof Error ? e.cause : undefined }));
-      return err(failure.error);
+      return health ? ok(healthEmergencyWithoutRoom(correlationId)) : err(failure.error);
     } finally {
       clearTimeout(timer);
     }
@@ -85,18 +117,22 @@ export function createHomeAgent(deps: {
       });
       const timeout = toolError('agent_timeout', 'The assistant took too long to answer. Try again in a moment.');
       deps.log?.(logLine(timeout, 'TurnDeadline', { correlationId }));
-      return err(timeout);
+      return health ? ok(healthEmergencyWithoutRoom(correlationId)) : err(timeout);
     }
     const { agent, recorder, session } = built;
     // Waiting for the previous turn AND opening the session both count: the model gets only what is
     // left (review of #139). Nothing started yet, so the agent and its session are kept.
     const leftMs = deps.config.turnDeadlineMs - (now() - arrivedAt);
+    if (leftMs <= 0 && health) return ok(healthEmergencyWithoutRoom(correlationId));
     if (leftMs <= 0) {
       const timeout = toolError('agent_timeout', 'The assistant took too long to answer. Try again in a moment.');
       deps.log?.(logLine(timeout, 'TurnDeadline', { correlationId }));
       return err(timeout);
     }
     recorder.reset(correlationId, question);
+    // A health worry (#438, owner 22 Oct): the code's fixed answer, never the model's. The place's number comes from the
+    // server (get_safe_room_status); without it, "your local emergency number". Its card comes with the answer.
+    if (health) return ok(await healthEmergencyTurn(session, recorder, correlationId, leftMs));
     const answer = await agent.ask(question, { correlationId, deadlineMs: leftMs });
     if (!answer.ok) {
       if (answer.error.code === 'agent_timeout') {
@@ -125,6 +161,9 @@ export function createHomeAgent(deps: {
   let inFlight = 0;
   return {
     ask(question, correlationId) {
+      // A health worry is never "busy" (review of #523): with the queue full it gets the fixed answer at once, with the
+      // local emergency number, rather than waiting or a refusal.
+      if (inFlight >= MAX_TURNS_PER_HOME && isHealthEmergency(question)) return Promise.resolve(ok(healthEmergencyWithoutRoom(correlationId)));
       if (inFlight >= MAX_TURNS_PER_HOME) {
         const busy = toolError('turn_in_progress', 'Wait for the answer to the previous question, then ask again.', { retryAfterMs: deps.config.turnDeadlineMs });
         deps.log?.(logLine(busy, 'TurnQueueFull', { correlationId }));

@@ -458,6 +458,8 @@ export const itIT = {
   'floor.waiting.user_off': 'In attesa: spenta da te',
   'manual.title': 'Controllo manuale',
   'manual.cloud_unreachable': 'Il cloud dei condizionatori non risponde, quindi non posso regolare gli split da solo. Impostali col telecomando:',
+  'emergency.health': 'Se qualcuno può stare male, chiama subito il {number}. Non posso dare consigli medici e non ho chiamato nessuno al posto tuo.',
+  'emergency.healthLocal': 'Se qualcuno può stare male, chiama subito il numero di emergenza della tua zona. Non posso dare consigli medici e non ho chiamato nessuno al posto tuo.',
   'manual.read_only': 'Per ora questa casa è in sola lettura, quindi nulla cambia in automatico. Impostali col telecomando:',
   'manual.list': 'Da impostare a mano',
   'manual.done': 'Fatto: {text}',
