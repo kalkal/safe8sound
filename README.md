@@ -29,6 +29,7 @@ Built for the Amazon "Build, Ship, Shape" hackathon, Alexa+ track: an MCP server
 - **The guard decides, not the model.** Every plan is checked against five guarantees, every time: `storm_reserve`, `inverter_limit`, `battery_power`, `safe_room_comfort`, `pacing_on_track`. The **inverter limit and the battery floor can never be overridden**, by the model, by a request or by any text.
 - **Only a plan that holds is shown.** Plans the guard turns down stay in the log and are never shown or spoken, **unless the person asked for them**. If you ask for something that would eat into the storm reserve, the assistant says so, gives the reason and the numbers, and nothing changes.
 - **Unclear request?** The assistant asks **one short question** and nothing else.
+- **Someone may be unwell?** The answer is fixed and comes from the code, not the model: call the emergency number of the home's place now (112 in Italy, 911 in Houston, "your local emergency number" when the place is not known). It **never gives medical advice**, never says the person is safe, and never claims anyone was called.
 - **Proof:** guard property tests (10 000 cases), mutation testing, and end-to-end flows through MCP.
 
 ### Night recovery
