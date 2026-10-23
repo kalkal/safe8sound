@@ -307,7 +307,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     const plan = { ...hotDayPlan(), refusedProposal: { code: 'inverter_limit_exceeded' as const, message: 'Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W.' } };
     const onCallTool = show({ kind: 'plan', data: plan });
     expect(screen.getByTestId('refused-proposal').textContent).toBe(
-      'The safety check refused the proposed plan: Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W. This plan holds instead.',
+      'Peak load 8.0 kW is above the limit. Nearest allowed: 6000 W. This plan holds instead.',
     );
     fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
     expect(onCallTool).toHaveBeenCalledWith('apply_plan', { planId: plan.id });

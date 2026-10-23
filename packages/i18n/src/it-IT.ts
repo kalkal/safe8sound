@@ -391,7 +391,7 @@ export const itIT = {
   'receipt.titleProposed': 'Controllo di sicurezza · piano proposto',
   'receipt.listProposed': 'Controllo di sicurezza per il piano proposto',
   'plan.refused': 'Il controllo di sicurezza ha rifiutato questo piano: {message}',
-  'plan.refusedProposal': 'Il controllo di sicurezza ha rifiutato il piano proposto: {message} Questo piano invece regge.',
+  'plan.refusedProposal': '{message} Questo piano invece regge.',
   'guarantee.storm_reserve': 'Riserva per il temporale',
   'guarantee.inverter_limit': 'Limite dell’inverter',
   'guarantee.battery_power': 'Potenza della batteria',

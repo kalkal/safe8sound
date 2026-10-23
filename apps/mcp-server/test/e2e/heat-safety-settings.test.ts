@@ -46,7 +46,7 @@ describe('the stricter night limit over MCP (#266)', () => {
 
   it('on: every point of the night is held to 24 °C, and the refusal says so', async () => {
     const plan = await proposeAt25(true);
-    expect(plan.refusedProposal).toEqual({ code: 'safe_room_comfort_violated', message: 'The safe room would reach 25 °C, above its 24 °C maximum. Nearest allowed: 24 C.' });
+    expect(plan.refusedProposal).toEqual({ code: 'safe_room_comfort_violated', message: expect.stringMatching(/^No — cooling .+ to 25 °C: .+ would reach 25 °C, above the 24 °C it must stay under\.$/) as unknown });
     expect(plan.guarantees.every((g) => g.ok)).toBe(true);
   });
 });

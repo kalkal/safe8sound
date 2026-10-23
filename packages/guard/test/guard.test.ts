@@ -219,7 +219,7 @@ describe('the temperature unit of the texts (#306): the guard computes in °C, o
     const i = input({ plan: plan([step({ mode: 'off' })]) });
     const f = runGuard({ ...i, displayUnit: 'F' });
     const room = f.guarantees.find((x) => x.id === 'safe_room_comfort');
-    expect(room?.reason).toMatch(/above its 80\.6 °F maximum\.$/);
+    expect(room?.reason).toMatch(/above the 80\.6 °F it must stay under\.$/);
     // The structured numbers stay in °C for the cards.
     expect(room).toMatchObject({ limit: 27, unit: 'C' });
     expect(rejectionOf(f, 'F')?.message).toMatch(/ Nearest allowed: 80\.6 °F \(27 C\)\.$/);
@@ -272,7 +272,8 @@ describe('night recovery (feature queue item 1)', () => {
     expect(n?.heatIndexDegreeHoursAbove26_7).toBeGreaterThan(n?.budgetDegreeHours ?? Infinity);
     expect(n?.status).not.toBe('met');
     const said = n?.status === 'unmet' ? rejectionOf(v)?.message : v.warnings[0]?.message;
-    expect(said).toMatch(/heat-index degree-hours above 26\.7 °C/);
+    // A refusal says it in human terms (owner, 23 Oct); the infeasible warning keeps the amount.
+    expect(said).toMatch(/heat-index degree-hours above 26\.7 °C|too warm for too long/);
     expect(said).not.toMatch(/of the 0|not the 0/);
   });
 

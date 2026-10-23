@@ -1,6 +1,6 @@
 import { stormNotForecastMessage } from '@cold-reserve/contracts';
 import { describe, expect, it } from 'vitest';
-import { answerRuleViolations, asksToConfirmAnAppliedPlan, notOneShortQuestion } from '../src/evals/answer-rules.js';
+import { answerRuleViolations, asksToConfirmAnAppliedPlan, notOneShortQuestion, refusalNotSaidFirst } from '../src/evals/answer-rules.js';
 
 // The rules on the words the assistant says (found on the real site, 20 Oct): the exact sentences seen there are caught,
 // and ordinary good answers are not.
@@ -169,5 +169,15 @@ describe('notOneShortQuestion', () => {
         'Would you like me to make the living room cooler this afternoon, or keep the battery for the storm reserve tonight, or start a comfort plan for Leo, or something else entirely?',
       ),
     ).toBe(true);
+  });
+});
+
+describe('a refusal said first (#537 review)', () => {
+  const refused = ["Error: No — cooling the living room too: by 07:50 the battery would be at 67 %, not the 83 % set aside for Leo's room."];
+  it('"No — …", "No, …" and a word of refusal say it; "No problem" does not', () => {
+    expect(refusalNotSaidFirst("No — cooling the living room too: the battery would fall short. This plan holds instead.", refused)).toBe(false);
+    expect(refusalNotSaidFirst('No, I cannot cool the living room too: the battery would fall short.', refused)).toBe(false);
+    expect(refusalNotSaidFirst('The safety check refused cooling the living room too.', refused)).toBe(false);
+    expect(refusalNotSaidFirst("No problem, Leo's room stays cool until 07:50.", refused)).toBe(true);
   });
 });

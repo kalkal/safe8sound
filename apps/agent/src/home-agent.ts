@@ -6,6 +6,7 @@ import { classifyFailure } from './failure.js';
 import { logLine, type AgentLogEntry } from './log.js';
 import type { HomeAgent } from './invocations.js';
 import { createTurnRecorder, mcpToolset, type McpSession, type TurnRecorder } from './mcp-tools.js';
+import { refusalFirst } from './refusal-first.js';
 import { replyText } from './reply-text.js';
 import { healthEmergencyReply, isHealthEmergency } from './health-emergency.js';
 
@@ -146,7 +147,12 @@ export function createHomeAgent(deps: {
     }
     const cards = recorder.cards();
     const status = recorder.status();
-    const reply = replyText(answer.value.text);
+    // The voice says the guard's refusal first, as its card does (22 Oct): logged without any text.
+    const said = refusalFirst(answer.value.text, cards, answer.value.toolResults);
+    if (said.prepended) {
+      deps.log?.({ ts: new Date(now()).toISOString(), level: 'info', component: 'agent', message: 'refusal_prepended', correlationId, details: { event: 'refusal_prepended' } });
+    }
+    const reply = replyText(said.text);
     // A warning, not an internal error: the person still gets an answer, cut, or a sentence for an empty one.
     if (reply.cut || reply.empty) {
       const line = logLine(toolError('output_schema_violation', 'The model reply did not fit a TurnReply.'), reply.cut ? 'ReplyTooLong' : 'ReplyEmpty', { correlationId });

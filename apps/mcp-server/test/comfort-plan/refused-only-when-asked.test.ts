@@ -33,7 +33,7 @@ describe('a refused proposal, said only when the person asked for it (owner, 22 
     const r = await planComfort(w.deps, greedy, { ...w.ctx, askedByPerson: true });
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     expect(r.value.refusedProposal?.code).toBe('inverter_limit_exceeded');
-    expect(planSummary(r.value, OPTS)).toMatch(/^The safety check refused the proposed plan: /);
+    expect(planSummary(r.value, OPTS)).toMatch(/^No — /);
     const line = w.logger.lines.find((l) => l.details?.['event'] === 'proposal_refused');
     expect(line?.details).toMatchObject({ askedByPerson: true });
   });

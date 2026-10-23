@@ -71,7 +71,8 @@ export function ignoresStormRefusal(answer: string, toolResults: readonly string
 }
 
 /** A plan result that opens with the guard's refusal of the proposal (the card's own sentence; the fake world words it "...refused the plan you proposed"). */
-const PLAN_REFUSED = /^(?:Error: )?The safety check refused the (?:proposed plan|plan you proposed)/;
+// Since 23 Oct the card's sentence opens with "No — <what was asked>: <why>" (owner: the reason comes first).
+const PLAN_REFUSED = /^(?:Error: )?(?:No — |The safety check refused the (?:proposed plan|plan you proposed))/;
 
 /**
  * A plan the guard refused (21 Oct: the voice said the plan and "9 hours" over a card that said "0 of 6" and never said the
@@ -81,7 +82,8 @@ export function refusalNotSaidFirst(answer: string, toolResults: readonly string
   if (!toolResults.some((r) => PLAN_REFUSED.test(r))) return false;
   // A point between two digits ("21.5") does not end the sentence.
   const first = /^(?:[^.?!]|\.(?=\d))*[.?!]/.exec(answer.trim())?.[0] ?? answer;
-  return !/\brefus/i.test(first);
+  // "No — …" or "No, …" says the refusal; "No problem, …" does not.
+  return !(/\brefus/i.test(first) || /^\s*No(?: —|,)/.test(first));
 }
 
 

@@ -175,11 +175,11 @@
       "goal": "cool"
     },
     "isError": true,
-    "text": "The plan takes the battery to 30 %, below the 41 % kept for a storm (4.8 kWh). Nearest allowed: 41 %.",
+    "text": "That would take the battery to 30 %, below the 41 % kept back so the safe room stays cool if a storm cuts the power. Nearest allowed: 41 %.",
     "structuredContent": {
       "code": "storm_reserve_violated",
       "category": "guard_rejection",
-      "message": "The plan takes the battery to 30 %, below the 41 % kept for a storm (4.8 kWh). Nearest allowed: 41 %.",
+      "message": "That would take the battery to 30 %, below the 41 % kept back so the safe room stays cool if a storm cuts the power. Nearest allowed: 41 %.",
       "retryable": false,
       "details": {
         "guarantee": "storm_reserve",
@@ -191,7 +191,7 @@
           {
             "id": "storm_reserve",
             "ok": false,
-            "reason": "The plan takes the battery to 30 %, below the 41 % kept for a storm (4.8 kWh).",
+            "reason": "That would take the battery to 30 %, below the 41 % kept back so the safe room stays cool if a storm cuts the power.",
             "measured": 30,
             "limit": 41,
             "nearestAllowed": 41,

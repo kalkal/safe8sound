@@ -3,7 +3,7 @@ import { exampleHomeProfile, examplePreferences } from '@cold-reserve/contracts/
 import type { ProjectionPoint } from '@cold-reserve/core';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { CONSTRAINTS, isHeldUnderFloor, stormKeptClause } from '../src/constraints.js';
+import { CONSTRAINTS, isHeldUnderFloor, span, stormKeptClause } from '../src/constraints.js';
 import { dryAirWarning } from '../src/dry-air.js';
 import { humidAirWarning } from '../src/humid-air.js';
 import type { GuardContext } from '../src/context.js';
@@ -97,16 +97,16 @@ describe('storm_reserve', () => {
   it('a failing row quotes the floor and the level with the same rounding as the receipt (48.7 against 48.8)', () => {
     const r = check('storm_reserve', ctx({ reserveFloorSocPct: pct(48.78), targets: [at(0, 48.76)], points: [point(0, { soc: 60 })] }));
     expect(r).toMatchObject({ ok: false, measured: 48.7, limit: 48.8, nearestAllowed: 48.8 });
-    expect(r.reason).toBe('The plan takes the battery to 48.7 %, below the 48.8 % kept for a storm (4.0 kWh).');
+    expect(r.reason).toBe('That would take the battery to 48.7 %, below the 48.8 % kept back so the safe room stays cool if a storm cuts the power.');
     const r2 = check('storm_reserve', ctx({ reserveFloorSocPct: pct(48.72), targets: [at(0, 48.6)], points: [point(0, { soc: 60 })] }));
-    expect(r2.reason).toBe('The plan takes the battery to 48.6 %, below the 48.8 % kept for a storm (4.0 kWh).');
+    expect(r2.reason).toBe('That would take the battery to 48.6 %, below the 48.8 % kept back so the safe room stays cool if a storm cuts the power.');
     expect(r2.nearestAllowed).toBe(48.8);
   });
 
   it('fails just below the floor and names both numbers', () => {
     const r = check('storm_reserve', ctx({ targets: [at(0, 35.9)], points: [point(0, { soc: 50 })] }));
     expect(r).toMatchObject({ ok: false, measured: 35.9, limit: 36, nearestAllowed: 36 });
-    expect(r.reason).toBe('The plan takes the battery to 35.9 %, below the 36 % kept for a storm (4.0 kWh).');
+    expect(r.reason).toBe('That would take the battery to 35.9 %, below the 36 % kept back so the safe room stays cool if a storm cuts the power.');
   });
 
   it('compares the plan’s targets with the floor exactly (a hair below fails)', () => {
@@ -175,7 +175,8 @@ describe('inverter_limit', () => {
   it('fails one watt above, off grid, and says what to do', () => {
     const r = check('inverter_limit', ctx({ gridAvailable: false, acLimitW: 5000, points: [point(0, { loadW: 5001 }), point(5, { loadW: 100 })] }));
     expect(r).toMatchObject({ ok: false, measured: 5001, limit: 5000 });
-    expect(r.reason).toBe('Peak load 5.0 kW is above the 5.0 kW the inverter delivers off grid: fewer rooms at once, safe room first.');
+    // One watt over reads as watts, never "5.0 kW, more than the 5.0 kW" (#537 review).
+    expect(r.reason).toBe('Running all those rooms at once needs 5001 W, more than the 5000 W the home system can deliver on the battery; the safe room comes first.');
   });
 });
 
@@ -201,7 +202,7 @@ describe('battery_power', () => {
     expect(check('battery_power', ctx({ gridAvailable: false, points: [point(0, { loadW: 5000 })] })).ok).toBe(true);
     const r = check('battery_power', ctx({ gridAvailable: false, points: [point(0, { loadW: 5001 })] }));
     expect(r).toMatchObject({ ok: false, measured: 5001 });
-    expect(r.reason).toBe('The plan needs 5.0 kW from the battery; it delivers at most 5.0 kW.');
+    expect(r.reason).toBe('That would need 5001 W from the battery, more than the 5000 W it can deliver; the safe room comes first.');
   });
 
   it('reads the trajectory between consecutive targets, keeping the worst step', () => {
@@ -216,7 +217,7 @@ describe('battery_power', () => {
     expect(r).toEqual({
       id: 'battery_power',
       ok: false,
-      reason: 'The plan asks the battery to charge at 6.1 kW; it takes at most 5.0 kW.',
+      reason: 'That would charge the battery at 6.1 kW, faster than the 5.0 kW it can take.',
       measured: 6133,
       limit: profile.battery.maxChargeW,
       nearestAllowed: profile.battery.maxChargeW,
@@ -250,7 +251,7 @@ describe('safe_room_comfort', () => {
     expect(check('safe_room_comfort', ctx({ points: [point(60, { tempC: 27.1 })] }))).toEqual({
       id: 'safe_room_comfort',
       ok: false,
-      reason: 'The safe room would reach 27.1 °C, above its 27 °C maximum.',
+      reason: 'The safe room would reach 27.1 °C, above the 27 °C it must stay under.',
       measured: 27.1,
       limit: 27,
       nearestAllowed: 27,
@@ -262,7 +263,7 @@ describe('safe_room_comfort', () => {
     expect(check('safe_room_comfort', ctx({ season: 'heating', points: [point(60, { tempC: 18 }), point(65, { tempC: 30 })] }))).toMatchObject({ ok: true, measured: 18, limit: 18 });
     expect(check('safe_room_comfort', ctx({ season: 'heating', points: [point(60, { tempC: 17.9 })] }))).toMatchObject({
       ok: false,
-      reason: 'The safe room would drop to 17.9 °C, below its 18 °C minimum.',
+      reason: 'The safe room would get as cold as 17.9 °C, below the 18 °C it must stay above.',
       measured: 17.9,
       limit: 18,
       unit: 'C',
@@ -287,7 +288,7 @@ describe('safe_room_comfort', () => {
     expect(check('safe_room_comfort', ctx({ input: older, points: [point(60, { tempC: 26, rh: 90 })] }))).toEqual({
       id: 'safe_room_comfort',
       ok: false,
-      reason: 'The safe room would feel like 26.5 °C (26 °C at 90 % humidity), above its 26 °C maximum.',
+      reason: 'With this humidity the safe room would feel like 26.5 °C, above the 26 °C it must stay under.',
       measured: 26.5,
       limit: 26,
       // No nearest allowed value for how hot it feels: the air may already be at the limit (#285 review).
@@ -307,7 +308,7 @@ describe('safe_room_comfort', () => {
       expect(check('safe_room_comfort', ctx({ input: on, points: [point(60, { tempC: 26.5, rh: 40 })] })).ok).toBe(true);
       expect(check('safe_room_comfort', ctx({ input: on, points: [point(150, { tempC: 26.5, rh: 40 })] }))).toMatchObject({
         ok: false,
-        reason: 'The safe room would reach 26.5 °C, above its 26 °C maximum.',
+        reason: 'The safe room would reach 26.5 °C, above the 26 °C it must stay under.',
         limit: 26,
       });
       expect(check('safe_room_comfort', ctx({ input: withPrefs({}), points: [point(150, { tempC: 26.5, rh: 40 })] })).ok).toBe(true);
@@ -337,13 +338,15 @@ describe('safe_room_comfort', () => {
     const at30 = input({ season: 'cooling', preferences: PreferencesSchema.parse({ ...examplePreferences(), safety: { ...examplePreferences().safety, cooling: { ...examplePreferences().safety.cooling, maxC: 30 } } }) });
     const result = check('safe_room_comfort', ctx({ input: at30, points: [point(60, { tempC: 30, rh: 50 }), point(65, { tempC: 30, rh: 60 })] }));
     expect(result).toMatchObject({ ok: false, limit: 32.2 });
-    expect(result.reason).toMatch(/Extreme Caution/);
+    expect(result.reason).toMatch(/past the point where heat becomes dangerous \(32\.2 °C\)/);
   });
 
   it('reports the point that feels hottest', () => {
     const result = check('safe_room_comfort', ctx({ points: [point(60, { tempC: 26.5, rh: 80 }), point(65, { tempC: 26.8, rh: 85 }), point(70, { tempC: 25, rh: 50 })] }));
     expect(result).toMatchObject({ ok: false, limit: 27 });
-    expect(result.reason).toMatch(/^The safe room would feel like \d+(\.5)? °C \(26\.8 °C at 85 % humidity\)/);
+    // 26.8 °C at 85 % feels hotter than 26.5 °C at 80 % (28.5 °C): the reason says that point.
+    expect(result.reason).toMatch(/^With this humidity the safe room would feel like \d+(\.5)? °C/);
+    expect(result.measured).toBeGreaterThan(28.5);
   });
 
   it('checks the humidity minimum where the plan dries the room', () => {
@@ -351,7 +354,7 @@ describe('safe_room_comfort', () => {
     const drying = input({ season: 'cooling', preferences: PreferencesSchema.parse(examplePreferences()), plan: plan([step({ mode: 'dry' })]) });
     expect(check('safe_room_comfort', ctx({ input: drying, points: [point(60, { rh: 39.4 })] }))).toMatchObject({
       ok: false,
-      reason: 'Humidity in the safe room would drop to 39 %, below 40 %.',
+      reason: 'The air in the safe room would get too dry: 39 % humidity, below 40 %.',
       limit: 40,
       unit: '%',
     });
@@ -408,7 +411,7 @@ describe('safe_room_comfort', () => {
     expect(check('safe_room_comfort', ctx({ points: [point(60, { room: 'living' })] }))).toEqual({
       id: 'safe_room_comfort',
       ok: false,
-      reason: 'The safe room has no reading, so its safety cannot be checked.',
+      reason: 'The safe room has no temperature reading right now, so there is no way to check it stays safe.',
     });
   });
 });
@@ -419,7 +422,7 @@ describe('pacing_on_track', () => {
     expect(r).toEqual({
       id: 'pacing_on_track',
       ok: false,
-      reason: 'At this pace the battery runs out at 04:00, 120 min before the next recharge at 06:00.',
+      reason: 'At that pace the battery would run out at 04:00, about 2 hours before it can recharge at 06:00.',
       measured: 120,
       limit: 0,
       nearestAllowed: 0,
@@ -446,7 +449,7 @@ describe('pacing_on_track', () => {
     expect(r).toEqual({
       id: 'pacing_on_track',
       ok: false,
-      reason: "At 21:00 the battery would be at 50 %, below the plan's 60 %.",
+      reason: 'By 21:00 the battery would be at 50 %, not the 60 % set aside for the safe room.',
       measured: 50,
       limit: 57,
       nearestAllowed: 53,
@@ -469,5 +472,13 @@ describe('storm floor wording helpers (#417)', () => {
     expect(isHeldUnderFloor(48.8, 48.8)).toBe(false);
     expect(isHeldUnderFloor(48.9, 48.8)).toBe(false);
     expect(isHeldUnderFloor(48.6, 48.8)).toBe(true);
+  });
+});
+
+describe('a time span said to a person (#537 review)', () => {
+  it('one minute is singular, minutes under an hour and a half, else about so many hours', () => {
+    expect(span(1)).toBe('1 minute');
+    expect(span(45)).toBe('45 minutes');
+    expect(span(150)).toBe('about 3 hours');
   });
 });

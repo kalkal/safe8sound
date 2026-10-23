@@ -59,7 +59,7 @@ describe('plan_comfort (two-phase: propose)', () => {
     expect(plan.guarantees.every((g) => g.ok)).toBe(true);
     expect(plan.lastResort).toBeUndefined();
     expect(plan.refusedProposal?.code).toMatch(/_(violated|exceeded|off_track|unmet)$/);
-    expect(plan.refusedProposal?.message).toMatch(/Nearest allowed/);
+    expect(plan.refusedProposal?.message).toMatch(/^No — /);
     // Saved and applicable: the person can apply it in one step.
     const saved = await w.store.getPlan(plan.id);
     expect(saved.ok && saved.value.status).toBe('proposed');
@@ -269,7 +269,7 @@ describe('plan_comfort (two-phase: propose)', () => {
     // Cool at 26 °C misses the older person's 24 °C night target (the guided test of #202; humid air alone is no
     // longer a refusal, #248): the guard refuses the proposal as it is, never a silently edited one, and the
     // planner's own plan answers.
-    expect(r.value.refusedProposal).toEqual({ code: 'night_recovery_unmet', message: expect.stringMatching(/^The plan keeps the safe room at or below 24 °C for \d+(\.\d+)? of the 6 night hours/) as unknown });
+    expect(r.value.refusedProposal).toEqual({ code: 'night_recovery_unmet', message: expect.stringMatching(/^No — cooling the bedroom to 26 °C: the bedroom would be cool enough to sleep \(at or below 24 °C\) for only \d+(\.\d+)? of the 6 night hours/) as unknown });
     expect(r.value.guarantees.every((g) => g.ok)).toBe(true);
     expect(r.value.steps.filter((s) => s.roomId === 'bedroom-1').map((s) => s.hvacMode)).toContain('dry');
   });
@@ -451,7 +451,7 @@ describe('last resort (approved in #19: proposal only)', () => {
     const w = stormAt(30);
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(29), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, { ...w.ctx, askedByPerson: true });
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
-    expect(r.value.refusedProposal?.message).toMatch(/Nearest allowed/);
+    expect(r.value.refusedProposal?.message).toMatch(/^No — /);
     expect(r.value.lastResort).toBeUndefined();
     expect(r.value.guarantees.every((g) => g.ok)).toBe(true);
     const own = await planComfort(stormAt(30).deps, { goal: 'cool' }, w.ctx);

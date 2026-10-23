@@ -73,7 +73,9 @@ describe('hot day (heatwave, 14:00): propose, the guard says no, re-plan, confir
       const holds = PlanSchema.parse(greedy.structuredContent);
       expect(holds.refusedProposal?.code).toBe('inverter_limit_exceeded');
       expect(holds.guarantees.every((g) => g.ok)).toBe(true);
-      expect(textOf(greedy)).toMatch(/^The safety check refused the proposed plan: .*Nearest allowed: 6000 W\. This plan holds instead\. It is ready to apply\./);
+      // In the person's words and human terms, first (owner, 23 Oct); never "Nearest allowed" in what is said.
+      expect(textOf(greedy)).toMatch(/^No — cooling every room to 22 °C: running all those rooms at once needs .+ This plan holds instead\. It is ready to apply\./);
+      expect(textOf(greedy).split(' It is ready to apply.')[0]).not.toMatch(/Nearest allowed/);
       expect(textOf(greedy)).toContain(`call apply_plan with planId ${holds.id}`);
 
       // 2. It asks the planner instead: the most comfortable plan the guard accepts.

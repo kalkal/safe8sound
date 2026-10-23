@@ -163,7 +163,7 @@ describe('apply_plan (two-phase: confirm)', () => {
       // Meanwhile a window was left open: the safe room is too cold to recover within the grace period.
       w.setSnapshot(roomsAt(3, 90));
       const r = await applyPlan(w.deps, { planId: planned.value.id }, w.ctx);
-      expect(!r.ok && r.error.message).toMatch(/^The safe room would drop to [\d.]+ °C, below its 18 °C minimum\./);
+      expect(!r.ok && r.error.message).toMatch(/^The safe room would get as cold as [\d.]+ °C, below the 18 °C it must stay above\./);
       expect(await statusOf(w, planned.value)).toBe('proposed');
     });
   }

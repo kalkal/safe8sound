@@ -1,5 +1,5 @@
 import { toolError, type ErrorCode, type ErrorDetails, type ErrorEnvelope, type GuaranteeId, type TempUnit } from '@cold-reserve/contracts';
-import { degreeHours, heatAmount, inputTemp, temp } from './display.js';
+import { inputTemp, temp } from './display.js';
 import type { GuardVerdict } from './guard.js';
 
 // A rejected plan becomes a guard_rejection error envelope (docs/error-handling.md §2): the model reads
@@ -40,16 +40,14 @@ export function rejectionOf(verdict: GuardVerdict, unit: TempUnit = 'C'): ErrorE
   const night = verdict.nightRecovery;
   if (night?.status === 'unmet') {
     const minutes = (h: number) => Math.round(h * 60);
-    const heat = heatAmount(night.heatIndexDegreeHoursAbove26_7, unit);
-    const budget = `${degreeHours(night.budgetDegreeHours, unit)} allowed`;
     // With no hour required (a plan that sees only the end of the night) only the heat budget can fail.
     if (night.requiredHours === 0) {
-      return toolError('night_recovery_unmet', `The plan lets the heat in the safe room reach ${heat} tonight, over the ${budget}.`, { details: { roomId: night.roomId } });
+      return toolError('night_recovery_unmet', 'The safe room would stay too warm for too long tonight to sleep well.', { details: { roomId: night.roomId } });
     }
     const overBudget = night.heatIndexDegreeHoursAbove26_7 > night.budgetDegreeHours;
     return toolError(
       'night_recovery_unmet',
-      `The plan keeps the safe room at or below ${temp(night.thresholdC, unit)} for ${night.achievedHours.toString()} of the ${night.requiredHours.toString()} night hours it can reach${overBudget ? `, and lets the heat reach ${heat}, over the ${budget}` : ''}.`,
+      `The safe room would be cool enough to sleep (at or below ${temp(night.thresholdC, unit)}) for only ${night.achievedHours.toString()} of the ${night.requiredHours.toString()} night hours${overBudget ? ', and too warm for too long' : ''}.`,
       {
         details: {
           roomId: night.roomId,

@@ -208,7 +208,7 @@ export function planSummary(p: Plan, opts: PlanSummaryOptions): string {
   // card's own (the same catalog key), so the voice and the screen say the same (21 Oct: a voice said 9 night hours over a card
   // saying 0 of 6).
   const refusal = p.refusedProposal === undefined ? undefined : format('en-US', 'plan.refusedProposal', { message: p.refusedProposal.message });
-  const refused = p.refusedProposal === undefined ? [] : [`${refusal?.ok === true ? refusal.value : `The safety check refused the proposed plan: ${p.refusedProposal.message} This plan holds instead.`} It is ready to apply.`];
+  const refused = p.refusedProposal === undefined ? [] : [`${refusal?.ok === true ? refusal.value : `${p.refusedProposal.message} This plan holds instead.`} It is ready to apply.`];
   const parts = [
     ...refused,
     `${head} (${commanded}), built on ${dataText(p.sourceOrigin)}.`,

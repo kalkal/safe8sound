@@ -61,7 +61,7 @@ describe('stricter caps from the settings (#266)', () => {
     const caps = { heatIndexC: 29, elderlyC: 31 };
     const d = heatDanger(at(29, 50), { limitC: 30, elderly: false, caps });
     expect(d).toMatchObject({ rule: 'extreme_caution', limitC: 29 });
-    expect(heatDangerReason(at(29, 50), d ?? { rule: 'temperature', valueC: 0, limitC: 0 })).toMatch(/above the 29 °C heat-index cap set for this home\.$/);
+    expect(heatDangerReason(at(29, 50), d ?? { rule: 'temperature', valueC: 0, limitC: 0 })).toMatch(/feel like [\d.]+ °C, above the 29 °C set for this home\.$/);
     expect(heatDanger(at(29, 50), { limitC: 30, elderly: false })).toBeUndefined();
   });
 
@@ -73,6 +73,6 @@ describe('stricter caps from the settings (#266)', () => {
 
   it('the default caps keep the health wording', () => {
     const d = heatDanger(at(30, 60), { limitC: 40, elderly: false });
-    expect(heatDangerReason(at(30, 60), d ?? { rule: 'temperature', valueC: 0, limitC: 0 })).toMatch(/Extreme Caution band from 32\.2 °C\.$/);
+    expect(heatDangerReason(at(30, 60), d ?? { rule: 'temperature', valueC: 0, limitC: 0 })).toMatch(/past the point where heat becomes dangerous \(32\.2 °C\)\.$/);
   });
 });

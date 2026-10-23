@@ -31,6 +31,7 @@ import { localIso, theRoom, localTimeText } from '@cold-reserve/core';
 import type { ComfortHome, ComfortPlanDeps } from './deps.js';
 import { lastResortActions, lastResortThen, lastResortWindow, limitCrossedAt, loweredLimit } from './last-resort.js';
 import { recordRejection } from './rejections.js';
+import { refusalWords } from './refusal-words.js';
 
 // plan_comfort, the first of the two phases (plan §9.2): read-only on the home, it proposes a plan and
 // saves it as `proposed` with an expiry. "The model proposes, the guard decides":
@@ -258,7 +259,18 @@ export async function planComfort(deps: ComfortPlanDeps, asked: PlanComfortInput
       });
       // Said and shown only when the person asked for it (owner, 22 Oct): a proposal the model made up on its own is
       // neither, the card and the text describe only the plan that holds.
-      if (askedByPerson) refusedProposal = { code: refusal.code, message: refusal.message };
+      if (askedByPerson) {
+        // In the person's words and human terms, the safe room by its name (owner, 23 Oct): the card's first line and the voice's.
+        const message = refusalWords({
+          input,
+          reason: last.verdict.guarantees.find((g) => !g.ok)?.reason,
+          fallback: refusal.message,
+          rooms: profile.rooms,
+          safeRoomName: profile.rooms.find((r) => r.id === preferences.safeRoomId)?.name ?? 'the safe room',
+          unit: guardInput.displayUnit ?? 'C',
+        });
+        refusedProposal = { code: refusal.code, message };
+      }
       chosen = passing;
     }
   }

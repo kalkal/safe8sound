@@ -92,7 +92,7 @@ describe('PlanCard', () => {
   it('a plan that answers a refused proposal says the refusal inside the card, above the estimate (#202, #231)', () => {
     const { container } = show(planThatHolds());
     const note = screen.getByTestId('refused-proposal');
-    expect(note.textContent).toBe(`The safety check refused the proposed plan: ${planThatHolds().refusedProposal?.message ?? ''} This plan holds instead.`);
+    expect(note.textContent).toBe(`${planThatHolds().refusedProposal?.message ?? ''} This plan holds instead.`);
     // The video's refusal is about the storm reserve, the product's own promise, not the inverter (scene 2b).
     expect(planThatHolds().refusedProposal).toEqual({
       code: 'storm_reserve_violated',

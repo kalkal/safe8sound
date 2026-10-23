@@ -41,7 +41,7 @@ describe('storm-blackout: the grid goes down at 15:00 and returns at 06:30', () 
 
   it('refuses the naive plan: dry all night takes the safe room under its humidity minimum', () => {
     expect(byId(naive, 'pacing_on_track')).toMatchObject({ ok: true, reason: 'The energy lasts until the next recharge at 08:00.' });
-    expect(byId(naive, 'safe_room_comfort')?.reason).toMatch(/^Humidity in the safe room would drop to \d+ %, below 40 %\.$/);
+    expect(byId(naive, 'safe_room_comfort')?.reason).toMatch(/^The air in the safe room would get too dry: \d+ % humidity, below 40 %\.$/);
     expect(naive.ok).toBe(false);
   });
 
@@ -51,7 +51,7 @@ describe('storm-blackout: the grid goes down at 15:00 and returns at 06:30', () 
     expect(pacing?.ok).toBe(false);
     expect(pacing?.unit).toBe('min');
     expect(pacing?.measured).toBeGreaterThan(0);
-    expect(pacing?.reason).toMatch(/runs out at \d\d:\d\d, \d+ min before the next recharge at 08:00/);
+    expect(pacing?.reason).toMatch(/run out at \d\d:\d\d, (?:about \d+ hours?|\d+ minutes?) before it can recharge at 08:00/);
   });
 
   it('with the grid down, the reserve is the budget and the inverter limit is the EPS rating', () => {

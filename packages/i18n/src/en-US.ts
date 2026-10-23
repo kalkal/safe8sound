@@ -452,7 +452,8 @@ export const enUS = {
   'receipt.listProposed': 'Safety check for the proposed plan',
   'plan.refused': 'The safety check refused this plan: {message}',
   // A plan that answers a refused proposal (#202): the planner's own plan that holds.
-  'plan.refusedProposal': 'The safety check refused the proposed plan: {message} This plan holds instead.',
+  // The message already says no and why, in the person's words (owner, 23 Oct): the reason comes first.
+  'plan.refusedProposal': '{message} This plan holds instead.',
   'guarantee.storm_reserve': 'Storm reserve',
   'guarantee.inverter_limit': 'Inverter limit',
   'guarantee.battery_power': 'Battery power',

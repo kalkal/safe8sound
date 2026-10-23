@@ -60,21 +60,20 @@ const r1 = (x: number) => Math.round(x * 10) / 10 + 0;
 
 /** The guard's reason for a dangerous reading, with its numbers. */
 export function heatDangerReason(r: Reading, d: HeatDanger, unit: TempUnit = 'C'): string {
-  const air = `${temp(r1(r.tempC), unit)} at ${Math.round(r.humidityPct).toString()} % humidity`;
   const value = temp(r1(d.valueC), unit);
   const limit = temp(d.limitC, unit);
   switch (d.rule) {
     case 'temperature':
-      return `The safe room would reach ${value}, above its ${limit} maximum.`;
+      return `The safe room would reach ${value}, above the ${limit} it must stay under.`;
     case 'elderly_critical':
       return d.limitC < ELDERLY_CRITICAL_C
         ? `The safe room would reach ${value}, above the ${limit} set for an older person.`
-        : `The safe room would reach ${value}, above the ${limit} that is critical for an older person.`;
+        : `The safe room would reach ${value}, above the ${limit} that is dangerous for an older person.`;
     case 'extreme_caution':
       return d.limitC < EXTREME_CAUTION_HEAT_INDEX_C
-        ? `The safe room would feel like ${value} (${air}), above the ${limit} heat-index cap set for this home.`
-        : `The safe room would feel like ${value} (${air}), in the heat index's Extreme Caution band from ${limit}.`;
+        ? `With this humidity the safe room would feel like ${value}, above the ${limit} set for this home.`
+        : `With this humidity the safe room would feel like ${value}, past the point where heat becomes dangerous (${limit}).`;
     case 'heat_index':
-      return `The safe room would feel like ${value} (${air}), above its ${limit} maximum.`;
+      return `With this humidity the safe room would feel like ${value}, above the ${limit} it must stay under.`;
   }
 }

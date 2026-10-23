@@ -65,38 +65,37 @@ describe('rejectionOf', () => {
     expect(rejectionOf(verdict(all(), night('unmet')))).toEqual({
       code: 'night_recovery_unmet',
       category: 'guard_rejection',
-      message: 'The plan keeps the safe room at or below 26 °C for 2.5 of the 6 night hours it can reach.',
+      message: 'The safe room would be cool enough to sleep (at or below 26 °C) for only 2.5 of the 6 night hours.',
       retryable: false,
       details: { roomId: 'bedroom-1', measured: 150, limit: 360, nearestAllowed: 360, unit: 'min' },
     });
   });
 
-  it('an unmet night over the heat budget names the heat as well', () => {
+  it('an unmet night over the heat budget says it stays too warm for too long as well', () => {
     const n = { ...night('unmet'), heatIndexDegreeHoursAbove26_7: 7.2 };
     expect(rejectionOf(verdict(all(), n))?.message).toBe(
-      'The plan keeps the safe room at or below 26 °C for 2.5 of the 6 night hours it can reach, and lets the heat reach 7.2 heat-index degree-hours above 26.7 °C, over the 4 allowed.',
+      'The safe room would be cool enough to sleep (at or below 26 °C) for only 2.5 of the 6 night hours, and too warm for too long.',
     );
   });
 
-  it('in °F (#306): the threshold in °F and the heat as °F-hours, the same amount (x1.8)', () => {
+  it('in °F (#306): the threshold in °F', () => {
     const n = { ...night('unmet'), heatIndexDegreeHoursAbove26_7: 7.2 };
     expect(rejectionOf(verdict(all(), n), 'F')?.message).toBe(
-      'The plan keeps the safe room at or below 78.8 °F for 2.5 of the 6 night hours it can reach, and lets the heat reach 13 heat-index °F-hours above 80.1 °F, over the 7.2 allowed.',
+      'The safe room would be cool enough to sleep (at or below 78.8 °F) for only 2.5 of the 6 night hours, and too warm for too long.',
     );
   });
 
-  it('in °F an amount just over the budget is never said as equal to it: the amount is rounded up (#306 review)', () => {
-    // 4.01 degree-hours are 7.218 °F-hours: said 7.3, over the 7.2 allowed, never "7.2 over the 7.2".
+  it('never says the heat as degree-hours: a person does not count them (owner, 23 Oct)', () => {
     const n = { ...night('unmet'), heatIndexDegreeHoursAbove26_7: 4.01 };
-    expect(rejectionOf(verdict(all(), n), 'F')?.message).toContain('lets the heat reach 7.3 heat-index °F-hours above 80.1 °F, over the 7.2 allowed.');
+    expect(rejectionOf(verdict(all(), n), 'F')?.message).not.toMatch(/hours above|allowed/);
   });
 
-  it('with no hour required, an unmet night is the heat budget alone, without hours', () => {
+  it('with no hour required, an unmet night is the heat alone, without hours', () => {
     const n = { ...night('unmet'), requiredHours: 0, achievedHours: 0.5, heatIndexDegreeHoursAbove26_7: 7.2 };
     expect(rejectionOf(verdict(all(), n))).toEqual({
       code: 'night_recovery_unmet',
       category: 'guard_rejection',
-      message: 'The plan lets the heat in the safe room reach 7.2 heat-index degree-hours above 26.7 °C tonight, over the 4 allowed.',
+      message: 'The safe room would stay too warm for too long tonight to sleep well.',
       retryable: false,
       details: { roomId: 'bedroom-1' },
     });

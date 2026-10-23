@@ -299,7 +299,7 @@ describe('what the model reads', () => {
     // none for the room's threshold, the counterfactual's night hours included.
     const durations = text.split(/(?<=\.) /).filter((s) => /\d+(\.\d+)? (night )?(hours?|minutes?|min|h)\b/.test(s));
     expect(durations).toEqual([
-      expect.stringMatching(/^pacing on track FAILS: At this pace the battery runs out at 00:50, \d+ min before the next recharge at 08:00\.$/),
+      expect.stringMatching(/^pacing on track FAILS: At that pace the battery would run out at 00:50, (?:about \d+ hours|\d+ minutes) before it can recharge at 08:00\.$/),
     ]);
     // #364: the warning says the room's time first and the battery's after it, with no duration.
     expect(text).toContain('Warning: No plan keeps the Bedroom within its limits until the next recharge: within them until about 03:35, the battery until 00:50; then it warms up.');
@@ -585,7 +585,9 @@ describe('what the model reads', () => {
     const r = await planComfort(w.deps, { goal: 'cool', setpointC: celsius(22), roomIds: ['bedroom-1', 'bedroom-2', 'living', 'study'] }, { ...w.ctx, askedByPerson: true });
     if (!r.ok) throw new Error(r.error.message);
     const text = planSummary(r.value, NIGHT);
-    expect(r.value.refusedProposal?.message).toMatch(/Nearest allowed: 6000 W\.$/);
+    // In the person's words and human terms (owner, 23 Oct), never "Nearest allowed" (that stays in the model's re-plan text).
+    expect(r.value.refusedProposal?.message).toMatch(/^No — cooling every room to 22 °C: running all those rooms at once needs /);
+    expect(r.value.refusedProposal?.message).not.toMatch(/Nearest allowed/);
     // The card's own sentence (the i18n catalog key the card uses), then that the plan is ready to apply (21 Oct: the voice and the card say the same).
     const sentence = format('en-US', 'plan.refusedProposal', { message: r.value.refusedProposal?.message ?? '' });
     expect(sentence.ok && text.startsWith(`${sentence.value} It is ready to apply. Proposed plan: `)).toBe(true);

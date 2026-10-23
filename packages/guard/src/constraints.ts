@@ -41,6 +41,16 @@ export const stormKeptClause = (limit: number, under?: number): string =>
 /** True when the storm_reserve row's measured level is a held level under the limit (the "not taken lower" case). */
 export const isHeldUnderFloor = (measured: number, limit: number): boolean => Math.round(measured * 10) < Math.round(limit * 10);
 const kw = (w: number) => (w / 1000).toFixed(1);
+/** Two powers said to a person: one decimal of kW, unless they would read the same ("5.0 kW, more than 5.0 kW"), then watts. */
+const kws = (a: number, b: number): [string, string] => (kw(a) !== kw(b) ? [`${kw(a)} kW`, `${kw(b)} kW`] : [`${Math.round(a).toString()} W`, `${Math.round(b).toString()} W`]);
+/**
+ * Two battery levels said to a person (owner, 23 Oct: a refusal says why in human terms, with a rounded number): whole
+ * percents, unless rounding would make them the same ("49 % below 49 %"), then one decimal.
+ */
+const pcts = (a: number, b: number): [string, string] =>
+  Math.round(a) !== Math.round(b) ? [Math.round(a).toString(), Math.round(b).toString()] : [r1(a).toString(), r1(b).toString()];
+/** A time span said to a person: minutes under an hour and a half, else about so many hours. */
+export const span = (minutes: number) => (minutes === 1 ? '1 minute' : minutes < 90 ? `${minutes.toString()} minutes` : `about ${Math.round(minutes / 60).toString()} hours`);
 const clock = (ms: number, tz: string) => {
   const h = localHour(ms, tz);
   const hh = Math.floor(h);
@@ -78,7 +88,7 @@ const stormReserve: Constraint = {
       ok,
       reason: ok
         ? kept
-        : `The plan takes the battery to ${measured.toString()} %, below the ${limit.toString()} % kept for a storm (${kwh} kWh).`,
+        : `That would take the battery to ${pcts(measured, limit)[0]} %, below the ${pcts(measured, limit)[1]} % kept back so the safe room stays cool if a storm cuts the power.`,
       measured,
       limit,
       nearestAllowed: limit,
@@ -98,7 +108,7 @@ const inverterLimit: Constraint = {
       ok,
       reason: ok
         ? `Peak load ${kw(peak)} kW, within the ${kw(ctx.acLimitW)} kW the inverter delivers ${where}.`
-        : `Peak load ${kw(peak)} kW is above the ${kw(ctx.acLimitW)} kW the inverter delivers ${where}: fewer rooms at once, safe room first.`,
+        : `Running all those rooms at once needs ${kws(peak, ctx.acLimitW)[0]}, more than the ${kws(peak, ctx.acLimitW)[1]} the home system can deliver${ctx.gridAvailable ? "" : " on the battery"}; the safe room comes first.`,
       measured: Math.round(peak),
       limit: ctx.acLimitW,
       nearestAllowed: Math.floor(ctx.acLimitW),
@@ -129,7 +139,7 @@ const batteryPower: Constraint = {
       return {
         id: 'battery_power',
         ok: false,
-        reason: `The plan asks the battery to charge at ${kw(chargeW)} kW; it takes at most ${kw(battery.maxChargeW)} kW.`,
+        reason: `That would charge the battery at ${kws(chargeW, battery.maxChargeW)[0]}, faster than the ${kws(chargeW, battery.maxChargeW)[1]} it can take.`,
         measured: Math.round(chargeW),
         limit: battery.maxChargeW,
         nearestAllowed: Math.floor(battery.maxChargeW),
@@ -141,7 +151,7 @@ const batteryPower: Constraint = {
       ok: dischargeOk,
       reason: dischargeOk
         ? `The battery delivers at most ${kw(dischargeW)} kW, within its ${kw(battery.maxDischargeW)} kW.`
-        : `The plan needs ${kw(dischargeW)} kW from the battery; it delivers at most ${kw(battery.maxDischargeW)} kW.`,
+        : `That would need ${kws(dischargeW, battery.maxDischargeW)[0]} from the battery, more than the ${kws(dischargeW, battery.maxDischargeW)[1]} it can deliver; the safe room comes first.`,
       measured: Math.round(dischargeW),
       limit: battery.maxDischargeW,
       nearestAllowed: Math.floor(battery.maxDischargeW),
@@ -163,7 +173,7 @@ const safeRoomComfort: Constraint = {
     // the humidity, so air that is dry anyway is a warning (dryAirWarning), not a refusal (#107).
     const dried = considered.filter((p) => driedInto(ctx)(p.ms)).flatMap((p) => p.rooms.filter((r) => r.id === preferences.safeRoomId));
     if (readings.length === 0) {
-      return { id: 'safe_room_comfort', ok: false, reason: 'The safe room has no reading, so its safety cannot be checked.' };
+      return { id: 'safe_room_comfort', ok: false, reason: 'The safe room has no temperature reading right now, so there is no way to check it stays safe.' };
     }
     const unit = ctx.input.displayUnit ?? 'C';
     const temps = readings.map((r) => r.tempC);
@@ -172,10 +182,10 @@ const safeRoomComfort: Constraint = {
     const minT = Math.min(...temps);
     // Measured air temperature and humidity only (plan §3.1): the fan and the feels-like never count here.
     if (season !== 'heating' && maxT > safety.cooling.maxC + EPS) {
-      return fail(`The safe room would reach ${temp(r1(maxT), unit)}, above its ${temp(safety.cooling.maxC, unit)} maximum.`, r1(maxT), safety.cooling.maxC, 'C');
+      return fail(`The safe room would reach ${temp(r1(maxT), unit)}, above the ${temp(safety.cooling.maxC, unit)} it must stay under.`, r1(maxT), safety.cooling.maxC, 'C');
     }
     if (season !== 'cooling' && minT < safety.heating.minC - EPS) {
-      return fail(`The safe room would drop to ${temp(r1(minT), unit)}, below its ${temp(safety.heating.minC, unit)} minimum.`, r1(minT), safety.heating.minC, 'C');
+      return fail(`The safe room would get as cold as ${temp(r1(minT), unit)}, below the ${temp(safety.heating.minC, unit)} it must stay above.`, r1(minT), safety.heating.minC, 'C');
     }
     // Heat danger (#248): the room feels hotter than its maximum (NWS heat index), or passes a cap. With the stricter
     // night limit on (#266) the maximum drops to the night threshold in the night window; the caps may be set
@@ -213,7 +223,7 @@ const safeRoomComfort: Constraint = {
     const minRh = Math.min(...rhs);
     const minDriedRh = Math.min(...dried.map((r) => r.humidityPct));
     if (minDriedRh < safety.humidity.minPct - EPS) {
-      return fail(`Humidity in the safe room would drop to ${Math.round(minDriedRh).toString()} %, below ${safety.humidity.minPct.toString()} %.`, r1(minDriedRh), safety.humidity.minPct, '%');
+      return fail(`The air in the safe room would get too dry: ${Math.round(minDriedRh).toString()} % humidity, below ${safety.humidity.minPct.toString()} %.`, r1(minDriedRh), safety.humidity.minPct, '%');
     }
     const [measured, limit] = season === 'heating' ? [minT, safety.heating.minC] : [maxT, safety.cooling.maxC];
     return {
@@ -242,7 +252,7 @@ const pacingOnTrack: Constraint = {
       return {
         id: 'pacing_on_track',
         ok: false,
-        reason: `At this pace the battery runs out at ${clock(empty.ms, tz)}, ${short.toString()} min before the next recharge at ${clock(ctx.horizonMs, tz)}.`,
+        reason: `At that pace the battery would run out at ${clock(empty.ms, tz)}, ${span(short)} before it can recharge at ${clock(ctx.horizonMs, tz)}.`,
         measured: short,
         limit: 0,
         nearestAllowed: 0,
@@ -260,7 +270,7 @@ const pacingOnTrack: Constraint = {
       return {
         id: 'pacing_on_track',
         ok: false,
-        reason: `At ${clock(worst.ms, tz)} the battery would be at ${r1(worst.soc).toString()} %, below the plan's ${r1(worst.target).toString()} %.`,
+        reason: `By ${clock(worst.ms, tz)} the battery would be at ${pcts(worst.soc, worst.target)[0]} %, not the ${pcts(worst.soc, worst.target)[1]} % set aside for the safe room.`,
         measured: r1(worst.soc),
         limit: r1(worst.target - tol),
         nearestAllowed: down1(worst.soc + tol),
