@@ -26,7 +26,7 @@ describe('catalogues', () => {
   });
 
   it('#284: phrases that ask for a spoken command stay English while recognition and the agent are English', () => {
-    for (const key of ['prefs.voiceHint', 'card.noActions'] as const) expect(CATALOGS['it-IT'][key]).toBe(CATALOGS['en-US'][key]);
+    for (const key of ['card.noActions'] as const) expect(CATALOGS['it-IT'][key]).toBe(CATALOGS['en-US'][key]);
   });
 
   it('formats in Italian with the same values', () => {

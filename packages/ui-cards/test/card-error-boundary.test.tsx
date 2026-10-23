@@ -37,7 +37,7 @@ it('logs a broken card as one JSON line with the error name only, and shows a ca
 it('the failed card is still a card: inline it offers no "Full screen"; in full screen it keeps "Back" and Escape (#356)', () => {
   const toggle = vi.fn();
   render(<CardFailed display={{ canFullscreen: true, fullscreen: false, toggle }} />);
-  expect(screen.getByRole('alert').textContent).toBe('This card could not be shown.');
+  expect(screen.getByRole('alert').textContent).toBe("This card didn't load. Ask again, or say what you'd like to see.");
   expect(screen.getByRole('region', { name: 'Something went wrong' })).toBeTruthy();
   expect(screen.queryByRole('button')).toBeNull();
   cleanup();
@@ -48,5 +48,5 @@ it('the failed card is still a card: inline it offers no "Full screen"; in full 
   cleanup();
   // The bridge never connected (main.tsx): no display control yet, still the same card.
   render(<CardFailed />);
-  expect(screen.getByRole('alert').textContent).toBe('This card could not be shown.');
+  expect(screen.getByRole('alert').textContent).toBe("This card didn't load. Ask again, or say what you'd like to see.");
 });

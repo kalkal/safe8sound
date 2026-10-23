@@ -249,7 +249,6 @@ export function PreferencesCard({ view, rooms, outlook, origin, onSave, busy = f
             </button>
           </>
         )}
-        <p className="muted">{t('prefs.voiceHint')}</p>
       </div>
     </CardShell>
   );

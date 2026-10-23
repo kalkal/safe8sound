@@ -356,7 +356,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const broken = { ...hotDayPlan(), steps: null } as unknown as ReturnType<typeof hotDayPlan>;
     show({ kind: 'plan', data: broken });
-    expect(screen.getByRole('alert').textContent).toBe('This card could not be shown.');
+    expect(screen.getByRole('alert').textContent).toBe("This card didn't load. Ask again, or say what you'd like to see.");
   });
 
   it('offers no Apply or Save when the host cannot run card actions, and says so', () => {
@@ -468,7 +468,7 @@ describe('CardApp: what the person sees inside the ui:// frame', () => {
       const toggle = vi.fn();
       const broken = { ...hotDayPlan(), steps: null } as unknown as ReturnType<typeof hotDayPlan>;
       render(<CardApp state={{ kind: 'plan', data: broken }} timeZone="Europe/Rome" canAct onCallTool={vi.fn()} display={{ canFullscreen: true, fullscreen: true, toggle }} />);
-      expect(screen.getByRole('alert').textContent).toBe('This card could not be shown.');
+      expect(screen.getByRole('alert').textContent).toBe("This card didn't load. Ask again, or say what you'd like to see.");
       fireEvent.click(screen.getByRole('button', { name: 'Back to the conversation' }));
       expect(toggle).toHaveBeenCalledTimes(1);
       fireEvent.keyDown(document, { key: 'Escape' });

@@ -233,7 +233,8 @@ export const enUS = {
   'home.hide': 'Hide my home',
   'home.title': 'My home',
   'home.loading': 'Getting your home…',
-  'home.failed': "I can't reach your home right now.",
+  // Says what to do (NN/g error-message guidelines, 22 Oct): no retry runs by itself, and after a failed read the old home is not shown.
+  'home.failed': "I can't reach your home right now. Try again in a moment.",
   'home.empty': 'Ask about your rooms or the storm to see your home here.',
   'home.needsCode': 'Enter the demo code to see your home.',
   // The realistic Echo Show screen (#432 S6): the top row and the tiles at rest. The weather is the sky's (no number).
@@ -320,7 +321,10 @@ export const enUS = {
   // The title of a card still waiting for its tool result (#356): "Loading…" follows.
   'card.waitingTitle': 'One moment',
   'card.loading': 'Loading…',
-  'card.failed': 'This card could not be shown.',
+  // Says what to do (NN/g, 22 Oct): no retry button sits by it, asking again always works.
+  'card.failed': "This card didn't load. Ask again, or say what you'd like to see.",
+  // An action of a loaded card that may have failed (review of 535): never "didn't load", which invites a repeat.
+  'card.actionFailed': "That may not have gone through. Ask me what's set now.",
   'card.noAnswer': 'No answer came back: try again.',
   // The title of a card whose tool failed (#353): the reason follows in words.
   'card.errorTitle': 'Something went wrong',
@@ -581,7 +585,6 @@ export const enUS = {
   'prefs.channel.in_app': 'in-app',
   'prefs.save': 'Save',
   'prefs.cancel': 'Cancel',
-  'prefs.voiceHint': 'Or say "set comfort to 24".',
   'prefs.limitsHint': 'Change temperatures and limits in the settings, under "Temperatures and limits".',
   'prefs.invalid': 'These preferences cannot be saved: {reason}',
   'prefs.error.comfortAboveMax': 'the comfort setpoint is above the cooling safety maximum.',

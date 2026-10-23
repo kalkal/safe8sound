@@ -174,12 +174,12 @@ export function safeTimeZone(zone: string | undefined): string {
 export function parseSaveResult(result: ToolResultLike): Result<PublicPreferences, string> {
   if (result.isError === true) {
     const envelope = EnvelopeSchema.safeParse(result.structuredContent);
-    return err(envelope.success ? envelope.data.message : t('card.failed'));
+    return err(envelope.success ? envelope.data.message : t('card.actionFailed'));
   }
   const parsed = SetPreferencesOutputSchema.safeParse(result.structuredContent);
   if (!parsed.success) {
     log({ level: 'warn', code: 'output_schema_violation', details: { tool: 'set_preferences', issues: parsed.error.issues.length } });
-    return err(t('card.failed'));
+    return err(t('card.actionFailed'));
   }
   return ok(parsed.data.preferences);
 }

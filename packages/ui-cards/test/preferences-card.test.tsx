@@ -187,12 +187,12 @@ describe('PreferencesCard (one screen, plan §11.2 p.14)', () => {
     expect(screen.getByRole('alert').textContent).toBe('These preferences cannot be saved: the comfort setpoint is above the cooling safety maximum.');
   });
 
-  it('offers Save only when there is somewhere to send it; the voice hint stays', () => {
+  it('offers Save only when there is somewhere to send it, and never a voice hint: a spoken setting is not saved since 519', () => {
     const valid = PreferencesSchema.parse(examplePreferences());
     const view = { preferences: toPublicPreferences(valid), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) };
     render(<PreferencesCard view={view} rooms={rooms} />);
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
-    expect(screen.getByText('Or say "set comfort to 24".')).toBeTruthy();
+    expect(screen.queryByText(/Or say/)).toBeNull();
   });
 
   it('shows readable room names from the ids when the host gives no names', () => {

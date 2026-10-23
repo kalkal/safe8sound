@@ -63,7 +63,7 @@ describe('parseCardResult: the tool result as the card sees it, never trusted un
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect(parseCardResult('plan', { content: [], structuredContent: { ...hotDayPlan(), guarantees: [] } })).toEqual({
       kind: 'error',
-      message: 'This card could not be shown.',
+      message: "This card didn't load. Ask again, or say what you'd like to see.",
       retryable: false,
     });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('output_schema_violation'));
@@ -159,7 +159,7 @@ describe('parseSaveResult: the set_preferences answer, shown to the person', () 
     const envelope = toolError('safety_threshold_out_of_range', 'safety.cooling.maxC must stay between 24 and 30 C.');
     expect(parseSaveResult({ isError: true, content: [], structuredContent: envelope })).toEqual({ ok: false, error: 'safety.cooling.maxC must stay between 24 and 30 C.' });
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    expect(parseSaveResult({ content: [], structuredContent: { nope: 1 } })).toEqual({ ok: false, error: 'This card could not be shown.' });
+    expect(parseSaveResult({ content: [], structuredContent: { nope: 1 } })).toEqual({ ok: false, error: "That may not have gone through. Ask me what's set now." });
   });
 });
 
@@ -178,6 +178,8 @@ describe('afterCall: what a card shows once the host answered its call (or never
 
   it('a call that got no answer keeps the card, and says to try again', () => {
     expect(afterCall(plan, 'apply_plan', undefined)).toEqual({ state: plan, notice: { ok: false, text: 'No answer came back: try again.' } });
+    // An answer that is neither the applied plan nor an error envelope: it may not have gone through (review of 535).
+    expect(afterCall(plan, 'apply_plan', { content: [], structuredContent: { nope: 1 } })).toEqual({ state: plan, notice: { ok: false, text: "That may not have gone through. Ask me what's set now." } });
     const prefs: CardState = { kind: 'preferences', data: { preferences: toPublicPreferences(PreferencesSchema.parse(examplePreferences())), isDefault: false, hardLimits: SafetyHardLimitsSchema.parse(exampleSafetyLimits()) } };
     expect(afterCall(prefs, 'set_preferences', undefined)).toEqual({ state: prefs, notice: { ok: false, text: 'No answer came back: try again.' } });
   });

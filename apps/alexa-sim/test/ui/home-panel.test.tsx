@@ -150,7 +150,7 @@ describe('HomePanel', () => {
     const onRetry = vi.fn();
     render(<HomePanel status={undefined} renderCard={frame} load="failed" onRetry={onRetry} />);
     fireEvent.click(screen.getByRole('button', { name: 'Show my home' }));
-    expect(screen.getByRole('region', { name: 'My home' }).textContent).toContain("I can't reach your home right now.");
+    expect(screen.getByRole('region', { name: 'My home' }).textContent).toContain("I can't reach your home right now. Try again in a moment.");
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });

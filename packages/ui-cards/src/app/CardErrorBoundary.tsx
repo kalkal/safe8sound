@@ -4,7 +4,7 @@ import { log } from './card-log.js';
 import { t } from '../text.js';
 
 /**
- * "This card could not be shown." as a card with its title row (#356): inline it offers no "Full screen", like any
+ * "This card didn't load" (card.failed) as a card with its title row (#356): inline it offers no "Full screen", like any
  * error; a frame already full screen keeps "Back to the conversation" and Escape.
  */
 export function CardFailed({ display }: { display?: DisplayControl | undefined }) {

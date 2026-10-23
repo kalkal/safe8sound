@@ -21,7 +21,8 @@ export function afterCall(state: CardState, name: string, result: ToolResultLike
     // Apply turns this frame into the applied plan; a refusal (expired, not allowed) is said above the plan.
     const next = parseCardResult('applied', result);
     if (next.kind === 'applied') return { state: { ...next, fromThisFrame: true } };
-    return { state, notice: { ok: false, text: next.kind === 'error' ? next.message : t('card.failed') } };
+    // The server's own words when it said why; otherwise, as for any action of a loaded card, it may not have gone through.
+    return { state, notice: { ok: false, text: next.kind === 'error' && next.message !== t('card.failed') ? next.message : t('card.actionFailed') } };
   }
   if (name === 'set_preferences') {
     // Save says whether it worked and shows the new values; a refused save keeps the draft (the card stays as it is).
