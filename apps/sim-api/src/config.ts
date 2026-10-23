@@ -34,7 +34,7 @@ const invalid = (message: string) => err(toolError('invalid_config', message));
  * of a turn (infra/cdk.json cold-reserve:turnTiming, #270). On AWS the stack sets it from the table; a test keeps
  * this default equal to it.
  */
-export const DEFAULT_AGENT_TIMEOUT_MS = 14_000;
+export const DEFAULT_AGENT_TIMEOUT_MS = 22_000;
 
 export const SPEECH_ENGINES = ['neural', 'generative', 'standard'] as const;
 export type SpeechEngine = (typeof SPEECH_ENGINES)[number];

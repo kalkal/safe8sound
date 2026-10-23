@@ -9,7 +9,7 @@ const cdk: unknown = JSON.parse(readFileSync(new URL('../../../infra/cdk.json', 
 
 describe('the browser waits from the timing table (#270)', () => {
   it('the AWS build sets both waits from cdk.json', () => {
-    expect(siteTimingEnv(cdk)).toEqual({ VITE_AGENT_TIMEOUT_MS: '16000', VITE_TURN_BUDGET_MS: '18000' });
+    expect(siteTimingEnv(cdk)).toEqual({ VITE_AGENT_TIMEOUT_MS: '24000', VITE_TURN_BUDGET_MS: '26000' });
   });
 
   it('refuses a cdk.json without the table, rather than building with a guess', () => {

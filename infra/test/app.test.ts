@@ -8,7 +8,7 @@ import { SITE_DIR, exampleConfig } from './fixtures.js';
 
 const config: InfraConfig = exampleConfig();
 /** #474: dev's limits on the recording days, over the fixture's caps; restored after 23 Oct. */
-const RECORDING_DAYS_DEV = { turnsPerCodePerDay: 60, toolCallsPerCodePerDay: 60, turnsGlobalPerDay: 100, readCallsPerCodePerDay: 1000, readCallsGlobalPerDay: 5000, demoCallsPerCodePerDay: 500 };
+const RECORDING_DAYS_DEV = { turnsPerCodePerDay: 200, toolCallsPerCodePerDay: 200, turnsGlobalPerDay: 250, readCallsPerCodePerDay: 1000, readCallsGlobalPerDay: 5000, demoCallsPerCodePerDay: 500, speechCharsPerCodePerDay: 20_000, speechCharsGlobalPerDay: 60_000 };
 // Bundling the Lambda is left to `pnpm synth`; tests synthesize the templates only.
 const newApp = () => new App({ context: { 'aws:cdk:bundling-stacks': [] } });
 
@@ -30,8 +30,8 @@ describe('loadInfraConfig (region and stages always from config)', () => {
     const loaded = loadInfraConfig((key) => cdk.context[key]);
     if (!loaded.ok) throw new Error('cdk.json is not valid');
     const { simApi, warmup, alexa } = loaded.value;
-    // #474 (owner, 20 Oct): dev's daily limits raised for the recording days (21-22 Oct), to be restored to the
-    // fixture's after 23 Oct; only turns reach the model, and the budget action is unchanged. Demo is untouched.
+    // #474 (owner, 20 Oct), raised again on 23 Oct for the filming and the last tests: dev's daily limits, to be restored to the
+    // fixture's after the deadline (#475); only turns reach the model, and the budget action is unchanged. Demo is untouched.
     expect(simApi.limits.dev).toEqual({ ...config.simApi.limits.dev, ...RECORDING_DAYS_DEV });
     expect(simApi.limits.demo).toEqual(config.simApi.limits.demo);
     expect(simApi.codeLimits).toEqual(config.simApi.codeLimits);

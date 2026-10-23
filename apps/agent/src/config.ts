@@ -11,7 +11,7 @@ const TURN_DEADLINE_CEILING_MS = 30_000;
 // The agent deadline of the timing table of a turn (infra/cdk.json cold-reserve:turnTiming, #270): the agent closes
 // its turn first, before sim-api and the browser stop waiting. The AgentCore stack sets it from the table; a test
 // keeps this local default equal to it.
-const DEFAULT_TURN_DEADLINE_MS = 12_000;
+const DEFAULT_TURN_DEADLINE_MS = 20_000;
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
 const MIN_TOKEN_LENGTH = 32;

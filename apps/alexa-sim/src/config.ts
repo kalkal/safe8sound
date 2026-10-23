@@ -89,8 +89,8 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>, s
     simApiUrl: env['VITE_SIM_API_URL'] ?? (override === 'remote' ? DEV_SIM_API_PATH : undefined),
     // The timing table of a turn (infra/cdk.json cold-reserve:turnTiming, #270): the AWS build sets both from it; a
     // test keeps these local defaults equal to it.
-    agentTimeoutMs: env['VITE_AGENT_TIMEOUT_MS'] ?? 16_000,
-    turnBudgetMs: env['VITE_TURN_BUDGET_MS'] ?? 18_000,
+    agentTimeoutMs: env['VITE_AGENT_TIMEOUT_MS'] ?? 24_000,
+    turnBudgetMs: env['VITE_TURN_BUDGET_MS'] ?? 26_000,
     homeTimeZone: env['VITE_HOME_TIME_ZONE'] ?? DEFAULT_HOME_TIME_ZONE,
     phone,
     phonePollMs: env['VITE_PHONE_POLL_MS'] ?? 5_000,

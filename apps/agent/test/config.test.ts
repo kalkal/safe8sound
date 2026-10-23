@@ -17,7 +17,7 @@ describe('loadAgentConfig (cost rule caps, model from config)', () => {
         maxModelTurns: 7,
         maxToolCalls: 6,
         historyWindowMessages: 12,
-        turnDeadlineMs: 12_000,
+        turnDeadlineMs: 20_000,
         mcpUrl: 'http://127.0.0.1:3316/mcp',
       },
     });

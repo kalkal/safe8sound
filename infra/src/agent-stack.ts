@@ -25,7 +25,7 @@ export interface AgentStackProps extends StackProps {
  * - direct code deployment of the one-file CommonJS bundle (Node 22, `app.js`), built at synth time;
  * - HTTP protocol, public network, no authorizer: callers are authenticated by IAM (SigV4) through
  *   InvokeAgentRuntime, and only sim-api's role gets that permission (G1c);
- * - idle sessions end after `idleRuntimeSessionTimeoutSeconds` (120);
+ * - idle sessions end after `idleRuntimeSessionTimeoutSeconds` (900 in infra/cdk.json);
  * - its own role: Bedrock on the configured model only, its MCP token parameter only, its own logs.
  */
 export class AgentStack extends Stack {

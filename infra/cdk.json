@@ -35,13 +35,13 @@
       "modelId": "us.amazon.nova-2-lite-v1:0",
       "foundationModelId": "amazon.nova-2-lite-v1:0",
       "mcpTokenParameter": "/cold-reserve/{stage}/agent/mcp-token",
-      "idleRuntimeSessionTimeoutSeconds": 120
+      "idleRuntimeSessionTimeoutSeconds": 900
     },
     "cold-reserve:turnTiming": {
-      "agentDeadlineMs": 12000,
+      "agentDeadlineMs": 20000,
       "agentMarginMs": 2000,
-      "browserTimeoutMs": 16000,
-      "turnBudgetMs": 18000
+      "browserTimeoutMs": 24000,
+      "turnBudgetMs": 26000
     },
     "cold-reserve:alexa": {
       "stages": [
@@ -74,9 +74,9 @@
       "originSecretPreviousParameter": "/cold-reserve/{stage}/sim-api/origin-secret-previous",
       "phoneTokenParameter": "/cold-reserve/{stage}/sim-api/phone-token",
       "memoryMb": 512,
-      "timeoutSeconds": 32,
+      "timeoutSeconds": 40,
       "logRetentionDays": 14,
-      "p95AlarmMs": 9000,
+      "p95AlarmMs": 20000,
       "ssmTimeoutMs": 2000,
       "mcpTimeoutMs": 10000,
       "allowedOrigins": [],
@@ -87,15 +87,15 @@
       "tokenTtlS": 3600,
       "limits": {
         "dev": {
-          "turnsPerCodePerDay": 60,
-          "turnsGlobalPerDay": 100,
-          "toolCallsPerCodePerDay": 60,
+          "turnsPerCodePerDay": 200,
+          "turnsGlobalPerDay": 250,
+          "toolCallsPerCodePerDay": 200,
           "readCallsPerCodePerDay": 1000,
           "readCallsGlobalPerDay": 5000,
           "demoCallsPerCodePerDay": 500,
           "codeAttemptsPerIpPerHour": 10,
-          "speechCharsPerCodePerDay": 6000,
-          "speechCharsGlobalPerDay": 30000,
+          "speechCharsPerCodePerDay": 20000,
+          "speechCharsGlobalPerDay": 60000,
           "phoneReadsPerSessionPerMinute": 20,
           "phoneReadsPerCodePerMinute": 120,
           "logLinesPerSessionPerMinute": 30,
