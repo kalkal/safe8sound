@@ -2,18 +2,22 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ArnFormat, CfnOutput, Duration, RemovalPolicy, Stack, Validations, type StackProps } from 'aws-cdk-lib';
 import { ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
+import type { ITopic } from 'aws-cdk-lib/aws-sns';
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Architecture, FunctionUrlAuthType, LoggingFormat, ParamsAndSecretsLayerVersion, ParamsAndSecretsVersions, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { FilterPattern, LogGroup, MetricFilter, type CfnLogGroup } from 'aws-cdk-lib/aws-logs';
 import type { Construct } from 'constructs';
 import type { McpConfig, StageName, StateConfig } from './config.js';
+import { notifyAlarms } from './alarms.js';
 import { addWarmup, type WarmupSchedule } from './warmup.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export interface McpStackProps extends StackProps {
   readonly stage: StageName;
+  /** The stage's alarm topic (security review, 22 Oct): every alarm of this stack notifies it. */
+  readonly alarmTopic?: ITopic;
   readonly mcp: McpConfig;
   readonly state: StateConfig;
   /** Only what the function needs: the name for its env, the ARN for its policy. */
@@ -134,6 +138,8 @@ export class McpStack extends Stack {
         comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
         treatMissingData: TreatMissingData.NOT_BREACHING,
       });
+
+    notifyAlarms(this, props.alarmTopic);
 
     // cdk-nag 3 findings are acknowledged through CDK Validations, each with its reason.
     const logGroupId = this.getLogicalId(logGroup.node.defaultChild as CfnLogGroup);

@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-  Copies one demo code of the `demo` stage to the clipboard, without printing it.
+  Copies one demo code of a stage (`demo` by default) to the clipboard, without printing it.
 
 .DESCRIPTION
-  Reads /cold-reserve/demo/codes/<code> (written by new-demo-parameters.ps1; no function of the app may read it) with
+  Reads /cold-reserve/<stage>/codes/<code> (written by new-demo-parameters.ps1 or rotate-demo-code.ps1; no function of the app may read it) with
   the owner's own AWS profile, puts it on the clipboard, waits for Enter, then clears the clipboard.
     judges  the code shared by all judges (pasted into the Devpost testing instructions)
     owner   the owner's own test code (small caps of its own, never counted against the judges' code)
@@ -15,6 +15,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$AwsProfile,
   [Parameter(Mandatory = $true)][ValidateSet('judges', 'owner')][string]$Code,
+  [ValidateSet('dev', 'demo')][string]$Stage = 'demo',
   [string]$Aws = 'aws'
 )
 
@@ -25,7 +26,7 @@ $cdk = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot '..\cdk.json') |
 $Region = $cdk.context.'cold-reserve:region'
 if ($Region -notmatch '^[a-z]{2}(-[a-z]+)+-\d$') { throw 'infra/cdk.json has no valid cold-reserve:region.' }
 
-$value = & $Aws ssm get-parameter --name "/cold-reserve/demo/codes/$Code" --with-decryption --query Parameter.Value --output text --profile $AwsProfile --region $Region
+$value = & $Aws ssm get-parameter --name "/cold-reserve/$Stage/codes/$Code" --with-decryption --query Parameter.Value --output text --profile $AwsProfile --region $Region
 if ($LASTEXITCODE -ne 0) { throw "Could not read the $Code code (exit $LASTEXITCODE)." }
 try {
   Set-Clipboard -Value $value.Trim()

@@ -2,6 +2,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ArnFormat, CfnOutput, Duration, Fn, RemovalPolicy, Stack, Validations, type StackProps } from 'aws-cdk-lib';
 import { ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
+import type { ITopic } from 'aws-cdk-lib/aws-sns';
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Architecture, FunctionUrlAuthType, LoggingFormat, ParamsAndSecretsLayerVersion, ParamsAndSecretsVersions, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -9,12 +10,15 @@ import { BlockPublicAccess, Bucket, BucketEncryption, type CfnBucket } from 'aws
 import { FilterPattern, LogGroup, MetricFilter, type CfnLogGroup } from 'aws-cdk-lib/aws-logs';
 import type { Construct } from 'constructs';
 import { simApiAgentTimeoutMs, type SimApiConfig, type StageName, type StateConfig, type TurnTiming } from './config.js';
+import { notifyAlarms } from './alarms.js';
 import { addWarmup, type WarmupSchedule } from './warmup.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export interface SimApiStackProps extends StackProps {
   readonly stage: StageName;
+  /** The stage's alarm topic (security review, 22 Oct): every alarm of this stack notifies it. */
+  readonly alarmTopic?: ITopic;
   readonly simApi: SimApiConfig;
   readonly state: StateConfig;
   /** The one timing table of a turn (#270): how long sim-api waits for the agent. */
@@ -199,6 +203,26 @@ export class SimApiStack extends Stack {
         comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
         treatMissingData: TreatMissingData.NOT_BREACHING,
       });
+    // Injection hardening (22 Oct): the sim-api writes "code_attempts_global_cap" when everyone's wrong demo codes of the
+    // hour reach the cap (someone is guessing codes; a right code still opens). Alarm on the first such line.
+    new MetricFilter(this, 'CodeAttemptsGlobalCapFilter', {
+      logGroup,
+      filterPattern: FilterPattern.stringValue('$.message', '=', 'code_attempts_global_cap'),
+      metricNamespace: `ColdReserve/${stage}`,
+      metricName: 'CodeAttemptsGlobalCap',
+      metricValue: '1',
+      dimensions: { Component: '$.component' },
+    })
+      .metric({ period: Duration.minutes(5), statistic: 'Sum', dimensionsMap: { Component: 'sim-api' } })
+      .createAlarm(this, 'CodeAttemptsGlobalCap', {
+        alarmDescription: 'Every wrong demo code of the hour is used up: someone may be guessing codes (a right code still opens).',
+        threshold: 0,
+        evaluationPeriods: 1,
+        comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
+        treatMissingData: TreatMissingData.NOT_BREACHING,
+      });
+
+    notifyAlarms(this, props.alarmTopic);
 
     // cdk-nag 3 findings are acknowledged through CDK Validations, each with its reason.
     const logGroupId = this.getLogicalId(logGroup.node.defaultChild as CfnLogGroup);

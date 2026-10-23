@@ -63,6 +63,9 @@
       },
       "rateMinutes": 5
     },
+    "cold-reserve:alarms": {
+      "emailParameter": "/cold-reserve/{stage}/alarms/email"
+    },
     "cold-reserve:simApi": {
       "demoCodesParameter": "/cold-reserve/{stage}/sim-api/demo-codes",
       "tokenKeysParameter": "/cold-reserve/{stage}/sim-api/token-keys",

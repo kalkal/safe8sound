@@ -158,6 +158,14 @@ describe('sim-api stack (#17)', () => {
     t.hasResourceProperties('AWS::CloudWatch::Alarm', { MetricName: 'InternalErrors', Dimensions: [{ Name: 'Component', Value: 'sim-api' }] });
   });
 
+  it('alarms on the first line that says every wrong demo code of the hour is used up (someone is guessing codes), under its own dimension', () => {
+    t.hasResourceProperties('AWS::Logs::MetricFilter', {
+      FilterPattern: '{ $.message = "code_attempts_global_cap" }',
+      MetricTransformations: [Match.objectLike({ MetricName: 'CodeAttemptsGlobalCap', MetricNamespace: 'ColdReserve/dev', Dimensions: [{ Key: 'Component', Value: '$.component' }] })],
+    });
+    t.hasResourceProperties('AWS::CloudWatch::Alarm', { MetricName: 'CodeAttemptsGlobalCap', Threshold: 0, EvaluationPeriods: 1, Dimensions: [{ Name: 'Component', Value: 'sim-api' }] });
+  });
+
   it('alarms on the p95 duration from config in 2 of 3 periods', () => {
     t.hasResourceProperties('AWS::CloudWatch::Alarm', { MetricName: 'Duration', ExtendedStatistic: 'p95', Threshold: 9000, EvaluationPeriods: 3, DatapointsToAlarm: 2 });
   });

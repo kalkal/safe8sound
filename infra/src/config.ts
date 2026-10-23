@@ -229,6 +229,12 @@ export const WarmupConfigSchema = z.strictObject({
 });
 export type WarmupConfig = z.infer<typeof WarmupConfigSchema>;
 
+/** Where the alarms go (security review, 22 Oct): an SSM String with the owner's email, read by CloudFormation at deploy, never in the repo. */
+export const AlarmsConfigSchema = z.strictObject({
+  emailParameter: z.string().regex(/^\/[a-z0-9-]+\/\{stage\}\/alarms\/[A-Za-z0-9_.-]+$/),
+});
+export type AlarmsConfig = z.infer<typeof AlarmsConfigSchema>;
+
 /** How long sim-api waits for the agent: the agent's own deadline plus the margin. */
 export const simApiAgentTimeoutMs = (t: TurnTiming): number => t.agentDeadlineMs + t.agentMarginMs;
 
@@ -244,6 +250,7 @@ export const InfraConfigSchema = z.strictObject({
   alexa: AlexaConfigSchema,
   /** Absent = off on every stage. */
   warmup: WarmupConfigSchema.default({ enabled: { dev: false, demo: false }, rateMinutes: 5 }),
+  alarms: AlarmsConfigSchema.default({ emailParameter: '/cold-reserve/{stage}/alarms/email' }),
 })
   .superRefine((c, ctx) => {
     // The sim-api worst case (Copilot on #156): the SSM reads at a cold start, two DynamoDB calls with every
@@ -292,10 +299,11 @@ export function loadInfraConfig(context: (key: string) => unknown): Result<Infra
     turnTiming: context('cold-reserve:turnTiming'),
     alexa: context('cold-reserve:alexa'),
     warmup: context('cold-reserve:warmup'),
+    alarms: context('cold-reserve:alarms'),
   });
   if (parsed.success) return ok(parsed.data);
   return err(
-    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp, :state, :agent, :simApi, :turnTiming, :alexa or :warmup.', {
+    toolError('invalid_config', 'The CDK context has no valid cold-reserve:region, :stages, :mcp, :state, :agent, :simApi, :turnTiming, :alexa, :warmup or :alarms.', {
       details: { issues: parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message.slice(0, 200) })) },
     }),
   );

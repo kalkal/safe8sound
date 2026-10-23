@@ -24,6 +24,7 @@ export const exampleConfig = (): InfraConfig => ({
   },
   state: { connectTimeoutMs: 500, requestTimeoutMs: 1500, maxAttempts: 3 },
   warmup: { enabled: { dev: false, demo: false }, rateMinutes: 5 },
+  alarms: { emailParameter: '/cold-reserve/{stage}/alarms/email' },
   agent: {
     modelId: 'us.amazon.nova-2-lite-v1:0',
     foundationModelId: 'amazon.nova-2-lite-v1:0',
