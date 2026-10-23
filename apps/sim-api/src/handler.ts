@@ -21,7 +21,7 @@ import {
   type ToolCallRequest,
   type TurnReply,
 } from '@cold-reserve/contracts';
-import { CORRELATION_ID_HEADER, SandboxHomeIdSchema, correlationIdFrom } from '@cold-reserve/contracts';
+import { CORRELATION_ID_HEADER, DEMO_CLOCK_TOOLS as DEMO_CLOCK_TOOL_NAMES, SandboxHomeIdSchema, correlationIdFrom } from '@cold-reserve/contracts';
 import type { Clock } from '@cold-reserve/core';
 import type { SimApiConfig, SpeechEngine } from './config.js';
 import { CLIENT_LOG_MAX_BODY_BYTES, ClientLogRequestSchema, clientLogEntries } from './client-log.js';
@@ -94,7 +94,7 @@ const CLIENT_LOG_PATH = '/v1/log';
 export type SimApiHandler = (req: Request, meta: { clientIp: string }) => Promise<Response>;
 
 /** The simulated clock and the scenario (time pack): their own daily count per code, never apply_plan's writes. */
-const DEMO_CLOCK_TOOLS: ReadonlySet<string> = new Set(['set_scenario', 'get_milestones', 'advance_clock']);
+const DEMO_CLOCK_TOOLS: ReadonlySet<string> = new Set(DEMO_CLOCK_TOOL_NAMES);
 const ROUTES = new Set(['/v1/session', '/v1/turns', '/v1/tools/call', '/v1/speech', CLIENT_LOG_PATH]);
 const LOGGED: ReadonlySet<ErrorCategory> = new Set(['internal', 'dependency_unavailable', 'unauthorized', 'rate_limited']);
 const nameOf = (e: unknown): string => (e instanceof Error ? e.name : typeof e);

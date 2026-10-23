@@ -7,6 +7,15 @@ import { TempUnitSchema } from './units.js';
 // C2b (#222, approved in #222): a visitor's sandbox settings as two tools, get_demo_settings and set_scenario. Only
 // visitor sandboxes list them; health thresholds are never among them (C1).
 
+/** The simulated clock and the scenario, driven by the demo's buttons: counted apart in the sim-api's quotas (time pack). */
+export const DEMO_CLOCK_TOOLS = ['set_scenario', 'get_milestones', 'advance_clock'] as const;
+
+/**
+ * The demo controls the model is never offered (security review, 22 Oct): only buttons and cards
+ * use them, and the prompt, its examples and the skill never do, so a tricked model cannot move the clock or the scenario.
+ */
+export const MODEL_HIDDEN_TOOLS = [...DEMO_CLOCK_TOOLS, 'get_demo_settings'] as const;
+
 /** Output of `get_demo_settings`: the settings and the place the scenario is played in. */
 export const GetDemoSettingsOutputSchema = z.strictObject({
   settings: SandboxSettingsSchema,

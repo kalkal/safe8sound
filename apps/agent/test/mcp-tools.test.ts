@@ -1,5 +1,5 @@
 import './no-network.js';
-import { ASKED_BY_PERSON_META, HomeIdSchema, PlanSchema } from '@cold-reserve/contracts';
+import { ASKED_BY_PERSON_META, HomeIdSchema, MODEL_HIDDEN_TOOLS, PlanSchema } from '@cold-reserve/contracts';
 import { examplePlan } from '@cold-reserve/contracts/fixtures';
 import { describe, expect, it } from 'vitest';
 import { McpToken } from '../src/config.js';
@@ -53,6 +53,19 @@ describe('mcpToolset: our own MCP wrapper (approved in #101)', () => {
       ['get_home_status', 'The get_home_status tool.'],
       ['plan_comfort', 'The plan_comfort tool.'],
     ]);
+  });
+
+  it('never offers the demo controls to the model (set_scenario, advance_clock, get_milestones, get_demo_settings): buttons and cards keep them (security review, 22 Oct)', async () => {
+    const { session } = fakeSession({
+      get_home_status: { text: 'Battery at 45%.' },
+      set_scenario: { text: 'Scenario set.' },
+      advance_clock: { text: 'Clock moved.' },
+      get_milestones: { text: 'Milestones.' },
+      get_demo_settings: { text: 'Settings.' },
+    });
+    const tools = await mcpToolset(session, inTurn());
+    expect(tools.map((t) => t.name)).toEqual(['get_home_status']);
+    expect([...MODEL_HIDDEN_TOOLS].sort()).toEqual(['advance_clock', 'get_demo_settings', 'get_milestones', 'set_scenario']);
   });
 
   it('gives the model the text, and records structuredContent only for the card tools', async () => {

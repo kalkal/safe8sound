@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import type { Browser, BrowserContext, Page } from '@playwright/test';
-import { CARD_TOOL_ACCESS } from '../../packages/contracts/src/index.js';
+import { CARD_TOOL_ACCESS, DEMO_CLOCK_TOOLS } from '../../packages/contracts/src/index.js';
 import { SITE_URL, demoCode } from './target.js';
 import type { Size } from './sizes.js';
 
@@ -32,8 +32,8 @@ export async function openSiteSession(browser: Browser, size: Size): Promise<Sit
   return { context, page, escaped };
 }
 
-/** The tools sim-api counts on the demo counter (apps/sim-api/src/handler.ts: DEMO_CLOCK_TOOLS): the clock and the scenario. */
-const DEMO_TOOLS: ReadonlySet<string> = new Set(['set_scenario', 'get_milestones', 'advance_clock']);
+/** The tools sim-api counts on the demo counter (the contract's DEMO_CLOCK_TOOLS): the clock and the scenario. */
+const DEMO_TOOLS: ReadonlySet<string> = new Set(DEMO_CLOCK_TOOLS);
 
 /**
  * Writes one line per metered call of the visit to e2e-results/calls-<size>.jsonl: its kind (turn, read, write or demo, as

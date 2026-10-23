@@ -1,4 +1,4 @@
-import { ASKED_BY_PERSON_META, CORRELATION_ID_HEADER, CorrelationIdSchema, GuardRefusalSchema, TURN_HEADER, HOME_HEADER, StatusFactsSchema, ToolCardSchema, toolError, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
+import { ASKED_BY_PERSON_META, CORRELATION_ID_HEADER, MODEL_HIDDEN_TOOLS, CorrelationIdSchema, GuardRefusalSchema, TURN_HEADER, HOME_HEADER, StatusFactsSchema, ToolCardSchema, toolError, type HomeId, type StatusFacts, type ToolCard } from '@cold-reserve/contracts';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -101,10 +101,11 @@ function modelArgs(name: string, args: Record<string, unknown>): Record<string, 
 /**
  * The model's tools, over our own MCP session. Every call names its turn (#230): outside a well-formed turn the tool
  * is not called at all, the model gets an error and one warn line is logged (#233), so the agent never passes for
- * the person's tap on a card.
+ * the person's tap on a card. The demo controls (the clock and the scenario) are never offered: only buttons use them.
  */
 export async function mcpToolset(session: McpSession, recorder: TurnRecorder, log?: (line: AgentLogEntry) => void): Promise<FunctionTool[]> {
-  return (await session.listTools()).map(
+  const hidden: ReadonlySet<string> = new Set(MODEL_HIDDEN_TOOLS);
+  return (await session.listTools()).filter((info) => !hidden.has(info.name)).map(
     (info) =>
       new FunctionTool({
         name: info.name,
