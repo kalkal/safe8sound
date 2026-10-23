@@ -31,8 +31,9 @@ a test feeds other values and checks other numbers come out.
 
 ## Timing
 
-Alexa waits 8 s. The function times out at 7 s. Inside it, one deadline of 6 s covers the whole request; the SSM read
-has 1.5 s and the MCP call 4 s, both also bounded by the deadline (`AbortSignal.any`). Config:
+Alexa waits 8 s. The function times out at 7 s. Inside it, one deadline of 6.9 s covers the whole request; the SSM read
+has 1.2 s and the MCP call 5.7 s, both also bounded by the deadline (`AbortSignal.any`). Until 23 Oct the MCP call had
+4 s: the first call after a pause (the skill's and the MCP server's cold starts together) timed out at 5.3 s. Config:
 `infra/cdk.json` `cold-reserve:alexa`; the schema refuses SSM + MCP over the deadline, or a deadline the function
 does not outlive. The SSM read happens only on a cold container (a success is kept).
 
@@ -42,7 +43,7 @@ does not outlive. The SSM read happens only on a cold container (a success is ke
 |---|---|---|---|
 | SSM slow / extension starting | `config_unavailable` | warn | "I cannot reach the home right now..." |
 | SSM setup (name, permission) | `invalid_config` | error | "Something went wrong on our side..." |
-| MCP over 4 s or the deadline | `agent_timeout` | warn | "The home did not answer in time..." |
+| MCP over 5.7 s or the deadline | `agent_timeout` | warn | "The home did not answer in time..." |
 | MCP 401/403 (token not in MCP clients) | `wrong_client` | error | "Something went wrong on our side..." |
 | MCP unreachable | `agent_unavailable` | warn | "I cannot reach the home right now..." |
 | tool `isError` | the tool's own code | by category | by retryable |
@@ -66,8 +67,11 @@ the MCP token, the Alexa request id or any error text (only `errorName`).
    configuration change, for example
    `aws lambda update-function-configuration --function-name <McpServer function name> --description "clients <date>"`.
    Until then the skill gets 401 `wrong_client` (it says "Something went wrong on our side").
-4. `pnpm synth`, then deploy with the skill ID on the command line only (never in `cdk.json`):
-   `cdk deploy "dev/alexa-skill" -c alexaSkillId=amzn1.ask.skill.<uuid>`. `cdk list` with the same `-c` shows the
+4. `pnpm synth`, then deploy with the skill ID on the command line or in the deployer's environment (never in `cdk.json`):
+   `cdk deploy "dev/alexa-skill" -c alexaSkillId=amzn1.ask.skill.<uuid>`, or `ALEXA_SKILL_ID` set for every deploy so
+   the skill stack goes out with the rest. A synth without it warns `alexa_skill_left_out`: the skill then keeps its last
+   deployed code, and its strict schemas refuse the newer MCP fields (23 Oct: 13 Oct's code answered "The home sent an
+   answer I could not read" to every launch). `cdk list` with the same `-c` shows the
    stack as `dev/alexa-skill (cold-reserve-dev-alexa-skill)`; without `alexaSkillId` it is not in the app at all.
 5. Reserved concurrency: none by default, because a new account (limit 10, AWS keeps 10 unreserved) refuses any
    reservation. Once the quota is raised, set `reservedConcurrency: 2` in `cold-reserve:alexa`.

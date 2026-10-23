@@ -51,9 +51,9 @@
       "memoryMb": 256,
       "timeoutSeconds": 7,
       "logRetentionDays": 14,
-      "deadlineMs": 6000,
-      "ssmTimeoutMs": 1500,
-      "mcpTimeoutMs": 4000,
+      "deadlineMs": 6900,
+      "ssmTimeoutMs": 1200,
+      "mcpTimeoutMs": 5700,
       "tempUnit": "C"
     },
     "cold-reserve:warmup": {
